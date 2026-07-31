@@ -332,7 +332,7 @@ export function WorkflowRunTimeline({
     if (!rid) return false
     pollTicksRef.current += 1
     if (pollTicksRef.current > MAX_POLL_TICKS) {
-      setFetchError("Stopped polling after maximum duration.")
+      setFetchError("Stopped checking for updates after the maximum wait. Reload to resume.")
       return false
     }
     try {
@@ -493,12 +493,14 @@ export function WorkflowRunTimeline({
           <InfoTooltip content={TIMELINE_TOOLTIP} label="Workflow run timeline information" />
         </CardTitle>
         <CardDescription>
-          Live status of the run, with events and per-step progress. Polling pauses once the run
+          Live status of the run, with events and per-step progress. Updates stop once the run
           settles.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <p className="font-mono text-[10px] text-muted-foreground break-all">workflow_run_id: {rid}</p>
+        <p className="text-[10px] text-muted-foreground break-all">
+          Run reference: <span className="font-mono">{rid}</span>
+        </p>
 
         {fetchError ? <p className="text-sm text-destructive">{fetchError}</p> : null}
 

@@ -1,9 +1,12 @@
+import { humanizeField } from "@/lib/ui/status"
+
 export class ApiError extends Error {
   status: number
   data: unknown
 
   constructor(status: number, data: unknown, message?: string) {
-    super(message || `Request failed with status ${status}`)
+    // Default is user-visible: no HTTP status codes in reader-facing copy.
+    super(message || "Request could not be completed. Please try again.")
     this.name = "ApiError"
     this.status = status
     this.data = data
@@ -35,7 +38,8 @@ export const SESSION_ERROR_CODES = {
   REUSE: "token_reuse_detected",
 } as const
 export const GENERIC_REQUEST_FAILURE_MESSAGE = "Request could not be completed. Please try again."
-const BACKEND_CONNECTION_FAILURE_MESSAGE = "Backend connection failed. Please retry in a moment."
+// User-facing text only — "backend" is implementation language a scientist should never read.
+const BACKEND_CONNECTION_FAILURE_MESSAGE = "Could not reach the MolTrace service. Please retry in a moment."
 
 const INTERNAL_ERROR_MESSAGE_PATTERN =
   /(backend\s+requires\s+authentication|for\s+local\s+development|disable\s+backend\s+auth|disable_auth|disable_backend_auth|todo:|authorization\s*:\s*bearer|bearer\s*<\s*token\s*>|bearer\s+token|x-api-key|api[_\s-]?key|\b(?:get|post|put|patch|delete)\s+\/[a-z0-9]|\/api\/backend\/|raw\s+prompt|system\s+prompt|developer\s+prompt|chain[_\s-]?of[_\s-]?thought|\bcot\b|reasoning[_\s-]?trace|credential\s*[:=]|secret\s*[:=]|password\s*[:=]|private[_\s-]?key|service[_\s-]?account|traceback\s+\(most\s+recent\s+call\s+last\)|\bfile\s+"[^"]+")/i
@@ -175,19 +179,33 @@ async function readResponseData(response: Response) {
   return response.text()
 }
 
+/** Field-shape prefixes a reader should never see — they describe where in the request
+ *  the value sat, which is implementation detail, not a field a scientist can find. */
+const FIELD_LOCATION_PREFIXES = new Set(["body", "query", "path", "header", "cookie"])
+
+/** Turn a validation error's field location into a readable field name:
+ *  ["body", "metadata_json"] → "Metadata", ["body", "peaks", 0, "ppm"] → "Peaks → item 1 → Ppm". */
+function humanizeFieldLocation(loc: unknown): string | null {
+  if (!Array.isArray(loc)) return null
+  const parts = loc
+    .filter((p): p is string | number => typeof p === "string" || typeof p === "number")
+    .map(String)
+    .filter((p, i) => !(i === 0 && FIELD_LOCATION_PREFIXES.has(p.toLowerCase())))
+  if (parts.length === 0) return null
+  return parts.map((p) => (/^\d+$/.test(p) ? `item ${Number(p) + 1}` : humanizeField(p))).join(" → ")
+}
+
 function formatDetailValue(detail: unknown, fallback: string): string {
   if (typeof detail === "string") return detail
   if (Array.isArray(detail)) {
-    // FastAPI validation errors: [{ type, loc, msg, ... }, ...]
+    // Field validation errors: [{ type, loc, msg, ... }, ...]
     const messages = detail
       .map((item) => {
         if (typeof item === "string") return item
         if (item && typeof item === "object") {
           const record = item as Record<string, unknown>
           const msg = typeof record.msg === "string" ? record.msg : null
-          const loc = Array.isArray(record.loc)
-            ? record.loc.filter((p) => typeof p === "string" || typeof p === "number").join(".")
-            : null
+          const loc = humanizeFieldLocation(record.loc)
           if (msg) return loc ? `${loc}: ${msg}` : msg
           if (typeof record.message === "string") return record.message
         }

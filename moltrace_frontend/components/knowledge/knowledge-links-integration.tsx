@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import { apiFetch } from "@/lib/api/client"
 import { formatApiError } from "@/components/spectracheck/spectracheck-helpers"
 import { readRecordNumber, readRecordString } from "@/components/projects/project-workspace-utils"
-import { KNOWLEDGE_LINK_CONFIDENCE_LABELS, KNOWLEDGE_REVIEW_RECORD_TYPES } from "@/components/knowledge/knowledge-constants"
+import { KNOWLEDGE_LINK_CONFIDENCE_LABELS, KNOWLEDGE_REVIEW_RECORD_TYPES, knowledgeLabel } from "@/components/knowledge/knowledge-constants"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -137,7 +137,7 @@ export function KnowledgeLinkMiniForm({
             <SelectContent>
               {KNOWLEDGE_REVIEW_RECORD_TYPES.map((t) => (
                 <SelectItem key={t} value={t}>
-                  {t}
+                  {knowledgeLabel(t)}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -160,7 +160,7 @@ export function KnowledgeLinkMiniForm({
             <SelectContent>
               {KNOWLEDGE_LINK_CONFIDENCE_LABELS.map((c) => (
                 <SelectItem key={c} value={c}>
-                  {c}
+                  {knowledgeLabel(c)}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -312,7 +312,7 @@ export function SpectraCheckKnowledgeLinksCard({ backendSessionId }: { backendSe
                                 <TableCell className="max-w-[200px] truncate text-xs">
                                   {truncateLabel(readRecordString(row, "compound_name"), 48)}
                                 </TableCell>
-                                <TableCell className="text-xs">{readRecordString(row, "review_status") ?? "—"}</TableCell>
+                                <TableCell className="text-xs">{knowledgeLabel(readRecordString(row, "review_status"))}</TableCell>
                                 <TableCell className="text-right font-mono text-[11px]">
                                   {readIntList(row["citation_ids_json"]).length}
                                 </TableCell>
@@ -326,7 +326,7 @@ export function SpectraCheckKnowledgeLinksCard({ backendSessionId }: { backendSe
                 </div>
 
                 <div>
-                  <p className="mb-2 text-xs font-medium text-muted-foreground">Training dataset candidates (session-scoped when metadata matches)</p>
+                  <p className="mb-2 text-xs font-medium text-muted-foreground">Training dataset candidates linked to this session</p>
                   <div className="table-scroll max-h-[160px] min-w-0 overflow-auto rounded-md border">
                     <Table>
                       <TableHeader>
@@ -350,10 +350,10 @@ export function SpectraCheckKnowledgeLinksCard({ backendSessionId }: { backendSe
                             return (
                               <TableRow key={id != null ? `t-${id}` : `t-${idx}`}>
                                 <TableCell className="font-mono text-[11px]">{id ?? "—"}</TableCell>
-                                <TableCell className="font-mono text-[11px]">{readRecordString(row, "dataset_type") ?? "—"}</TableCell>
+                                <TableCell className="text-[11px]">{knowledgeLabel(readRecordString(row, "dataset_type"))}</TableCell>
                                 <TableCell>
                                   <Badge variant="outline" className="text-[10px]">
-                                    {readRecordString(row, "status") ?? "—"}
+                                    {knowledgeLabel(readRecordString(row, "status"))}
                                   </Badge>
                                 </TableCell>
                                 <TableCell className="font-mono text-[11px]">{readRecordNumber(row, "record_id") ?? "—"}</TableCell>
@@ -451,7 +451,7 @@ export function ReactionStudioKnowledgeLinksCard({ reactionProjectId }: { reacti
             ) : (
               <>
                 <div>
-                  <p className="mb-2 text-xs font-medium text-muted-foreground">Extracted reaction records (summary fields only)</p>
+                  <p className="mb-2 text-xs font-medium text-muted-foreground">Extracted reaction records (summary only)</p>
                   <div className="table-scroll max-h-[200px] min-w-0 overflow-auto rounded-md border">
                     <Table>
                       <TableHeader>
@@ -479,7 +479,7 @@ export function ReactionStudioKnowledgeLinksCard({ reactionProjectId }: { reacti
                                 <TableCell className="max-w-[200px] truncate text-xs">
                                   {truncateLabel(readRecordString(row, "substrate_summary"), 56)}
                                 </TableCell>
-                                <TableCell className="text-xs">{readRecordString(row, "review_status") ?? "—"}</TableCell>
+                                <TableCell className="text-xs">{knowledgeLabel(readRecordString(row, "review_status"))}</TableCell>
                               </TableRow>
                             )
                           })
@@ -513,7 +513,7 @@ export function ReactionStudioKnowledgeLinksCard({ reactionProjectId }: { reacti
                             return (
                               <TableRow key={id != null ? `tr-${id}` : `tr-${idx}`}>
                                 <TableCell className="font-mono text-[11px]">{id ?? "—"}</TableCell>
-                                <TableCell className="text-xs">{readRecordString(row, "status") ?? "—"}</TableCell>
+                                <TableCell className="text-xs">{knowledgeLabel(readRecordString(row, "status"))}</TableCell>
                                 <TableCell className="font-mono text-[11px]">{readRecordNumber(row, "record_id") ?? "—"}</TableCell>
                               </TableRow>
                             )
@@ -658,7 +658,7 @@ export function RegulatoryDossierKnowledgeLinksCard({ dossierId }: { dossierId: 
                             <TableCell className="max-w-[140px] truncate font-mono text-[11px]">
                               {truncateLabel(readRecordString(row, "topic"), 40)}
                             </TableCell>
-                            <TableCell className="text-xs">{readRecordString(row, "review_status") ?? "—"}</TableCell>
+                            <TableCell className="text-xs">{knowledgeLabel(readRecordString(row, "review_status"))}</TableCell>
                             <TableCell className="text-right font-mono text-[11px]">
                               {readIntList(row["citation_ids_json"]).length}
                             </TableCell>
@@ -781,7 +781,7 @@ export function CompoundDetailKnowledgeLinksCard({
                     ) : (
                       analytical.slice(0, 5).map((row, i) => (
                         <li key={readRecordNumber(row, "id") ?? i} className="font-mono">
-                          ID {readRecordNumber(row, "id") ?? "—"} · {readRecordString(row, "review_status") ?? "—"} ·{" "}
+                          ID {readRecordNumber(row, "id") ?? "—"} · {knowledgeLabel(readRecordString(row, "review_status"))} ·{" "}
                           {readIntList(row["citation_ids_json"]).length} citations
                         </li>
                       ))
@@ -796,7 +796,7 @@ export function CompoundDetailKnowledgeLinksCard({
                     ) : (
                       reactions.slice(0, 5).map((row, i) => (
                         <li key={readRecordNumber(row, "id") ?? i} className="font-mono">
-                          ID {readRecordNumber(row, "id") ?? "—"} · {readRecordString(row, "review_status") ?? "—"}
+                          ID {readRecordNumber(row, "id") ?? "—"} · {knowledgeLabel(readRecordString(row, "review_status"))}
                         </li>
                       ))
                     )}

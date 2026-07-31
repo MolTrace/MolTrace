@@ -135,14 +135,14 @@ export function SpectraCheckRegulatoryImpactCard({ sessionId, evidenceItemIds = 
   return (
     <ModuleCard
       accent="cyan"
-      eyebrow="Regulatory · Bridge"
+      eyebrow="Regulatory · Handoff"
       title={
         <span className="inline-flex items-center gap-2">
           Regulatory Impact
           <InfoTooltip label="Regulatory impact" content={TOOLTIP} />
         </span>
       }
-      description="Bridge handoff to Regentry for review-required action items. Decision support only — not legal advice."
+      description="Hands SpectraCheck evidence to Regentry as review-required action items. Decision support only — not legal advice."
       href="/regulatory"
       ctaLabel="Open Regentry"
     >
@@ -187,11 +187,11 @@ export function SpectraCheckRegulatoryImpactCard({ sessionId, evidenceItemIds = 
 
         {!hasSession ? (
           <p className="text-xs text-muted-foreground">
-            Connect or create a SpectraCheck backend session to enable bridge handoff.
+            Connect or create a saved SpectraCheck session before handing evidence to Regentry.
           </p>
         ) : null}
-        {loading ? <p className="text-xs text-muted-foreground">Loading regulatory bridge records…</p> : null}
-        {err ? <AlertCard variant="error" title="Bridge error" description={err} /> : null}
+        {loading ? <p className="text-xs text-muted-foreground">Loading previous Regentry handoffs…</p> : null}
+        {err ? <AlertCard variant="error" title="Handoff to Regentry failed" description={err} /> : null}
 
         <div className="grid gap-2 md:grid-cols-2">
           <div className="rounded-md border bg-muted/20 px-3 py-2">
@@ -214,7 +214,7 @@ export function SpectraCheckRegulatoryImpactCard({ sessionId, evidenceItemIds = 
           </div>
           <div className="rounded-md border bg-muted/20 px-3 py-2">
             <p className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">Human review required</p>
-            <p className="mt-1 text-xs text-muted-foreground">{humanReviewRequired ? "true" : "false"}</p>
+            <p className="mt-1 text-xs text-muted-foreground">{humanReviewRequired ? "Yes" : "No"}</p>
           </div>
           <div className="rounded-md border bg-muted/20 px-3 py-2 md:col-span-2">
             <p className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">Warnings</p>

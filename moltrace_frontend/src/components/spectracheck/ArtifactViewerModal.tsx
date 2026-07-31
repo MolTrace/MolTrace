@@ -55,7 +55,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { ApiError, buildApiPath, readStoredAuthToken } from "@/lib/api/client"
+import { ApiError, buildApiPath, readStoredAuthToken, sanitizePublicApiErrorMessage } from "@/lib/api/client"
 import {
   fetchSessionComments,
   pickCommentText,
@@ -352,7 +352,12 @@ async function downloadArtifactToDisk(artifactId: string, fallbackName: string) 
   })
   if (!response.ok) {
     const data = await response.json().catch(() => response.text())
-    throw new ApiError(response.status, data, `Download failed (${response.status})`)
+    // Message is user-visible (setDownloadError) — no status codes in the copy.
+    throw new ApiError(
+      response.status,
+      data,
+      sanitizePublicApiErrorMessage("This file could not be downloaded. Please try again.", response.status)
+    )
   }
   const blob = await response.blob()
   const cd = response.headers.get("content-disposition") || ""
@@ -596,7 +601,7 @@ export function ArtifactViewerModal({
           </div>
         ) : (
           <p className="text-sm text-muted-foreground">
-            No observed MS/MS peak list found in this payload (see tables / JSON for raw content).
+            No observed MS/MS peak list found in this artifact — see the tables below for its recorded content.
           </p>
         )
 

@@ -131,9 +131,11 @@ describe("src api client", () => {
     )
   })
 
+  // Re-baselined: the connection-failure copy no longer says "backend" (implementation
+  // language in user-visible text). Sanitization behaviour is unchanged.
   it("replaces raw network fetch failures with user-friendly copy", () => {
     expect(sanitizePublicApiErrorMessage("Failed to fetch")).toBe(
-      "Backend connection failed. Please retry in a moment."
+      "Could not reach the MolTrace service. Please retry in a moment."
     )
   })
 
@@ -142,7 +144,7 @@ describe("src api client", () => {
       '<!DOCTYPE html><html><head><title>502</title></head><body><h1>Bad Gateway</h1><p>Powered by Render</p></body></html>'
 
     expect(sanitizePublicApiErrorMessage(renderErrorPage, 502)).toBe(
-      "Backend connection failed. Please retry in a moment."
+      "Could not reach the MolTrace service. Please retry in a moment."
     )
 
     vi.stubGlobal(
@@ -159,7 +161,7 @@ describe("src api client", () => {
     await expect(apiFetch("/nmr/raw-fid/preview")).rejects.toMatchObject({
       name: "ApiError",
       status: 502,
-      message: "Backend connection failed. Please retry in a moment.",
+      message: "Could not reach the MolTrace service. Please retry in a moment.",
     } satisfies Partial<ApiError>)
   })
 })

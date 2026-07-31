@@ -21,6 +21,7 @@ import {
   extractSpectraCheckSessionId,
 } from "@/components/projects/session-workflow-runs-section"
 import { formatIsoWhenPresent, projectsErrorMessage, readRecordString } from "@/components/projects/project-workspace-utils"
+import { statusLabel } from "@/lib/ui/status"
 import { ArrowLeft, ServerOff } from "lucide-react"
 
 function pickSessions(sample: unknown): unknown[] {
@@ -82,8 +83,9 @@ export default function ProjectSampleDetailPage() {
       : undefined
   const solventDisplay =
     sample && typeof sample === "object" ? readRecordString(sample, "solvent") ?? "—" : "—"
+  // Display only — the stored status value is unchanged.
   const statusDisplay =
-    sample && typeof sample === "object" ? readRecordString(sample, "status") ?? "—" : "—"
+    sample && typeof sample === "object" ? statusLabel(readRecordString(sample, "status")) : "—"
   const notesDisplay =
     sample && typeof sample === "object"
       ? readRecordString(sample, "notes") ?? readRecordString(sample, "note") ?? "—"

@@ -145,9 +145,11 @@ describe("apiFetch", () => {
     )
   })
 
+  // Re-baselined: the connection-failure copy no longer says "backend" (implementation
+  // language in user-visible text). Sanitization behaviour is unchanged.
   it("replaces raw network fetch failures with user-friendly copy", () => {
     expect(sanitizePublicApiErrorMessage("Failed to fetch")).toBe(
-      "Backend connection failed. Please retry in a moment."
+      "Could not reach the MolTrace service. Please retry in a moment."
     )
   })
 
@@ -156,7 +158,7 @@ describe("apiFetch", () => {
       '<!DOCTYPE html><html><head><title>502</title></head><body><h1>Bad Gateway</h1><p>Powered by Render</p></body></html>'
 
     expect(sanitizePublicApiErrorMessage(renderErrorPage, 502)).toBe(
-      "Backend connection failed. Please retry in a moment."
+      "Could not reach the MolTrace service. Please retry in a moment."
     )
 
     vi.stubGlobal(
@@ -173,7 +175,7 @@ describe("apiFetch", () => {
     await expect(apiFetch("/nmr/raw-fid/preview")).rejects.toMatchObject({
       name: "ApiError",
       status: 502,
-      message: "Backend connection failed. Please retry in a moment.",
+      message: "Could not reach the MolTrace service. Please retry in a moment.",
     } satisfies Partial<ApiError>)
   })
 
@@ -199,8 +201,15 @@ describe("apiFetch", () => {
       name: "ApiError",
       status: 422,
     } satisfies Partial<ApiError>)
+    // Re-baselined deliberately: this used to assert "body.smiles: Field required", i.e. it
+    // encoded the defect — request-shape vocabulary ("body.") and a raw field identifier
+    // rendered to a scientist. The server's field location is unchanged; only the copy is
+    // humanized, and the message still names which field failed.
     await expect(apiFetch("/analyze")).rejects.toMatchObject({
-      message: expect.stringContaining("body.smiles: Field required"),
+      message: expect.stringContaining("SMILES: Field required"),
+    } as unknown as Partial<ApiError>)
+    await expect(apiFetch("/analyze")).rejects.toMatchObject({
+      message: expect.not.stringContaining("body."),
     } as unknown as Partial<ApiError>)
   })
 

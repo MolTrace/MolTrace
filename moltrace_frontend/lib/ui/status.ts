@@ -71,3 +71,18 @@ export function humanizeField(field: string): string {
   const stripped = field.trim().replace(/_(id|ids|json)$/i, "")
   return titleCaseWords(stripped || field, false)
 }
+
+/**
+ * Inverse of {@link statusLabel}, for the narrow case where a filter box shows the
+ * user a humanized value and then sends what they typed to an exact-match query.
+ * "Report released" → "report_released"; an already-stored token passes through
+ * unchanged, so anyone typing the raw value still gets the same results.
+ *
+ * Only safe where the stored vocabulary is lowercase snake_case (audit event
+ * types, security event types and severities are). Do NOT reach for this to
+ * convert a display label back into a value you are about to persist — carry the
+ * stored value alongside the label instead.
+ */
+export function toWireToken(input: string): string {
+  return input.trim().toLowerCase().replace(/[\s-]+/g, "_")
+}

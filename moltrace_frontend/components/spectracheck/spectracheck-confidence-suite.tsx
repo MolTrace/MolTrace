@@ -29,6 +29,7 @@ import {
 } from "@/src/lib/spectracheck/evidence-queue-qc"
 import { useSpectraCheckEvidence } from "@/src/lib/spectracheck/useSpectraCheckEvidence"
 import { SpectraCheckSavedSessionReviewAudit } from "@/components/spectracheck/spectracheck-review-audit"
+import { humanizeTokenForDisplay } from "@/src/components/spectracheck/spectracheck-display-labels"
 import type { SessionFileRecord } from "@/src/lib/spectracheck/session-file-record"
 import { fetchSessionAudit, fetchSessionReview } from "@/src/lib/spectracheck/spectracheck-backend-session"
 import {
@@ -44,6 +45,7 @@ import { ReportVisualEvidenceInlinePreviews } from "@/components/spectracheck/re
 import { ReportLockControls } from "@/components/reports/report-lock-controls"
 import { SecureShareDialog } from "@/src/components/collaboration/SecureShareDialog"
 import { trackReportGenerated } from "@/src/lib/analytics/analytics-client"
+import { statusLabel } from "@/lib/ui/status"
 
 type SuiteProps = {
   sampleId: string
@@ -460,7 +462,7 @@ function UnifiedQueueSynthesisSection({ items }: { items: EvidenceItem[] }) {
                     <span className="text-muted-foreground"> · score {typeof it.score === "number" ? it.score.toFixed(2) : it.score}</span>
                   )}
                   <Badge variant="outline" className="ml-2 align-middle text-[10px]">
-                    {it.status}
+                    {statusLabel(it.status)}
                   </Badge>
                   <MlModelProvenanceSummary
                     className="mt-1.5 border-l-2 border-muted py-1 pl-2"
@@ -1609,7 +1611,8 @@ function ReportComposerTab({
               <div>
                 <p className="text-xs font-medium text-muted-foreground">Workspace previews</p>
                 <p className="mt-0.5 text-[10px] text-muted-foreground">
-                  Compact plots from queued payloads — not serialized into compose; interpretation requires expert review.
+                  Compact plots from the queued evidence — shown for on-screen review only, not embedded in the composed
+                  report; interpretation requires expert review.
                 </p>
               </div>
               <div className="space-y-4">
@@ -1856,15 +1859,19 @@ function ReportComposerTab({
               <div className="grid gap-3 md:grid-cols-2">
                 <div className="space-y-1">
                   <p className="text-xs font-medium text-muted-foreground">Session QC status (when loaded)</p>
-                  <p className="break-all font-mono text-xs">
-                    {qcProv.session_qc?.sessionReadiness ?? (backendSessionId?.trim() ? "—" : "No backend session")}
+                  <p className="break-all text-xs">
+                    {qcProv.session_qc?.sessionReadiness
+                      ? humanizeTokenForDisplay(qcProv.session_qc.sessionReadiness)
+                      : backendSessionId?.trim()
+                        ? "—"
+                        : "No saved session"}
                   </p>
                 </div>
                 <div className="space-y-1">
                   <p className="text-xs font-medium text-muted-foreground">Evidence QC snapshot (selected queue)</p>
                   <p className="text-xs text-muted-foreground">
                     {getSelectedEvidenceItems().length} item(s); human review suggested:{" "}
-                    {qcProv.human_review_suggested ? "yes" : "no"}
+                    {qcProv.human_review_suggested ? "Yes" : "No"}
                   </p>
                 </div>
               </div>
@@ -2386,7 +2393,7 @@ function ReportComposerTab({
                   accent="teal"
                   eyebrow="Result · Secure Share"
                   title="Secure share"
-                  description="Generate a scoped share link — permissions and expiry follow your tenant's policy."
+                  description="Generate a scoped share link — permissions and expiry follow your organization's policy."
                 >
                   <SecureShareDialog
                     scope="report"

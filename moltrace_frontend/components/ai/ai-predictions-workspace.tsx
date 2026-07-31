@@ -2,7 +2,9 @@
 
 import Link from "next/link"
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { ApiError, apiFetch } from "@/lib/api/client"
+import { apiFetch } from "@/lib/api/client"
+import { formatApiError } from "@/components/spectracheck/spectracheck-helpers"
+import { statusLabel } from "@/lib/ui/status"
 import { readRecordString } from "@/components/projects/project-workspace-utils"
 import {
   trackAiPredictionRunCompleted,
@@ -57,16 +59,6 @@ function formatWhen(iso: string | undefined): string {
   return new Date(t).toLocaleString()
 }
 
-function formatErr(err: unknown, fallback: string): string {
-  if (err instanceof ApiError) {
-    const data = err.data
-    if (isRecord(data) && typeof data.detail === "string" && data.detail.trim()) return data.detail
-    return err.message || fallback
-  }
-  if (err instanceof Error) return err.message
-  return fallback
-}
-
 function confidenceBucketFromUnknown(raw: unknown): string {
   let n: number | null = null
   if (typeof raw === "number" && Number.isFinite(raw)) n = raw
@@ -117,7 +109,7 @@ export function AiPredictionsWorkspace() {
           const data = await apiFetch<unknown>("/ai/predictions", { method: "GET" })
           setPredictions(extractRows(data, PREDICTION_KEYS))
         } catch (err) {
-          setLoadErrPredictions(formatErr(err, "Could not load predictions."))
+          setLoadErrPredictions(formatApiError(err, "Could not load predictions."))
           setPredictions([])
         }
       })(),
@@ -126,7 +118,7 @@ export function AiPredictionsWorkspace() {
           const data = await apiFetch<unknown>("/ai/prediction-audit", { method: "GET" })
           setAuditRows(extractRows(data, AUDIT_KEYS))
         } catch (err) {
-          setLoadErrAudit(formatErr(err, "Could not load prediction audit."))
+          setLoadErrAudit(formatApiError(err, "Could not load prediction audit."))
           setAuditRows([])
         }
       })(),
@@ -190,7 +182,7 @@ export function AiPredictionsWorkspace() {
       setFormOk(createdId ? `Prediction submitted (${createdId}).` : "Prediction submitted.")
       setReloadToken((x) => x + 1)
     } catch (err) {
-      setFormErr(formatErr(err, "Could not run prediction."))
+      setFormErr(formatApiError(err, "Could not run prediction."))
     } finally {
       setSubmitBusy(false)
     }
@@ -254,7 +246,7 @@ export function AiPredictionsWorkspace() {
                 <SelectContent>
                   {TARGET_MODULE_OPTIONS.map((opt) => (
                     <SelectItem key={opt} value={opt}>
-                      {opt}
+                      {statusLabel(opt)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -337,7 +329,7 @@ export function AiPredictionsWorkspace() {
         eyebrow="History"
         title="Predictions"
         icon={ListChecks}
-        description="All inference results across services with their confidence and out-of-distribution flags."
+        description="All prediction results across services with their confidence and out-of-distribution flags."
       >
         <div className="overflow-x-auto">
           {loadErrPredictions ? <p className="mb-3 text-sm text-destructive">{loadErrPredictions}</p> : null}
@@ -357,13 +349,13 @@ export function AiPredictionsWorkspace() {
               {predictions.slice(0, 25).map((row, idx) => {
                 const id = readRecordString(row, "prediction_id") ?? readRecordString(row, "id") ?? String(idx + 1)
                 const confidence = readRecordString(row, "confidence") ?? readRecordString(row, "confidence_score") ?? "-"
-                const ood = readRecordString(row, "ood_status") ?? readRecordString(row, "is_ood") ?? "-"
+                const ood = statusLabel(readRecordString(row, "ood_status") ?? readRecordString(row, "is_ood"))
                 return (
                   <TableRow key={`${id}-${idx}`}>
                     <TableCell>{id}</TableCell>
                     <TableCell>{readRecordString(row, "service_key") ?? "-"}</TableCell>
                     <TableCell>
-                      <Badge variant="outline">{readRecordString(row, "status") ?? "-"}</Badge>
+                      <Badge variant="outline">{statusLabel(readRecordString(row, "status"))}</Badge>
                     </TableCell>
                     <TableCell>{confidence}</TableCell>
                     <TableCell>{ood}</TableCell>
@@ -388,7 +380,7 @@ export function AiPredictionsWorkspace() {
                         </EmptyMedia>
                         <EmptyTitle>No predictions yet</EmptyTitle>
                         <EmptyDescription>
-                          Run a prediction above to see inference results, confidence, and OOD flags here.
+                          Run a prediction above to see prediction results, confidence, and OOD flags here.
                         </EmptyDescription>
                       </EmptyHeader>
                     </Empty>
@@ -424,10 +416,10 @@ export function AiPredictionsWorkspace() {
                 const predictionId = readRecordString(row, "prediction_id") ?? "-"
                 return (
                   <TableRow key={`${predictionId}-${idx}`}>
-                    <TableCell>{readRecordString(row, "event_type") ?? readRecordString(row, "event") ?? "-"}</TableCell>
+                    <TableCell>{statusLabel(readRecordString(row, "event_type") ?? readRecordString(row, "event"))}</TableCell>
                     <TableCell>{predictionId}</TableCell>
                     <TableCell>
-                      <Badge variant="outline">{readRecordString(row, "status") ?? "-"}</Badge>
+                      <Badge variant="outline">{statusLabel(readRecordString(row, "status"))}</Badge>
                     </TableCell>
                     <TableCell>{readRecordString(row, "actor") ?? readRecordString(row, "reviewer") ?? "-"}</TableCell>
                     <TableCell className="whitespace-nowrap text-xs text-muted-foreground">

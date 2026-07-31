@@ -407,7 +407,7 @@ export function DeploymentSettingsWorkspace() {
         >
           <CardHeader className="gap-1 pt-5 pb-2">
             <CardTitle className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">OpenAPI availability</CardTitle>
-            <CardDescription>API contract reachability</CardDescription>
+            <CardDescription>Service interface description reachability</CardDescription>
           </CardHeader>
           <CardContent>
             {loading ? (
@@ -449,7 +449,7 @@ export function DeploymentSettingsWorkspace() {
         >
           <CardHeader className="gap-1 pt-5 pb-2">
             <CardTitle className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">App build</CardTitle>
-            <CardDescription>NEXT_PUBLIC_APP_BUILD or NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA</CardDescription>
+            <CardDescription>Web app build identifier — set by your administrator at deploy time.</CardDescription>
           </CardHeader>
           <CardContent className="font-mono text-xs">
             {frontendBuild ? frontendBuild : <span className="text-muted-foreground">Not configured</span>}

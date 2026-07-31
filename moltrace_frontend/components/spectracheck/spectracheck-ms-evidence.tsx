@@ -1032,7 +1032,7 @@ function MsmsAnnotationDetailTables({ result }: { result: unknown }) {
               )}
             </>
           ) : (
-            <p className="text-muted-foreground">No best candidate row returned.</p>
+            <p className="text-muted-foreground">No top-ranked candidate was returned.</p>
           )}
         </CardContent>
       </Card>
@@ -1554,7 +1554,7 @@ function LcmsFeatureDetectionDetailTables({ result }: { result: unknown }) {
         <Card className="min-w-0">
           <CardHeader className="pb-2">
             <CardTitle className="text-base">Best feature</CardTitle>
-            <CardDescription>Highest-scoring feature row for quick review (not a compound ID).</CardDescription>
+            <CardDescription>Highest-scoring feature for quick review (not a compound ID).</CardDescription>
           </CardHeader>
           <CardContent className="space-y-2 text-sm">
             <p>

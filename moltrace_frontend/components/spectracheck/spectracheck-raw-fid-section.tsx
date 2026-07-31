@@ -319,11 +319,22 @@ function humanizePromptSidecarStatus(status: string): string {
   const labels: Record<string, string> = {
     consistent: "Consistent",
     review_peak_count_delta: "Review peak-count delta",
-    prompt_guidance_unavailable: "Prompt guidance unavailable",
+    prompt_guidance_unavailable: "Cross-check guidance unavailable",
     active_peak_count_unavailable: "Active peak count unavailable",
     review: "Review",
   }
   return labels[status] ?? status.replaceAll("_", " ")
+}
+
+/**
+ * Phase/baseline algorithm names arrive as stored tokens ("regions_analysis").
+ * Show readable prose; the stored value is never rewritten.
+ */
+function humanizeMethodName(value: string | null): string {
+  const trimmed = value?.trim()
+  if (!trimmed) return "Not reported"
+  const spaced = trimmed.replaceAll("_", " ")
+  return spaced.charAt(0).toUpperCase() + spaced.slice(1)
 }
 
 function formatPromptSidecarNumber(value: number | null): string {
@@ -1790,7 +1801,7 @@ export function SpectraCheckRawFidSection({
                         : "Reading raw FID metadata…"}
                   </p>
                   <p className="mt-1 max-w-md text-xs text-muted-foreground">
-                    The spectrum and processing details will populate here together when the server response is ready.
+                    The spectrum and processing details will appear here together once processing finishes.
                   </p>
                 </div>
               ) : previewSpectrumError ? (
@@ -1997,7 +2008,7 @@ export function SpectraCheckRawFidSection({
                           style={{ color: promptSidecarAccent }}
                         >
                           <ShieldCheck className="h-3 w-3" aria-hidden />
-                          Prompt reader sidecar
+                          Independent reader cross-check
                         </p>
                         <Badge
                           variant="outline"
@@ -2019,7 +2030,7 @@ export function SpectraCheckRawFidSection({
                               : promptSidecarQa.validationStatus
                                 ? humanizePromptSidecarStatus(promptSidecarQa.validationStatus)
                                 : promptSidecarQa.available === false
-                                  ? "Sidecar unavailable"
+                                  ? "Cross-check unavailable"
                                   : "Metadata available"}
                           </p>
                         </div>
@@ -2033,7 +2044,7 @@ export function SpectraCheckRawFidSection({
                         </div>
                         <div className="rounded-md border bg-muted/20 px-2 py-1.5">
                           <p className="font-mono text-[9px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
-                            Prompt peaks
+                            Cross-check peaks
                           </p>
                           <p className="font-mono text-xs font-medium tabular-nums">
                             {formatPromptSidecarNumber(promptSidecarConsistency?.recommendedPeakCount ?? null)}
@@ -2073,7 +2084,7 @@ export function SpectraCheckRawFidSection({
                           <p className="font-mono text-[9px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
                             Phase
                           </p>
-                          <p className="text-xs font-medium">{promptSidecarQa.phaseMethod ?? "Not reported"}</p>
+                          <p className="text-xs font-medium">{humanizeMethodName(promptSidecarQa.phaseMethod)}</p>
                           <p className="font-mono text-[10px] text-muted-foreground">
                             P0 {formatPromptSidecarNumber(promptSidecarQa.phaseZeroOrderDegrees)}°
                           </p>
@@ -2082,7 +2093,7 @@ export function SpectraCheckRawFidSection({
                           <p className="font-mono text-[9px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
                             Baseline
                           </p>
-                          <p className="text-xs font-medium">{promptSidecarQa.baselineMethod ?? "Not reported"}</p>
+                          <p className="text-xs font-medium">{humanizeMethodName(promptSidecarQa.baselineMethod)}</p>
                           <p className="font-mono text-[10px] text-muted-foreground">
                             order {formatPromptSidecarNumber(promptSidecarQa.baselineOrder)} · RMSE{" "}
                             {formatPromptSidecarPercent(promptSidecarQa.baselineRmseFractionFullScale)}
@@ -2090,7 +2101,7 @@ export function SpectraCheckRawFidSection({
                         </div>
                         <div className="rounded-md border bg-muted/10 px-2 py-1.5">
                           <p className="font-mono text-[9px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
-                            Sidecar runtime
+                            Cross-check runtime
                           </p>
                           <p className="font-mono text-xs font-medium tabular-nums">
                             {formatPromptSidecarRuntime(promptSidecarQa.runtimeMs)}
@@ -2112,7 +2123,7 @@ export function SpectraCheckRawFidSection({
                       ) : null}
                       {promptSidecarHasUnexpectedActivation ? (
                         <p className="text-xs font-medium" style={{ color: "var(--mt-amber)" }}>
-                          Unexpected activation flag present; review before enabling any Prompt 1/2 pipeline output.
+                          This cross-check appears to be influencing the displayed results; review before relying on it.
                         </p>
                       ) : null}
                       {(promptSidecarQa.activeVisiblePipeline ||
@@ -2129,8 +2140,9 @@ export function SpectraCheckRawFidSection({
                         promptSidecarConsistency.recommendedPeakCountSource ||
                         promptSidecarConsistency.acceptanceTolerance != null) ? (
                         <p className="break-words font-mono text-[10px] text-muted-foreground">
-                          Source: {promptSidecarConsistency.activePeakSource ?? "legacy"} · Prompt:{" "}
-                          {promptSidecarConsistency.recommendedPeakCountSource ?? "sidecar"} · Tolerance:{" "}
+                          Active peak source: {promptSidecarConsistency.activePeakSource ?? "legacy"} · Cross-check
+                          source: {promptSidecarConsistency.recommendedPeakCountSource ?? "independent reader"} ·
+                          Tolerance:{" "}
                           {formatPromptSidecarNumber(promptSidecarConsistency.acceptanceTolerance)}
                         </p>
                       ) : null}

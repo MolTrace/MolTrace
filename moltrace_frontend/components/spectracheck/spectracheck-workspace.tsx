@@ -1501,9 +1501,9 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
                 Experimental engine usage on your spectra
               </h2>
               <p className="text-sm text-muted-foreground">
-                Live aggregation of every <code className="font-mono">spectrum.analyze_gsd</code>{" "}
-                event for this tenant — useful to size opt-in adoption and verify performance on
-                your own data before the promotion gate clears.
+                Live aggregation of every GSD analysis run recorded for your organization — useful
+                to size opt-in adoption and verify performance on your own data before the
+                promotion gate clears.
               </p>
             </div>
             <GsdTelemetryPanel mode="tenant" />

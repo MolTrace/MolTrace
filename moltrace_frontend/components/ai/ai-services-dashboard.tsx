@@ -8,23 +8,15 @@ import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/ca
 import { AlertCard } from "@/components/dashboard/alert-card"
 import { ModuleCard } from "@/components/dashboard/module-card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { ApiError, apiFetch } from "@/lib/api/client"
+import { apiFetch } from "@/lib/api/client"
+import { formatApiError } from "@/components/spectracheck/spectracheck-helpers"
+import { humanizeField, statusLabel } from "@/lib/ui/status"
 import { Loader2, RefreshCw } from "lucide-react"
 
 type AnyRecord = Record<string, unknown>
 
 function isRecord(v: unknown): v is AnyRecord {
   return Boolean(v) && typeof v === "object" && !Array.isArray(v)
-}
-
-function formatErr(err: unknown, fallback: string): string {
-  if (err instanceof ApiError) {
-    const data = err.data
-    if (isRecord(data) && typeof data.detail === "string") return data.detail
-    return err.message || fallback
-  }
-  if (err instanceof Error) return err.message
-  return fallback
 }
 
 function extractRows(data: unknown, keys: string[]): AnyRecord[] {
@@ -89,7 +81,11 @@ function scalarPreviewRows(data: unknown): Array<{ key: string; value: string }>
       out.push({ key, value: "—" })
       continue
     }
-    if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+    if (typeof value === "boolean") {
+      out.push({ key, value: value ? "Yes" : "No" })
+      continue
+    }
+    if (typeof value === "string" || typeof value === "number") {
       out.push({ key, value: String(value) })
     }
   }
@@ -139,7 +135,7 @@ export function AiServicesDashboard() {
           const data = await apiFetch<unknown>("/ai/services", { method: "GET" })
           setServices(extractRows(data, SERVICE_KEYS))
         } catch (err) {
-          setErrServices(formatErr(err, "Could not load AI services."))
+          setErrServices(formatApiError(err, "Could not load AI services."))
           setServices([])
         }
       })(),
@@ -148,7 +144,7 @@ export function AiServicesDashboard() {
           const data = await apiFetch<unknown>("/ai/predictions", { method: "GET" })
           setPredictions(extractRows(data, PREDICTION_KEYS))
         } catch (err) {
-          setErrPredictions(formatErr(err, "Could not load predictions."))
+          setErrPredictions(formatApiError(err, "Could not load predictions."))
           setPredictions([])
         }
       })(),
@@ -157,7 +153,7 @@ export function AiServicesDashboard() {
           const data = await apiFetch<unknown>("/ai/active-learning/candidates", { method: "GET" })
           setActiveLearningCandidates(extractRows(data, ACTIVE_LEARNING_KEYS))
         } catch (err) {
-          setErrActiveLearning(formatErr(err, "Could not load active-learning candidates."))
+          setErrActiveLearning(formatApiError(err, "Could not load active-learning candidates."))
           setActiveLearningCandidates([])
         }
       })(),
@@ -166,7 +162,7 @@ export function AiServicesDashboard() {
           const data = await apiFetch<unknown>("/ai/model-monitoring", { method: "GET" })
           setModelMonitoring(data)
         } catch (err) {
-          setErrMonitoring(formatErr(err, "Could not load model monitoring."))
+          setErrMonitoring(formatApiError(err, "Could not load model monitoring."))
           setModelMonitoring(null)
         }
       })(),
@@ -254,7 +250,7 @@ export function AiServicesDashboard() {
         </p>
         <h1 className="font-mono text-2xl font-bold tracking-tight">AI Services</h1>
         <p className="text-sm text-muted-foreground">
-          Controlled prediction services, model routing, active-learning feedback, and inference audit trails.
+          Controlled prediction services, model routing, active-learning feedback, and prediction audit trails.
         </p>
       </div>
 
@@ -381,7 +377,7 @@ export function AiServicesDashboard() {
                     <TableRow key={`${readString(row, ["id", "service_id", "name"])}-${idx}`}>
                       <TableCell>{readString(row, ["name", "service_name", "endpoint", "id"])}</TableCell>
                       <TableCell>{readString(row, ["model_name", "model", "model_id", "model_artifact_id"])}</TableCell>
-                      <TableCell>{readString(row, ["status", "service_status", "approval_status"])}</TableCell>
+                      <TableCell>{statusLabel(readString(row, ["status", "service_status", "approval_status"]))}</TableCell>
                       <TableCell>{readString(row, ["version", "model_version", "service_version"])}</TableCell>
                       <TableCell>{formatWhen(readString(row, ["updated_at", "updatedAt", "created_at"]))}</TableCell>
                     </TableRow>
@@ -405,7 +401,7 @@ export function AiServicesDashboard() {
           accent="teal"
           eyebrow="AI · Recent Predictions"
           title="Recent predictions"
-          description="The most recent inference requests across all AI services with their confidence and review status."
+          description="The most recent predictions across all AI services with their confidence and review status."
         >
           <div className="space-y-2">
             {errPredictions ? <p className="text-sm" style={{ color: "var(--mt-red)" }}>{errPredictions}</p> : null}
@@ -425,7 +421,7 @@ export function AiServicesDashboard() {
                     <TableRow key={`${readString(row, ["id", "prediction_id"])}-${idx}`}>
                       <TableCell>{readString(row, ["id", "prediction_id", "request_id"])}</TableCell>
                       <TableCell>{readString(row, ["service_name", "service_id", "endpoint"])}</TableCell>
-                      <TableCell>{readString(row, ["status", "result_status", "review_status"])}</TableCell>
+                      <TableCell>{statusLabel(readString(row, ["status", "result_status", "review_status"]))}</TableCell>
                       <TableCell>{readString(row, ["confidence", "confidence_score", "predicted_confidence"])}</TableCell>
                       <TableCell>{formatWhen(readString(row, ["created_at", "createdAt", "timestamp"]))}</TableCell>
                     </TableRow>
@@ -468,7 +464,7 @@ export function AiServicesDashboard() {
                     <TableRow key={`${readString(row, ["id", "candidate_id"])}-${idx}`}>
                       <TableCell>{readString(row, ["id", "candidate_id", "prediction_id"])}</TableCell>
                       <TableCell>{readString(row, ["reason", "candidate_reason", "queue_reason"])}</TableCell>
-                      <TableCell>{readString(row, ["status", "queue_status", "review_status"])}</TableCell>
+                      <TableCell>{statusLabel(readString(row, ["status", "queue_status", "review_status"]))}</TableCell>
                       <TableCell>{formatWhen(readString(row, ["created_at", "createdAt", "queued_at"]))}</TableCell>
                     </TableRow>
                   ))}
@@ -504,7 +500,7 @@ export function AiServicesDashboard() {
                 <TableBody>
                   {monitoringRows.map((row) => (
                     <TableRow key={row.key}>
-                      <TableCell>{row.key}</TableCell>
+                      <TableCell>{humanizeField(row.key)}</TableCell>
                       <TableCell>{row.value}</TableCell>
                     </TableRow>
                   ))}

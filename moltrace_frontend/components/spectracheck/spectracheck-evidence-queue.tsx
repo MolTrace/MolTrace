@@ -288,7 +288,7 @@ function EvidenceItemRow({
           </div>
           {!hasBackendId ? (
             <p className="text-[11px] text-muted-foreground">
-              Save evidence to session before attaching backend comments.
+              Save this evidence to the session before adding shared comments.
             </p>
           ) : null}
         </div>
@@ -648,12 +648,12 @@ export function SpectraCheckEvidenceQueuePanel({
           {sessionCommentsErr ? <p className="text-xs" style={{ color: "var(--mt-red)" }}>{sessionCommentsErr}</p> : null}
           {!sid ? (
             <p className="text-xs text-muted-foreground">
-              No backend session is connected. Notes below can be stored locally in this browser only.
+              No saved session is connected. Notes below can be stored in this browser only.
             </p>
           ) : null}
           {dialogItem && !dialogItem.backendEvidenceId ? (
             <p className="text-xs text-muted-foreground">
-              Save evidence to session before attaching backend comments.
+              Save this evidence to the session before adding shared comments.
             </p>
           ) : null}
           <div className="space-y-2">

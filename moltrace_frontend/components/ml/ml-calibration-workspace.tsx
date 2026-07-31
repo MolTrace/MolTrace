@@ -179,7 +179,8 @@ export function MlCalibrationWorkspace() {
           </p>
           <h1 className="font-mono text-2xl font-bold tracking-tight">Calibration assessments</h1>
           <p className="text-sm text-muted-foreground">
-            Assess probabilistic calibration using standard methods; metrics and status come from the recorded assessment.
+            Assess probabilistic calibration using the supported calibration methods; metrics and status come from the
+            recorded assessment.
           </p>
         </div>
         <BackendStatusIndicator />

@@ -1,5 +1,6 @@
 "use client"
 
+import { statusLabel } from "@/lib/ui/status"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { ApiError, apiFetch } from "@/lib/api/client"
@@ -659,7 +660,7 @@ export function ValidationDashboardWorkspace() {
                           </TableCell>
                           <TableCell className="text-xs">
                             <Badge variant="outline" className="font-normal">
-                              {readStr(row, ["status", "run_status", "state"]) || "—"}
+                              {statusLabel(readStr(row, ["status", "run_status", "state"]))}
                             </Badge>
                           </TableCell>
                           <TableCell className="max-w-[14rem] text-xs">
@@ -738,7 +739,7 @@ export function ValidationDashboardWorkspace() {
                         <TableCell className="text-xs">{readStr(row, ["version"]) || "—"}</TableCell>
                         <TableCell className="text-xs">
                           <Badge variant="outline" className="font-normal">
-                            {readStr(row, ["status"]) || "—"}
+                            {statusLabel(readStr(row, ["status"]))}
                           </Badge>
                         </TableCell>
                       </TableRow>
@@ -819,7 +820,7 @@ export function ValidationDashboardWorkspace() {
                           </TableCell>
                           <TableCell className="text-xs">
                             <Badge variant="outline" className="font-normal">
-                              {readStr(row, ["status", "alert_status", "state"]) || "—"}
+                              {statusLabel(readStr(row, ["status", "alert_status", "state"]))}
                             </Badge>
                           </TableCell>
                           <TableCell className="text-right align-top">

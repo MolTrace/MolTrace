@@ -7,6 +7,8 @@
  * value is sent or read.
  */
 
+import { humanizeField } from "@/lib/ui/status"
+
 export const FILE_KIND_LABELS: Record<string, string> = {
   processed_nmr: "Processed NMR spectrum",
   raw_fid: "Raw FID",
@@ -111,4 +113,17 @@ export function workflowInputLabel(key: string): string {
 export function artifactTypeLabel(value: string): string {
   const key = value.trim().toLowerCase()
   return ARTIFACT_TYPE_LABELS[key] ?? humanizeStoredValue(value)
+}
+
+/**
+ * Humanize a stored token only when it still looks like one (snake_case, no
+ * spaces). Fields such as quality-control readiness can arrive either as a
+ * stored token or as a sentence already written for a reader — leave the
+ * latter exactly as-is rather than re-casing it.
+ */
+export function humanizeTokenForDisplay(value: string | null | undefined): string {
+  const trimmed = typeof value === "string" ? value.trim() : ""
+  if (!trimmed) return "—"
+  if (/\s/.test(trimmed) || !trimmed.includes("_")) return trimmed
+  return humanizeField(trimmed)
 }

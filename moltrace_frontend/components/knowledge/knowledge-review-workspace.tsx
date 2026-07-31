@@ -6,7 +6,7 @@ import { apiFetch } from "@/lib/api/client"
 import { formatApiError } from "@/components/spectracheck/spectracheck-helpers"
 import { DeveloperJsonPanel } from "@/components/spectracheck/spectracheck-result-panels"
 import { readRecordNumber, readRecordString } from "@/components/projects/project-workspace-utils"
-import { KNOWLEDGE_TASK_STATUSES } from "@/components/knowledge/knowledge-constants"
+import { KNOWLEDGE_TASK_STATUSES, knowledgeLabel } from "@/components/knowledge/knowledge-constants"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -204,7 +204,7 @@ export function KnowledgeReviewWorkspace() {
                 <SelectItem value="__all__">All</SelectItem>
                 {KNOWLEDGE_TASK_STATUSES.map((s) => (
                   <SelectItem key={s} value={s}>
-                    {s}
+                    {knowledgeLabel(s)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -223,7 +223,7 @@ export function KnowledgeReviewWorkspace() {
                 <SelectItem value="__all__">All</SelectItem>
                 {RECORD_TYPE_FILTERS.filter((x) => x !== "").map((s) => (
                   <SelectItem key={s} value={s}>
-                    {s}
+                    {knowledgeLabel(s)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -281,11 +281,11 @@ export function KnowledgeReviewWorkspace() {
                   return (
                     <TableRow key={id != null ? `t-${id}` : `t-${idx}`}>
                       <TableCell className="font-mono text-xs">{id ?? "—"}</TableCell>
-                      <TableCell className="font-mono text-xs">{rt ?? "—"}</TableCell>
+                      <TableCell className="text-xs">{knowledgeLabel(rt)}</TableCell>
                       <TableCell className="font-mono text-xs">{rid ?? "—"}</TableCell>
                       <TableCell className="font-mono text-xs">{erun ?? "—"}</TableCell>
                       <TableCell>
-                        <Badge variant="outline">{readRecordString(row, "status") ?? "—"}</Badge>
+                        <Badge variant="outline">{knowledgeLabel(readRecordString(row, "status"))}</Badge>
                       </TableCell>
                       <TableCell className="max-w-[220px] truncate text-sm">{readRecordString(row, "title") ?? "—"}</TableCell>
                       <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
@@ -349,7 +349,7 @@ export function KnowledgeReviewWorkspace() {
                   <SelectContent>
                     {KNOWLEDGE_TASK_STATUSES.map((s) => (
                       <SelectItem key={s} value={s}>
-                        {s}
+                        {knowledgeLabel(s)}
                       </SelectItem>
                     ))}
                   </SelectContent>

@@ -3,6 +3,8 @@
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import type { QcFindingRow, QcFindingSeverity } from "@/src/lib/spectracheck/quality-control-assessment"
+import { artifactTypeLabel } from "@/src/components/spectracheck/spectracheck-display-labels"
+import { statusLabel } from "@/lib/ui/status"
 import { cn } from "@/lib/utils"
 
 export type QualityFindingSeverity = QcFindingSeverity
@@ -55,15 +57,15 @@ export function QualityFindingsTable({
             findings.map((row, i) => (
               <TableRow key={`${row.code}-${i}`}>
                 <TableCell className="align-top">
-                  <Badge variant="outline" className={cn("font-mono text-[10px]", severityClass(row.severity))}>
-                    {row.severity}
+                  <Badge variant="outline" className={cn("text-[10px]", severityClass(row.severity))}>
+                    {statusLabel(row.severity)}
                   </Badge>
                 </TableCell>
                 <TableCell className="max-w-[100px] align-top font-mono text-[10px] break-all">{row.code}</TableCell>
                 <TableCell className="max-w-[140px] align-top text-sm">{row.title}</TableCell>
                 <TableCell className="max-w-[220px] align-top text-xs text-muted-foreground">{row.message}</TableCell>
                 <TableCell className="max-w-[200px] align-top text-xs">{row.recommendation}</TableCell>
-                <TableCell className="max-w-[120px] align-top font-mono text-[10px]">{row.layer}</TableCell>
+                <TableCell className="max-w-[120px] align-top text-xs">{artifactTypeLabel(row.layer)}</TableCell>
               </TableRow>
             ))
           )}

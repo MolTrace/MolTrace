@@ -21,6 +21,7 @@ import { BackendStatusIndicator } from "@/components/app/backend-status-indicato
 import { DeveloperOnly } from "@/components/developer-mode-provider"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { InfoTooltip } from "@/components/ui/info-tooltip"
+import { statusLabel, toWireToken } from "@/lib/ui/status"
 import {
   AlertTriangle,
   ChevronDown,
@@ -175,8 +176,10 @@ export function SecurityEventsWorkspace() {
     const params = new URLSearchParams()
     const lim = Math.min(500, Math.max(1, Math.floor(Number(f.filterLimit) || 100)))
     params.set("limit", String(lim))
-    const sev = f.filterSeverity.trim()
-    const et = f.filterEventType.trim()
+    const sev = toWireToken(f.filterSeverity)
+    // The table now shows humanized event types ("Login failure"), so accept that spelling
+    // here and convert it back to the stored token before it goes on the wire.
+    const et = toWireToken(f.filterEventType)
     const ac = f.filterActorEmail.trim()
     if (sev) params.set("severity", sev)
     if (et) params.set("event_type", et)
@@ -338,7 +341,7 @@ export function SecurityEventsWorkspace() {
                   {Object.entries(summary.counts_by_severity as Record<string, unknown>).map(([k, v]) => (
                     <li key={k}>
                       <Badge variant="outline" className={`font-normal ${severityBadgeClass(k)}`}>
-                        {k}: {String(v)}
+                        {statusLabel(k)}: {String(v)}
                       </Badge>
                     </li>
                   ))}
@@ -364,7 +367,7 @@ export function SecurityEventsWorkspace() {
                   {Object.entries(summary.counts_by_type as Record<string, unknown>).map(([k, v]) => (
                     <li key={k}>
                       <Badge variant="outline" className="font-normal">
-                        {k}: {String(v)}
+                        {statusLabel(k)}: {String(v)}
                       </Badge>
                     </li>
                   ))}
@@ -401,7 +404,7 @@ export function SecurityEventsWorkspace() {
               <Label htmlFor="etype-filter">Event type</Label>
               <Input
                 id="etype-filter"
-                placeholder="e.g. login_failure"
+                placeholder="e.g. Login failure"
                 value={filterEventType}
                 onChange={(e) => setFilterEventType(e.target.value)}
               />
@@ -511,10 +514,10 @@ export function SecurityEventsWorkspace() {
                                 variant="outline"
                                 className={`font-normal ${severityBadgeClass(readStr(row, ["severity"]))}`}
                               >
-                                {readStr(row, ["severity"]) || "—"}
+                                {statusLabel(readStr(row, ["severity"]))}
                               </Badge>
                             </TableCell>
-                            <TableCell className="font-mono text-[10px]">{readStr(row, ["event_type"]) || "—"}</TableCell>
+                            <TableCell className="text-xs">{statusLabel(readStr(row, ["event_type"]))}</TableCell>
                             <TableCell className="max-w-[10rem] truncate text-xs">{readStr(row, ["actor_email"]) || "—"}</TableCell>
                             <TableCell className="max-w-[12rem] truncate font-mono text-[10px]">{resourceLabel}</TableCell>
                             <TableCell className="max-w-[18rem] text-xs">{readStr(row, ["message"]) || "—"}</TableCell>

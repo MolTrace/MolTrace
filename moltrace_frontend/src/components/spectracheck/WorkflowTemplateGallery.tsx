@@ -262,7 +262,7 @@ export function WorkflowTemplateGallery(props: WorkflowTemplateGalleryProps = {}
             </EmptyMedia>
             <EmptyTitle>No workflow templates</EmptyTitle>
             <EmptyDescription>
-              No predefined workflows are available for this tenant yet. Templates appear here once published.
+              No predefined workflows are available to your organization yet. Templates appear here once published.
             </EmptyDescription>
           </EmptyHeader>
         </Empty>
@@ -379,7 +379,7 @@ export function WorkflowTemplateGallery(props: WorkflowTemplateGalleryProps = {}
             </ol>
           ) : (
             <p className="text-sm text-muted-foreground">
-              No step list was included for this template in the API response.
+              This template does not list its steps.
             </p>
           )}
         </DialogContent>

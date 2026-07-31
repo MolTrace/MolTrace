@@ -1,7 +1,9 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { ApiError, apiFetch } from "@/lib/api/client"
+import { apiFetch } from "@/lib/api/client"
+import { formatApiError } from "@/components/spectracheck/spectracheck-helpers"
+import { statusLabel } from "@/lib/ui/status"
 import { readRecordNumber, readRecordString } from "@/components/projects/project-workspace-utils"
 import {
   trackAiActiveLearningCandidateCreated,
@@ -68,16 +70,6 @@ function formatWhen(iso: string | undefined): string {
   return new Date(t).toLocaleString()
 }
 
-function formatErr(err: unknown, fallback: string): string {
-  if (err instanceof ApiError) {
-    const data = err.data
-    if (isRecord(data) && typeof data.detail === "string" && data.detail.trim()) return data.detail
-    return err.message || fallback
-  }
-  if (err instanceof Error) return err.message
-  return fallback
-}
-
 function hasSensitiveCorrectionContent(raw: string): boolean {
   const t = raw.toLowerCase()
   return [
@@ -137,7 +129,7 @@ export function AiActiveLearningWorkspace() {
       const data = await apiFetch<unknown>("/ai/active-learning/candidates", { method: "GET" })
       setQueueRows(extractRows(data, QUEUE_KEYS))
     } catch (err) {
-      setQueueErr(formatErr(err, "Could not load active-learning candidates."))
+      setQueueErr(formatApiError(err, "Could not load active-learning candidates."))
       setQueueRows([])
     } finally {
       setLoading(false)
@@ -201,7 +193,7 @@ export function AiActiveLearningWorkspace() {
       })
       setFeedbackOk("Prediction feedback submitted.")
     } catch (err) {
-      setFeedbackErr(formatErr(err, "Could not submit prediction feedback/review."))
+      setFeedbackErr(formatApiError(err, "Could not submit prediction feedback/review."))
     } finally {
       setFeedbackBusy(false)
     }
@@ -237,7 +229,7 @@ export function AiActiveLearningWorkspace() {
       setCandidateOk("Active-learning candidate created.")
       setReloadToken((x) => x + 1)
     } catch (err) {
-      setCandidateErr(formatErr(err, "Could not create active-learning candidate."))
+      setCandidateErr(formatApiError(err, "Could not create active-learning candidate."))
     } finally {
       setCandidateCreateBusy(false)
     }
@@ -254,7 +246,7 @@ export function AiActiveLearningWorkspace() {
       })
       setReloadToken((x) => x + 1)
     } catch (err) {
-      setCandidateErr(formatErr(err, `Could not update candidate ${candidateId}.`))
+      setCandidateErr(formatApiError(err, `Could not update candidate ${candidateId}.`))
     } finally {
       setRowBusyId(null)
     }
@@ -305,7 +297,7 @@ export function AiActiveLearningWorkspace() {
                 <SelectContent>
                   {FEEDBACK_TYPES.map((opt) => (
                     <SelectItem key={opt} value={opt}>
-                      {opt}
+                      {statusLabel(opt)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -340,7 +332,7 @@ export function AiActiveLearningWorkspace() {
                   <SelectContent>
                     {REASON_CODES.map((code) => (
                       <SelectItem key={code} value={code}>
-                        {REASON_CODE_LABEL[code]} <span className="ml-2 text-muted-foreground">({code})</span>
+                        {REASON_CODE_LABEL[code]}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -398,7 +390,7 @@ export function AiActiveLearningWorkspace() {
                 <SelectContent>
                   {SOURCE_MODULES.map((opt) => (
                     <SelectItem key={opt} value={opt}>
-                      {opt}
+                      {statusLabel(opt)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -413,7 +405,7 @@ export function AiActiveLearningWorkspace() {
                 <SelectContent>
                   {PRIORITIES.map((opt) => (
                     <SelectItem key={opt} value={opt}>
-                      {opt}
+                      {statusLabel(opt)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -428,7 +420,7 @@ export function AiActiveLearningWorkspace() {
                 <SelectContent>
                   {STATUSES.map((opt) => (
                     <SelectItem key={opt} value={opt}>
-                      {opt}
+                      {statusLabel(opt)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -500,13 +492,13 @@ export function AiActiveLearningWorkspace() {
                 const busy = candidateId != null && rowBusyId === candidateId
                 return (
                   <TableRow key={`${candidateId ?? "row"}-${idx}`}>
-                    <TableCell>{readRecordString(row, "source_module") ?? "-"}</TableCell>
+                    <TableCell>{statusLabel(readRecordString(row, "source_module"))}</TableCell>
                     <TableCell className="max-w-[260px] truncate">{readRecordString(row, "reason") ?? "-"}</TableCell>
                     <TableCell>
-                      <Badge variant="outline">{readRecordString(row, "priority") ?? "-"}</Badge>
+                      <Badge variant="outline">{statusLabel(readRecordString(row, "priority"))}</Badge>
                     </TableCell>
                     <TableCell>
-                      <Badge variant="outline">{readRecordString(row, "status") ?? "-"}</Badge>
+                      <Badge variant="outline">{statusLabel(readRecordString(row, "status"))}</Badge>
                     </TableCell>
                     <TableCell>{readRecordString(row, "linked_prediction") ?? "-"}</TableCell>
                     <TableCell>{readRecordString(row, "linked_model_improvement_item") ?? "-"}</TableCell>

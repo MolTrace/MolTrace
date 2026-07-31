@@ -308,13 +308,13 @@ export function ShiftPredictionPanel({
                   Method
                 </span>
                 {mBadge ? (
-                  <Badge variant="outline" className={cn("gap-1", mBadge.chip)} title={`method: ${result.method}`}>
+                  <Badge variant="outline" className={cn("gap-1", mBadge.chip)} title={`Prediction method: ${mBadge.label}`}>
                     {mBadge.ml ? <Sparkles className="h-3 w-3" aria-hidden /> : <Waves className="h-3 w-3" aria-hidden />}
                     {mBadge.label}
                   </Badge>
                 ) : null}
                 {dBadge ? (
-                  <Badge variant="outline" className={cn("gap-1", dBadge.chip)} title={`compute device: ${result.device}`}>
+                  <Badge variant="outline" className={cn("gap-1", dBadge.chip)} title={`Compute device: ${dBadge.label}`}>
                     {result.device === "cuda" || result.device === "mps" ? (
                       <Zap className="h-3 w-3" aria-hidden />
                     ) : (

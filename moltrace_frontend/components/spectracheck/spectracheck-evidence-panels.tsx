@@ -83,6 +83,28 @@ function humanizeCategory(category: string | null | undefined): string {
     .replace(/^\w/, (c) => c.toUpperCase())
 }
 
+/**
+ * Peak-provenance values arrive as stored tokens ("nmr_text_guided",
+ * "spectrum_and_nmr_text"). Show a scientist readable prose; the stored value
+ * itself is never rewritten.
+ */
+const PROVENANCE_VALUE_LABELS: Record<string, string> = {
+  spectrum: "picked from the spectrum",
+  spectrum_only: "picked from the spectrum only",
+  spectrum_and_nmr_text: "spectrum peak matched to the reported NMR text",
+  spectrum_only_unmatched_to_nmr_text: "spectrum peak with no match in the reported NMR text",
+  nmr_text: "reported NMR text",
+  nmr_text_guided: "spectrum integrals guided by the reported NMR text",
+  nmr_text_unconfirmed_by_picker: "reported NMR text, not confirmed by peak picking",
+  nmr_text_split_from_overlapped_spectrum_peak:
+    "reported NMR text, split out of an overlapped spectrum peak",
+}
+
+function humanizeProvenanceValue(value: string): string {
+  const key = value.trim().toLowerCase()
+  return PROVENANCE_VALUE_LABELS[key] ?? key.replace(/_/g, " ")
+}
+
 function peakEvidenceLabel(peak: RawPeak): { label: string; title: string } | null {
   const source = asString(peak.pick_source)
   const integrationSource = asString(peak.integration_source)
@@ -106,10 +128,10 @@ function peakEvidenceLabel(peak: RawPeak): { label: string; title: string } | nu
   }
 
   const details = [
-    source ? `pick source: ${source}` : null,
-    integrationSource ? `integration: ${integrationSource}` : null,
-    basis ? `inventory basis: ${basis}` : null,
-    excluded ? "excluded from proton inventory" : null,
+    source ? `Peak source: ${humanizeProvenanceValue(source)}` : null,
+    integrationSource ? `Integral source: ${humanizeProvenanceValue(integrationSource)}` : null,
+    basis ? `Inventory basis: ${humanizeProvenanceValue(basis)}` : null,
+    excluded ? "Excluded from proton inventory" : null,
     excludeReason,
   ].filter((item): item is string => Boolean(item))
 
@@ -522,7 +544,8 @@ export function ProtonInventoryPanel({ payload }: { payload: unknown }) {
           <div className="flex flex-wrap gap-2 text-[11px] text-muted-foreground">
             {integrationBasis ? (
               <span>
-                Basis: <span className="font-mono font-bold text-foreground">{integrationBasis}</span>
+                Integration basis:{" "}
+                <span className="font-bold text-foreground">{humanizeProvenanceValue(integrationBasis)}</span>
               </span>
             ) : null}
             {reconciliation ? (

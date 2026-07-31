@@ -412,9 +412,8 @@ export function SpectrumReasonPanel({
                   <p className="text-sm font-medium text-foreground">Reasoning not available</p>
                   <p className="max-w-md text-xs text-muted-foreground">
                     This deployment has no spectral similarity index configured, so retrieval-augmented
-                    reasoning has no precedents to ground on. An administrator can configure one
-                    server-side (<code className="font-mono">MOLTRACE_SIMILARITY_INDEX</code>) to turn
-                    this surface on.
+                    reasoning has no precedents to ground on. Ask your administrator to configure a
+                    reference index to turn this surface on.
                   </p>
                 </div>
                 <WarningList warnings={warnings} variant="info" title="Notes" />
@@ -443,7 +442,7 @@ export function SpectrumReasonPanel({
                     <Badge
                       variant="outline"
                       className="gap-1 border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300"
-                      title="ANTHROPIC_API_KEY not configured server-side"
+                      title="The reasoning model is not enabled for this deployment — ask your administrator to turn it on."
                     >
                       <CircleSlash className="h-3 w-3" aria-hidden />
                       Reasoner unavailable
@@ -471,9 +470,8 @@ export function SpectrumReasonPanel({
                   </p>
                   {result.reasoner_available === false ? (
                     <div className="rounded-md border border-dashed bg-muted/10 px-4 py-6 text-center text-sm text-muted-foreground">
-                      Retrieval succeeded, but the reasoning model is not configured on this
-                      deployment. Set <code className="font-mono">ANTHROPIC_API_KEY</code> server-side to
-                      enable structure proposals.
+                      Retrieval succeeded, but the reasoning model is not enabled on this
+                      deployment. Ask your administrator to enable it for structure proposals.
                     </div>
                   ) : candidates.length === 0 ? (
                     <div className="rounded-md border border-dashed bg-muted/20 px-4 py-6 text-center text-sm text-muted-foreground">

@@ -176,7 +176,7 @@ export function ScimProvisioningSection({ connectionId, enabled }: { connectionI
             Paste both into the SCIM provisioning settings of your IdP (Okta, Entra ID, …).
             {SCIM_BASE_URL
               ? null
-              : " Replace the bracketed part with your MolTrace service address — your MolTrace administrator can configure it so the exact SCIM base URL appears here."}
+              : " The URL above is a template: replace <your-api-origin> with the host your MolTrace API is served from. Whoever operates your MolTrace deployment can confirm that host, and can have the exact SCIM base URL shown here instead of the placeholder."}
           </p>
           <Button type="button" size="sm" variant="outline" onClick={() => setIssued(null)}>
             Done — I&apos;ve copied it

@@ -14,6 +14,7 @@ import {
   KNOWLEDGE_REVIEW_RECORD_TYPES,
   KNOWLEDGE_TRAINING_DATASET_TYPES,
   LEAKAGE_RISK_LABELS,
+  knowledgeLabel,
 } from "@/components/knowledge/knowledge-constants"
 import { InfoTooltip } from "@/components/ui/info-tooltip"
 import { Badge } from "@/components/ui/badge"
@@ -600,7 +601,7 @@ export function KnowledgeDatasetsDashboard() {
                     <SelectItem value="__all">All</SelectItem>
                     {KNOWLEDGE_CANDIDATE_STATUSES.map((s) => (
                       <SelectItem key={s} value={s}>
-                        {s}
+                        {knowledgeLabel(s)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -654,10 +655,10 @@ export function KnowledgeDatasetsDashboard() {
                         <TableRow key={id != null ? `tr-${id}` : `tr-${idx}`}>
                           <TableCell className="font-mono text-xs">{id ?? "—"}</TableCell>
                           <TableCell>
-                            <Badge variant="outline">{readRecordString(row, "status") ?? "—"}</Badge>
+                            <Badge variant="outline">{knowledgeLabel(readRecordString(row, "status"))}</Badge>
                           </TableCell>
-                          <TableCell className="font-mono text-xs">{readRecordString(row, "dataset_type") ?? "—"}</TableCell>
-                          <TableCell className="font-mono text-xs">{readRecordString(row, "record_type") ?? "—"}</TableCell>
+                          <TableCell className="text-xs">{knowledgeLabel(readRecordString(row, "dataset_type"))}</TableCell>
+                          <TableCell className="text-xs">{knowledgeLabel(readRecordString(row, "record_type"))}</TableCell>
                           <TableCell className="font-mono text-xs">{readRecordNumber(row, "record_id") ?? "—"}</TableCell>
                           <TableCell className="font-mono text-xs">{readRecordNumber(row, "source_id") ?? "—"}</TableCell>
                           <TableCell className="text-right tabular-nums text-xs">{cit}</TableCell>
@@ -708,7 +709,7 @@ export function KnowledgeDatasetsDashboard() {
                     <SelectContent>
                       {KNOWLEDGE_REVIEW_RECORD_TYPES.map((t) => (
                         <SelectItem key={t} value={t}>
-                          {t}
+                          {knowledgeLabel(t)}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -727,7 +728,7 @@ export function KnowledgeDatasetsDashboard() {
                     <SelectContent>
                       {KNOWLEDGE_TRAINING_DATASET_TYPES.map((t) => (
                         <SelectItem key={t} value={t}>
-                          {t}
+                          {knowledgeLabel(t)}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -771,7 +772,7 @@ export function KnowledgeDatasetsDashboard() {
                         <SelectContent>
                           {KNOWLEDGE_CANDIDATE_STATUSES.map((s) => (
                             <SelectItem key={s} value={s}>
-                              {s}
+                              {knowledgeLabel(s)}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -805,7 +806,7 @@ export function KnowledgeDatasetsDashboard() {
           eyebrow="Benchmark"
           title="2. Benchmark dataset candidates"
           icon={Database}
-          description="Knowledge claims nominated for ML benchmark evaluation — includes leakage risk label and split recommendation. Citation IDs are not modeled on benchmark candidates and display as blank."
+          description="Knowledge claims nominated for ML benchmark evaluation — includes leakage risk label and split recommendation. Benchmark candidates do not carry citation IDs, so that column stays blank."
         >
           <div className="space-y-4">
             <div className="flex flex-wrap items-end gap-3">
@@ -819,7 +820,7 @@ export function KnowledgeDatasetsDashboard() {
                     <SelectItem value="__all">All</SelectItem>
                     {KNOWLEDGE_CANDIDATE_STATUSES.map((s) => (
                       <SelectItem key={s} value={s}>
-                        {s}
+                        {knowledgeLabel(s)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -874,20 +875,20 @@ export function KnowledgeDatasetsDashboard() {
                         <TableRow key={id != null ? `bc-${id}` : `bc-${idx}`}>
                           <TableCell className="font-mono text-xs">{id ?? "—"}</TableCell>
                           <TableCell>
-                            <Badge variant="outline">{readRecordString(row, "status") ?? "—"}</Badge>
+                            <Badge variant="outline">{knowledgeLabel(readRecordString(row, "status"))}</Badge>
                           </TableCell>
-                          <TableCell className="font-mono text-xs">{readRecordString(row, "benchmark_type") ?? "—"}</TableCell>
-                          <TableCell className="font-mono text-xs">{readRecordString(row, "record_type") ?? "—"}</TableCell>
+                          <TableCell className="text-xs">{knowledgeLabel(readRecordString(row, "benchmark_type"))}</TableCell>
+                          <TableCell className="text-xs">{knowledgeLabel(readRecordString(row, "record_type"))}</TableCell>
                           <TableCell className="font-mono text-xs">{readRecordNumber(row, "record_id") ?? "—"}</TableCell>
                           <TableCell className="font-mono text-xs">{readRecordNumber(row, "source_id") ?? "—"}</TableCell>
-                          <TableCell className="text-right tabular-nums text-xs text-muted-foreground" title="Not modeled on benchmark candidates">
+                          <TableCell className="text-right tabular-nums text-xs text-muted-foreground" title="Not recorded for benchmark candidates">
                             —
                           </TableCell>
                           <TableCell className="max-w-[140px] truncate text-xs" title={flags.join(", ")}>
                             {flagPreview}
                           </TableCell>
-                          <TableCell className="font-mono text-xs">{readRecordString(row, "leakage_risk_label") ?? "—"}</TableCell>
-                          <TableCell className="font-mono text-xs">{readRecordString(row, "split_recommendation") ?? "—"}</TableCell>
+                          <TableCell className="text-xs">{knowledgeLabel(readRecordString(row, "leakage_risk_label"))}</TableCell>
+                          <TableCell className="text-xs">{knowledgeLabel(readRecordString(row, "split_recommendation"))}</TableCell>
                           <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
                             {formatWhen(readRecordString(row, "created_at"))}
                           </TableCell>
@@ -932,7 +933,7 @@ export function KnowledgeDatasetsDashboard() {
                     <SelectContent>
                       {KNOWLEDGE_REVIEW_RECORD_TYPES.map((t) => (
                         <SelectItem key={t} value={t}>
-                          {t}
+                          {knowledgeLabel(t)}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -951,7 +952,7 @@ export function KnowledgeDatasetsDashboard() {
                     <SelectContent>
                       {KNOWLEDGE_BENCHMARK_TYPES.map((t) => (
                         <SelectItem key={t} value={t}>
-                          {t}
+                          {knowledgeLabel(t)}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -991,7 +992,7 @@ export function KnowledgeDatasetsDashboard() {
                         <SelectContent>
                           {KNOWLEDGE_CANDIDATE_STATUSES.map((s) => (
                             <SelectItem key={s} value={s}>
-                              {s}
+                              {knowledgeLabel(s)}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -1006,7 +1007,7 @@ export function KnowledgeDatasetsDashboard() {
                         <SelectContent>
                           {DATASET_SPLIT_RECOMMENDATIONS.map((s) => (
                             <SelectItem key={s} value={s}>
-                              {s}
+                              {knowledgeLabel(s)}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -1021,7 +1022,7 @@ export function KnowledgeDatasetsDashboard() {
                         <SelectContent>
                           {LEAKAGE_RISK_LABELS.map((s) => (
                             <SelectItem key={s} value={s}>
-                              {s}
+                              {knowledgeLabel(s)}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -1065,7 +1066,7 @@ export function KnowledgeDatasetsDashboard() {
                     <SelectItem value="__all">All</SelectItem>
                     {DATASET_VERSION_STATUSES.map((s) => (
                       <SelectItem key={s} value={s}>
-                        {s}
+                        {knowledgeLabel(s)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -1095,7 +1096,7 @@ export function KnowledgeDatasetsDashboard() {
                     <SelectContent>
                       {KNOWLEDGE_TRAINING_DATASET_TYPES.map((t) => (
                         <SelectItem key={t} value={t}>
-                          {t}
+                          {knowledgeLabel(t)}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -1193,9 +1194,9 @@ export function KnowledgeDatasetsDashboard() {
                               .map((k) => {
                                 const v = (sj as Record<string, unknown>)[k]
                                 const n = Array.isArray(v) ? v.length : 0
-                                return `${k}:${n}`
+                                return `${knowledgeLabel(k)} ${n}`
                               })
-                              .join(" ")
+                              .join(" · ")
                           : "—"
                       const qs = row["quality_summary_json"]
                       const qsHint =
@@ -1207,10 +1208,10 @@ export function KnowledgeDatasetsDashboard() {
                         <TableRow key={id != null ? `dv-${id}` : `dv-${idx}`}>
                           <TableCell className="font-mono text-xs">{id ?? "—"}</TableCell>
                           <TableCell className="max-w-[160px] truncate text-sm">{readRecordString(row, "name") ?? "—"}</TableCell>
-                          <TableCell className="font-mono text-xs">{readRecordString(row, "dataset_type") ?? "—"}</TableCell>
+                          <TableCell className="text-xs">{knowledgeLabel(readRecordString(row, "dataset_type"))}</TableCell>
                           <TableCell className="font-mono text-xs">{readRecordString(row, "version") ?? "—"}</TableCell>
                           <TableCell>
-                            <Badge variant="outline">{readRecordString(row, "status") ?? "—"}</Badge>
+                            <Badge variant="outline">{knowledgeLabel(readRecordString(row, "status"))}</Badge>
                           </TableCell>
                           <TableCell className="text-right tabular-nums text-xs">{srcLen}</TableCell>
                           <TableCell className="font-mono text-xs">{splitKeys}</TableCell>
@@ -1284,7 +1285,7 @@ export function KnowledgeDatasetsDashboard() {
                         <SelectContent>
                           {DATASET_VERSION_STATUSES.map((s) => (
                             <SelectItem key={s} value={s}>
-                              {s}
+                              {knowledgeLabel(s)}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -1348,7 +1349,7 @@ export function KnowledgeDatasetsDashboard() {
                   >
                     <CardContent className="space-y-1 pt-5 pb-5">
                       <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                        Leakage risk · {k}
+                        Leakage risk · {knowledgeLabel(k)}
                       </p>
                       <div
                         className="font-mono text-3xl font-bold tabular-nums leading-none"
@@ -1398,7 +1399,7 @@ export function KnowledgeDatasetsDashboard() {
                 <TableBody>
                   {qualityFlagAnalytics.map(([flag, count]) => (
                     <TableRow key={flag}>
-                      <TableCell className="font-mono text-xs">{flag}</TableCell>
+                      <TableCell className="text-xs">{knowledgeLabel(flag)}</TableCell>
                       <TableCell className="text-right tabular-nums">{count}</TableCell>
                     </TableRow>
                   ))}

@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { InfoTooltip } from "@/components/ui/info-tooltip"
 import { apiFetch } from "@/src/lib/api/client"
 import { parseSessionQualityControlPayload } from "@/src/lib/spectracheck/quality-control-assessment"
+import { humanizeTokenForDisplay } from "@/src/components/spectracheck/spectracheck-display-labels"
 
 const CARD_TOOLTIP =
   "Session-level quality control summarizes whether files, artifacts, and evidence items are ready to influence Unified Evidence and reports."
@@ -109,7 +110,7 @@ export function SessionEvidenceReadinessCard({ sessionId }: Props) {
 
             <div>
               <p className="mb-2 text-xs font-medium text-muted-foreground">Session readiness status</p>
-              <p className="text-sm font-medium">{parsed.sessionReadiness}</p>
+              <p className="text-sm font-medium">{humanizeTokenForDisplay(parsed.sessionReadiness)}</p>
             </div>
 
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
@@ -136,7 +137,7 @@ export function SessionEvidenceReadinessCard({ sessionId }: Props) {
             <div>
               <p className="mb-2 text-xs font-medium text-muted-foreground">Findings summary</p>
               {parsed.findings.length === 0 ? (
-                <p className="text-xs text-muted-foreground">No findings in the latest session QC payload.</p>
+                <p className="text-xs text-muted-foreground">No findings in the latest session QC assessment.</p>
               ) : (
                 <ul className="max-h-48 space-y-2 overflow-y-auto pr-1">
                   {parsed.findings.slice(0, 16).map((f, i) => (

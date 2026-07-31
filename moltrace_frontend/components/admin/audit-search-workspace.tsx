@@ -1,5 +1,6 @@
 "use client"
 
+import { statusLabel, toWireToken } from "@/lib/ui/status"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { ApiError, apiFetch } from "@/lib/api/client"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -114,7 +115,7 @@ function filterByDateRange(
   return out
 }
 
-/** Maps UI resource IDs to GET /admin/audit/search query params (entity_type, entity_id). */
+/** Maps UI resource IDs to audit-search query params (entity_type, entity_id). */
 function resolveEntityParams(
   spectracheckProjectId: string,
   spectracheckSampleId: string,
@@ -187,7 +188,7 @@ export function AuditSearchWorkspace() {
     const lim = Math.min(500, Math.max(1, Math.floor(Number(f.filterLimit) || 100)))
     params.set("limit", String(lim))
 
-    const et = f.filterEventType.trim()
+    const et = toWireToken(f.filterEventType)
     const actor = f.filterActorEmail.trim()
     if (et) params.set("event_type", et)
     if (actor) params.set("actor_email", actor)
@@ -404,7 +405,7 @@ export function AuditSearchWorkspace() {
               <Label htmlFor="ev-type">Event type</Label>
               <Input
                 id="ev-type"
-                placeholder="Event type"
+                placeholder="e.g. Report released"
                 value={filterEventType}
                 onChange={(e) => setFilterEventType(e.target.value)}
               />
@@ -479,7 +480,7 @@ export function AuditSearchWorkspace() {
                           [readStr(row, ["entity_type"]), readStr(row, ["entity_id"])].filter(Boolean).join(" · ") || "—"
                         return (
                           <TableRow key={readStr(row, ["id"]) || `audit-${i}`}>
-                            <TableCell className="font-mono text-[10px]">{readStr(row, ["event_type"]) || "—"}</TableCell>
+                            <TableCell className="text-xs">{statusLabel(readStr(row, ["event_type"]))}</TableCell>
                             <TableCell className="max-w-[22rem] text-xs">{readStr(row, ["message"]) || "—"}</TableCell>
                             <TableCell className="max-w-[12rem] truncate text-xs">{readStr(row, ["actor_email"]) || "—"}</TableCell>
                             <TableCell className="whitespace-nowrap font-mono text-[10px] text-muted-foreground">

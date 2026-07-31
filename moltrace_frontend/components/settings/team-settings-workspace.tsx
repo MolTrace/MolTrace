@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/table"
 import { Separator } from "@/components/ui/separator"
 import { Users } from "lucide-react"
+import { statusLabel } from "@/lib/ui/status"
 
 const ROLE_OPTIONS = ["owner", "admin", "scientist", "reviewer", "viewer"] as const
 
@@ -50,7 +51,7 @@ function pickDetail(err: unknown): string {
     return err.message
   }
   if (err instanceof Error) return err.message
-  return "That didn't go through. Please try again."
+  return "That action could not be completed. Please try again."
 }
 
 export type OrganizationRow = {
@@ -414,10 +415,10 @@ export function TeamSettingsWorkspace() {
                             </TableCell>
                             <TableCell className="text-xs">
                               <Badge variant="secondary" className="font-normal">
-                                {m.role}
+                                {statusLabel(m.role)}
                               </Badge>
                             </TableCell>
-                            <TableCell className="text-xs">{m.status}</TableCell>
+                            <TableCell className="text-xs">{statusLabel(m.status)}</TableCell>
                             <TableCell className="whitespace-nowrap text-xs text-muted-foreground">{m.createdAt}</TableCell>
                             <TableCell className="text-right">
                               <Select
@@ -433,8 +434,9 @@ export function TeamSettingsWorkspace() {
                                 </SelectTrigger>
                                 <SelectContent>
                                   {ROLE_OPTIONS.map((r) => (
+                                    // value= stays the stored role; only the label is humanized.
                                     <SelectItem key={r} value={r}>
-                                      {r}
+                                      {statusLabel(r)}
                                     </SelectItem>
                                   ))}
                                 </SelectContent>
@@ -488,8 +490,9 @@ export function TeamSettingsWorkspace() {
                     </SelectTrigger>
                     <SelectContent>
                       {ROLE_OPTIONS.map((r) => (
+                        // value= stays the stored role; only the label is humanized.
                         <SelectItem key={r} value={r}>
-                          {r}
+                          {statusLabel(r)}
                         </SelectItem>
                       ))}
                     </SelectContent>

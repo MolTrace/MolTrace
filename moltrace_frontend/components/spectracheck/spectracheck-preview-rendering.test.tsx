@@ -592,9 +592,15 @@ describe("SpectraCheck preview rendering", () => {
 
     expect(await screen.findByTestId("prompt-sidecar-consistency-card")).toBeInTheDocument()
     expect(screen.getByTestId("prompt-sidecar-qa-details")).toBeInTheDocument()
-    expect(screen.getByText(/Prompt reader sidecar/i)).toBeInTheDocument()
+    // Re-baselined: the card heading now reads "Independent reader cross-check"
+    // instead of the internal "Prompt reader sidecar" wording. The stored
+    // ``prompt_pipeline_sidecar`` payload keys and the card's data-testid are
+    // unchanged — this is a display-copy change only.
+    expect(screen.getByText(/Independent reader cross-check/i)).toBeInTheDocument()
     expect(screen.getByText(/Review-only metadata/i)).toBeInTheDocument()
-    expect(screen.getByText(/regions_analysis/i)).toBeInTheDocument()
+    // Re-baselined: phase/baseline algorithm names are humanized for display
+    // ("regions_analysis" → "Regions analysis"); the stored values are unchanged.
+    expect(screen.getByText(/Regions analysis/i)).toBeInTheDocument()
     expect(screen.getByText(/bernstein/i)).toBeInTheDocument()
     expect(screen.getByText(/123 ms/i)).toBeInTheDocument()
     expect(

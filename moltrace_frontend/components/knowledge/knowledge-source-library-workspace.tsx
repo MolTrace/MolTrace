@@ -34,6 +34,7 @@ import {
 } from "@/components/ui/table"
 import {
   KNOWLEDGE_RELIABILITY_LABELS,
+  knowledgeLabel,
   KNOWLEDGE_SOURCE_STATUS,
   KNOWLEDGE_SOURCE_TYPES,
 } from "@/components/knowledge/knowledge-constants"
@@ -347,7 +348,7 @@ export function KnowledgeSourceLibraryWorkspace() {
         description="Register a new knowledge source — scientific literature, structured databases, or curated reference documents — for extraction and review."
       >
         <div className="space-y-4">
-          {createErr ? <AlertCard variant="error" title="Create error" description={createErr} /> : null}
+          {createErr ? <AlertCard variant="error" title="Could not create" description={createErr} /> : null}
           {createOk ? <AlertCard variant="success" title="Recorded" description={createOk} /> : null}
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
@@ -368,7 +369,7 @@ export function KnowledgeSourceLibraryWorkspace() {
                 <SelectContent>
                   {KNOWLEDGE_SOURCE_TYPES.map((t) => (
                     <SelectItem key={t} value={t}>
-                      {t}
+                      {knowledgeLabel(t)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -418,7 +419,7 @@ export function KnowledgeSourceLibraryWorkspace() {
                 <SelectContent>
                   {KNOWLEDGE_RELIABILITY_LABELS.map((r) => (
                     <SelectItem key={r} value={r}>
-                      {r}
+                      {knowledgeLabel(r)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -433,7 +434,7 @@ export function KnowledgeSourceLibraryWorkspace() {
                 <SelectContent>
                   {KNOWLEDGE_SOURCE_STATUS.map((s) => (
                     <SelectItem key={s} value={s}>
-                      {s}
+                      {knowledgeLabel(s)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -495,11 +496,11 @@ export function KnowledgeSourceLibraryWorkspace() {
                       <TableCell className="max-w-[240px] truncate text-sm font-medium">
                         {readRecordString(row, "title") ?? "—"}
                       </TableCell>
-                      <TableCell className="font-mono text-xs">{readRecordString(row, "source_type") ?? "—"}</TableCell>
+                      <TableCell className="text-xs">{knowledgeLabel(readRecordString(row, "source_type"))}</TableCell>
                       <TableCell>
-                        <Badge variant="outline">{readRecordString(row, "status") ?? "—"}</Badge>
+                        <Badge variant="outline">{knowledgeLabel(readRecordString(row, "status"))}</Badge>
                       </TableCell>
-                      <TableCell className="text-xs">{readRecordString(row, "reliability_label") ?? "—"}</TableCell>
+                      <TableCell className="text-xs">{knowledgeLabel(readRecordString(row, "reliability_label"))}</TableCell>
                       <TableCell>
                         {id != null ? (
                           <Button
@@ -566,7 +567,7 @@ export function KnowledgeSourceLibraryWorkspace() {
                       <SelectContent>
                         {KNOWLEDGE_SOURCE_TYPES.map((t) => (
                           <SelectItem key={t} value={t}>
-                            {t}
+                            {knowledgeLabel(t)}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -606,7 +607,7 @@ export function KnowledgeSourceLibraryWorkspace() {
                       <SelectContent>
                         {KNOWLEDGE_RELIABILITY_LABELS.map((r) => (
                           <SelectItem key={r} value={r}>
-                            {r}
+                            {knowledgeLabel(r)}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -621,7 +622,7 @@ export function KnowledgeSourceLibraryWorkspace() {
                       <SelectContent>
                         {KNOWLEDGE_SOURCE_STATUS.map((s) => (
                           <SelectItem key={s} value={s}>
-                            {s}
+                            {knowledgeLabel(s)}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -651,7 +652,7 @@ export function KnowledgeSourceLibraryWorkspace() {
           description="Upload and manage files attached to this knowledge source."
         >
           <div className="space-y-4">
-            {uploadErr ? <AlertCard variant="error" title="Upload error" description={uploadErr} /> : null}
+            {uploadErr ? <AlertCard variant="error" title="Could not upload" description={uploadErr} /> : null}
             {uploadOk ? <AlertCard variant="success" title="Recorded" description={uploadOk} /> : null}
             <div className="flex flex-wrap items-end gap-3">
               <div className="space-y-2">
@@ -712,7 +713,7 @@ export function KnowledgeSourceLibraryWorkspace() {
                             {sha ?? "—"}
                           </TableCell>
                           <TableCell>
-                            <Badge variant="secondary">{readRecordString(row, "parse_status") ?? "—"}</Badge>
+                            <Badge variant="secondary">{knowledgeLabel(readRecordString(row, "parse_status"))}</Badge>
                           </TableCell>
                           <TableCell className="text-right tabular-nums text-xs">{warnCt}</TableCell>
                           <TableCell className="whitespace-nowrap text-xs text-muted-foreground">

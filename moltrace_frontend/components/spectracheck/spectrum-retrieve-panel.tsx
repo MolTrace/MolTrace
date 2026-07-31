@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils"
 import { formatApiError } from "@/components/spectracheck/spectracheck-helpers"
 import { parseCandidatesFromText } from "@/components/spectracheck/gsd-jcoupling-panel"
 import type { components } from "@/src/lib/api/schema"
+import { readRetrievalCoverage } from "@/src/lib/spectracheck/retrieval-nucleus-coverage"
 
 /**
  * Spectral-similarity retrieval (`POST /spectrum/retrieve`).
@@ -248,8 +249,7 @@ export function SpectrumRetrievePanel({
                   <p className="text-sm font-medium text-foreground">Retrieval index not configured</p>
                   <p className="max-w-md text-xs text-muted-foreground">
                     This deployment has no spectral similarity index enabled, so there is nothing to
-                    search against. An administrator can configure one server-side
-                    (<code className="font-mono">MOLTRACE_SIMILARITY_INDEX</code>) to turn on
+                    search against. Ask your administrator to configure a reference index to turn on
                     nearest-neighbour retrieval.
                   </p>
                 </div>
@@ -264,7 +264,11 @@ export function SpectrumRetrievePanel({
                   <Badge
                     variant="outline"
                     className="gap-1 border-violet-300 bg-violet-50 text-violet-700 dark:border-violet-900 dark:bg-violet-950/40 dark:text-violet-300"
-                    title={`retrieval method: ${result.method}`}
+                    title={`Retrieval method: ${
+                      result.method === "vector_l2"
+                        ? "nearest-neighbour search by L2 distance over the encoded shift vectors"
+                        : result.method
+                    }`}
                   >
                     <DatabaseZap className="h-3 w-3" aria-hidden />
                     {result.method === "vector_l2" ? "L2 vector" : result.method}
@@ -294,10 +298,15 @@ export function SpectrumRetrievePanel({
                             <th className="px-3 py-2 text-right">Rank</th>
                             <th className="px-3 py-2">Reference ID</th>
                             <th className="px-3 py-2 text-right">L2 distance</th>
+                            <th className="px-3 py-2">Matched on</th>
                           </tr>
                         </thead>
                         <tbody className="font-mono tabular-nums">
-                          {renderedHits.map((hit, idx) => (
+                          {renderedHits.map((hit, idx) => {
+                            // Part of a small distance can be the penalty for a nucleus the
+                            // reference simply does not carry, rather than measured agreement.
+                            const coverage = readRetrievalCoverage(hit)
+                            return (
                             <tr key={`${hit.id}-${idx}`} className="border-t hover:bg-muted/20">
                               <td className="px-3 py-1.5 text-right text-muted-foreground">
                                 <span className="inline-flex items-center justify-end gap-1">
@@ -314,15 +323,37 @@ export function SpectrumRetrievePanel({
                                 <span className={cn("font-bold", idx === 0 ? "text-violet-600 dark:text-violet-300" : "")}>
                                   {hit.l2_distance.toFixed(4)}
                                 </span>
+                                {coverage.partial ? (
+                                  <span
+                                    className="ml-1 cursor-help text-muted-foreground"
+                                    title={coverage.partialExplanation ?? undefined}
+                                    aria-label={coverage.partialExplanation ?? undefined}
+                                  >
+                                    *
+                                  </span>
+                                ) : null}
+                              </td>
+                              <td className="px-3 py-1.5 whitespace-nowrap text-muted-foreground">
+                                {coverage.matchedOnLabel}
+                                {coverage.partial ? (
+                                  <span
+                                    className="ml-1.5 cursor-help rounded border px-1 py-0.5 text-[9px] uppercase tracking-wide"
+                                    title={coverage.partialExplanation ?? undefined}
+                                  >
+                                    partial
+                                  </span>
+                                ) : null}
                               </td>
                             </tr>
-                          ))}
+                            )
+                          })}
                         </tbody>
                       </table>
                     </div>
                     <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
                       Decision-support · lower L2 = closer; corroborate against the observed spectrum
-                      before any assignment.
+                      before any assignment. Some references carry only one nucleus, so a close match
+                      on one nucleus is weaker corroboration than a close match on both.
                     </p>
                   </div>
                 )}

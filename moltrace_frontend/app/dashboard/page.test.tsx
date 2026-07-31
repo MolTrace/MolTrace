@@ -13,7 +13,7 @@ vi.mock("next/navigation", () => ({
 }))
 
 vi.mock("@/components/app/backend-status-indicator", () => ({
-  BackendStatusIndicator: () => <span>Backend connected</span>,
+  BackendStatusIndicator: () => <span>System connected</span>,
 }))
 
 describe("dashboard page", () => {

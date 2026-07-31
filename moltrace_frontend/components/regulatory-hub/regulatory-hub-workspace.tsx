@@ -35,8 +35,9 @@ import {
   Shield,
   UserRound,
 } from "lucide-react"
+import { statusLabel } from "@/lib/ui/status"
 
-/** Static demo rows — not synced to any backend. */
+/** Static illustrative rows — not derived from your data. */
 const DEMO_DOSSIER = {
   project: "PRJ-MTX-2047",
   compound: "MTX-447",
@@ -314,9 +315,8 @@ export function RegulatoryHubWorkspace() {
                               ? "secondary"
                               : "outline"
                         }
-                        className="capitalize"
                       >
-                        {row.status.replace("_", " ")}
+                        {statusLabel(row.status)}
                       </Badge>
                     </TableCell>
                     <TableCell className="font-mono text-xs">

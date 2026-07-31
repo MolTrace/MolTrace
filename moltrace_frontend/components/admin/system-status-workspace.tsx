@@ -1,5 +1,6 @@
 "use client"
 
+import { statusLabel } from "@/lib/ui/status"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { ApiError, apiFetch } from "@/lib/api/client"
 import { Badge } from "@/components/ui/badge"
@@ -437,7 +438,7 @@ export function SystemStatusWorkspace() {
                                 variant="outline"
                                 className={`font-normal ${dependencyBadgeClass(readStr(row, ["status"]))}`}
                               >
-                                {readStr(row, ["status"]) || "unknown"}
+                                {statusLabel(readStr(row, ["status"]))}
                               </Badge>
                             </TableCell>
                             <TableCell className="font-mono text-[10px]">
@@ -473,7 +474,7 @@ export function SystemStatusWorkspace() {
                                 variant="outline"
                                 className={`font-normal ${dependencyBadgeClass(readStr(row, ["status"]))}`}
                               >
-                                {readStr(row, ["status"]) || "unknown"}
+                                {statusLabel(readStr(row, ["status"]))}
                               </Badge>
                             </TableCell>
                             <TableCell className="font-mono text-[10px]">
