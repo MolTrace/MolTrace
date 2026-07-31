@@ -27,15 +27,37 @@ integration, which is how the reasons are phrased.
 
 from __future__ import annotations
 
+import math
+import re
 from dataclasses import dataclass, field
 from typing import Any
 
-# Recycle time (d1 + acquisition time) thresholds, in seconds. 25 s covers
-# 5·T1 for the common small-molecule 1H range; below 10 s the differential
-# saturation between fast- and slow-relaxing protons is large enough that
-# integrals should not be presented as proton counts without qualification.
-QUANTITATIVE_RECYCLE_S = 25.0
-SEMI_QUANTITATIVE_RECYCLE_S = 10.0
+# Integration bias is judged from the Ernst steady state rather than from a
+# flat recycle-time threshold, because the flip angle matters as much as the
+# delay. For a pulse of flip angle a repeated every T seconds, the steady-state
+# signal of a spin with relaxation time T1 is
+#
+#     S(T1)  ∝  sin(a) · (1 - E) / (1 - E·cos(a)),      E = exp(-T / T1)
+#
+# What corrupts an integral is not saturation itself but DIFFERENTIAL
+# saturation: fast- and slow-relaxing protons losing different fractions. So
+# the figure of merit is the ratio of S between the extremes of a plausible
+# small-molecule 1H T1 range. A 90 degree pulse needs ~5·T1 to bring that ratio
+# near 1, which is where the familiar "25-30 s" rule comes from; a 30 degree
+# pulse — the standard routine experiment, zg30 — reaches the same fidelity far
+# sooner, and judging it by the 90 degree rule condemns almost every real
+# spectrum ever recorded.
+T1_FAST_S = 0.5
+T1_SLOW_S = 5.0
+
+# Tolerated ratio S(fast)/S(slow). 2% is a genuinely quantitative integral;
+# beyond 10% the integrals reflect relaxation as much as proton count.
+QUANTITATIVE_BIAS_RATIO = 1.02
+SEMI_QUANTITATIVE_BIAS_RATIO = 1.10
+
+# Flip angle inferred from the pulse-program name when it is not supplied.
+# Bruker names the angle in the sequence: zg30 is 30 degrees, zg is a 90.
+_DEFAULT_PULSE_ANGLE_DEG = 90.0
 
 # Scans below this give poor SNR on minor components; integrals of small peaks
 # carry large relative error even when relaxation is complete.
@@ -77,6 +99,47 @@ class AcquisitionQuality:
         }
 
 
+def pulse_angle_from_program(pulse_program: str | None) -> float:
+    """Flip angle in degrees, read from the Bruker pulse-program name.
+
+    ``zg30`` is a 30 degree read pulse, ``zg60`` a 60, plain ``zg`` a 90.
+    Unrecognised sequences fall back to 90 degrees, which is the conservative
+    choice: it demands the longest recycle delay.
+    """
+    if not pulse_program:
+        return _DEFAULT_PULSE_ANGLE_DEG
+    match = re.search(r"(\d{2,3})\s*$", pulse_program.strip().lower())
+    if match:
+        angle = float(match.group(1))
+        if 1.0 <= angle <= 180.0:
+            return angle
+    return _DEFAULT_PULSE_ANGLE_DEG
+
+
+def steady_state_response(*, recycle_s: float, t1_s: float, angle_deg: float) -> float:
+    """Ernst steady-state signal for one spin, in arbitrary units."""
+    angle = math.radians(angle_deg)
+    e = math.exp(-recycle_s / t1_s) if t1_s > 0 else 0.0
+    denominator = 1.0 - e * math.cos(angle)
+    if denominator <= 0:
+        return 0.0
+    return math.sin(angle) * (1.0 - e) / denominator
+
+
+def differential_saturation_ratio(*, recycle_s: float, angle_deg: float) -> float:
+    """S(fast-relaxing) / S(slow-relaxing) across the plausible 1H T1 range.
+
+    1.0 means both relax fully between transients and their integrals are
+    directly comparable; larger values mean slowly relaxing protons integrate
+    low purely because of the acquisition.
+    """
+    fast = steady_state_response(recycle_s=recycle_s, t1_s=T1_FAST_S, angle_deg=angle_deg)
+    slow = steady_state_response(recycle_s=recycle_s, t1_s=T1_SLOW_S, angle_deg=angle_deg)
+    if slow <= 0:
+        return float("inf")
+    return fast / slow
+
+
 def acquisition_time_s(*, td: float | None, sw_hz: float | None) -> float | None:
     """Acquisition time from time-domain points and sweep width.
 
@@ -95,6 +158,7 @@ def assess_1h_acquisition(
     sw_hz: float | None,
     scans: int | None = None,
     pulse_program: str | None = None,
+    pulse_angle_deg: float | None = None,
 ) -> AcquisitionQuality:
     """Classify how far the acquisition supports quantitative integration."""
     aq = acquisition_time_s(td=td, sw_hz=sw_hz)
@@ -148,27 +212,50 @@ def assess_1h_acquisition(
             "error even when relaxation is complete."
         )
 
-    if recycle >= QUANTITATIVE_RECYCLE_S:
+    angle = (
+        float(pulse_angle_deg)
+        if pulse_angle_deg is not None
+        else pulse_angle_from_program(pulse_program)
+    )
+    parameters["pulse_angle_deg"] = angle
+    ratio = differential_saturation_ratio(recycle_s=recycle, angle_deg=angle)
+    parameters["differential_saturation_ratio"] = (
+        round(ratio, 4) if math.isfinite(ratio) else None
+    )
+
+    bias_pct = (ratio - 1.0) * 100.0 if math.isfinite(ratio) else float("inf")
+    summary = (
+        f"Recycle time {recycle:.1f} s at a {angle:.0f} degree pulse. Across a "
+        f"{T1_FAST_S:g}-{T1_SLOW_S:g} s T1 range that leaves "
+    )
+
+    if ratio <= QUANTITATIVE_BIAS_RATIO:
         reasons.insert(
             0,
-            f"Recycle time {recycle:.1f} s is consistent with >=5xT1 for typical "
-            "small-molecule 1H, so integrals may be read as proton counts. T1 was "
-            "not measured.",
+            summary
+            + f"about {bias_pct:.0f}% differential saturation, so integrals may be "
+            "read as proton counts. T1 was not measured.",
         )
         return AcquisitionQuality(LEVEL_QUANTITATIVE, reasons, parameters)
 
-    if recycle >= SEMI_QUANTITATIVE_RECYCLE_S:
+    if ratio <= SEMI_QUANTITATIVE_BIAS_RATIO:
         reasons.insert(
             0,
-            f"Recycle time {recycle:.1f} s is short of the ~25 s that covers 5xT1 for "
-            "typical small-molecule 1H. Slowly relaxing protons will integrate low.",
+            summary
+            + f"about {bias_pct:.0f}% differential saturation: slowly relaxing "
+            "protons integrate low by roughly that much.",
         )
         return AcquisitionQuality(LEVEL_SEMI, reasons, parameters)
 
     reasons.insert(
         0,
-        f"Recycle time {recycle:.1f} s is far below the ~25 s needed for full "
-        "relaxation. Integrals reflect relaxation rates as much as proton counts and "
-        "should not be read as proton ratios.",
+        summary
+        + (
+            f"about {bias_pct:.0f}% differential saturation"
+            if math.isfinite(bias_pct)
+            else "near-total saturation"
+        )
+        + ". Integrals reflect relaxation rates as much as proton counts and should "
+        "not be read as proton ratios.",
     )
     return AcquisitionQuality(LEVEL_NOT, reasons, parameters)
