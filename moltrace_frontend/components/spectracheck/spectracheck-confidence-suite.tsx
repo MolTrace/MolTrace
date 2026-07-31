@@ -665,7 +665,9 @@ function UnifiedConfidenceTab({
 
   return (
     <div className="space-y-6">
-      <SpectraCheckSavedSessionReviewAudit backendSessionId={backendSessionId} />
+      <div id="spectracheck-review-gate" className="scroll-mt-20">
+        <SpectraCheckSavedSessionReviewAudit backendSessionId={backendSessionId} />
+      </div>
       <ModuleCard
         accent="teal"
         eyebrow="Spectroscopy · Unified Confidence"
@@ -3036,6 +3038,18 @@ function UnifiedConfidencePanels({ data }: { data: unknown }) {
               <Badge variant="secondary">No automatic hard-stop flags (still verify experimentally)</Badge>
             </>
           )}
+          <Button
+            type="button"
+            variant="link"
+            className="ml-auto h-auto p-0 text-sm"
+            onClick={() =>
+              document
+                .getElementById("spectracheck-review-gate")
+                ?.scrollIntoView({ behavior: "smooth", block: "start" })
+            }
+          >
+            Go to review gate →
+          </Button>
         </CardContent>
       </Card>
 
