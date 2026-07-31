@@ -229,12 +229,14 @@ export function CompoundRegistryWorkspace() {
     setSearchBusy(true)
     try {
       const body: Record<string, unknown> = {}
+      // CompoundRegistrySearchRequest (extra="forbid") fields: `name` (its filter
+      // already matches aliases too) and `inchikey` (no underscore).
       const na = sfNameAlias.trim()
-      if (na) body.name_alias = na
+      if (na) body.name = na
       const f = sfFormula.trim()
       if (f) body.formula = f
       const ik = sfInchiKey.trim()
-      if (ik) body.inchi_key = ik
+      if (ik) body.inchikey = ik
       if (sfCompoundType !== "__any__") body.compound_type = sfCompoundType
       const minRaw = sfMassMin.trim()
       const maxRaw = sfMassMax.trim()
