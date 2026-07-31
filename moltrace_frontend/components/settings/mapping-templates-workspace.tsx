@@ -374,10 +374,7 @@ export function MappingTemplatesWorkspace() {
           Configure mapping templates and external object links for connector-driven data flow.
         </p>
         <p className="mt-1 text-xs text-muted-foreground">
-          <span
-            className="cursor-help underline decoration-dotted underline-offset-2"
-            title="Mapping templates define how fields from external systems become MolTrace projects, samples, sessions, dossiers, experiments, files, or action items."
-          >
+          <span>
             Mapping templates define how fields from external systems become MolTrace projects, samples, sessions,
             dossiers, experiments, files, or action items.
           </span>
