@@ -13,6 +13,11 @@ import { formatApiError } from "@/components/spectracheck/spectracheck-helpers"
 import { parseCandidatesFromText } from "@/components/spectracheck/gsd-jcoupling-panel"
 import type { components } from "@/src/lib/api/schema"
 import { readRetrievalCoverage } from "@/src/lib/spectracheck/retrieval-nucleus-coverage"
+import { InfoTooltip } from "@/components/ui/info-tooltip"
+
+/** Mechanism only — the caveat stays in the visible description. */
+const RETRIEVE_MECHANISM_TOOLTIP =
+  "Nearest-neighbour search over encoded chemical shifts, ranked by L2 distance against the reference index configured for this deployment."
 
 /**
  * Spectral-similarity retrieval (`POST /spectrum/retrieve`).
@@ -218,9 +223,14 @@ export function SpectrumRetrievePanel({
       <ModuleCard
         accent="violet"
         eyebrow="Candidate tool · Similarity search"
-        title="Spectral-similarity retrieval"
+        title={
+          <span className="inline-flex items-center gap-1.5">
+            Spectral-similarity retrieval
+            <InfoTooltip label="How retrieval works" content={RETRIEVE_MECHANISM_TOOLTIP} />
+          </span>
+        }
         icon={DatabaseZap}
-        description="Finds reference spectra closest to a candidate structure. Nearest-neighbour search over encoded shifts, ranked by L2 distance on the server-configured index; matches are decision-support, not identity assignments."
+        description="Finds reference spectra closest to a candidate structure. Matches are decision-support, not identity assignments."
         className="min-w-0 overflow-visible shadow-none"
       >
         <div className="space-y-4">

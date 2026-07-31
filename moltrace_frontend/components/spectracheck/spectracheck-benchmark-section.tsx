@@ -31,6 +31,15 @@ import {
 import { formatApiError } from "@/components/spectracheck/spectracheck-helpers"
 import { isRecord } from "@/components/spectracheck/spectracheck-nmr-result-parse"
 import { Activity, BarChart3, PlayCircle, RotateCcw, ShieldCheck, Sparkles } from "lucide-react"
+import { InfoTooltip } from "@/components/ui/info-tooltip"
+
+/** Mechanism only — the caveat stays in the visible description. */
+const BENCHMARK_CASE_TOOLTIP =
+  "Nucleus is 1H or 13C. Audit fields — sample ID, SHA-256, operator and instrument — are editable under the raw-data toggle on each case."
+
+/** Mechanism only — the caveat stays in the visible description. */
+const BENCHMARK_MECHANISM_TOOLTIP =
+  "Scores each (structure, observed NMR) case on peak-level accuracy, structural ranking, explainability, robustness and regulatory evidence. Runs the same pipeline as processed-NMR analysis, so results are directly comparable."
 
 const DEFAULT_CASES: Record<string, unknown>[] = [
   {
@@ -228,9 +237,14 @@ export function SpectraCheckBenchmarkSection() {
       <ModuleCard
         accent="teal"
         eyebrow="Step 1 · Suite"
-        title="5-layer SpectraCheck benchmark"
+        title={
+          <span className="inline-flex items-center gap-1.5">
+            5-layer SpectraCheck benchmark
+            <InfoTooltip label="What is scored" content={BENCHMARK_MECHANISM_TOOLTIP} />
+          </span>
+        }
         icon={Sparkles}
-        description="Score curated (structure, observed NMR) cases across peak-level accuracy, structural ranking, explainability, robustness, and regulatory evidence. Same pipeline as the processed-NMR analysis, so results are comparable."
+        description="Scores curated cases and reports where interpretation is weakest."
       >
         <div className="space-y-4">
           <div data-testid="benchmark-suite-input">
@@ -242,7 +256,7 @@ export function SpectraCheckBenchmarkSection() {
               fields={BENCHMARK_CASE_FIELDS}
               initialValue={cases}
               onChange={setCases}
-              description="Each case is a (structure, observed NMR) pair, nucleus 1H or 13C. Audit fields (sample ID, SHA-256, operator, instrument) live under the raw-JSON toggle."
+              description={`One case per (structure, observed NMR) pair. ${BENCHMARK_CASE_TOOLTIP}`}
               idPrefix="bench-cases"
             />
           </div>
