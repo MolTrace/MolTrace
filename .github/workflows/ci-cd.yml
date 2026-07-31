@@ -143,7 +143,7 @@ jobs:
         run: uv run --with pytest-split pytest -n auto --splits 4 --group ${{ matrix.group }}
 
   backend-slow-tests:
-    name: Backend · slow regression suite
+    name: Backend · slow regression suite (shard ${{ matrix.group }}/4)
     # The heavy FID/GSD validation guards (>30s, marked `slow` and therefore
     # excluded from the per-commit fast lane above). Run on pushes to main only
     # so the regression coverage isn't lost while PRs stay fast. This is an
@@ -152,9 +152,22 @@ jobs:
     # the `deploy` job's `needs:` below.
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
-    # Generous ceiling: the slow set is a handful of heavy fixtures (the dense
-    # ¹³C FID recovery alone is ~40s of compute), so 30 min kills a true hang
-    # without clipping a legitimately long validation run.
+    # Sharded across 4 runners with pytest-split, exactly like backend-tests above.
+    # The slow set is ~13 min of serial compute (the dense ¹³C FID recovery alone
+    # is ~40-65s); unsharded on a 2-vCPU runner it crept past the 30-min ceiling
+    # and got KILLED near the end — a timed-out job reports as "cancelled", which
+    # skips the gate + deploy. Splitting into 4 groups (~3-4 min each) keeps every
+    # shard well under the cap and relieves the per-runner memory pressure that was
+    # OOM-killing and restarting xdist workers. `fail-fast: false` so one shard's
+    # real failure reports on its own instead of cancelling its siblings.
+    strategy:
+      fail-fast: false
+      matrix:
+        group: [1, 2, 3, 4]
+    # Per-shard backstop. With sharding this only ever fires on a true hang — and
+    # the per-test --timeout below surfaces such a hang with a traceback naming the
+    # exact test, instead of the whole shard dying silently at the cap (which is
+    # what made the earlier unsharded cancellation impossible to diagnose).
     timeout-minutes: 30
     defaults:
       run:
@@ -173,8 +186,18 @@ jobs:
       - name: Install dependencies
         run: uv sync --frozen --extra fid --extra dev
 
-      - name: Run slow tests
-        run: uv run pytest -n auto -m slow
+      # pytest-split divides the collected slow set into 4 groups; this leg runs
+      # only group ${{ matrix.group }} (still `-n auto` within the shard). Both
+      # pytest-split and pytest-timeout are pulled in just-in-time via `uv run
+      # --with`, so the backend's pyproject stays untouched (split-sessions: no BE
+      # edits). --timeout=600 (thread method, xdist-safe) fails a genuinely hung
+      # test with a traceback rather than burning the shard's whole 30-min budget
+      # in silence; the heaviest real test is ~65s, so 600s never clips a legit run.
+      - name: Run slow tests (shard ${{ matrix.group }}/4)
+        run: >-
+          uv run --with pytest-split --with pytest-timeout pytest -m slow -n auto
+          --splits 4 --group ${{ matrix.group }}
+          --timeout=600 --timeout-method=thread
 
   deployment-gate:
     name: Deployment gate · fail-closed release control
