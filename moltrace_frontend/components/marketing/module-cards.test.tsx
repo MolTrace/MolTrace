@@ -46,31 +46,28 @@ describe("ModuleCards", () => {
     await waitFor(() => expect(screen.getByText("Capabilities")).toBeInTheDocument())
   })
 
-  // Each module card carries a direct link into the running module alongside the
-  // in-place "Explore Module" preview — the same "Open <module>" CTA the module
-  // marketing pages use.
+  // The launch link lives INSIDE the explore overlay, not on the card: the card
+  // carries one CTA ("Explore Module") rather than two competing ones.
+  it("keeps the card down to a single CTA, with no launch link beside it", () => {
+    render(<ModuleCards />)
+    expect(screen.getAllByRole("button", { name: /Explore Module/i }).length).toBeGreaterThan(0)
+    expect(screen.queryByRole("link", { name: /Open SpectraCheck/i })).not.toBeInTheDocument()
+  })
+
   it.each([
     ["MODULE 01", "Open SpectraCheck", "/spectracheck"],
     ["MODULE 02", "Open Regentry", "/regulatory"],
     ["MODULE 03", "Open Repho", "/reactions"],
-  ])("links %s to the live module via '%s'", (tab, label, href) => {
+  ])("reveals %s's '%s' link once the overlay is open", async (tab, label, href) => {
     render(<ModuleCards />)
     fireEvent.click(screen.getByRole("button", { name: tab }))
 
-    // Rendered twice (desktop CTA row + mobile CTA stack); both must point at
-    // the module route.
-    const links = screen.getAllByRole("link", { name: new RegExp(label, "i") })
-    expect(links.length).toBeGreaterThan(0)
-    for (const link of links) {
-      expect(link).toHaveAttribute("href", href)
-    }
-  })
+    // Not on the card...
+    expect(screen.queryByRole("link", { name: new RegExp(label, "i") })).not.toBeInTheDocument()
 
-  it("keeps a way into the module while the explore overlay is open", async () => {
-    render(<ModuleCards />)
+    // ...and present once the reader opens the preview.
     fireEvent.click(screen.getAllByRole("button", { name: /Explore Module/i })[0])
-
-    const link = await screen.findByRole("link", { name: /Open SpectraCheck/i }, { timeout: 4000 })
-    expect(link).toHaveAttribute("href", "/spectracheck")
+    const link = await screen.findByRole("link", { name: new RegExp(label, "i") }, { timeout: 4000 })
+    expect(link).toHaveAttribute("href", href)
   })
 })

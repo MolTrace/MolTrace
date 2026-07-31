@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react"
 import { ArrowRight, Check } from "lucide-react"
 import dynamic from "next/dynamic"
-import Link from "next/link"
 
 // The three "Explore Module" overlays live in a separate chunk and are pulled in
 // only when a user opens one — keeping ~half of this module's original code (the
@@ -30,10 +29,6 @@ const modules = [
     title: "Spectroscopy Intelligence",
     desc: "Interpret raw FID files, elucidate molecular structures from 1H/13C/2D NMR, and annotate unknown compounds from LC-MS/MS. AI-assisted, human-verified.",
     badge: "Start Here",
-    // Direct link into the running module, mirroring the "Open SpectraCheck"
-    // CTA on the module marketing pages (/spectroscopy, /regulatory-hub,
-    // /reaction-optimization) so the homepage card can launch the module too.
-    app: { href: "/spectracheck", label: "Open SpectraCheck" },
     color: {
       text: "text-teal-500 dark:text-teal-400",
       borderActive: "border-teal-500 dark:border-teal-400",
@@ -41,10 +36,6 @@ const modules = [
       badgeBg: "bg-teal-500/10 border border-teal-500/30 text-teal-600 dark:text-teal-400",
       check: "text-teal-500 dark:text-teal-400",
       btn: "bg-teal-500 text-white hover:bg-teal-600 dark:bg-teal-400 dark:text-black dark:hover:bg-teal-300",
-      // Secondary (outline) CTA. Uses the AA-safe `--mt-*-ink` text token
-      // rather than the bright brand hue, which fails contrast as small text.
-      inkVar: "--mt-teal-ink",
-      hueVar: "--mt-teal",
     },
     features: [
       "1D & 2D NMR interpretation (COSY, HSQC, HMBC)",
@@ -60,7 +51,6 @@ const modules = [
     title: "Regulatory Intelligence Hub",
     desc: "Dossier assembly designed to support ICH requirements, impurity threshold monitoring, nitrosamine CPCA assessment, and jurisdiction-specific requirement tracking.",
     badge: null,
-    app: { href: "/regulatory", label: "Open Regentry" },
     color: {
       text: "text-cyan-500 dark:text-cyan-400",
       borderActive: "border-cyan-500 dark:border-cyan-400",
@@ -68,8 +58,6 @@ const modules = [
       badgeBg: "bg-cyan-500/10 border border-cyan-500/30 text-cyan-600 dark:text-cyan-400",
       check: "text-cyan-500 dark:text-cyan-400",
       btn: "bg-cyan-500 text-white hover:bg-cyan-600 dark:bg-cyan-400 dark:text-black dark:hover:bg-cyan-300",
-      inkVar: "--mt-cyan-ink",
-      hueVar: "--mt-cyan",
     },
     features: [
       "ICH Q3A/B/C impurity threshold automation",
@@ -85,7 +73,6 @@ const modules = [
     title: "Reaction Optimization",
     desc: "Bayesian multi-objective optimization of reaction conditions with uncertainty quantification, regulatory impurity constraints, and human-in-the-loop validation.",
     badge: null,
-    app: { href: "/reactions", label: "Open Repho" },
     color: {
       text: "text-violet-500 dark:text-violet-400",
       borderActive: "border-violet-500 dark:border-violet-400",
@@ -93,8 +80,6 @@ const modules = [
       badgeBg: "bg-violet-500/10 border border-violet-500/30 text-violet-600 dark:text-violet-400",
       check: "text-violet-500 dark:text-violet-400",
       btn: "bg-violet-500 text-white hover:bg-violet-600 dark:bg-violet-400 dark:text-black dark:hover:bg-violet-300",
-      inkVar: "--mt-violet-ink",
-      hueVar: "--mt-violet",
     },
     features: [
       "Gaussian process surrogate modelling",
@@ -186,32 +171,18 @@ export function ModuleCards() {
               <p className="mt-4 text-base leading-relaxed text-muted-foreground">
                 {m.desc}
               </p>
-              {/* Desktop-only CTA row (hidden on mobile): the in-place
-                  "Explore Module" preview plus a direct link into the live
-                  module, matching the module marketing pages. */}
-              <div className="mt-8 hidden flex-wrap items-center gap-3 lg:flex">
-                <button
-                  type="button"
-                  onClick={() => setExploreOpen(true)}
-                  className={`inline-flex items-center gap-2 rounded-md px-5 py-2.5 text-xs font-bold uppercase tracking-widest transition-opacity hover:opacity-85 ${m.color.btn}`}
-                  aria-expanded={exploreOpen}
-                >
-                  Explore Module
-                  <ArrowRight className="h-3.5 w-3.5" />
-                </button>
-                <Link
-                  href={m.app.href}
-                  className="inline-flex items-center gap-2 rounded-md border px-5 py-2.5 text-xs font-bold uppercase tracking-widest transition-colors hover:bg-[color-mix(in_oklab,var(--hue)_10%,transparent)]"
-                  style={{
-                    color: `var(${m.color.inkVar})`,
-                    borderColor: `color-mix(in oklab, var(${m.color.hueVar}) 40%, transparent)`,
-                    ["--hue" as string]: `var(${m.color.hueVar})`,
-                  }}
-                >
-                  {m.app.label}
-                  <ArrowRight className="h-3.5 w-3.5" />
-                </Link>
-              </div>
+              {/* Desktop-only Explore Module button (hidden on mobile). The
+                  "Open <module>" link lives inside the overlay this opens, so
+                  the card carries one CTA rather than two competing ones. */}
+              <button
+                type="button"
+                onClick={() => setExploreOpen(true)}
+                className={`mt-8 hidden items-center gap-2 rounded-md px-5 py-2.5 text-xs font-bold uppercase tracking-widest transition-opacity hover:opacity-85 lg:inline-flex ${m.color.btn}`}
+                aria-expanded={exploreOpen}
+              >
+                Explore Module
+                <ArrowRight className="h-3.5 w-3.5" />
+              </button>
             </div>
 
             {/* Right: capabilities card */}
@@ -229,31 +200,18 @@ export function ModuleCards() {
               </ul>
             </div>
 
-            {/* Mobile-only CTA stack: rendered as a 3rd grid item so on
-                stacked mobile it appears AFTER the Capabilities card. Hidden
-                at lg+ where the desktop CTA row takes over. */}
-            <div className="flex flex-col gap-2 lg:hidden">
-              <button
-                type="button"
-                onClick={() => setExploreOpen(true)}
-                className={`inline-flex w-full items-center justify-center gap-2 rounded-md px-5 py-3 text-xs font-bold uppercase tracking-widest transition-opacity hover:opacity-85 ${m.color.btn}`}
-                aria-expanded={exploreOpen}
-              >
-                Explore Module
-                <ArrowRight className="h-3.5 w-3.5" />
-              </button>
-              <Link
-                href={m.app.href}
-                className="inline-flex w-full items-center justify-center gap-2 rounded-md border px-5 py-3 text-xs font-bold uppercase tracking-widest transition-colors"
-                style={{
-                  color: `var(${m.color.inkVar})`,
-                  borderColor: `color-mix(in oklab, var(${m.color.hueVar}) 40%, transparent)`,
-                }}
-              >
-                {m.app.label}
-                <ArrowRight className="h-3.5 w-3.5" />
-              </Link>
-            </div>
+            {/* Mobile-only Explore Module button: rendered as a 3rd grid item
+                so on stacked mobile it appears AFTER the Capabilities card.
+                Hidden at lg+ where the desktop button takes over. */}
+            <button
+              type="button"
+              onClick={() => setExploreOpen(true)}
+              className={`inline-flex w-full items-center justify-center gap-2 rounded-md px-5 py-3 text-xs font-bold uppercase tracking-widest transition-opacity hover:opacity-85 lg:hidden ${m.color.btn}`}
+              aria-expanded={exploreOpen}
+            >
+              Explore Module
+              <ArrowRight className="h-3.5 w-3.5" />
+            </button>
           </div>
         )}
       </div>
