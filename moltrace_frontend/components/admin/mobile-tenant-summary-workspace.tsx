@@ -212,14 +212,20 @@ function MobileMetric({
   )
 }
 
-function ProgramOrderCard({ moduleAccess }: { moduleAccess: TenantModuleAccess[] }) {
+function ProgramOrderCard({
+  moduleAccess,
+  licensingConfigured,
+}: {
+  moduleAccess: TenantModuleAccess[]
+  licensingConfigured: boolean
+}) {
   return (
     <ModuleCard
       accent="slate"
       eyebrow="Programs"
       title="Program Order"
       icon={ListOrdered}
-      description="Locked modules stay visible in MolTrace's core sequence."
+      description="The order modules run in. Every module stays visible regardless of licensing."
     >
       <div className="space-y-2">
         {moduleAccess.map((module, index) => (
@@ -228,9 +234,11 @@ function ProgramOrderCard({ moduleAccess }: { moduleAccess: TenantModuleAccess[]
               <p className="text-xs font-medium text-muted-foreground">Program {index + 1}</p>
               <p className="break-words text-sm font-semibold">{module.label}</p>
             </div>
-            <Badge variant={module.enabled ? "secondary" : "outline"} className="shrink-0">
-              {module.enabled ? "Enabled" : "Locked"}
-            </Badge>
+            {licensingConfigured ? (
+              <Badge variant={module.enabled ? "secondary" : "outline"} className="shrink-0">
+                {module.enabled ? "Licensed" : "Not licensed"}
+              </Badge>
+            ) : null}
           </div>
         ))}
       </div>
@@ -239,7 +247,15 @@ function ProgramOrderCard({ moduleAccess }: { moduleAccess: TenantModuleAccess[]
 }
 
 export function MobileTenantSummaryWorkspace() {
-  const { currentTenantId, tenantDisplayName, tenantStatus, moduleAccess, isAdmin, loading: tenantLoading } = useTenant()
+  const {
+    currentTenantId,
+    tenantDisplayName,
+    tenantStatus,
+    moduleAccess,
+    licensingConfigured,
+    isAdmin,
+    loading: tenantLoading,
+  } = useTenant()
   const [summary, setSummary] = useState<MobileTenantSummary>(() => emptySummary(tenantStatus, tenantDisplayName))
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
@@ -429,7 +445,7 @@ export function MobileTenantSummaryWorkspace() {
         </div>
       </ModuleCard>
 
-      <ProgramOrderCard moduleAccess={moduleAccess} />
+      <ProgramOrderCard moduleAccess={moduleAccess} licensingConfigured={licensingConfigured} />
 
       <div id="onboarding" className="scroll-mt-24">
         <ModuleCard

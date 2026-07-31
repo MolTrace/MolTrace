@@ -370,6 +370,7 @@ export function DashboardV0() {
     tenantDisplayName,
     isAdmin,
     moduleAccess,
+    licensingConfigured,
   } = tenantContext
   const live = overview.metrics != null
   const metrics = overview.metrics
@@ -1336,9 +1337,11 @@ export function DashboardV0() {
                     <span>
                       {index + 1}. {module.label}
                     </span>
-                    <Badge variant={module.enabled ? "secondary" : "outline"}>
-                      {module.enabled ? "enabled" : "locked"}
-                    </Badge>
+                    {licensingConfigured ? (
+                      <Badge variant={module.enabled ? "secondary" : "outline"}>
+                        {module.enabled ? "licensed" : "not licensed"}
+                      </Badge>
+                    ) : null}
                   </div>
                 </div>
               ))}
