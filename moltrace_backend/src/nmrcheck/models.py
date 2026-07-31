@@ -2876,6 +2876,9 @@ RegulatoryActionType = Literal[
     "impurity_identification",
     "impurity_qualification",
     "residual_solvent_review",
+    # ICH Q3D elemental impurities. The store has always written this value; it was missing here,
+    # so every action item raised by an elemental assessment made the whole list unreadable.
+    "elemental_impurity_review",
     "nitrosamine_risk_review",
     "qnmr_validation_gap",
     "ai_governance_gap",
