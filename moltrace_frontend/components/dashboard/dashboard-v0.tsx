@@ -1874,7 +1874,8 @@ export function DashboardV0() {
         ) : null}
         {!opsLoading && opsUseDemo ? (
           <p className="text-xs text-muted-foreground">
-            Live operations data couldn't load — showing example values.
+            Live operations data couldn't load — showing example values. QC failures are the
+            exception: that tile matches the Quality Alerts card.
           </p>
         ) : null}
         {!opsLoading && opsRollup?.available && opsRollup.partial ? (
@@ -2241,7 +2242,7 @@ export function DashboardV0() {
         eyebrow="Activity · Sessions"
         title="Recent Activity"
         icon={Activity}
-        description="Newest first when workflow data is available."
+        description="SpectraCheck sessions and workflow runs. Newest first when workflow data is available."
       >
           <StatusFilterPills
             label="Filter activity by status"

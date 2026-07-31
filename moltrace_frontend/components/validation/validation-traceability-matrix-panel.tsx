@@ -20,7 +20,7 @@ import {
 type Row = Record<string, unknown>
 
 const TRACEABILITY_TOOLTIP =
-  "Traceability maps user requirements to functions, risks, test cases, execution evidence, and validation coverage gaps."
+  "Links requirements to functions, risks, test cases, and execution evidence — and flags coverage gaps."
 
 function isRecord(v: unknown): v is Row {
   return Boolean(v) && typeof v === "object" && !Array.isArray(v)

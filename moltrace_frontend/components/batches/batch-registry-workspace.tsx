@@ -648,7 +648,7 @@ export function BatchRegistryWorkspace() {
         description={
           <span>
             Enter a regulatory dossier ID. The assessment is scoped to that dossier, plus the selected batch and its
-            compound.
+            compound when available.
           </span>
         }
       >

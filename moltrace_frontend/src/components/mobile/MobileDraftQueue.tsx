@@ -108,7 +108,7 @@ export function MobileDraftQueue() {
         <div className="grid gap-2 sm:grid-cols-2">
           <div className="space-y-1">
             <Label htmlFor="mobile-draft-action-type" className="text-xs">
-              action_type
+              action type
             </Label>
             <Input
               id="mobile-draft-action-type"
@@ -119,7 +119,7 @@ export function MobileDraftQueue() {
           </div>
           <div className="space-y-1">
             <Label htmlFor="mobile-draft-target-type" className="text-xs">
-              target_type
+              target type
             </Label>
             <Input
               id="mobile-draft-target-type"
@@ -130,7 +130,7 @@ export function MobileDraftQueue() {
           </div>
           <div className="space-y-1">
             <Label htmlFor="mobile-draft-target-id" className="text-xs">
-              target_id
+              target ID
             </Label>
             <Input
               id="mobile-draft-target-id"

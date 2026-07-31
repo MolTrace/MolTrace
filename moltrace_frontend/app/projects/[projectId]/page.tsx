@@ -189,7 +189,7 @@ export default function ProjectDetailPage() {
         </p>
         <h1 className="font-mono text-2xl font-bold tracking-tight">Project workspace</h1>
         <p className="max-w-3xl text-sm text-muted-foreground">
-          Metadata, samples, value summary, member access, and connected SpectraCheck / Regulatory / Reaction campaigns.
+          Metadata, samples, value summary, member access, and connected spectroscopy, regulatory, and reaction campaigns.
         </p>
       </div>
 

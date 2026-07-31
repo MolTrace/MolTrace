@@ -995,7 +995,7 @@ export function ValidationProjectDetailWorkspace() {
           <p className="text-sm font-medium">Validated state — change control active</p>
           <p className="text-xs text-muted-foreground">
             This project is <span className="font-mono">{readStr(project?.status)}</span>. Editing its records requires
-            a documented reason, which is recorded.
+            a documented reason — enter it here before editing; it is recorded as the change-control reason.
           </p>
           <div className="space-y-1">
             <Label htmlFor="change-reason" className="text-xs">

@@ -587,7 +587,7 @@ export function KnowledgeDatasetsDashboard() {
           eyebrow="Training"
           title="1. Training dataset candidates"
           icon={Database}
-          description="Curated claims nominated for model training."
+          description="Reviewed claims nominated for model training."
         >
           <div className="space-y-4">
             <div className="flex flex-wrap items-end gap-3">
@@ -623,7 +623,7 @@ export function KnowledgeDatasetsDashboard() {
                   </EmptyMedia>
                   <EmptyTitle>No training candidates</EmptyTitle>
                   <EmptyDescription>
-                    Nominate curated claims for ML training.
+                    Nominate reviewed claims for model training.
                   </EmptyDescription>
                 </EmptyHeader>
               </Empty>

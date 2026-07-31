@@ -36,7 +36,7 @@ export function ValidationTraceabilityWorkspace() {
         eyebrow="Project"
         title="Validation project"
         icon={Network}
-        description="Enter a validation project id to load or generate its traceability matrix."
+        description="Enter a validation project ID to load or generate its traceability matrix."
       >
         <div className="space-y-3">
           <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">

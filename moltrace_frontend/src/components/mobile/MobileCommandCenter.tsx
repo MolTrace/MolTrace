@@ -264,7 +264,7 @@ export function MobileCommandCenter() {
   return (
     <Card>
       <CardHeader className="pb-2">
-        <CardTitle className="text-base">Mobile Command Center</CardTitle>
+        <CardTitle className="text-base">Module Status</CardTitle>
         <CardDescription>Active alerts, pending actions, and health for each module.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-3 text-sm">

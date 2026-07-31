@@ -469,7 +469,7 @@ export function SPCProcessCapabilityPanel() {
           Process Capability &amp; Trending
         </span>
       }
-      description="Catches drift before a specification breach. Control chart, Cp/Cpk/Pp/Ppk/Cpm, and Shewhart / CUSUM / EWMA signals. Decision-support only."
+      description="Trends a single parameter to catch drift before a specification breach. Control chart, Cp/Cpk/Pp/Ppk/Cpm, and Shewhart / CUSUM / EWMA signals. Decision-support only."
     >
       <div className="space-y-6">
         {/* ── Inputs ── */}

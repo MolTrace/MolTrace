@@ -3107,10 +3107,10 @@ export function TenantDetailWorkspace() {
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
             <StatCard title="Environments" value={environments.length} />
             <StatCard title="Entitlements" value={entitlements.length} />
-            <StatCard title="Pilot programs" value={pilotPrograms.length} />
+            <StatCard title="Pilot Programs" value={pilotPrograms.length} />
             <StatCard title="Onboarding" value={onboardingProjects.length} />
-            <StatCard title="Procurement packages" value={procurementPackages.length} />
-            <StatCard title="Health score" value={readFirst(healthScore, ["score", "status"]) || "-"} />
+            <StatCard title="Procurement Packages" value={procurementPackages.length} />
+            <StatCard title="Health Score" value={readFirst(healthScore, ["score", "status"]) || "-"} />
           </div>
 
           <SectionCard title="Overview" description="Core tenant record — display name, tenant key, type, status, and primary contact." error={sections.tenant.error}>

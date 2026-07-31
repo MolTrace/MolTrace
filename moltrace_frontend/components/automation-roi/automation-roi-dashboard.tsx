@@ -270,7 +270,7 @@ export default function AutomationRoiDashboard() {
         eyebrow="Programs"
         title="Regentry events"
         icon={ListChecks}
-        description="Privacy-safe activity events — only dossier ID, jurisdiction, status, and review state. No regulatory questions, answers, or raw scientific data are recorded."
+        description="Privacy-safe activity events — only summary details such as dossier ID, jurisdiction, status, and review state. No regulatory questions, answers, or raw scientific data are recorded."
       >
         <div className="text-xs text-muted-foreground">
           <ul className="list-inside list-disc space-y-1">
