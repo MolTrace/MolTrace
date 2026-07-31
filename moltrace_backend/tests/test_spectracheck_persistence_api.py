@@ -1,3 +1,6 @@
+import hashlib
+import json
+
 from fastapi.testclient import TestClient
 
 
@@ -157,21 +160,30 @@ def test_spectracheck_project_sample_session_persistence_flow(client, api_header
         assert reviewed_session.status_code == 200
         assert reviewed_session.json()["status"] == "approved"
 
+        # RE-BASELINED (standalone-modules Layer 0.A). This used to post "b" * 64 and assert the
+        # stored digest came back as "b" * 64 — i.e. it pinned the defect that a caller could
+        # choose their own report fingerprint, letting a report and its digest disagree by design.
+        # The digest is what a signature and the audit trail bind to, so it is now always the
+        # server's computation and a supplied hash is a claim to verify. See
+        # test_tenant_ops_and_reference_data_hardening.py for the invariant.
+        report_json = {"sample_id": "MT-SAMPLE-001", "human_review_required": True}
+        expected_sha256 = hashlib.sha256(
+            json.dumps(report_json, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        ).hexdigest()
         report_res = client.post(
             f"/spectracheck/sessions/{session['id']}/reports",
             headers=headers,
             json={
                 "report_title": "Structure Elucidation Review Draft",
                 "status": "draft_requires_review",
-                "report_json": {"sample_id": "MT-SAMPLE-001", "human_review_required": True},
+                "report_json": report_json,
                 "report_html": "<h1>Review draft</h1>",
-                "report_sha256": "b" * 64,
                 "metadata_json": {"format": "html"},
             },
         )
         assert report_res.status_code == 201, report_res.text
         report = report_res.json()
-        assert report["report_sha256"] == "b" * 64
+        assert report["report_sha256"] == expected_sha256
 
         audit_res = client.get(f"/spectracheck/sessions/{session['id']}/audit", headers=headers)
         assert audit_res.status_code == 200, audit_res.text

@@ -95,11 +95,14 @@ def _requirement(
     return res.json()
 
 
-def test_regulatory_jurisdiction_source_search_and_dossier_workflow(client):
+def test_regulatory_jurisdiction_source_search_and_dossier_workflow(client, api_headers):
     with client:
         headers = _sign_up(client, "reg-intel-workflow@example.com")
 
-        jurisdiction = _jurisdiction(client, headers)
+        # Jurisdictions and source documents are GLOBAL, unowned reference data: every caller's
+        # citations and assessment verdicts resolve against them. Publishing them is therefore an
+        # operator action (standalone-modules Layer 0.A) — the regulatory user below consumes them.
+        jurisdiction = _jurisdiction(client, api_headers)
         listed_jurisdictions = client.get("/regulatory/jurisdictions", headers=headers)
         assert listed_jurisdictions.status_code == 200, listed_jurisdictions.text
         assert listed_jurisdictions.json()[0]["name"] == "US FDA"
@@ -115,7 +118,7 @@ def test_regulatory_jurisdiction_source_search_and_dossier_workflow(client):
         assert no_source_query.json()["answer"]["confidence_label"] == "insufficient_sources"
         assert no_source_query.json()["answer"]["human_review_required"] is True
 
-        source = _source(client, headers, jurisdiction["id"])
+        source = _source(client, api_headers, jurisdiction["id"])
         assert source["sha256"]
         assert source["citations"]
         citation_id = source["citations"][0]["id"]
@@ -177,11 +180,12 @@ def test_regulatory_jurisdiction_source_search_and_dossier_workflow(client):
         assert fetched_query.json()["answer"]["citation_ids_json"] == answer["citation_ids_json"]
 
 
-def test_regulatory_risk_review_and_readiness_report(client):
+def test_regulatory_risk_review_and_readiness_report(client, api_headers):
     with client:
         headers = _sign_up(client, "reg-intel-risk@example.com")
-        jurisdiction = _jurisdiction(client, headers)
-        source = _source(client, headers, jurisdiction["id"])
+        # Global reference data is published by an operator; the dossier work below is the user's.
+        jurisdiction = _jurisdiction(client, api_headers)
+        source = _source(client, api_headers, jurisdiction["id"])
         dossier = _dossier(client, headers, jurisdiction["id"])
         citation_id = source["citations"][0]["id"]
         satisfied = _requirement(

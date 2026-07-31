@@ -13248,23 +13248,35 @@ def _is_internal_super_admin(context: AccessContext) -> bool:
     return bool(context.system_api_key or (context.user and context.user.is_admin))
 
 
-def _require_tenant_scope_header(
+def _require_tenant_ops_access(
     *,
     context: AccessContext,
     requested_tenant_id: int | None,
     actual_tenant_id: int,
 ) -> None:
-    if _is_internal_super_admin(context):
-        return
-    if requested_tenant_id is None:
+    """Gate the tenant-operations surface (tenants, entitlements, pilots, profiles, exports).
+
+    This used to accept any authenticated caller who echoed the path's tenant id back in an
+    ``x-tenant-id`` header. That proved nothing: the header is supplied by the caller, so matching
+    it against the URL only demonstrated the caller could read the URL. A customer could therefore
+    read *and write* another tenant's records — including minting their own entitlement rows.
+
+    A request carries no server-derived tenant today (``AccessContext`` has no tenant, and
+    ``organizations`` has no link to ``tenants``), so there is no verifiable non-admin tenant claim
+    to check. Until that binding exists, this surface is internal operations only and everyone else
+    is denied. The header is still honoured as a *consistency* check for the callers that send it,
+    so a mis-targeted console request fails loudly instead of quietly editing the wrong tenant.
+    """
+    if not _is_internal_super_admin(context):
         raise HTTPException(
             status_code=403,
-            detail="Tenant-scoped access requires an x-tenant-id header.",
+            detail="Tenant administration access is required.",
         )
-    try:
-        tenant_store.ensure_tenant_scope(requested_tenant_id, actual_tenant_id)
-    except Exception as exc:
-        _raise_tenant_saas_http_error(exc)
+    if requested_tenant_id is not None:
+        try:
+            tenant_store.ensure_tenant_scope(requested_tenant_id, actual_tenant_id)
+        except Exception as exc:
+            _raise_tenant_saas_http_error(exc)
 
 
 @router.get(
@@ -15720,7 +15732,7 @@ def get_tenant_route(
     x_tenant_id: int | None = Header(default=None, alias="x-tenant-id"),
     context: AccessContext = Depends(require_access_context),
 ) -> Tenant:
-    _require_tenant_scope_header(
+    _require_tenant_ops_access(
         context=context,
         requested_tenant_id=x_tenant_id,
         actual_tenant_id=tenant_id,
@@ -15743,7 +15755,7 @@ def update_tenant_route(
     x_tenant_id: int | None = Header(default=None, alias="x-tenant-id"),
     context: AccessContext = Depends(require_access_context),
 ) -> Tenant:
-    _require_tenant_scope_header(
+    _require_tenant_ops_access(
         context=context,
         requested_tenant_id=x_tenant_id,
         actual_tenant_id=tenant_id,
@@ -15780,7 +15792,7 @@ def create_tenant_environment_route(
     x_tenant_id: int | None = Header(default=None, alias="x-tenant-id"),
     context: AccessContext = Depends(require_access_context),
 ) -> TenantEnvironment:
-    _require_tenant_scope_header(
+    _require_tenant_ops_access(
         context=context,
         requested_tenant_id=x_tenant_id,
         actual_tenant_id=tenant_id,
@@ -15813,7 +15825,7 @@ def list_tenant_environments_route(
     x_tenant_id: int | None = Header(default=None, alias="x-tenant-id"),
     context: AccessContext = Depends(require_access_context),
 ) -> list[TenantEnvironment]:
-    _require_tenant_scope_header(
+    _require_tenant_ops_access(
         context=context,
         requested_tenant_id=x_tenant_id,
         actual_tenant_id=tenant_id,
@@ -15850,7 +15862,7 @@ def update_tenant_environment_route(
         raise
     if record is None:
         raise HTTPException(status_code=404, detail="Tenant environment not found.")
-    _require_tenant_scope_header(
+    _require_tenant_ops_access(
         context=context,
         requested_tenant_id=x_tenant_id,
         actual_tenant_id=record.tenant_id,
@@ -15939,7 +15951,7 @@ def create_tenant_entitlement_route(
     x_tenant_id: int | None = Header(default=None, alias="x-tenant-id"),
     context: AccessContext = Depends(require_access_context),
 ) -> TenantEntitlement:
-    _require_tenant_scope_header(
+    _require_tenant_ops_access(
         context=context,
         requested_tenant_id=x_tenant_id,
         actual_tenant_id=tenant_id,
@@ -15977,7 +15989,7 @@ def list_tenant_entitlements_route(
     x_tenant_id: int | None = Header(default=None, alias="x-tenant-id"),
     context: AccessContext = Depends(require_access_context),
 ) -> list[TenantEntitlement]:
-    _require_tenant_scope_header(
+    _require_tenant_ops_access(
         context=context,
         requested_tenant_id=x_tenant_id,
         actual_tenant_id=tenant_id,
@@ -16014,7 +16026,7 @@ def update_tenant_entitlement_route(
         raise
     if record is None:
         raise HTTPException(status_code=404, detail="Tenant entitlement not found.")
-    _require_tenant_scope_header(
+    _require_tenant_ops_access(
         context=context,
         requested_tenant_id=x_tenant_id,
         actual_tenant_id=record.tenant_id,
@@ -16135,7 +16147,7 @@ def create_pilot_program_route(
     x_tenant_id: int | None = Header(default=None, alias="x-tenant-id"),
     context: AccessContext = Depends(require_access_context),
 ) -> PilotProgram:
-    _require_tenant_scope_header(
+    _require_tenant_ops_access(
         context=context,
         requested_tenant_id=x_tenant_id,
         actual_tenant_id=tenant_id,
@@ -16168,7 +16180,7 @@ def list_pilot_programs_route(
     x_tenant_id: int | None = Header(default=None, alias="x-tenant-id"),
     context: AccessContext = Depends(require_access_context),
 ) -> list[PilotProgram]:
-    _require_tenant_scope_header(
+    _require_tenant_ops_access(
         context=context,
         requested_tenant_id=x_tenant_id,
         actual_tenant_id=tenant_id,
@@ -16194,7 +16206,7 @@ def get_pilot_program_route(
     record = tenant_store.get_pilot_program(_state(request).session_factory, pilot_id)
     if record is None:
         raise HTTPException(status_code=404, detail="Pilot program not found.")
-    _require_tenant_scope_header(
+    _require_tenant_ops_access(
         context=context,
         requested_tenant_id=x_tenant_id,
         actual_tenant_id=record.tenant_id,
@@ -16221,7 +16233,7 @@ def update_pilot_program_route(
         raise
     if record is None:
         raise HTTPException(status_code=404, detail="Pilot program not found.")
-    _require_tenant_scope_header(
+    _require_tenant_ops_access(
         context=context,
         requested_tenant_id=x_tenant_id,
         actual_tenant_id=record.tenant_id,
@@ -16251,7 +16263,7 @@ def create_onboarding_project_route(
     x_tenant_id: int | None = Header(default=None, alias="x-tenant-id"),
     context: AccessContext = Depends(require_access_context),
 ) -> CustomerOnboardingProject:
-    _require_tenant_scope_header(
+    _require_tenant_ops_access(
         context=context,
         requested_tenant_id=x_tenant_id,
         actual_tenant_id=tenant_id,
@@ -16284,7 +16296,7 @@ def list_onboarding_projects_route(
     x_tenant_id: int | None = Header(default=None, alias="x-tenant-id"),
     context: AccessContext = Depends(require_access_context),
 ) -> list[CustomerOnboardingProject]:
-    _require_tenant_scope_header(
+    _require_tenant_ops_access(
         context=context,
         requested_tenant_id=x_tenant_id,
         actual_tenant_id=tenant_id,
@@ -16310,7 +16322,7 @@ def get_onboarding_project_route(
     record = tenant_store.get_onboarding_project(_state(request).session_factory, project_id)
     if record is None:
         raise HTTPException(status_code=404, detail="Onboarding project not found.")
-    _require_tenant_scope_header(
+    _require_tenant_ops_access(
         context=context,
         requested_tenant_id=x_tenant_id,
         actual_tenant_id=record.tenant_id,
@@ -16337,7 +16349,7 @@ def update_onboarding_project_route(
         raise
     if record is None:
         raise HTTPException(status_code=404, detail="Onboarding project not found.")
-    _require_tenant_scope_header(
+    _require_tenant_ops_access(
         context=context,
         requested_tenant_id=x_tenant_id,
         actual_tenant_id=record.tenant_id,
@@ -16370,7 +16382,7 @@ def create_implementation_task_route(
     project = tenant_store.get_onboarding_project(_state(request).session_factory, project_id)
     if project is None:
         raise HTTPException(status_code=404, detail="Onboarding project not found.")
-    _require_tenant_scope_header(
+    _require_tenant_ops_access(
         context=context,
         requested_tenant_id=x_tenant_id,
         actual_tenant_id=project.tenant_id,
@@ -16410,7 +16422,7 @@ def list_implementation_tasks_route(
     project = tenant_store.get_onboarding_project(_state(request).session_factory, project_id)
     if project is None:
         raise HTTPException(status_code=404, detail="Onboarding project not found.")
-    _require_tenant_scope_header(
+    _require_tenant_ops_access(
         context=context,
         requested_tenant_id=x_tenant_id,
         actual_tenant_id=project.tenant_id,
@@ -16440,7 +16452,7 @@ def update_implementation_task_route(
     )
     if task_tenant_id is None:
         raise HTTPException(status_code=404, detail="Implementation task not found.")
-    _require_tenant_scope_header(
+    _require_tenant_ops_access(
         context=context,
         requested_tenant_id=x_tenant_id,
         actual_tenant_id=task_tenant_id,
@@ -16477,7 +16489,7 @@ def create_tenant_data_boundary_route(
     x_tenant_id: int | None = Header(default=None, alias="x-tenant-id"),
     context: AccessContext = Depends(require_access_context),
 ) -> TenantDataBoundary:
-    _require_tenant_scope_header(
+    _require_tenant_ops_access(
         context=context,
         requested_tenant_id=x_tenant_id,
         actual_tenant_id=tenant_id,
@@ -16510,7 +16522,7 @@ def get_tenant_data_boundary_route(
     x_tenant_id: int | None = Header(default=None, alias="x-tenant-id"),
     context: AccessContext = Depends(require_access_context),
 ) -> TenantDataBoundary:
-    _require_tenant_scope_header(
+    _require_tenant_ops_access(
         context=context,
         requested_tenant_id=x_tenant_id,
         actual_tenant_id=tenant_id,
@@ -16544,7 +16556,7 @@ def update_tenant_data_boundary_route(
         raise
     if record is None:
         raise HTTPException(status_code=404, detail="Tenant data boundary not found.")
-    _require_tenant_scope_header(
+    _require_tenant_ops_access(
         context=context,
         requested_tenant_id=x_tenant_id,
         actual_tenant_id=record.tenant_id,
@@ -16574,7 +16586,7 @@ def create_tenant_security_profile_route(
     x_tenant_id: int | None = Header(default=None, alias="x-tenant-id"),
     context: AccessContext = Depends(require_access_context),
 ) -> TenantSecurityProfile:
-    _require_tenant_scope_header(
+    _require_tenant_ops_access(
         context=context,
         requested_tenant_id=x_tenant_id,
         actual_tenant_id=tenant_id,
@@ -16607,7 +16619,7 @@ def get_tenant_security_profile_route(
     x_tenant_id: int | None = Header(default=None, alias="x-tenant-id"),
     context: AccessContext = Depends(require_access_context),
 ) -> TenantSecurityProfile:
-    _require_tenant_scope_header(
+    _require_tenant_ops_access(
         context=context,
         requested_tenant_id=x_tenant_id,
         actual_tenant_id=tenant_id,
@@ -16641,7 +16653,7 @@ def update_tenant_security_profile_route(
         raise
     if record is None:
         raise HTTPException(status_code=404, detail="Tenant security profile not found.")
-    _require_tenant_scope_header(
+    _require_tenant_ops_access(
         context=context,
         requested_tenant_id=x_tenant_id,
         actual_tenant_id=record.tenant_id,
@@ -16671,7 +16683,7 @@ def create_tenant_validation_profile_route(
     x_tenant_id: int | None = Header(default=None, alias="x-tenant-id"),
     context: AccessContext = Depends(require_access_context),
 ) -> TenantValidationProfile:
-    _require_tenant_scope_header(
+    _require_tenant_ops_access(
         context=context,
         requested_tenant_id=x_tenant_id,
         actual_tenant_id=tenant_id,
@@ -16704,7 +16716,7 @@ def get_tenant_validation_profile_route(
     x_tenant_id: int | None = Header(default=None, alias="x-tenant-id"),
     context: AccessContext = Depends(require_access_context),
 ) -> TenantValidationProfile:
-    _require_tenant_scope_header(
+    _require_tenant_ops_access(
         context=context,
         requested_tenant_id=x_tenant_id,
         actual_tenant_id=tenant_id,
@@ -16738,7 +16750,7 @@ def update_tenant_validation_profile_route(
         raise
     if record is None:
         raise HTTPException(status_code=404, detail="Tenant validation profile not found.")
-    _require_tenant_scope_header(
+    _require_tenant_ops_access(
         context=context,
         requested_tenant_id=x_tenant_id,
         actual_tenant_id=record.tenant_id,
@@ -16766,7 +16778,7 @@ def get_tenant_usage_summary_route(
     x_tenant_id: int | None = Header(default=None, alias="x-tenant-id"),
     context: AccessContext = Depends(require_access_context),
 ) -> TenantUsageSummary:
-    _require_tenant_scope_header(
+    _require_tenant_ops_access(
         context=context,
         requested_tenant_id=x_tenant_id,
         actual_tenant_id=tenant_id,
@@ -16789,7 +16801,7 @@ def get_tenant_roi_route(
     x_tenant_id: int | None = Header(default=None, alias="x-tenant-id"),
     context: AccessContext = Depends(require_access_context),
 ) -> TenantRoiSnapshot:
-    _require_tenant_scope_header(
+    _require_tenant_ops_access(
         context=context,
         requested_tenant_id=x_tenant_id,
         actual_tenant_id=tenant_id,
@@ -16812,7 +16824,7 @@ def get_tenant_health_score_route(
     x_tenant_id: int | None = Header(default=None, alias="x-tenant-id"),
     context: AccessContext = Depends(require_access_context),
 ) -> CustomerSuccessHealthScore:
-    _require_tenant_scope_header(
+    _require_tenant_ops_access(
         context=context,
         requested_tenant_id=x_tenant_id,
         actual_tenant_id=tenant_id,
@@ -16837,7 +16849,7 @@ def create_tenant_procurement_package_route(
     x_tenant_id: int | None = Header(default=None, alias="x-tenant-id"),
     context: AccessContext = Depends(require_access_context),
 ) -> ProcurementEvidencePackage:
-    _require_tenant_scope_header(
+    _require_tenant_ops_access(
         context=context,
         requested_tenant_id=x_tenant_id,
         actual_tenant_id=tenant_id,
@@ -16874,7 +16886,7 @@ def list_tenant_procurement_packages_route(
     x_tenant_id: int | None = Header(default=None, alias="x-tenant-id"),
     context: AccessContext = Depends(require_access_context),
 ) -> list[ProcurementEvidencePackage]:
-    _require_tenant_scope_header(
+    _require_tenant_ops_access(
         context=context,
         requested_tenant_id=x_tenant_id,
         actual_tenant_id=tenant_id,
@@ -16900,7 +16912,7 @@ def get_procurement_package_route(
     record = tenant_store.get_procurement_package(_state(request).session_factory, package_id)
     if record is None:
         raise HTTPException(status_code=404, detail="Procurement evidence package not found.")
-    _require_tenant_scope_header(
+    _require_tenant_ops_access(
         context=context,
         requested_tenant_id=x_tenant_id,
         actual_tenant_id=record.tenant_id,
@@ -16921,7 +16933,7 @@ def create_tenant_audit_export_route(
     x_tenant_id: int | None = Header(default=None, alias="x-tenant-id"),
     context: AccessContext = Depends(require_access_context),
 ) -> TenantAuditExport:
-    _require_tenant_scope_header(
+    _require_tenant_ops_access(
         context=context,
         requested_tenant_id=x_tenant_id,
         actual_tenant_id=tenant_id,
@@ -16957,7 +16969,7 @@ def get_tenant_audit_export_route(
     record = tenant_store.get_audit_export(_state(request).session_factory, export_id)
     if record is None:
         raise HTTPException(status_code=404, detail="Tenant audit export not found.")
-    _require_tenant_scope_header(
+    _require_tenant_ops_access(
         context=context,
         requested_tenant_id=x_tenant_id,
         actual_tenant_id=record.tenant_id,
@@ -16976,7 +16988,7 @@ def get_tenant_module_readiness_route(
     x_tenant_id: int | None = Header(default=None, alias="x-tenant-id"),
     context: AccessContext = Depends(require_access_context),
 ) -> TenantModuleReadiness:
-    _require_tenant_scope_header(
+    _require_tenant_ops_access(
         context=context,
         requested_tenant_id=x_tenant_id,
         actual_tenant_id=tenant_id,
@@ -16999,7 +17011,7 @@ def get_tenant_go_live_readiness_route(
     x_tenant_id: int | None = Header(default=None, alias="x-tenant-id"),
     context: AccessContext = Depends(require_access_context),
 ) -> TenantGoLiveReadiness:
-    _require_tenant_scope_header(
+    _require_tenant_ops_access(
         context=context,
         requested_tenant_id=x_tenant_id,
         actual_tenant_id=tenant_id,
@@ -17310,7 +17322,7 @@ def seed_demo_tenant_route(
     x_tenant_id: int | None = Header(default=None, alias="x-tenant-id"),
     context: AccessContext = Depends(require_access_context),
 ) -> DemoTenantSeed:
-    _require_tenant_scope_header(
+    _require_tenant_ops_access(
         context=context,
         requested_tenant_id=x_tenant_id,
         actual_tenant_id=payload.tenant_id,
@@ -17346,7 +17358,7 @@ def get_demo_tenant_seed_route(
     record = golden_pilot_store.get_demo_seed(_state(request).session_factory, seed_id)
     if record is None:
         raise HTTPException(status_code=404, detail="Demo tenant seed not found.")
-    _require_tenant_scope_header(
+    _require_tenant_ops_access(
         context=context,
         requested_tenant_id=x_tenant_id,
         actual_tenant_id=record.tenant_id,
@@ -17368,7 +17380,7 @@ def run_pilot_scenario_route(
     context: AccessContext = Depends(require_access_context),
 ) -> PilotRunDetail:
     if payload.tenant_id is not None:
-        _require_tenant_scope_header(
+        _require_tenant_ops_access(
             context=context,
             requested_tenant_id=x_tenant_id,
             actual_tenant_id=payload.tenant_id,
@@ -17403,7 +17415,7 @@ def list_pilot_runs_route(
     context: AccessContext = Depends(require_access_context),
 ) -> list[PilotRun]:
     if tenant_id is not None:
-        _require_tenant_scope_header(context=context, requested_tenant_id=x_tenant_id, actual_tenant_id=tenant_id)
+        _require_tenant_ops_access(context=context, requested_tenant_id=x_tenant_id, actual_tenant_id=tenant_id)
     elif not _is_internal_super_admin(context):
         raise HTTPException(status_code=403, detail="Tenant-scoped access requires a tenant_id filter.")
     return golden_pilot_store.list_pilot_runs(_state(request).session_factory, tenant_id=tenant_id, limit=limit)
@@ -17424,7 +17436,7 @@ def get_pilot_run_route(
     if record is None:
         raise HTTPException(status_code=404, detail="Pilot run not found.")
     if record.tenant_id is not None:
-        _require_tenant_scope_header(context=context, requested_tenant_id=x_tenant_id, actual_tenant_id=record.tenant_id)
+        _require_tenant_ops_access(context=context, requested_tenant_id=x_tenant_id, actual_tenant_id=record.tenant_id)
     return record
 
 
@@ -17443,7 +17455,7 @@ def validate_pilot_run_route(
     if run is None:
         raise HTTPException(status_code=404, detail="Pilot run not found.")
     if run.tenant_id is not None:
-        _require_tenant_scope_header(context=context, requested_tenant_id=x_tenant_id, actual_tenant_id=run.tenant_id)
+        _require_tenant_ops_access(context=context, requested_tenant_id=x_tenant_id, actual_tenant_id=run.tenant_id)
     try:
         records = golden_pilot_store.validate_pilot_run(_state(request).session_factory, pilot_run_id)
     except Exception as exc:
@@ -17476,7 +17488,7 @@ def list_pilot_run_validation_results_route(
     if run is None:
         raise HTTPException(status_code=404, detail="Pilot run not found.")
     if run.tenant_id is not None:
-        _require_tenant_scope_header(context=context, requested_tenant_id=x_tenant_id, actual_tenant_id=run.tenant_id)
+        _require_tenant_ops_access(context=context, requested_tenant_id=x_tenant_id, actual_tenant_id=run.tenant_id)
     try:
         return golden_pilot_store.list_validation_results(_state(request).session_factory, pilot_run_id)
     except Exception as exc:
@@ -17497,7 +17509,7 @@ def create_acceptance_protocol_route(
     context: AccessContext = Depends(require_access_context),
 ) -> CustomerAcceptanceProtocol:
     if payload.tenant_id is not None:
-        _require_tenant_scope_header(context=context, requested_tenant_id=x_tenant_id, actual_tenant_id=payload.tenant_id)
+        _require_tenant_ops_access(context=context, requested_tenant_id=x_tenant_id, actual_tenant_id=payload.tenant_id)
     try:
         record = golden_pilot_store.create_acceptance_protocol(_state(request).session_factory, payload)
     except Exception as exc:
@@ -17528,7 +17540,7 @@ def list_acceptance_protocols_route(
     context: AccessContext = Depends(require_access_context),
 ) -> list[CustomerAcceptanceProtocol]:
     if tenant_id is not None:
-        _require_tenant_scope_header(context=context, requested_tenant_id=x_tenant_id, actual_tenant_id=tenant_id)
+        _require_tenant_ops_access(context=context, requested_tenant_id=x_tenant_id, actual_tenant_id=tenant_id)
     elif not _is_internal_super_admin(context):
         raise HTTPException(status_code=403, detail="Tenant-scoped access requires a tenant_id filter.")
     return golden_pilot_store.list_acceptance_protocols(
@@ -17553,7 +17565,7 @@ def get_acceptance_protocol_route(
     if record is None:
         raise HTTPException(status_code=404, detail="Customer acceptance protocol not found.")
     if record.tenant_id is not None:
-        _require_tenant_scope_header(context=context, requested_tenant_id=x_tenant_id, actual_tenant_id=record.tenant_id)
+        _require_tenant_ops_access(context=context, requested_tenant_id=x_tenant_id, actual_tenant_id=record.tenant_id)
     return record
 
 
@@ -17574,7 +17586,7 @@ def update_acceptance_protocol_route(
         raise HTTPException(status_code=404, detail="Customer acceptance protocol not found.")
     scope_tenant_id = payload.tenant_id or existing.tenant_id
     if scope_tenant_id is not None:
-        _require_tenant_scope_header(context=context, requested_tenant_id=x_tenant_id, actual_tenant_id=scope_tenant_id)
+        _require_tenant_ops_access(context=context, requested_tenant_id=x_tenant_id, actual_tenant_id=scope_tenant_id)
     try:
         record = golden_pilot_store.update_acceptance_protocol(_state(request).session_factory, protocol_id, payload)
     except Exception as exc:
@@ -17611,7 +17623,7 @@ def execute_acceptance_test_route(
         raise HTTPException(status_code=404, detail="Customer acceptance test not found.")
     protocol = golden_pilot_store.get_acceptance_protocol(_state(request).session_factory, existing.protocol_id)
     if protocol is not None and protocol.tenant_id is not None:
-        _require_tenant_scope_header(
+        _require_tenant_ops_access(
             context=context,
             requested_tenant_id=x_tenant_id,
             actual_tenant_id=protocol.tenant_id,
@@ -17650,7 +17662,7 @@ def list_acceptance_tests_route(
     if protocol is None:
         raise HTTPException(status_code=404, detail="Customer acceptance protocol not found.")
     if protocol.tenant_id is not None:
-        _require_tenant_scope_header(
+        _require_tenant_ops_access(
             context=context,
             requested_tenant_id=x_tenant_id,
             actual_tenant_id=protocol.tenant_id,
@@ -17675,7 +17687,7 @@ def create_pilot_readiness_assessment_route(
     context: AccessContext = Depends(require_access_context),
 ) -> PilotReadinessAssessment:
     if payload.tenant_id is not None:
-        _require_tenant_scope_header(context=context, requested_tenant_id=x_tenant_id, actual_tenant_id=payload.tenant_id)
+        _require_tenant_ops_access(context=context, requested_tenant_id=x_tenant_id, actual_tenant_id=payload.tenant_id)
     try:
         record = golden_pilot_store.create_readiness_assessment(_state(request).session_factory, payload)
     except Exception as exc:
@@ -17706,7 +17718,7 @@ def list_pilot_readiness_assessments_route(
     context: AccessContext = Depends(require_access_context),
 ) -> list[PilotReadinessAssessment]:
     if tenant_id is not None:
-        _require_tenant_scope_header(context=context, requested_tenant_id=x_tenant_id, actual_tenant_id=tenant_id)
+        _require_tenant_ops_access(context=context, requested_tenant_id=x_tenant_id, actual_tenant_id=tenant_id)
     elif not _is_internal_super_admin(context):
         raise HTTPException(status_code=403, detail="Tenant-scoped access requires a tenant_id filter.")
     return golden_pilot_store.list_readiness_assessments(
@@ -17731,7 +17743,7 @@ def get_pilot_readiness_assessment_route(
     if record is None:
         raise HTTPException(status_code=404, detail="Pilot readiness assessment not found.")
     if record.tenant_id is not None:
-        _require_tenant_scope_header(context=context, requested_tenant_id=x_tenant_id, actual_tenant_id=record.tenant_id)
+        _require_tenant_ops_access(context=context, requested_tenant_id=x_tenant_id, actual_tenant_id=record.tenant_id)
     return record
 
 
@@ -17748,7 +17760,7 @@ def create_pilot_signoff_route(
     context: AccessContext = Depends(require_access_context),
 ) -> PilotSignoffRecord:
     if payload.tenant_id is not None:
-        _require_tenant_scope_header(context=context, requested_tenant_id=x_tenant_id, actual_tenant_id=payload.tenant_id)
+        _require_tenant_ops_access(context=context, requested_tenant_id=x_tenant_id, actual_tenant_id=payload.tenant_id)
     try:
         record = golden_pilot_store.create_signoff(_state(request).session_factory, payload)
         if record.signature_record_id is None:
@@ -17811,7 +17823,7 @@ def get_pilot_signoff_route(
     if record is None:
         raise HTTPException(status_code=404, detail="Pilot signoff record not found.")
     if record.tenant_id is not None:
-        _require_tenant_scope_header(context=context, requested_tenant_id=x_tenant_id, actual_tenant_id=record.tenant_id)
+        _require_tenant_ops_access(context=context, requested_tenant_id=x_tenant_id, actual_tenant_id=record.tenant_id)
     return record
 
 
@@ -17832,7 +17844,7 @@ def create_pilot_evidence_bundle_route(
     if run is None:
         raise HTTPException(status_code=404, detail="Pilot run not found.")
     if run.tenant_id is not None:
-        _require_tenant_scope_header(context=context, requested_tenant_id=x_tenant_id, actual_tenant_id=run.tenant_id)
+        _require_tenant_ops_access(context=context, requested_tenant_id=x_tenant_id, actual_tenant_id=run.tenant_id)
     try:
         record = golden_pilot_store.create_evidence_bundle(_state(request).session_factory, pilot_run_id, payload)
     except Exception as exc:
@@ -17865,7 +17877,7 @@ def list_pilot_evidence_bundles_route(
     if run is None:
         raise HTTPException(status_code=404, detail="Pilot run not found.")
     if run.tenant_id is not None:
-        _require_tenant_scope_header(context=context, requested_tenant_id=x_tenant_id, actual_tenant_id=run.tenant_id)
+        _require_tenant_ops_access(context=context, requested_tenant_id=x_tenant_id, actual_tenant_id=run.tenant_id)
     try:
         return golden_pilot_store.list_evidence_bundles(_state(request).session_factory, pilot_run_id)
     except Exception as exc:
@@ -17884,7 +17896,7 @@ def get_pilot_customer_dashboard_route(
     x_tenant_id: int | None = Header(default=None, alias="x-tenant-id"),
     context: AccessContext = Depends(require_access_context),
 ) -> PilotCustomerDashboard:
-    _require_tenant_scope_header(context=context, requested_tenant_id=x_tenant_id, actual_tenant_id=tenant_id)
+    _require_tenant_ops_access(context=context, requested_tenant_id=x_tenant_id, actual_tenant_id=tenant_id)
     try:
         return golden_pilot_store.get_customer_dashboard(_state(request).session_factory, tenant_id)
     except Exception as exc:
@@ -17909,10 +17921,13 @@ def list_regulatory_jurisdictions_route(
 
 
 @router.post(
+    # Reference data is global and unowned: every tenant's assessments resolve against these rows,
+    # so one caller's "active" jurisdiction silently changes another caller's verdicts. Until the
+    # reference tables carry an owner/tenant tier, publishing them is an operator action.
     "/regulatory/jurisdictions",
     response_model=RegulatoryJurisdiction,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_admin)],
 )
 def create_regulatory_jurisdiction_route(
     payload: RegulatoryJurisdictionCreate,
@@ -17931,10 +17946,12 @@ def create_regulatory_jurisdiction_route(
 
 
 @router.post(
+    # Source documents are global and feed every caller's citations and grounded answers, so
+    # registering one is an operator action for the same reason as jurisdictions and rule sets.
     "/regulatory/sources/upload",
     response_model=RegulatorySourceDocument,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_admin)],
 )
 async def upload_regulatory_source_route(
     request: Request,
@@ -21953,10 +21970,13 @@ def list_regulatory_rule_sets_route(
 
 
 @router.post(
+    # See the jurisdictions gate: an "active" rule set overrides the built-in ICH thresholds for
+    # every caller, so a non-operator write here can change another user's residual-solvent,
+    # elemental and nitrosamine verdicts.
     "/regulatory/rule-sets",
     response_model=RegulatoryRuleSet,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_access_context)],
+    dependencies=[Depends(require_access_context), Depends(require_admin)],
 )
 def create_regulatory_rule_set_route(
     payload: RegulatoryRuleSetCreate,

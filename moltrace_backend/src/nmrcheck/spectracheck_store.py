@@ -976,7 +976,15 @@ def create_spectracheck_report(
 ) -> SpectraCheckReportRecord:
     _assert_no_uploaded_file_bytes(payload.report_json, path="report_json")
     _assert_no_uploaded_file_bytes(payload.metadata_json, path="metadata_json")
-    report_sha256 = payload.report_sha256 or _report_sha256(payload.report_json)
+    # The stored digest is always the server's own computation. Accepting a caller-supplied hash
+    # would let a report body and its fingerprint disagree by design, which defeats the point of
+    # having a fingerprint at all — the digest is what a signature and an audit trail bind to.
+    # A supplied hash is treated as a claim to verify, never as the value to store.
+    report_sha256 = _report_sha256(payload.report_json)
+    if payload.report_sha256 is not None and payload.report_sha256.lower() != report_sha256:
+        raise SpectraCheckPersistenceError(
+            "The supplied report fingerprint does not match the report contents."
+        )
     with session_scope(session_factory) as session:
         parent = _get_session(session, session_id, owner_scope_id=owner_scope_id)
         if parent is None:
