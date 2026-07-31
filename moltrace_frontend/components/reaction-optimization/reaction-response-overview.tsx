@@ -424,8 +424,8 @@ export function ReactionResponseOverview({
                   </ResponsiveContainer>
                 </div>
                 <div className="rounded-md border border-dashed border-muted-foreground/40 bg-muted/20 p-4 text-center text-xs text-muted-foreground">
-                  Response-surface heatmap appears when grid-level outcomes exist for condition pairs
-                  (not shown here to avoid implying unavailable data).
+                  Response-surface heatmap — placeholder. Needs grid-level outcomes for condition
+                  pairs (not shown here to avoid implying unavailable data).
                 </div>
               </div>
             ) : null}

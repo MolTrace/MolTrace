@@ -243,7 +243,7 @@ export function GreenMetricsPanel({
             Green metrics
           </span>
         }
-        description="Deterministic green-chemistry metrics per experiment, plus a CHEM21-based composite score. A scale-up / regulatory deliverable; decision-support, human review required."
+        description="Deterministic per-experiment E-factor, PMI, atom economy and RME, plus a CHEM21 solvent-table composite score. A scale-up / regulatory deliverable; decision-support, human review required."
       >
         {error ? <AlertCard variant="error" title="Green metrics" description={error} /> : null}
 

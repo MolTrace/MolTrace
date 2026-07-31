@@ -328,7 +328,7 @@ export function MobileReactionApprovalBoard({
               className="h-8 text-xs"
             />
             <Label htmlFor="mobile-reaction-execution-status" className="text-xs">
-              Execution status (draft)
+              execution status draft
             </Label>
             <Input
               id="mobile-reaction-execution-status"

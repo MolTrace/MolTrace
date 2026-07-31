@@ -161,7 +161,8 @@ export function ReactionStudioCompoundLinkSummary({
       <CardHeader className="pb-2">
         <CardTitle className="text-base">Linked compounds (summary)</CardTitle>
         <CardDescription>
-          Registry links and product batches are managed on the Evidence Links tab.
+          Registry links and product batches are managed on the Evidence Links tab. Summaries below are
+          parsed from project and experiment records when available.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-2 text-sm">

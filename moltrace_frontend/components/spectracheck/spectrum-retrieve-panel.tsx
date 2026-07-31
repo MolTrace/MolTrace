@@ -248,7 +248,7 @@ export function SpectrumRetrievePanel({
                   <Library className="h-6 w-6 text-muted-foreground" aria-hidden />
                   <p className="text-sm font-medium text-foreground">Retrieval index not configured</p>
                   <p className="max-w-md text-xs text-muted-foreground">
-                    No spectral similarity index is enabled, so there is nothing to search
+                    No spectral similarity index is configured, so there is nothing to search
                     against. Ask your administrator to configure one.
                   </p>
                 </div>

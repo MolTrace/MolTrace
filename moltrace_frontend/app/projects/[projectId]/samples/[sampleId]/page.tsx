@@ -204,7 +204,7 @@ export default function ProjectSampleDetailPage() {
         <CardContent className="overflow-x-auto">
           {sessionRows.length === 0 ? (
             <p className="text-sm text-muted-foreground">
-              No sessions recorded. Analyses saved in SpectraCheck may still be there.
+              No sessions recorded. Analyses saved in SpectraCheck may still be in this browser.
             </p>
           ) : (
             <Table>

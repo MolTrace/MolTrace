@@ -1135,7 +1135,7 @@ export function SpectraCheckProcessedSpectrumSection({
                   </span>
                   <span className="text-sm leading-snug text-white/85">
                     {analysisBackend === "gsd_prompt3"
-                      ? "Peak detection with auto-classification — no candidate matching."
+                      ? "Peak detection with auto-classification — no candidate matching. Sends the parsed ppm + intensity arrays."
                       : "Detect peaks and match against candidate structures with scoring."}
                   </span>
                   <span className="mt-auto inline-flex items-center gap-1.5 pt-1 font-mono text-xs font-semibold uppercase tracking-[0.14em] text-white transition-transform duration-200 group-hover:translate-x-1">

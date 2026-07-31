@@ -489,7 +489,7 @@ export function RenewalValueReportSection() {
                         <TableCell className="text-right tabular-nums">{fmtInt(summaryM.workflows_completed)}</TableCell>
                       </TableRow>
                       <TableRow>
-                        <TableCell>Hours saved</TableCell>
+                        <TableCell>Workflow hours saved</TableCell>
                         <TableCell className="text-right tabular-nums">{fmtNum(workflowHours, 2)}</TableCell>
                       </TableRow>
                       <TableRow>

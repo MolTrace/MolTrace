@@ -24,13 +24,13 @@ export default function MobileCommandCenterPage() {
             <p className="text-muted-foreground">Everything awaiting you, across all three modules.</p>
           </div>
           <MobileCommandCenter />
-          <Suspense fallback={<div className="text-xs text-muted-foreground">Loading SpectraCheck review...</div>}>
+          <Suspense fallback={<div className="text-xs text-muted-foreground">Loading SpectraCheck review…</div>}>
             <MobileSpectraCheckReview />
           </Suspense>
-          <Suspense fallback={<div className="text-xs text-muted-foreground">Loading report preview...</div>}>
+          <Suspense fallback={<div className="text-xs text-muted-foreground">Loading report preview…</div>}>
             <MobileReportPreview />
           </Suspense>
-          <Suspense fallback={<div className="text-xs text-muted-foreground">Loading reaction approval board...</div>}>
+          <Suspense fallback={<div className="text-xs text-muted-foreground">Loading reaction approval board…</div>}>
             <MobileReactionApprovalBoard />
           </Suspense>
           <MobileRegulatoryQueue />

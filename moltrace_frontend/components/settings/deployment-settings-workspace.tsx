@@ -404,8 +404,8 @@ export function DeploymentSettingsWorkspace() {
           style={{ borderTop: "3px solid var(--mt-slate)" }}
         >
           <CardHeader className="gap-1 pt-5 pb-2">
-            <CardTitle className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">OpenAPI availability</CardTitle>
-            <CardDescription>Service interface description</CardDescription>
+            <CardTitle className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">API documentation</CardTitle>
+            <CardDescription>Public API reference</CardDescription>
           </CardHeader>
           <CardContent>
             {loading ? (
@@ -458,7 +458,7 @@ export function DeploymentSettingsWorkspace() {
           style={{ borderTop: "3px solid var(--mt-slate)" }}
         >
           <CardHeader className="gap-1 pt-5 pb-2">
-            <CardTitle className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">database status</CardTitle>
+            <CardTitle className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">Database</CardTitle>
           </CardHeader>
           <CardContent>
             {loading ? (
@@ -481,8 +481,7 @@ export function DeploymentSettingsWorkspace() {
           style={{ borderTop: "3px solid var(--mt-slate)" }}
         >
           <CardHeader className="gap-1 pt-5 pb-2">
-            <CardTitle className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">Storage service</CardTitle>
-            <CardDescription>Object storage</CardDescription>
+            <CardTitle className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">Object storage</CardTitle>
           </CardHeader>
           <CardContent>
             {loading ? (
@@ -525,7 +524,7 @@ export function DeploymentSettingsWorkspace() {
           style={{ borderTop: "3px solid var(--mt-slate)" }}
         >
           <CardHeader className="gap-1 pt-5 pb-2">
-            <CardTitle className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">worker status</CardTitle>
+            <CardTitle className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">Background worker</CardTitle>
           </CardHeader>
           <CardContent>
             {loading ? (

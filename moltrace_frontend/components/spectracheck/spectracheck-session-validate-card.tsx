@@ -182,7 +182,7 @@ export function SessionValidateCard({
       eyebrow="Session · Step 4 · Validate"
       title="Validate session inputs (optional)"
       icon={ShieldCheck}
-      description="Confirms the SMILES and 1H/13C text parse, and cross-checks each spectrum against the structure. Analysis runs without it, and with only one input layer."
+      description="Confirms the SMILES and 1H/13C text parse, and cross-checks each spectrum against the structure when one is supplied. Analysis runs without it, and with only one input layer."
       className="min-w-0"
     >
       <div className="space-y-4" data-testid="session-validate-card">

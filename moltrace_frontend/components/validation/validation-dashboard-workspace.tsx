@@ -427,7 +427,7 @@ export function ValidationDashboardWorkspace() {
           variant="error"
           icon={ServerOff}
           title="Validation services unavailable"
-          description="Try again in a moment, or contact your platform administrator."
+          description="Try again, or contact your administrator."
         />
       ) : null}
 

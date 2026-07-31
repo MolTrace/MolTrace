@@ -45,7 +45,7 @@ export function SpectraCheckMsEvidenceStudio({
           MS Evidence Studio
           <InfoTooltip
             label="About MS Evidence Studio"
-            content="Uses the shared sample ID and candidate structures from the session. Expand LC-MS for import through the consensus bridge."
+            content="Uses the shared sample ID and candidate structures from the session header. Expand LC-MS for import through the consensus bridge."
           />
         </h2>
         <p className="text-sm text-muted-foreground">
@@ -59,7 +59,7 @@ export function SpectraCheckMsEvidenceStudio({
         eyebrow="MS · Step 1 · Setup"
         title="Inputs from shared session"
         icon={Atom}
-        description="Sample ID and candidates from the session header. No extra inputs required."
+        description="Sample ID and candidates from the session header. No extra uploads required."
         className="min-w-0"
       >
         <div className="grid gap-2 sm:grid-cols-2">

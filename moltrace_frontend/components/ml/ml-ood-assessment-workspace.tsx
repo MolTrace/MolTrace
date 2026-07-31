@@ -204,7 +204,7 @@ export function MlOodAssessmentWorkspace() {
         eyebrow="Create"
         title="Create out-of-domain assessment"
         icon={Plus}
-        description="Flags structural regions where predictions are less reliable."
+        description="Flags high-risk structural regions where predictions are less reliable."
       >
         <div className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
