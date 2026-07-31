@@ -13,7 +13,7 @@ import {
   readRecordNumber,
   readRecordString,
 } from "@/components/projects/project-workspace-utils"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import {
@@ -133,6 +133,9 @@ const REGULATORY_ACTION_TYPES = [
   "impurity_identification",
   "impurity_qualification",
   "residual_solvent_review",
+  // Written by ICH Q3D elemental assessments. Rows already displayed correctly via
+  // labelFromSnake; only the FILTER was missing the value, so users could not narrow to it.
+  "elemental_impurity_review",
   "nitrosamine_risk_review",
   "qnmr_validation_gap",
   "ai_governance_gap",

@@ -4,6 +4,7 @@ import { SITE_URL, SITE_NAME, SITE_TAGLINE, SITE_DESCRIPTION } from '@/lib/seo/s
 import { OrganizationJsonLd } from '@/components/seo/json-ld'
 import { ThemeProvider } from '@/components/theme-provider'
 import { DeveloperModeProvider } from '@/components/developer-mode-provider'
+import { IncludedModulesProvider } from '@/src/lib/modules/included-modules-provider'
 import { Toaster } from '@/components/ui/toaster'
 import { OfflineBanner } from '@/src/components/pwa/OfflineBanner'
 import { InstallAppPrompt } from '@/src/components/pwa/InstallAppPrompt'
@@ -119,11 +120,15 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <DeveloperModeProvider>
-            <PWAUpdateManager />
-            <OfflineBanner />
-            {children}
-            <InstallAppPrompt />
-            <Toaster />
+            {/* Which products this deployment serves. Fetched once at shell mount; every nav
+                surface asks this rather than guessing from entitlements. Fails OPEN. */}
+            <IncludedModulesProvider>
+              <PWAUpdateManager />
+              <OfflineBanner />
+              {children}
+              <InstallAppPrompt />
+              <Toaster />
+            </IncludedModulesProvider>
           </DeveloperModeProvider>
         </ThemeProvider>
         {/* Vercel injects /_vercel/insights/script.js only when hosted on Vercel.
