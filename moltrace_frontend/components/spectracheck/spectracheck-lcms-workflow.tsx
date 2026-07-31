@@ -25,6 +25,12 @@ import {
   compoundClassForRequest,
   type CompoundClassValue,
 } from "@/src/lib/spectracheck/compound-classes"
+import { InfoTooltip } from "@/components/ui/info-tooltip"
+
+/** Mechanism only — the caveat stays in the visible description. */
+const LCMS_WORKFLOW_TOOLTIP =
+  "Steps are progressive: a later step can reuse the outputs of earlier ones, so running them in order avoids recomputing shared work."
+
 
 const STEP_UNIFIED_META: Record<string, { layer: EvidenceLayerType; endpoint: string; title: string }> = {
   import: {
@@ -524,8 +530,13 @@ export function SpectraCheckLcmsWorkflow({
       <ModuleCard
         accent="teal"
         eyebrow="Spectroscopy · LC-MS Workflow"
-        title="LC-MS workflow"
-        description="Progressive LC-MS processing: run steps in order when possible—later steps can reuse outputs from earlier steps. Treat outputs as decision-support; confirm with experimental context."
+        title={
+          <span className="inline-flex items-center gap-1.5">
+            LC-MS workflow
+            <InfoTooltip label="How the steps chain together" content={LCMS_WORKFLOW_TOOLTIP} />
+          </span>
+        }
+        description="Run the LC-MS steps in order. Outputs are decision-support; confirm with experimental context."
       />
 
       <div className="flex flex-wrap gap-2">

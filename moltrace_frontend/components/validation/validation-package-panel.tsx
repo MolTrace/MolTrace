@@ -21,6 +21,12 @@ import {
   type QualTone,
   type ValidationPackage,
 } from "@/lib/validation/validation-package"
+import { InfoTooltip } from "@/components/ui/info-tooltip"
+
+/** Mechanism only — the caveat stays in the visible description. */
+const VALIDATION_PACKAGE_TOOLTIP =
+  "Regenerable at any time. Bundles requirement-to-risk-to-test traceability together with the CI test evidence attached to the release."
+
 
 // formatApiError only unpacks detail for 401/403/404; the evidence ingest fails
 // with a 409/400 whose detail ("…already approved…") must reach the user.
@@ -133,9 +139,14 @@ export function ValidationPackagePanel({ releaseId }: { releaseId: number | stri
     <ModuleCard
       accent="cyan"
       eyebrow="Validation · GAMP 5 / CSA"
-      title="Validation package"
+      title={
+        <span className="inline-flex items-center gap-1.5">
+          Validation package
+          <InfoTooltip label="What the package contains" content={VALIDATION_PACKAGE_TOOLTIP} />
+        </span>
+      }
       icon={FileStack}
-      description="Regenerable evidence assembly (requirement→risk→test traceability + CI test evidence) that SUPPORTS the customer's CSV. It does not perform IQ/OQ/PQ execution or sign-off."
+      description="Assembles validation evidence for this release. SUPPORTS the customer's CSV — it does not perform IQ/OQ/PQ execution or sign-off."
     >
       <div className="space-y-5">
         {error ? (

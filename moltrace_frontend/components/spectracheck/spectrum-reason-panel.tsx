@@ -22,6 +22,11 @@ import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
 import { formatApiError } from "@/components/spectracheck/spectracheck-helpers"
 import type { components } from "@/src/lib/api/schema"
+import { InfoTooltip } from "@/components/ui/info-tooltip"
+
+/** Mechanism only — the caveat stays in the visible description. */
+const REASON_MECHANISM_TOOLTIP =
+  "Retrieval runs over the similarity index configured for this deployment. Each proposal is verifier-arbitrated against the observed spectrum before it is shown."
 
 /**
  * Retrieval-augmented structure reasoning (`POST /spectrum/reason`, Prompt 14).
@@ -376,9 +381,14 @@ export function SpectrumReasonPanel({
       <ModuleCard
         accent="cyan"
         eyebrow="Decision-support · Retrieval-augmented reasoning"
-        title="Retrieval-augmented structure reasoning"
+        title={
+          <span className="inline-flex items-center gap-1.5">
+            Retrieval-augmented structure reasoning
+            <InfoTooltip label="How structure reasoning works" content={REASON_MECHANISM_TOOLTIP} />
+          </span>
+        }
         icon={Brain}
-        description="Proposes candidate structures grounded in retrieved precedent spectra. Retrieval uses the server-configured similarity index. Each proposal is verifier-arbitrated against the observed spectrum — decision-support, never a standalone assignment."
+        description="Proposes candidate structures from retrieved precedent spectra. Decision-support, never a standalone assignment."
         className="min-w-0 overflow-visible shadow-none"
       >
         <div className="space-y-4">

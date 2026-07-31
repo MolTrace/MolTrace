@@ -7,6 +7,11 @@ import { apiFetch } from "@/lib/api/client"
 import { Button } from "@/components/ui/button"
 import { ModuleCard } from "@/components/dashboard/module-card"
 import { extractFirstSmiles, formatApiError } from "@/components/spectracheck/spectracheck-helpers"
+import { InfoTooltip } from "@/components/ui/info-tooltip"
+
+/** Mechanism only — the caveat stays in the visible description. */
+const VALIDATE_MECHANISM_TOOLTIP =
+  "Confirms the SMILES and the 1H/13C text parse, and cross-checks each spectrum against the structure when one is supplied."
 
 /**
  * Optional pre-flight check for the SpectraCheck session card.
@@ -180,9 +185,14 @@ export function SessionValidateCard({
     <ModuleCard
       accent="teal"
       eyebrow="Session · Step 4 · Validate"
-      title="Validate session inputs (optional)"
+      title={
+        <span className="inline-flex items-center gap-1.5">
+          Validate session inputs (optional)
+          <InfoTooltip label="What this check does" content={VALIDATE_MECHANISM_TOOLTIP} />
+        </span>
+      }
       icon={ShieldCheck}
-      description="Confirms the SMILES and 1H/13C text parse, and cross-checks each spectrum against the structure when one is supplied. Analysis runs without it, and with only one input layer."
+      description="Optional pre-flight check on your structure and spectra. Analysis runs without it, and with only one input layer."
       className="min-w-0"
     >
       <div className="space-y-4" data-testid="session-validate-card">
