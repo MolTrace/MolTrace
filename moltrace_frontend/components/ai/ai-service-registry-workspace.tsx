@@ -244,8 +244,10 @@ export function AiServiceRegistryWorkspace() {
       setFormErr("Selected active model is not approved; experimental mode must be enabled first.")
       return
     }
+    // service_key is the immutable service identifier: AIServiceRegistryUpdate
+    // (extra="forbid") does not accept it, so including it 422s every edit. (The
+    // create body above keeps it — AIServiceRegistryCreate requires it.)
     const body: Record<string, unknown> = {
-      service_key: serviceKey.trim(),
       name: name.trim(),
       target_module: targetModule,
       task_key: taskKey.trim(),

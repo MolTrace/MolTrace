@@ -152,7 +152,7 @@ export function AiCanaryDeploymentsWorkspace() {
         method: "POST",
         body: {
           service_key: serviceKey.trim(),
-          candidate_model_artifact: artifactId,
+          candidate_model_artifact_id: artifactId,
           target_module: targetModule.trim(),
           traffic_percent: traffic,
         },
