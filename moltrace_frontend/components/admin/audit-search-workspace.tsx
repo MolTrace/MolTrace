@@ -30,7 +30,7 @@ import {
 } from "lucide-react"
 
 const AUDIT_SEARCH_TOOLTIP =
-  "Audit search helps reconstruct who did what, when, and why across projects, sessions, evidence, reviews, reports, and admin actions."
+  "Reconstructs who did what, when, and why across every logged action."
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return Boolean(v) && typeof v === "object" && !Array.isArray(v)
@@ -256,12 +256,12 @@ export function AuditSearchWorkspace() {
             <InfoTooltip content={AUDIT_SEARCH_TOOLTIP} label="About Audit Search" />
           </div>
           <p className="text-sm text-muted-foreground">
-            Search the global audit log across all entities, actors, and events for compliance and forensics.
+            Search the global audit log for compliance and forensics.
           </p>
           {!loading && backendUnreachable ? (
             <p className="mt-1 flex items-center gap-1.5 text-xs text-destructive">
               <ServerOff className="h-3.5 w-3.5 shrink-0" aria-hidden />
-              Audit search is unavailable — try again in a moment, or contact your platform administrator.
+              Audit search is unavailable — try again, or contact your administrator.
             </p>
           ) : null}
         </div>
@@ -278,7 +278,7 @@ export function AuditSearchWorkspace() {
         <AlertCard
           variant="error"
           title="Audit search unavailable"
-          description="Audit search is currently unavailable. Verify you're signed in as an administrator and try again."
+          description="Check that you're signed in as an administrator, then try again."
         />
       ) : null}
 
@@ -339,7 +339,7 @@ export function AuditSearchWorkspace() {
           eyebrow="Search"
           title="Filters"
           icon={Search}
-          description="Narrow audit results by event type, entity, actor email, or free-text search. MolTrace and SpectraCheck projects use different record types — pick whichever matches your investigation. The date range is applied after results load."
+          description="Narrow results by event type, entity, actor, or text. The date range applies after results load."
         >
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <div className="space-y-2">

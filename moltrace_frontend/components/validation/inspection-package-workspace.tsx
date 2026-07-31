@@ -324,7 +324,7 @@ export function InspectionPackageWorkspace() {
           eyebrow="Create"
           title="Create inspection package"
           icon={PackageOpen}
-          description="Assemble an inspection-ready package — bundles controlled records, deviation reports, CAPA evidence, and validation artefacts for regulatory inspection readiness."
+          description="Bundles controlled records, deviations, CAPA evidence, and validation artefacts."
         >
           <div className="space-y-4">
             <div className="grid gap-3 sm:grid-cols-2">
@@ -417,7 +417,7 @@ export function InspectionPackageWorkspace() {
           eyebrow="Detail"
           title="Package detail"
           icon={FileText}
-          description="Selected package detail — included artefacts, status, and export readiness for this inspection package."
+          description="Included artefacts, status, and export readiness."
         >
           <div className="space-y-5">
             {detailPackage ? (
@@ -510,7 +510,7 @@ export function InspectionPackageWorkspace() {
         eyebrow="Packages"
         title="Inspection packages"
         icon={Archive}
-        description="All inspection packages — status, included artefacts, and export history for managing inspection readiness across programs."
+        description="Across every program, with export history."
       >
         <div className="space-y-3">
           <div className="flex justify-end">

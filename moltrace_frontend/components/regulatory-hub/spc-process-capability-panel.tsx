@@ -469,7 +469,7 @@ export function SPCProcessCapabilityPanel() {
           Process Capability &amp; Trending
         </span>
       }
-      description="Analyze a time-ordered measurement series for one parameter — control chart, capability indices (Cp/Cpk/Pp/Ppk/Cpm), and Shewhart / CUSUM / EWMA signals — to catch drift before a specification breach. Decision-support only."
+      description="Catches drift before a specification breach. Control chart, Cp/Cpk/Pp/Ppk/Cpm, and Shewhart / CUSUM / EWMA signals. Decision-support only."
     >
       <div className="space-y-6">
         {/* ── Inputs ── */}
@@ -582,13 +582,13 @@ export function SPCProcessCapabilityPanel() {
                 title={`Early warning: ${leadPoints} point${leadPoints === 1 ? "" : "s"} of lead time`}
                 description={`A control-rule signal fired at point #${firstSignal + 1}, before the first out-of-specification result at point #${
                   firstOos + 1
-                } — the trend was flagged ${leadPoints} sample${leadPoints === 1 ? "" : "s"} ahead of the spec breach.`}
+                }.`}
               />
             ) : firstSignal != null && firstOos == null ? (
               <AlertCard
                 variant="warning"
                 title={`Drift signal at point #${firstSignal + 1} — no spec breach yet`}
-                description="A control-rule signal fired while every point is still within specification. Investigate the trend before it reaches a limit."
+                description="Investigate the trend before it reaches a limit."
               />
             ) : null}
 

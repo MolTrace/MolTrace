@@ -19,7 +19,7 @@ import {
 import type { SavedReportRow } from "@/src/lib/reports/saved-reports"
 
 const DESC =
-  "Regulatory dossiers linked to the same SpectraCheck session as one of your saved reports, with their open action items and latest status labels. Workflow signals only."
+  "Dossiers that share a SpectraCheck session with your saved reports. Workflow signals only."
 
 type Props = {
   reportRows: SavedReportRow[]
@@ -147,8 +147,7 @@ export function ReportsRegulatoryComplianceSection({ reportRows, live }: Props) 
               </EmptyMedia>
               <EmptyTitle>No linked dossiers</EmptyTitle>
               <EmptyDescription>
-                None of your listed reports share a session with a regulatory dossier yet. Link a dossier from
-                SpectraCheck, or create one from a report session where that is available.
+                Link a dossier from SpectraCheck to see it here.
               </EmptyDescription>
             </EmptyHeader>
           </Empty>

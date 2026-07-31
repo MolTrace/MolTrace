@@ -21,16 +21,16 @@ export default function MobileCommandCenterPage() {
         <div className="mx-auto min-w-0 max-w-screen-sm space-y-4 px-3 pb-24 sm:px-4">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">Mobile Command Center</h1>
-            <p className="text-muted-foreground">Cross-module summary optimized for quick phone review.</p>
+            <p className="text-muted-foreground">Everything awaiting you, across all three modules.</p>
           </div>
           <MobileCommandCenter />
-          <Suspense fallback={<div className="text-xs text-muted-foreground">Loading mobile SpectraCheck review...</div>}>
+          <Suspense fallback={<div className="text-xs text-muted-foreground">Loading SpectraCheck review...</div>}>
             <MobileSpectraCheckReview />
           </Suspense>
-          <Suspense fallback={<div className="text-xs text-muted-foreground">Loading mobile report preview...</div>}>
+          <Suspense fallback={<div className="text-xs text-muted-foreground">Loading report preview...</div>}>
             <MobileReportPreview />
           </Suspense>
-          <Suspense fallback={<div className="text-xs text-muted-foreground">Loading mobile reaction approval board...</div>}>
+          <Suspense fallback={<div className="text-xs text-muted-foreground">Loading reaction approval board...</div>}>
             <MobileReactionApprovalBoard />
           </Suspense>
           <MobileRegulatoryQueue />
@@ -40,9 +40,7 @@ export default function MobileCommandCenterPage() {
         <div className="mx-auto max-w-xl space-y-4 rounded-lg border bg-card p-6 text-card-foreground shadow-sm">
           <div className="space-y-1">
             <h1 className="text-xl font-semibold tracking-tight">Desktop Workspace</h1>
-            <p className="text-sm text-muted-foreground">
-              The handheld workflow is hidden while this session is using desktop mode.
-            </p>
+            <p className="text-sm text-muted-foreground">The phone workflow is hidden on desktop.</p>
           </div>
           <Button asChild>
             <Link href="/dashboard">Open dashboard</Link>

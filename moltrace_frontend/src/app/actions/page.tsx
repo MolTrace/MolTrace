@@ -358,7 +358,7 @@ function CrossModuleActionQueueWorkspace() {
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-base">New action item</CardTitle>
-          <CardDescription>Create a follow-up task that links a finding in one program to a reviewer or owner in another.</CardDescription>
+          <CardDescription>Links a finding in one program to a reviewer or owner in another.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           {createErr ? <p className="text-xs text-destructive">{createErr}</p> : null}
@@ -562,7 +562,7 @@ function CrossModuleActionQueueWorkspace() {
                           No matches
                         </p>
                         <p className="text-sm text-muted-foreground">
-                          No cross-module action items match the current filters. Try resetting filters or create a new item above.
+                          Try resetting filters, or create a new item above.
                         </p>
                       </div>
                     </TableCell>
@@ -660,7 +660,7 @@ export default function CrossModuleActionQueuePage() {
             </p>
             <h1 className="font-mono text-2xl font-bold tracking-tight">Action Queue</h1>
             <p className="max-w-3xl text-sm text-muted-foreground">
-              Cross-module action items, saved reports, human-review queue, and validation-center status — all in one place. Coordinate work across SpectraCheck, Regentry, and Reaction Optimization.
+              Coordinate work across SpectraCheck, Regentry, and Reaction Optimization.
             </p>
           </div>
           <Tabs defaultValue="action_queue" className="space-y-6">

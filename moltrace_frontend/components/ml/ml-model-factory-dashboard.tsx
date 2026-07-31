@@ -484,7 +484,7 @@ export function MlModelFactoryDashboard() {
         accent="teal"
         eyebrow="ML · Tasks"
         title="Built-in task table"
-        description="Registered ML tasks available for training — task type, status, and configuration for each supported prediction objective."
+        description="Every prediction objective available for training."
       >
         <div className="table-scroll min-w-0">
           {loading ? (
@@ -535,7 +535,7 @@ export function MlModelFactoryDashboard() {
         accent="teal"
         eyebrow="ML · Training Runs"
         title="Recent training runs"
-        description="Recent ML training runs — task, dataset version, status, and metric summaries across all completed and in-progress runs."
+        description="Across every task and dataset version."
       >
         <div className="table-scroll min-w-0">
           {loading ? (
@@ -586,7 +586,7 @@ export function MlModelFactoryDashboard() {
         accent="teal"
         eyebrow="ML · Evaluation Runs"
         title="Recent evaluation runs"
-        description="Recent model evaluation runs — artifact, status, and metric summary for each completed or in-progress evaluation."
+        description="Completed and in-progress, with metric summaries."
       >
         <div className="table-scroll min-w-0">
           {loading ? (
@@ -633,7 +633,7 @@ export function MlModelFactoryDashboard() {
         accent="teal"
         eyebrow="ML · Deployment Candidates"
         title="Deployment candidate preview"
-        description="Model artifacts nominated for production deployment — approval status, task key, and review state for each candidate."
+        description="Artifacts nominated for production, with their review state."
       >
         <div className="table-scroll min-w-0">
           {loading ? (
@@ -684,7 +684,7 @@ export function MlModelFactoryDashboard() {
         accent="teal"
         eyebrow="ML · Model Health"
         title="Model health preview"
-        description="Model health summary — scalar performance and drift indicators. Nested details are not expanded; approval and validation states always come from stored record fields."
+        description="Scalar performance and drift indicators. Nested details are not expanded; approval and validation states always come from stored record fields."
       >
         <div className="table-scroll min-w-0">
           {loading ? (

@@ -58,7 +58,7 @@ import {
 } from "@/src/lib/analytics/roi-dashboard-data"
 
 const HOURS_SAVED_TOOLTIP =
-  "Estimated time saved using configurable automation task definitions. Values are approximate and should be reviewed by admins."
+  "Estimated from your automation task definitions. Values are approximate and should be reviewed by admins."
 
 const TASKS_AUTOMATED_TOOLTIP =
   "Count of workflow and analysis tasks completed by MolTrace instead of manual execution."
@@ -183,7 +183,7 @@ export default function AutomationRoiDashboard() {
         <AlertCard
           variant="info"
           title="Live analytics unavailable"
-          description="We couldn't load live analytics. Metrics below are blank; illustrative trends appear only in the labeled Demo data section."
+          description="Metrics below are blank; illustrative trends appear only in the labeled Demo data section."
         />
       ) : null}
 
@@ -201,7 +201,7 @@ export default function AutomationRoiDashboard() {
           value={loading ? "…" : roi ? fmtNum(roi.total_hours_saved) : "—"}
           sub={
             <p className="text-xs text-muted-foreground">
-              {loading ? "Loading…" : roi ? "Total hours saved across all automated tasks." : "No data."}
+              {loading ? "Loading…" : roi ? "Across all automated tasks." : "No data."}
             </p>
           }
         />
@@ -217,7 +217,7 @@ export default function AutomationRoiDashboard() {
           value={loading ? "…" : roi ? fmtInt(roi.tasks_automated) : "—"}
           sub={
             <p className="text-xs text-muted-foreground">
-              {loading ? "Loading…" : roi ? "Total automated task runs across the platform." : "No data."}
+              {loading ? "Loading…" : roi ? "Across every module." : "No data."}
             </p>
           }
         />
@@ -226,7 +226,7 @@ export default function AutomationRoiDashboard() {
           icon={FileText}
           severity="green"
           value={loading ? "…" : roi ? fmtInt(roi.reports_generated) : "—"}
-          sub={<p className="text-xs text-muted-foreground">Reports produced in this window.</p>}
+          sub={<p className="text-xs text-muted-foreground">In this snapshot window.</p>}
         />
         <MetricCard
           title="Workflows completed"
@@ -240,14 +240,14 @@ export default function AutomationRoiDashboard() {
           icon={FlaskConical}
           severity="violet"
           value={loading ? "…" : roi ? fmtInt(roi.analyses_completed) : "—"}
-          sub={<p className="text-xs text-muted-foreground">Analyses completed in this window.</p>}
+          sub={<p className="text-xs text-muted-foreground">In this snapshot window.</p>}
         />
         <MetricCard
           title="Review tasks completed"
           icon={ListChecks}
           severity="violet"
           value={loading ? "…" : roi ? fmtInt(roi.review_tasks_completed) : "—"}
-          sub={<p className="text-xs text-muted-foreground">Review tasks closed by a reviewer.</p>}
+          sub={<p className="text-xs text-muted-foreground">Closed by a reviewer.</p>}
         />
         <MetricCard
           title="Failed jobs"
@@ -261,7 +261,7 @@ export default function AutomationRoiDashboard() {
           icon={ShieldAlert}
           severity="amber"
           value={loading ? "…" : roi ? fmtInt(roi.qc_warnings) : "—"}
-          sub={<p className="text-xs text-muted-foreground">Quality-control warnings raised for review.</p>}
+          sub={<p className="text-xs text-muted-foreground">Raised for review.</p>}
         />
       </div>
 
@@ -270,7 +270,7 @@ export default function AutomationRoiDashboard() {
         eyebrow="Programs"
         title="Regentry events"
         icon={ListChecks}
-        description="Privacy-safe activity events tracked in Regentry — only summary details such as dossier ID, jurisdiction, status, and review state. No regulatory questions, answers, or raw scientific data are recorded."
+        description="Privacy-safe activity events — only dossier ID, jurisdiction, status, and review state. No regulatory questions, answers, or raw scientific data are recorded."
       >
         <div className="text-xs text-muted-foreground">
           <ul className="list-inside list-disc space-y-1">
@@ -289,7 +289,7 @@ export default function AutomationRoiDashboard() {
           eyebrow="Methods"
           title="Top automated tasks"
           icon={Bot}
-          description="Catalog of all automation task definitions with their default minutes-saved value. Run counts are populated when a per-task event stream is available."
+          description="Every automation task definition with its default minutes-saved value. Run counts appear once per-task events are recorded."
         >
           <div>
             <div className="table-scroll">
@@ -320,7 +320,7 @@ export default function AutomationRoiDashboard() {
                             </EmptyMedia>
                             <EmptyTitle>No automation tasks yet</EmptyTitle>
                             <EmptyDescription>
-                              Task definitions populate here once automation tasks are configured for your organization.
+                              Appears once automation tasks are configured for your organization.
                             </EmptyDescription>
                           </EmptyHeader>
                         </Empty>
@@ -383,7 +383,7 @@ export default function AutomationRoiDashboard() {
                           </EmptyMedia>
                           <EmptyTitle>No feedback yet</EmptyTitle>
                           <EmptyDescription>
-                            Reviewer feedback events will appear here as programs are reviewed.
+                            Appears as programs are reviewed.
                           </EmptyDescription>
                         </EmptyHeader>
                       </Empty>
@@ -501,7 +501,7 @@ function WorkflowValueCard({
       eyebrow="Throughput"
       title="Workflow value summary"
       icon={Network}
-      description="Aggregate workflow completion and time-saved totals across all templates. Hours saved are computed from total minutes saved (÷ 60)."
+      description="Completion and time-saved totals across all templates. Hours saved are total minutes ÷ 60."
     >
       <div>
         <div className="table-scroll">

@@ -153,8 +153,8 @@ export function YieldPredictionPanel({
         setGuidance(
           detail.includes("zero examples")
             ? requireVerified
-              ? "No verified completed experiments with a numeric yield yet — confirm outcomes (or turn off verified-only) first."
-              : "No completed experiments with a numeric yield yet — record completed experiments with yields first."
+              ? "No verified yields yet — confirm outcomes, or turn off verified-only."
+              : "No recorded yields yet — complete an experiment and record its yield."
             : detail || "The surrogate could not fit on this project's data yet.",
         )
       } else {
@@ -174,7 +174,7 @@ export function YieldPredictionPanel({
       eyebrow="Optimization · Yield surrogate"
       title="Predict yield"
       icon={LineChart}
-      description="Advisory: fits a lightweight surrogate on this project's own completed experiments and predicts each condition set. Ranks candidates for review — never a synthesis instruction; the producing model and its uncertainty always show with the number."
+      description="Advisory: fits a surrogate on this project's own completed experiments. Ranks candidates for review — never a synthesis instruction; the producing model and its uncertainty always show with the number."
     >
       <form className="space-y-3" onSubmit={(e) => void predict(e)}>
         <div className="space-y-1">
@@ -185,7 +185,7 @@ export function YieldPredictionPanel({
             fields={conditionFields}
             initialValue={conditions}
             onChange={setConditions}
-            description="Each set predicts one yield. Fields come from the design-space variables; add your own with the raw-JSON toggle."
+            description="Each set predicts one yield. Fields come from the design-space variables."
             idPrefix="yp-conditions"
           />
           {inputError ? (

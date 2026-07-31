@@ -417,7 +417,7 @@ export function SpectraCheckValidationReadinessCard({ sessionId }: { sessionId?:
     <Card>
       <CardHeader className="pb-2">
         <CardTitle className="text-base">Validation readiness</CardTitle>
-        <CardDescription>Compact readiness signals from Validation Center records.</CardDescription>
+        <CardDescription>Readiness signals from Validation Center records.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
         <div className="grid gap-3 md:grid-cols-3">

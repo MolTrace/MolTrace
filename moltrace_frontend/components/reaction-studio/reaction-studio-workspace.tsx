@@ -217,7 +217,7 @@ export function ReactionStudioWorkspace() {
             </p>
             <h1 className="font-mono text-2xl font-bold tracking-tight">Optimization workspace</h1>
             <p className="max-w-3xl text-sm text-muted-foreground">
-              Workspace for reaction schemes, condition matrices, outcomes, and decision-support cards. Live analysis is
+              Reaction schemes, condition matrices, outcomes, and decision support. Live analysis is
               intentionally turned off in this build until it becomes available.
             </p>
           </div>
@@ -244,7 +244,7 @@ export function ReactionStudioWorkspace() {
           </p>
           <h2 className="font-mono text-xl font-bold tracking-tight">Structure drawing &amp; SMARTS canvas</h2>
           <p className="text-sm text-muted-foreground">
-            Placeholder canvas for the route&apos;s structural representation — connect a structure editor or ELN link when chemistry services are available.
+            Placeholder canvas — connect a structure editor or ELN link when chemistry services are available.
           </p>
         </div>
         <ModuleCard
@@ -252,7 +252,7 @@ export function ReactionStudioWorkspace() {
           eyebrow="Studio · Scheme"
           title={<span id="scheme-heading">Reaction scheme</span>}
           icon={FlaskConical}
-          description="Structure drawing / SMARTS canvas placeholder — attach structure editor or ELN link when integrated."
+          description="Placeholder — attach a structure editor or ELN link when integrated."
         >
           <div className="scientific-grid-subtle flex min-h-[200px] flex-col items-center justify-center rounded-lg border border-dashed bg-muted/30 px-6 py-12 text-center">
             <Beaker className="mb-3 h-10 w-10 text-muted-foreground/70" aria-hidden />
@@ -276,7 +276,7 @@ export function ReactionStudioWorkspace() {
             Condition matrix &amp; outcomes
           </h2>
           <p className="text-sm text-muted-foreground">
-            Factor settings per run paired with measured yield / selectivity / impurity outcomes — review side-by-side to spot trends.
+            Factor settings per run paired with measured yield / selectivity / impurity outcomes.
           </p>
         </div>
         <div className="grid gap-6 lg:grid-cols-2">
@@ -372,7 +372,7 @@ export function ReactionStudioWorkspace() {
             ELN import &amp; export bridges
           </h2>
           <p className="text-sm text-muted-foreground">
-            Round-trip a route&apos;s conditions and outcomes between the studio and your ELN — both directions are demo placeholders until connectors are available.
+            Round-trip a route&apos;s conditions and outcomes with your ELN — both directions are demo placeholders until connectors are available.
           </p>
         </div>
         <div className="grid gap-6 lg:grid-cols-2">
@@ -381,7 +381,7 @@ export function ReactionStudioWorkspace() {
             accent="violet"
             eyebrow="Studio · Import"
             title={<span id="connector-import-heading">ELN / LIMS Experiment Import</span>}
-            description="Import an experiment table from a connected ELN or LIMS for reaction optimization."
+            description="Pull an experiment table into a reaction project."
           >
             <div className="space-y-4">
               <div className="grid gap-3 md:grid-cols-2">
@@ -619,7 +619,7 @@ export function ReactionStudioWorkspace() {
           </p>
           <h2 className="font-mono text-xl font-bold tracking-tight">Predicted vs observed surface plot</h2>
           <p className="text-sm text-muted-foreground">
-            Visualize how outcomes vary with the most influential factor pair — useful for spotting non-linear interactions.
+            How outcomes vary with the most influential factor pair.
           </p>
         </div>
         <ModuleCard
@@ -627,7 +627,7 @@ export function ReactionStudioWorkspace() {
           eyebrow="Studio · Response Surface"
           title={<span id="surface-heading">Response surface</span>}
           icon={LineChart}
-          description="Contour / surface visualization placeholder — connect a DOE engine or plotting library when data is available."
+          description="Placeholder — connect a DOE engine or plotting library when data is available."
         >
             <div className="scientific-grid relative flex min-h-[280px] items-center justify-center overflow-hidden rounded-lg border bg-muted/20">
               <div className="absolute inset-0 bg-gradient-to-br from-chart-2/10 via-transparent to-chart-4/10" aria-hidden />
@@ -664,7 +664,7 @@ export function ReactionStudioWorkspace() {
           eyebrow="Studio · Approval Gate"
           title={<span id="approval-heading">Human approval gate</span>}
           icon={Shield}
-          description="Experimental decisions require qualified review. This gate will attach signatures and audit trails when the approval workflow is connected."
+          description="Experimental decisions require qualified review."
         >
           <div className="space-y-4">
             <div className="flex flex-wrap items-center gap-4 rounded-md border bg-background/80 px-4 py-3">

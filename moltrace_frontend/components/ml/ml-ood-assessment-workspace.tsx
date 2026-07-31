@@ -204,7 +204,7 @@ export function MlOodAssessmentWorkspace() {
         eyebrow="Create"
         title="Create out-of-domain assessment"
         icon={Plus}
-        description="Run an out-of-distribution applicability assessment on a model artifact — flags high-risk structural regions where predictions are less reliable."
+        description="Flags structural regions where predictions are less reliable."
       >
         <div className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
@@ -302,7 +302,7 @@ export function MlOodAssessmentWorkspace() {
         eyebrow="Records"
         title="Assessments"
         icon={ShieldAlert}
-        description="Out-of-distribution assessments recorded for your organization — OOD method, status, associated artifact, and dataset version."
+        description="Every OOD assessment on record."
       >
         <div className="space-y-4">
           <div className="table-scroll min-w-0">

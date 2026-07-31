@@ -465,7 +465,7 @@ export function KnowledgeLibraryLanding() {
                 </EmptyMedia>
                 <EmptyTitle>No knowledge sources yet</EmptyTitle>
                 <EmptyDescription>
-                  Add a literature, patent, or document source to start building the knowledge library.
+                  Add a literature, patent, or document source.
                 </EmptyDescription>
               </EmptyHeader>
             </Empty>
@@ -510,7 +510,7 @@ export function KnowledgeLibraryLanding() {
         eyebrow="Extractions"
         title="Recent extraction runs"
         icon={FileStack}
-        description="Recent knowledge extraction runs — source, status, extracted record count, and when each run finished."
+        description="Newest 15, across every registered source."
       >
         <div className="table-scroll min-w-0">
           {loading ? (
@@ -525,7 +525,7 @@ export function KnowledgeLibraryLanding() {
                 </EmptyMedia>
                 <EmptyTitle>No extraction runs yet</EmptyTitle>
                 <EmptyDescription>
-                  Runs appear here once a source has been processed through the extraction pipeline.
+                  Runs appear once a source has been extracted.
                 </EmptyDescription>
               </EmptyHeader>
             </Empty>
@@ -570,7 +570,7 @@ export function KnowledgeLibraryLanding() {
         eyebrow="Review"
         title="Review queue preview"
         icon={ClipboardCheck}
-        description="Extracted knowledge claims pending expert review — status, source, and record type for each queued review task."
+        description="Extracted claims that still need an expert decision."
       >
         <div className="table-scroll min-w-0">
           {loading ? (
@@ -623,7 +623,7 @@ export function KnowledgeLibraryLanding() {
         eyebrow="Training Data"
         title="Training dataset candidates"
         icon={Database}
-        description="Reviewed knowledge claims nominated as training data for ML models — type, source, and curation status."
+        description="Reviewed claims nominated for model training."
       >
         <div className="table-scroll min-w-0">
           {loading ? (
@@ -667,7 +667,7 @@ export function KnowledgeLibraryLanding() {
         eyebrow="Benchmark Data"
         title="Benchmark dataset candidates"
         icon={Layers}
-        description="Knowledge claims nominated as held-out benchmark evaluation data — type, source, and curation status."
+        description="Held out from training, for evaluation only."
       >
         <div className="table-scroll min-w-0">
           {loading ? (
@@ -711,7 +711,7 @@ export function KnowledgeLibraryLanding() {
         eyebrow="Improvement"
         title="Model improvement queue"
         icon={Wrench}
-        description="Active model improvement signals — edge cases, failure modes, and feedback items queued for retraining consideration."
+        description="Edge cases, failure modes, and feedback awaiting retraining."
       >
         <div className="table-scroll min-w-0">
           {loading ? (
@@ -755,7 +755,7 @@ export function KnowledgeLibraryLanding() {
         eyebrow="Versions"
         title="Dataset versions"
         icon={BookMarked}
-        description="Versioned knowledge dataset snapshots — approval status, record counts, and provenance for each curated release."
+        description="Each release pins its records for reproducibility."
       >
         <div className="table-scroll min-w-0">
           {loading ? (

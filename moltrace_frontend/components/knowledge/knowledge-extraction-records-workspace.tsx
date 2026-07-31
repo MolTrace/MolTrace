@@ -876,7 +876,7 @@ export function KnowledgeExtractionRecordsWorkspace({ recordKind }: { recordKind
                   Create training candidate
                 </Button>
                 <p className="text-xs text-muted-foreground">
-                  Nominates this extraction record as a training data candidate for ML model development.
+                  Adds this record to the training pool.
                 </p>
               </div>
               <div className="space-y-2">
@@ -898,7 +898,7 @@ export function KnowledgeExtractionRecordsWorkspace({ recordKind }: { recordKind
                   Create benchmark candidate
                 </Button>
                 <p className="text-xs text-muted-foreground">
-                  Nominates this extraction record as a held-out benchmark candidate for model evaluation.
+                  Holds this record out for model evaluation.
                 </p>
               </div>
             </div>

@@ -10,8 +10,8 @@ export default function OfflinePage() {
             <CardDescription>MolTrace can&rsquo;t be reached right now.</CardDescription>
           </CardHeader>
           <CardContent className="text-sm text-muted-foreground">
-            You can still review draft actions saved on this device. Spectral analysis and report
-            generation need a connection and will work again once you&rsquo;re back online.
+            Draft actions saved on this device are still readable. Spectral analysis and report
+            generation resume when you reconnect.
           </CardContent>
         </Card>
       </div>

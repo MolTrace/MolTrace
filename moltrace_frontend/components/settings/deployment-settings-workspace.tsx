@@ -22,7 +22,7 @@ import { parseReleaseHealthDiagnostics } from "@/src/lib/admin/release-health"
 import { ServerOff } from "lucide-react"
 
 const DEPLOYMENT_SETTINGS_TOOLTIP =
-  "Deployment Settings helps verify that the app, storage, database, jobs, and environment configuration are ready for deployment."
+  "Checks that the app, storage, database, jobs, and configuration are ready for deployment."
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return Boolean(v) && typeof v === "object" && !Array.isArray(v)
@@ -329,7 +329,7 @@ export function DeploymentSettingsWorkspace() {
           variant="error"
           icon={ServerOff}
           title="Service unavailable"
-          description="Deployment data is not reachable. Verify you're signed in as an administrator and try again."
+          description="Deployment data is unreachable. Check that you're signed in as an administrator."
         />
       ) : null}
 
@@ -351,7 +351,6 @@ export function DeploymentSettingsWorkspace() {
         >
           <CardHeader className="gap-1 pt-5 pb-2">
             <CardTitle className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">environment</CardTitle>
-            <CardDescription>Active deployment environment label.</CardDescription>
           </CardHeader>
           <CardContent className="text-sm">
             {loading ? (
@@ -396,7 +395,6 @@ export function DeploymentSettingsWorkspace() {
         >
           <CardHeader className="gap-1 pt-5 pb-2">
             <CardTitle className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">API base URL</CardTitle>
-            <CardDescription>Next.js API proxy base</CardDescription>
           </CardHeader>
           <CardContent className="break-all font-mono text-xs">{API_BASE}</CardContent>
         </Card>
@@ -407,7 +405,7 @@ export function DeploymentSettingsWorkspace() {
         >
           <CardHeader className="gap-1 pt-5 pb-2">
             <CardTitle className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">OpenAPI availability</CardTitle>
-            <CardDescription>Service interface description reachability</CardDescription>
+            <CardDescription>Service interface description</CardDescription>
           </CardHeader>
           <CardContent>
             {loading ? (
@@ -436,7 +434,6 @@ export function DeploymentSettingsWorkspace() {
         >
           <CardHeader className="gap-1 pt-5 pb-2">
             <CardTitle className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">Service version</CardTitle>
-            <CardDescription>Service build identifier.</CardDescription>
           </CardHeader>
           <CardContent className="font-mono text-xs">
             {loading ? "…" : version ? readStr(version, ["backend_version"]) || "—" : "—"}
@@ -449,7 +446,7 @@ export function DeploymentSettingsWorkspace() {
         >
           <CardHeader className="gap-1 pt-5 pb-2">
             <CardTitle className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">App build</CardTitle>
-            <CardDescription>Web app build identifier — set by your administrator at deploy time.</CardDescription>
+            <CardDescription>Set by your administrator at deploy time.</CardDescription>
           </CardHeader>
           <CardContent className="font-mono text-xs">
             {frontendBuild ? frontendBuild : <span className="text-muted-foreground">Not configured</span>}
@@ -462,7 +459,6 @@ export function DeploymentSettingsWorkspace() {
         >
           <CardHeader className="gap-1 pt-5 pb-2">
             <CardTitle className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">database status</CardTitle>
-            <CardDescription>Database reachability</CardDescription>
           </CardHeader>
           <CardContent>
             {loading ? (
@@ -486,7 +482,7 @@ export function DeploymentSettingsWorkspace() {
         >
           <CardHeader className="gap-1 pt-5 pb-2">
             <CardTitle className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">Storage service</CardTitle>
-            <CardDescription>Object storage reachability</CardDescription>
+            <CardDescription>Object storage</CardDescription>
           </CardHeader>
           <CardContent>
             {loading ? (
@@ -510,7 +506,6 @@ export function DeploymentSettingsWorkspace() {
         >
           <CardHeader className="gap-1 pt-5 pb-2">
             <CardTitle className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">Job queue</CardTitle>
-            <CardDescription>Job queue reachability</CardDescription>
           </CardHeader>
           <CardContent>
             {loading ? (
@@ -531,7 +526,6 @@ export function DeploymentSettingsWorkspace() {
         >
           <CardHeader className="gap-1 pt-5 pb-2">
             <CardTitle className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">worker status</CardTitle>
-            <CardDescription>Background worker reachability</CardDescription>
           </CardHeader>
           <CardContent>
             {loading ? (
@@ -555,7 +549,7 @@ export function DeploymentSettingsWorkspace() {
         eyebrow="Variables"
         title="Required variables"
         icon={ListChecks}
-        description="Whether all required variables are present, plus the names of any that are missing — secret values are never shown."
+        description="Presence check plus the names of any missing variables — secret values are never shown."
       >
         <div className="space-y-3 text-sm">
           <div className="flex flex-wrap items-center gap-2">
@@ -864,9 +858,8 @@ export function DeploymentSettingsWorkspace() {
                   </Badge>
                 </div>
                 <p className="text-[11px] text-muted-foreground">
-                  CI emits a single markdown readiness summary combining the manual-promotion gate,
-                  provenance hashes, and shadow comparison status. It is read-only and cannot activate
-                  Prompt 1/2.
+                  CI emits one markdown readiness summary: manual-promotion gate, provenance hashes,
+                  shadow comparison. It is read-only and cannot activate Prompt 1/2.
                 </p>
                 <dl className="grid gap-2 md:grid-cols-2">
                   <div>
@@ -984,7 +977,7 @@ export function DeploymentSettingsWorkspace() {
                       </Badge>
                     </div>
                     <p className="text-[11px] text-muted-foreground">
-                      Checksums identify the exact fixture set, the stable record fingerprint, and the exported report file.
+                      Checksums identify the exact fixture set, record fingerprint, and exported report.
                     </p>
                     <dl className="grid gap-2 md:grid-cols-2">
                       <div>
@@ -1447,7 +1440,7 @@ export function DeploymentSettingsWorkspace() {
         eyebrow="Version"
         title="Version details"
         icon={FileCog}
-        description="Full version metadata: API, build hash, branch, build time."
+        description="API version, environment, and build timestamp."
       >
         <div className="space-y-2 font-mono text-xs">
           <p>

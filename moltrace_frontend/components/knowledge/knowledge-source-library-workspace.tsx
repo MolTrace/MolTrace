@@ -345,7 +345,7 @@ export function KnowledgeSourceLibraryWorkspace() {
         eyebrow="Create"
         title="Create source"
         icon={Plus}
-        description="Register a new knowledge source — scientific literature, structured databases, or curated reference documents — for extraction and review."
+        description="Scientific literature, structured databases, or curated reference documents."
       >
         <div className="space-y-4">
           {createErr ? <AlertCard variant="error" title="Could not create" description={createErr} /> : null}
@@ -471,7 +471,7 @@ export function KnowledgeSourceLibraryWorkspace() {
                 </EmptyMedia>
                 <EmptyTitle>No sources match</EmptyTitle>
                 <EmptyDescription>
-                  No knowledge sources found for the current filters — clear filters or create a new source.
+                  Clear the filters, or create a new source.
                 </EmptyDescription>
               </EmptyHeader>
             </Empty>
@@ -531,7 +531,7 @@ export function KnowledgeSourceLibraryWorkspace() {
           eyebrow="Detail"
           title="Selected source"
           icon={FileText}
-          description="Detail and edit panel for the selected knowledge source — update status, reliability label, and source metadata."
+          description="Update status, reliability label, and metadata."
         >
           <div className="space-y-4">
             {detailLoading ? (
@@ -681,7 +681,7 @@ export function KnowledgeSourceLibraryWorkspace() {
                   </EmptyMedia>
                   <EmptyTitle>No files attached</EmptyTitle>
                   <EmptyDescription>
-                    Upload a file to this source to make it available for extraction.
+                    Upload a file to make it available for extraction.
                   </EmptyDescription>
                 </EmptyHeader>
               </Empty>

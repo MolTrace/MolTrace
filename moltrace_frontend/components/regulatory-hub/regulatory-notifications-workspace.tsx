@@ -143,7 +143,7 @@ export function RegulatoryNotificationsWorkspace() {
         eyebrow="Signals"
         title="Notifications"
         icon={Bell}
-        description="Regulatory workflow signals — change alerts, dossier updates, and review triggers. Mark notifications as read after review."
+        description="Change alerts, dossier updates, and review triggers."
       >
         <div className="space-y-4">
           {patchErr ? (

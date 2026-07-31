@@ -338,14 +338,14 @@ export function RegulatoryDossierLinkedCompoundCard({
       <CardHeader className="pb-2">
         <CardTitle className="text-base">Linked Compound</CardTitle>
         <CardDescription>
-          Registry provenance link — identifies which compound is associated with this dossier for traceability. Does not indicate dossier approval or regulatory sign-off.
+          Registry provenance link. Does not indicate dossier approval or regulatory sign-off.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <Alert>
           <AlertTitle className="text-sm">Provenance note</AlertTitle>
           <AlertDescription className="text-xs leading-relaxed">
-            This card records which registry compound is associated with this dossier for traceability. It does not
+            Identifies the registry compound behind this dossier. It does not
             substitute cited sources, requirements, or human review outcomes shown elsewhere in Regentry.
           </AlertDescription>
         </Alert>
@@ -387,7 +387,7 @@ export function RegulatoryDossierLinkedCompoundCard({
         <div className="space-y-2 border-t pt-4">
           <h3 className="text-sm font-medium">Analytical evidence links (dossier index)</h3>
           <p className="text-xs text-muted-foreground">
-            Analytical evidence links indexed against this dossier — evidence type, source, and summary. Open the Evidence Links tab for full detail.
+            Summary only. Open the Evidence Links tab for full detail.
           </p>
           {analyticalRows.length === 0 ? (
             <p className="text-xs text-muted-foreground">No matching evidence entries.</p>

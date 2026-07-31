@@ -386,7 +386,7 @@ export function CapaWorkspace() {
           eyebrow="Create"
           title="Create CAPA"
           icon={Plus}
-          description="Log a new Corrective and Preventive Action with root cause, description, priority, and responsible owner."
+          description="Logs a Corrective and Preventive Action record."
         >
           <div className="space-y-4">
             <div className="grid gap-3 sm:grid-cols-2">
@@ -474,7 +474,7 @@ export function CapaWorkspace() {
           eyebrow="Detail"
           title="Selected CAPA"
           icon={FileText}
-          description="Selected CAPA details — update status, effectiveness, due date, and resolution notes."
+          description="Review and update this record."
         >
           <div className="space-y-5">
             {detailCapa ? (
@@ -509,7 +509,7 @@ export function CapaWorkspace() {
                     <p className="font-medium">{formatDate(detailCapa.due_date)}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-muted-foreground">updated date</p>
+                    <p className="text-xs text-muted-foreground">Updated</p>
                     <p className="font-medium">{formatDate(detailCapa.updated_at)}</p>
                   </div>
                 </div>
@@ -602,7 +602,7 @@ export function CapaWorkspace() {
         eyebrow="Backlog"
         title="CAPA table"
         icon={Wrench}
-        description="All CAPA records — filter by status, priority, and responsible owner to manage the corrective action backlog."
+        description="Filter by status, priority, or owner."
       >
         <div className="space-y-3">
           <div className="flex justify-end">

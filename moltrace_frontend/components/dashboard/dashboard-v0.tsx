@@ -1267,7 +1267,7 @@ export function DashboardV0() {
             roiLoading ? (
               <p className="mt-1 text-xs text-muted-foreground">Loading ROI snapshot…</p>
             ) : roiLive ? (
-              <p className="mt-1 text-xs text-muted-foreground">Total hours saved across automated workflows.</p>
+              <p className="mt-1 text-xs text-muted-foreground">Across automated workflows.</p>
             ) : (
               <>
                 {DEMO_STATS.hoursSub}
@@ -1364,7 +1364,7 @@ export function DashboardV0() {
           eyebrow="Spectroscopy · ML"
           title="ML factory health"
           icon={Cpu}
-          description="Health and review status of the ML models powering your analyses."
+          description="Review status of the models powering your analyses."
           href="/ml"
           ctaLabel="Open ML Model Factory"
         >
@@ -1470,8 +1470,8 @@ export function DashboardV0() {
             <FolderOpen className="h-4 w-4 text-muted-foreground" />
           </div>
           <CardDescription>
-            How SpectraCheck evidence, regulatory blockers, and reaction constraints connect across
-            modules. Draft summary — review before action.
+            How SpectraCheck evidence, regulatory blockers, and reaction constraints connect.
+            Draft summary — review before action.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4 text-sm">
@@ -1494,7 +1494,7 @@ export function DashboardV0() {
               <p className="text-xs font-medium uppercase text-muted-foreground">3. Reaction Optimization summary</p>
               <p className="mt-2 text-xs text-muted-foreground">reaction constraints created</p>
               <p className="text-2xl font-bold tabular-nums">{fmtCount(crossModuleDisplay.reactionConstraintsCreated)}</p>
-              <p className="mt-2 text-xs text-muted-foreground">optimization recommendations affected by compliance</p>
+              <p className="mt-2 text-xs text-muted-foreground">recommendations affected by compliance</p>
               <p className="text-2xl font-bold tabular-nums">
                 {fmtCount(crossModuleDisplay.optimizationRecommendationsAffectedByCompliance)}
               </p>
@@ -1528,7 +1528,7 @@ export function DashboardV0() {
               <p className="mt-3 text-xs text-muted-foreground">Live module activity isn't available right now.</p>
             ) : null}
             {!coreModuleActivityLoading && coreModuleActivity?.available && coreModuleActivity.total === 0 ? (
-              <p className="mt-3 text-xs text-muted-foreground">No core module activity has been logged yet.</p>
+              <p className="mt-3 text-xs text-muted-foreground">Nothing logged yet.</p>
             ) : null}
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
@@ -1569,7 +1569,7 @@ export function DashboardV0() {
               <Microscope className="h-4 w-4 text-muted-foreground" />
             </div>
             <CardDescription>
-              Compounds and batches in your registry — traceability counts only, not identity or
+              Compounds and batches — traceability counts only, not identity or
               release certification.
             </CardDescription>
           </CardHeader>
@@ -1641,7 +1641,7 @@ export function DashboardV0() {
           eyebrow="Regulatory · Hub"
           title="Regentry"
           icon={FolderOpen}
-          description="Active dossiers and review workload across your tenant — not a legal or compliance certification."
+          description="Active dossiers and review workload — not a legal or compliance certification."
           href="/regulatory"
           ctaLabel="Open Regentry"
         >
@@ -1678,7 +1678,7 @@ export function DashboardV0() {
           eyebrow="Regulatory · Compliance"
           title="Regulatory compliance"
           icon={AlertTriangle}
-          description="Open compliance action items, blocked dossiers, and triage by category — workflow signals, not legal conclusions."
+          description="Open action items, blocked dossiers, and triage by category — workflow signals, not legal conclusions."
           href="/regulatory"
           ctaLabel="Open regulatory workspace"
         >
@@ -1820,7 +1820,7 @@ export function DashboardV0() {
         ) : null}
         {!roiLoading && !roiLive ? (
           <p className="text-xs text-muted-foreground">
-            Live ROI data didn't load — hours mirror the summary card above; task and workflow counts are hidden until it does.
+            Live ROI data didn't load — only hours are shown, mirroring the summary card above.
           </p>
         ) : null}
       </ModuleCard>
@@ -1874,7 +1874,7 @@ export function DashboardV0() {
         ) : null}
         {!opsLoading && opsUseDemo ? (
           <p className="text-xs text-muted-foreground">
-            Live operations data couldn't load — showing example values (QC failures match the Quality Alerts card above).
+            Live operations data couldn't load — showing example values.
           </p>
         ) : null}
         {!opsLoading && opsRollup?.available && opsRollup.partial ? (
@@ -1933,7 +1933,7 @@ export function DashboardV0() {
         <CardHeader className="pb-2">
           <CardTitle className="text-base">Quality Alerts</CardTitle>
           <CardDescription>
-            Session QC rollup from your saved sessions; newest sessions scanned first.
+            QC rollup from your saved sessions; newest scanned first.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4 text-sm">
@@ -2104,7 +2104,7 @@ export function DashboardV0() {
         <CardHeader className="pb-2">
           <CardTitle className="text-base">Workflow runs</CardTitle>
           <CardDescription>
-            Queued/running, review, failed, and completed counts from the workflow run registry.
+            Queued/running, review, failed, and completed counts.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4 text-sm">
@@ -2241,7 +2241,7 @@ export function DashboardV0() {
         eyebrow="Activity · Sessions"
         title="Recent Activity"
         icon={Activity}
-        description="Latest SpectraCheck sessions and workflow runs (newest first when workflow data is available)."
+        description="Newest first when workflow data is available."
       >
           <StatusFilterPills
             label="Filter activity by status"

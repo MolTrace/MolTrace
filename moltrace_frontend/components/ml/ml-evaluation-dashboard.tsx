@@ -374,7 +374,7 @@ export function MlEvaluationDashboard() {
         eyebrow="Launch"
         title="Run evaluation"
         icon={PlayCircle}
-        description="Launch a model evaluation run against a dataset version or benchmark dataset. Evaluation split and configuration are stored with the run for reproducibility."
+        description="Against a dataset version or benchmark dataset. Split and configuration are stored for reproducibility."
       >
         <div className="space-y-4">
           <div className="space-y-2">
@@ -503,7 +503,7 @@ export function MlEvaluationDashboard() {
         eyebrow="Runs"
         title="Evaluation runs"
         icon={Activity}
-        description="All model evaluation runs — status, metric summary, and artifact linkage. Select Load detail to expand full metrics and per-split breakdowns."
+        description="Select Load detail for full metrics and per-split breakdowns."
       >
         <div className="space-y-6">
           {loading ? (

@@ -259,7 +259,7 @@ export function KnowledgeExtractionsWorkspace() {
         eyebrow="Run"
         title="Run extraction"
         icon={PlayCircle}
-        description="Run an extraction on a source document to parse and classify knowledge claims for the review queue."
+        description="Parses and classifies knowledge claims into the review queue."
       >
         <div className="space-y-4">
           {runErr ? (
@@ -364,7 +364,7 @@ export function KnowledgeExtractionsWorkspace() {
         eyebrow="History"
         title="Extraction runs"
         icon={Activity}
-        description="History of extraction runs — status, extracted claim count, and completion time for each source document processed."
+        description="One row per source document processed."
       >
         <div className="table-scroll min-w-0">
           <div className="mb-3">
@@ -449,7 +449,7 @@ export function KnowledgeExtractionsWorkspace() {
           eyebrow="Detail"
           title="Extraction run detail"
           icon={FileText}
-          description="Full detail for the selected extraction run — extracted claims, warnings, and processing details."
+          description="Extracted claims and any warnings."
         >
           <div className="space-y-4">
             {detailLoading ? (

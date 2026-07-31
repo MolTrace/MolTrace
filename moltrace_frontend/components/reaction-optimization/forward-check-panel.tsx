@@ -120,7 +120,7 @@ export function ForwardCheckPanel({ projectId }: { projectId: number }) {
       eyebrow="Safety · Forward check"
       title="Check a predicted product"
       icon={FlaskConical}
-      description="Annotate an externally-predicted or planned product with the frozen safety and green-chemistry engines before acting on it. Model confidence is NOT a safety opinion — both render side-by-side. Advisory decision support; a qualified chemist reviews every prediction."
+      description="Screens an externally-predicted or planned product against the frozen safety and green-chemistry engines. Model confidence is NOT a safety opinion — both render side-by-side. Advisory decision support; a qualified chemist reviews every prediction."
     >
       <form className="space-y-3" onSubmit={(e) => void check(e)}>
         <div className="grid gap-3 md:grid-cols-2">

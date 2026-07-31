@@ -36,7 +36,7 @@ import { InfoTooltip } from "@/components/ui/info-tooltip"
 import { UserPlus } from "lucide-react"
 
 const PROJECT_ACCESS_TOOLTIP =
-  "Project access controls who can view, upload, analyze, review, and approve evidence for this project."
+  "Controls who can view, upload, analyze, review, and approve evidence."
 
 const ROLE_OPTIONS = ["owner", "admin", "scientist", "reviewer", "viewer"] as const
 
@@ -309,7 +309,7 @@ export function ProjectAccessSection({ projectId }: Props) {
                 {rows.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={4} className="text-sm text-muted-foreground">
-                      No one has been granted access to this project yet.
+                      No collaborators yet.
                     </TableCell>
                   </TableRow>
                 ) : (

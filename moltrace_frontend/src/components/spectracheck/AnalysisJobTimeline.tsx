@@ -80,14 +80,14 @@ export function AnalysisJobTimeline({
           Analysis job timeline
           {!compact ? (
             <InfoTooltip
-              content="Analysis jobs track long-running processing tasks such as raw FID processing, LC-MS import, feature detection, and report generation."
+              content="Long-running tasks: raw FID processing, LC-MS import, feature detection, and report generation."
               label="Analysis job timeline information"
             />
           ) : null}
         </CardTitle>
         {!compact ? (
           <CardDescription>
-            Status refreshes on its own while the job is active, and stops once the job finishes, fails, or is canceled.
+            Status refreshes while the job is active, then stops.
           </CardDescription>
         ) : null}
       </CardHeader>

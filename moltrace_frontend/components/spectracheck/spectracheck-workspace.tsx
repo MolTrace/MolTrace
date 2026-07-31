@@ -152,7 +152,7 @@ const SPECTRACHECK_NAV: SpectraNavGroup[] = [
     label: "Overview",
     sections: [
       { value: "tab-overview", label: "Overview", desc: "Summary of available evidence, connection status, and next recommended actions." },
-      { value: "tab-workflow", label: "Workflow", desc: "Workflow templates run a predefined sequence of analysis, QC, evidence, unified confidence, and report steps so the session can be reproduced." },
+      { value: "tab-workflow", label: "Workflow", desc: "A predefined sequence of analysis, QC, evidence, unified confidence, and report steps. Reproduces the session." },
     ],
   },
   {
@@ -160,7 +160,7 @@ const SPECTRACHECK_NAV: SpectraNavGroup[] = [
     label: "Evidence Inputs",
     sections: [
       { value: "tab-nmr-text", label: "NMR text + candidates", desc: "Enter candidate structures and literature-style 1H/13C NMR text for quick structure-evidence comparison." },
-      { value: "tab-processed", label: "Processed 1H / 13C upload", desc: "Upload processed spectrum files such as CSV, TSV, TXT, or JCAMP-DX for preview, peak picking, and evidence matching." },
+      { value: "tab-processed", label: "Processed 1H / 13C upload", desc: "CSV, TSV, TXT, or JCAMP-DX — for preview, peak picking, and evidence matching." },
       { value: "tab-raw-fid", label: "Raw FID upload", desc: "Upload raw Bruker or Agilent/Varian FID archives for non-destructive processing. Raw data should remain immutable." },
       { value: "tab-dept-2d", label: "DEPT/APT + 2D NMR", desc: "Use DEPT/APT carbon typing and COSY, HSQC/HMQC, or HMBC correlations as supporting connectivity evidence." },
       { value: "tab-ms-evidence", label: "MS Evidence", desc: "HRMS, formula search, adduct inference, MS/MS, fragmentation, and optional LC-MS feature workflows using shared session inputs." },
@@ -1314,7 +1314,7 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
               <DataState
                 state={overviewDataState === "live" ? "empty" : overviewDataState}
                 title="No SpectraCheck analyses yet."
-                description="Use the existing session controls or upload/start-analysis areas below to begin; no new upload flow is created here."
+                description="Use the session controls or upload areas below to begin."
               />
             ) : null}
           </section>
@@ -1409,7 +1409,7 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
               </p>
               <h2 className="font-mono text-xl font-bold tracking-tight">Quick orientation</h2>
               <p className="text-sm text-muted-foreground">
-                Two short reads — what the workflow does, and how to interpret the evidence panel.
+                What the workflow does, and how to read the evidence.
               </p>
             </div>
             <div className="grid gap-4 lg:grid-cols-2">
@@ -1501,7 +1501,7 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
                 Experimental engine usage on your spectra
               </h2>
               <p className="text-sm text-muted-foreground">
-                Live aggregation of every GSD analysis run recorded for your organization — useful
+                Every GSD analysis run recorded for your organization — useful
                 to size opt-in adoption and verify performance on your own data before the
                 promotion gate clears.
               </p>
@@ -1521,7 +1521,7 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
               </p>
               <h2 className="font-mono text-xl font-bold tracking-tight">Pre-built analysis pipelines</h2>
               <p className="text-sm text-muted-foreground">
-                Pick a template, then launch it against the current session — no need to wire up tabs by hand.
+                Pick a template, then launch it against the current session.
               </p>
             </div>
             <FeedbackButton module="workflow" projectId={feedbackProjectId} sessionId={feedbackSessionId} />
@@ -1599,7 +1599,7 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
                     Sample ID
                   </Label>
                   <InfoTooltip
-                    content="A user-editable identifier used to connect uploads, spectra, candidate ranking, and reports for the same sample."
+                    content="Connects uploads, spectra, candidate ranking, and reports for the same sample."
                     label="About Sample ID"
                   />
                 </div>
@@ -1648,7 +1648,7 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
                     Compound class
                   </Label>
                   <InfoTooltip
-                    content="Pick the structural class the sample is expected to belong to. Forwarded to every analyzer (processed 1H/13C, raw FID, MS) as a prior to narrow candidate scoring and prediction. Leave as Unspecified when you don't want to bias the search."
+                    content="The structural class the sample is expected to belong to. Forwarded to every analyzer as a prior to narrow candidate scoring and prediction. Leave as Unspecified to avoid biasing the search."
                     label="About Compound class"
                   />
                 </div>
@@ -2416,7 +2416,7 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
               eyebrow="2D NMR · Step 1 · Setup"
               title="Configure & upload 2D peak table"
               icon={Network}
-              description="Choose the 2D experiment type, set SMILES, and drop a peak table to compare correlations against the candidate structure."
+              description="Choose the 2D experiment type, set SMILES, and drop a peak table."
               className="min-w-0"
             >
               <div className="space-y-5">
@@ -2701,7 +2701,7 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
               eyebrow="2D NMR · Step 2 · Run"
               title="Analyze 2D correlations"
               icon={Zap}
-              description="Submit the 2D peak table for HSQC / HMBC / COSY / HMQC correlation analysis against the SMILES candidate."
+              description="HSQC / HMBC / COSY / HMQC correlation analysis against the SMILES candidate."
               className="min-w-0"
             >
               <div className="space-y-4">
@@ -2835,7 +2835,7 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
               eyebrow="Predicted 1H/13C · Step 1 · Setup"
               title="Inputs from shared session"
               icon={Atom}
-              description="This analyzer uses the candidate list, observed 1H / 13C text, sample ID, and solvent from the workspace header — no extra uploads required."
+              description="Candidate list, observed 1H / 13C text, sample ID, and solvent. No extra uploads required."
               className="min-w-0"
             >
               <div className="space-y-3">
@@ -3348,7 +3348,7 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
               eyebrow="Compare · Step 1 · Setup"
               title="Optional DEPT + 2D uploads"
               icon={Atom}
-              description="Compare uses shared candidates and NMR text. Optionally attach DEPT/APT or 2D peak tables to layer in extra evidence channels."
+              description="Uses shared candidates and NMR text. DEPT/APT or 2D peak tables add extra evidence channels."
               className="min-w-0"
             >
               <div className="space-y-5">
@@ -3852,7 +3852,7 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
               />
             </h2>
             <p className="text-sm text-muted-foreground">
-              Latest raw results from this browser session — including upload previews. Use to verify result shape, warnings, and raw evidence.
+              Latest raw results from this browser session, including upload previews.
             </p>
           </div>
 

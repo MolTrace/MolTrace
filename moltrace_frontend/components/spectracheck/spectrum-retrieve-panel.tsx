@@ -220,7 +220,7 @@ export function SpectrumRetrievePanel({
         eyebrow="Candidate tool · Similarity search"
         title="Spectral-similarity retrieval"
         icon={DatabaseZap}
-        description="Encodes a candidate SMILES into the same vector space as the reference library and returns the nearest spectra by L2 distance. The similarity index is server-configured; matches are decision-support, not identity assignments."
+        description="Finds reference spectra closest to a candidate structure. Nearest-neighbour search over encoded shifts, ranked by L2 distance on the server-configured index; matches are decision-support, not identity assignments."
         className="min-w-0 overflow-visible shadow-none"
       >
         <div className="space-y-4">
@@ -248,9 +248,8 @@ export function SpectrumRetrievePanel({
                   <Library className="h-6 w-6 text-muted-foreground" aria-hidden />
                   <p className="text-sm font-medium text-foreground">Retrieval index not configured</p>
                   <p className="max-w-md text-xs text-muted-foreground">
-                    This deployment has no spectral similarity index enabled, so there is nothing to
-                    search against. Ask your administrator to configure a reference index to turn on
-                    nearest-neighbour retrieval.
+                    No spectral similarity index is enabled, so there is nothing to search
+                    against. Ask your administrator to configure one.
                   </p>
                 </div>
                 <WarningList warnings={warnings} variant="info" title="Encoding notes" />

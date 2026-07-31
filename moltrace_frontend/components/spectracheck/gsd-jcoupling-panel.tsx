@@ -325,8 +325,7 @@ export function GsdJCouplingPanel({
     return (
       <PanelShell title="J-coupling vs candidates" hint="No multiplets detected — nothing to score against candidate topologies." testId={`${testId}-empty-multiplets`}>
         <p className="text-sm text-muted-foreground">
-          The multiplet pass returned zero multiplets, so observed J couplings are an empty set.
-          Run GSD at a higher level (4 or 5) for finer resolution if you expect coupling structure.
+          If you expect coupling structure, run GSD at a higher level (4 or 5) for finer resolution.
         </p>
       </PanelShell>
     )

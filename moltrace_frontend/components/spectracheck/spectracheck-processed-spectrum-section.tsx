@@ -1135,7 +1135,7 @@ export function SpectraCheckProcessedSpectrumSection({
                   </span>
                   <span className="text-sm leading-snug text-white/85">
                     {analysisBackend === "gsd_prompt3"
-                      ? "Industry-standard peak detection with auto-classification. Sends the parsed ppm + intensity arrays — no candidate matching."
+                      ? "Peak detection with auto-classification — no candidate matching."
                       : "Detect peaks and match against candidate structures with scoring."}
                   </span>
                   <span className="mt-auto inline-flex items-center gap-1.5 pt-1 font-mono text-xs font-semibold uppercase tracking-[0.14em] text-white transition-transform duration-200 group-hover:translate-x-1">
@@ -1409,14 +1409,14 @@ export function SpectraCheckProcessedSpectrumSection({
                     {analyzeLoading ? "Running evidence match…" : "Previewing spectrum…"}
                   </p>
                   <p className="mt-1 max-w-md text-xs text-muted-foreground">
-                    The spectrum and analysis panels will populate here together when the server response is ready.
+                    Spectrum and analysis appear together when the response is ready.
                   </p>
                 </div>
               ) : (
                 <AlertCard
                   variant="warning"
                   title="Spectrum preview unavailable"
-                  description="The preview completed, but no display-ready spectrum points were returned. Try Analyze or inspect the response details below."
+                  description="No display-ready spectrum points were returned. Try Analyze, or check the response details below."
                 />
               )}
             </div>
@@ -1596,8 +1596,7 @@ export function SpectraCheckProcessedSpectrumSection({
             GSD pipeline · prompts 3 → 4 → 5
           </p>
           <p className="mt-1 text-sm text-muted-foreground">
-            Run GSD analysis above to populate the experimental peak-detection pipeline. Each stage
-            renders as its own panel here once the run completes.
+            Run GSD analysis above to populate the pipeline. Each stage appears once the run completes.
           </p>
           <ol className="mt-3 grid gap-2 sm:grid-cols-3">
             {[

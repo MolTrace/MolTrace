@@ -385,7 +385,7 @@ export function ControlledRecordsWorkspace() {
           eyebrow="Create"
           title="Create controlled record"
           icon={Plus}
-          description="Register a new controlled document with title, type, version, and responsible owner for GxP audit trail compliance."
+          description="Registers a controlled document into the GxP audit trail."
         >
           <div className="space-y-4">
             <div className="grid gap-3 sm:grid-cols-2">
@@ -460,7 +460,7 @@ export function ControlledRecordsWorkspace() {
           eyebrow="Detail"
           title="Selected controlled record"
           icon={FileText}
-          description="Selected controlled record details — version, status, owner, and full audit history."
+          description="Version, lock, or archive it, with full audit history."
         >
           <div className="space-y-5">
             {detailRecord ? (
@@ -487,7 +487,7 @@ export function ControlledRecordsWorkspace() {
                     <p className="font-medium">{readStr(detailRecord.locked_by) || "-"}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-muted-foreground">updated date</p>
+                    <p className="text-xs text-muted-foreground">Updated</p>
                     <p className="font-medium">{formatDate(detailRecord.updated_at)}</p>
                   </div>
                   <div className="sm:col-span-2">
@@ -515,7 +515,7 @@ export function ControlledRecordsWorkspace() {
                 <div className="space-y-3 rounded-lg border p-3">
                   <div>
                     <h3 className="text-sm font-medium">Create new version</h3>
-                    <p className="text-xs text-muted-foreground">Create a new controlled version of this record — specify title, version identifier, and content hash.</p>
+                    <p className="text-xs text-muted-foreground">Earlier versions stay in the audit trail.</p>
                   </div>
                   <div className="grid gap-3 sm:grid-cols-2">
                     <Input
@@ -551,7 +551,7 @@ export function ControlledRecordsWorkspace() {
                 <div className="space-y-3 rounded-lg border p-3">
                   <div>
                     <h3 className="text-sm font-medium">Lock record</h3>
-                    <p className="text-xs text-muted-foreground">Lock this record to prevent further edits — specify the reviewer, content hash, and reason for locking.</p>
+                    <p className="text-xs text-muted-foreground">Prevents further edits.</p>
                   </div>
                   <div className="grid gap-3 sm:grid-cols-2">
                     <Input
@@ -621,7 +621,7 @@ export function ControlledRecordsWorkspace() {
         eyebrow="Records"
         title="Controlled records"
         icon={FileCheck2}
-        description="All controlled documents across this environment — SOPs, validation plans, analytical methods, and other GxP-controlled records."
+        description="SOPs, validation plans, analytical methods, and other GxP-controlled records."
       >
         <div className="space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-2">

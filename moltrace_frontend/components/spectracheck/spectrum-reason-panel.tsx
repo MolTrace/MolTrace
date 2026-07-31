@@ -378,7 +378,7 @@ export function SpectrumReasonPanel({
         eyebrow="Decision-support · Retrieval-augmented reasoning"
         title="Retrieval-augmented structure reasoning"
         icon={Brain}
-        description="Encodes the displayed spectrum, retrieves precedent analogues from the server-configured similarity index, then asks the reasoning model to propose retrieval-grounded structures. Every proposal is verifier-arbitrated against the observed spectrum — decision-support, never a standalone assignment."
+        description="Proposes candidate structures grounded in retrieved precedent spectra. Retrieval uses the server-configured similarity index. Each proposal is verifier-arbitrated against the observed spectrum — decision-support, never a standalone assignment."
         className="min-w-0 overflow-visible shadow-none"
       >
         <div className="space-y-4">
@@ -398,9 +398,7 @@ export function SpectrumReasonPanel({
 
           {state.status === "idle" && hasTrace ? (
             <p className="text-sm text-muted-foreground">
-              Run the reasoner to retrieve precedent analogues and propose verifier-arbitrated candidate
-              structures. The verifier scores each proposal against the displayed spectrum; only
-              consistent candidates surface in the accepted list.
+              Run the reasoner to retrieve precedent analogues and propose candidate structures.
             </p>
           ) : null}
 
@@ -411,9 +409,8 @@ export function SpectrumReasonPanel({
                   <Library className="h-6 w-6 text-muted-foreground" aria-hidden />
                   <p className="text-sm font-medium text-foreground">Reasoning not available</p>
                   <p className="max-w-md text-xs text-muted-foreground">
-                    This deployment has no spectral similarity index configured, so retrieval-augmented
-                    reasoning has no precedents to ground on. Ask your administrator to configure a
-                    reference index to turn this surface on.
+                    No spectral similarity index is configured, so there are no precedents to
+                    reason from. Ask your administrator to configure one.
                   </p>
                 </div>
                 <WarningList warnings={warnings} variant="info" title="Notes" />
@@ -442,7 +439,7 @@ export function SpectrumReasonPanel({
                     <Badge
                       variant="outline"
                       className="gap-1 border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300"
-                      title="The reasoning model is not enabled for this deployment — ask your administrator to turn it on."
+                      title="The reasoning model is not enabled — ask your administrator to turn it on."
                     >
                       <CircleSlash className="h-3 w-3" aria-hidden />
                       Reasoner unavailable
@@ -470,8 +467,8 @@ export function SpectrumReasonPanel({
                   </p>
                   {result.reasoner_available === false ? (
                     <div className="rounded-md border border-dashed bg-muted/10 px-4 py-6 text-center text-sm text-muted-foreground">
-                      Retrieval succeeded, but the reasoning model is not enabled on this
-                      deployment. Ask your administrator to enable it for structure proposals.
+                      Retrieval succeeded, but the reasoning model is not enabled. Ask your
+                      administrator to enable it.
                     </div>
                   ) : candidates.length === 0 ? (
                     <div className="rounded-md border border-dashed bg-muted/20 px-4 py-6 text-center text-sm text-muted-foreground">

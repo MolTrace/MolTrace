@@ -1003,7 +1003,7 @@ export function SpectraCheckRawFidSection({
         eyebrow="Step 1 · Setup"
         title="Configure & upload raw FID archive"
         icon={Upload}
-        description="Set sample metadata, choose nucleus and vendor, then drop a raw FID archive (.zip / .tar.gz / .tgz). The original archive is preserved unchanged."
+        description="Set sample metadata, choose nucleus and vendor, then drop the archive (.zip / .tar.gz / .tgz). The original archive is preserved unchanged."
         className="min-w-0"
       >
         <div className="space-y-5">
@@ -1164,8 +1164,7 @@ export function SpectraCheckRawFidSection({
                 Bruker / Varian folder · ZIP · TAR.GZ · TGZ
               </p>
               <p className="mt-1 text-[10px] text-muted-foreground">
-                Drop the acquisition folder straight from the spectrometer — it is packaged in your
-                browser, so nothing leaves this machine until you start the analysis.
+                Packaged in your browser — nothing leaves this machine until you start the analysis.
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
@@ -1510,7 +1509,7 @@ export function SpectraCheckRawFidSection({
                 variant="outline"
                 size="sm"
                 disabled
-                title="Background processing is not available for raw FID yet — use the buttons above, which run the analysis directly."
+                title="Background processing is not available for raw FID yet — use the buttons above."
                 className="h-7 px-2 font-mono text-[11px]"
               >
                 Preview
@@ -1520,7 +1519,7 @@ export function SpectraCheckRawFidSection({
                 variant="outline"
                 size="sm"
                 disabled
-                title="Background processing is not available for raw FID yet — use the buttons above, which run the analysis directly."
+                title="Background processing is not available for raw FID yet — use the buttons above."
                 className="h-7 px-2 font-mono text-[11px]"
               >
                 Process
@@ -1818,7 +1817,7 @@ export function SpectraCheckRawFidSection({
                     description={
                       processResult
                         ? "Processing completed, but no display-ready spectrum points were returned. Review the response details below."
-                        : "Preview completed, but no display-ready spectrum points were returned yet. Generate the quick auto-FT preview again, or run Process raw FID for the full selected recipe."
+                        : "No display-ready spectrum points were returned. Try the quick auto-FT preview again, or Process raw FID."
                     }
                   />
                   {!processResult ? (
@@ -2116,7 +2115,7 @@ export function SpectraCheckRawFidSection({
                         Legacy spectrum, peak markers, phase, and baseline remain authoritative.
                       </p>
                       <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-                        Not used for plot · Not used for peak markers · Not used for phase/baseline
+                        Not used for: plot · peak markers · phase/baseline
                       </p>
                       {promptSidecarConsistency?.message ? (
                         <p className="text-xs text-muted-foreground">{promptSidecarConsistency.message}</p>

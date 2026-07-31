@@ -298,7 +298,7 @@ export function SafetyScreeningPanel({
       accent="amber"
       eyebrow="Reaction · Structural Safety Screening"
       title="energetic / reactive-group screening"
-      description="Structural (RDKit-SMARTS) screen for energetic and reactive functional groups, with an expert-review gate. Decision-support only — NOT a safety determination, and a clear result is never a safety clearance."
+      description="Structural RDKit-SMARTS screen with an expert-review gate. Decision-support only — NOT a safety determination, and a clear result is never a safety clearance."
     >
       <div className="space-y-5">
         {error ? (

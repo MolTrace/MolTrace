@@ -205,7 +205,7 @@ export function MlCalibrationWorkspace() {
         eyebrow="Create"
         title="Create calibration assessment"
         icon={Plus}
-        description="Log a calibration assessment for a model artifact — specify calibration method, metrics, and optional linked evaluation run."
+        description="Method, metrics, and an optional linked evaluation run."
       >
         <div className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
@@ -311,7 +311,7 @@ export function MlCalibrationWorkspace() {
         eyebrow="Records"
         title="Assessments"
         icon={ListChecks}
-        description="Calibration assessments recorded for your organization — method, status, and linked artifact and evaluation run."
+        description="Every calibration assessment on record."
       >
         <div className="space-y-4">
           <div className="table-scroll min-w-0">

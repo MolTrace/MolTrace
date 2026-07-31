@@ -244,8 +244,8 @@ export function ReactionResponsePreview({
       <CardHeader className="pb-2">
         <CardTitle className="text-base">Reaction Response Preview</CardTitle>
         <CardDescription>
-          Completed experiments with numeric condition values and numeric outcomes. Color encodes status or a categorical
-          variable when selected; uncertainty markers appear only when outcome uncertainty is present on experiments.
+          Completed experiments with numeric condition values and outcomes. Color encodes status or a selected
+          categorical variable; uncertainty markers appear only where recorded.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">

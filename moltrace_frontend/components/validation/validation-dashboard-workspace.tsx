@@ -758,7 +758,7 @@ export function ValidationDashboardWorkspace() {
         eyebrow="Drift"
         title="Drift alerts"
         icon={AlertTriangle}
-        description="Model health drift signals — outstanding alerts where current values diverge from approved baselines."
+        description="Where current values diverge from approved baselines."
       >
         <div>
           {loading ? (
@@ -877,7 +877,7 @@ export function ValidationDashboardWorkspace() {
         eyebrow="Method Comparison"
         title="Method comparison summary"
         icon={FlaskConical}
-        description="Analytical method comparison records — matched method pairs and their performance deltas across reference and candidate procedures."
+        description="Performance deltas between reference and candidate procedures."
       >
         <div>
           {loading ? (

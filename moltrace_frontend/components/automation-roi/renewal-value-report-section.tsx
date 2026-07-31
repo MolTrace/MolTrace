@@ -32,7 +32,7 @@ import {
 } from "@/components/ui/table"
 
 const RENEWAL_REPORT_TOOLTIP =
-  "Renewal reports summarize measurable product value such as tasks automated, hours saved, reports generated, review workload, and workflow completion."
+  "Measurable product value: tasks automated, hours saved, reports generated, review workload, workflow completion."
 
 type RenewalScope = "global" | "project" | "organization"
 
@@ -308,7 +308,7 @@ export function RenewalValueReportSection() {
           </span>
         </div>
         <CardDescription>
-          Generates and refreshes a renewal value report — aggregated automation ROI, hours saved, and workflow metrics. Admin-only; aggregate data only, no individual records.
+          Aggregated automation ROI, hours saved, and workflow metrics. Admin-only; aggregate data only, no individual records.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -439,7 +439,6 @@ export function RenewalValueReportSection() {
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold tabular-nums">{fmtNum(summaryM.total_hours_saved)}</div>
-                  <p className="text-xs text-muted-foreground">Total hours saved in this period.</p>
                 </CardContent>
               </Card>
               <Card>
@@ -448,7 +447,6 @@ export function RenewalValueReportSection() {
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold tabular-nums">{fmtInt(summaryM.tasks_automated)}</div>
-                  <p className="text-xs text-muted-foreground">Automated task runs in this period.</p>
                 </CardContent>
               </Card>
               <Card>
@@ -457,7 +455,6 @@ export function RenewalValueReportSection() {
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold tabular-nums">{fmtInt(summaryM.reports_generated)}</div>
-                  <p className="text-xs text-muted-foreground">Reports produced in this period.</p>
                 </CardContent>
               </Card>
               <Card>
@@ -475,7 +472,7 @@ export function RenewalValueReportSection() {
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-base">Workflow value summary</CardTitle>
-                <CardDescription>Workflow completion and time-saved totals for this reporting period.</CardDescription>
+                <CardDescription>Completion and time-saved totals for this period.</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="table-scroll">
@@ -492,7 +489,7 @@ export function RenewalValueReportSection() {
                         <TableCell className="text-right tabular-nums">{fmtInt(summaryM.workflows_completed)}</TableCell>
                       </TableRow>
                       <TableRow>
-                        <TableCell>Workflow-related hours saved (from minutes)</TableCell>
+                        <TableCell>Hours saved</TableCell>
                         <TableCell className="text-right tabular-nums">{fmtNum(workflowHours, 2)}</TableCell>
                       </TableRow>
                       <TableRow>

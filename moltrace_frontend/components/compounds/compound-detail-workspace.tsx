@@ -355,7 +355,7 @@ export function CompoundDetailWorkspace() {
         <AlertCard
           variant="error"
           title="Missing compound"
-          description="No compound was specified. Open a compound from the registry to see its detail."
+          description="Open a compound from the registry to see its detail."
         />
       </div>
     )
@@ -837,7 +837,7 @@ export function CompoundDetailWorkspace() {
               eyebrow="Lineage"
               title="Knowledge Graph (this page)"
               icon={Network}
-              description="Network of relationships and evidence links derived from data already loaded for this compound. For the complete graph across all linked compounds, open the Knowledge Graph view."
+              description="Relationships and evidence links already loaded here. Open the Knowledge Graph view for the complete graph."
             >
               <div>
                 {graphData.length === 0 ? (

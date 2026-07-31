@@ -25,7 +25,7 @@ export function ValidationTraceabilityWorkspace() {
           </p>
           <h1 className="font-mono text-2xl font-bold tracking-tight">Traceability Matrix</h1>
           <p className="text-sm text-muted-foreground">
-            Traceability maps user requirements to functions, risks, test cases, execution evidence, and validation coverage gaps.
+            Maps requirements through functions and risks to test evidence, exposing coverage gaps.
           </p>
         </div>
         <BackendStatusIndicator />
@@ -41,7 +41,7 @@ export function ValidationTraceabilityWorkspace() {
         <div className="space-y-3">
           <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
             <div className="space-y-1">
-              <Label htmlFor="traceability-validation-project-id">validation project ID</Label>
+              <Label htmlFor="traceability-validation-project-id">Validation project ID</Label>
               <Input
                 id="traceability-validation-project-id"
                 value={projectIdInput}

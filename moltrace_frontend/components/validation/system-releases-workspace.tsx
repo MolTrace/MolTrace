@@ -340,7 +340,7 @@ export function SystemReleasesWorkspace() {
           eyebrow="Create"
           title="Create system release"
           icon={Plus}
-          description="Create a system release record documenting a validated software version with qualification evidence and release approval status."
+          description="Documents a validated software version and its qualification evidence."
         >
           <div className="space-y-4">
             <div className="grid gap-3 sm:grid-cols-2">
@@ -419,7 +419,7 @@ export function SystemReleasesWorkspace() {
           eyebrow="Detail"
           title="Release detail"
           icon={FileText}
-          description="Selected release detail — version, release notes, qualification status, and linked validation artefacts."
+          description="Qualification status and linked validation artefacts."
         >
           <div className="space-y-5">
             {detailRelease ? (
@@ -521,7 +521,7 @@ export function SystemReleasesWorkspace() {
         eyebrow="History"
         title="System releases"
         icon={GitBranch}
-        description="All system release records — version history, qualification status, and release approval audit trail."
+        description="Version history, qualification status, and approval audit trail."
       >
         <div className="space-y-3">
           <div className="flex justify-end">

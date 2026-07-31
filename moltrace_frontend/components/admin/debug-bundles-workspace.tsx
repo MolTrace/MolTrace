@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/select"
 
 const DEBUG_BUNDLE_TOOLTIP =
-  "Debug bundles collect safe diagnostic metadata such as versions, statuses, job events, artifact IDs, file hashes, warnings, and audit events."
+  "Collects safe diagnostic metadata: versions, statuses, job events, artifact IDs, hashes, warnings, audit events."
 
 const SCOPE_OPTIONS = ["system", "project", "sample", "session", "job", "report"] as const
 
@@ -205,7 +205,7 @@ export function DebugBundlesWorkspace() {
           eyebrow="Create"
           title="New debug bundle"
           icon={Plus}
-          description="Capture a snapshot of session, project, or sample state for support investigations. Includes job summaries and artifact metadata; recent audit events and file hashes are optional."
+          description="Capture a snapshot of session, project, or sample state for support investigations."
         >
           <div className="space-y-4 text-sm">
             <div className="space-y-2">

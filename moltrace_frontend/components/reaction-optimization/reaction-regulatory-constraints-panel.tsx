@@ -270,7 +270,7 @@ export function ReactionRegulatoryConstraintsPanel({
         <CardHeader className="pb-2">
           <CardTitle className="text-base">Regulatory Constraints</CardTitle>
           <CardDescription>
-            Regulatory constraints applied to candidate conditions during optimization — solvent class limits, banned reagents, and jurisdiction-specific boundaries.
+            Applied to candidate conditions during optimization — solvent classes, banned reagents, jurisdiction limits.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -425,7 +425,7 @@ export function ReactionRegulatoryConstraintsPanel({
         <CardHeader className="pb-2">
           <CardTitle className="text-base">Compliance-Driven Objective</CardTitle>
           <CardDescription>
-            Compliance-informed optimization objective — yield or selectivity targets adjusted for regulatory feasibility, with impurity penalty weighting.
+            Yield or selectivity targets adjusted for regulatory feasibility, with impurity penalty weighting.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

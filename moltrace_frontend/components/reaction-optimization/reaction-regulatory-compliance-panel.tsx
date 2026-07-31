@@ -156,9 +156,8 @@ export function ReactionRegulatoryCompliancePanel({ reactionProjectId }: { react
     return (
       <div className="space-y-4">
         <p className="text-xs text-muted-foreground">
-          Recorded experiment outcomes checked against the project&rsquo;s active regulatory
-          constraints that carry a numeric limit. Evaluated from measured results — not applied at
-          recommendation time.
+          Recorded outcomes checked against active regulatory constraints that carry a numeric
+          limit. Evaluated from measured results — not applied at recommendation time.
         </p>
 
         <div className="grid gap-3 sm:grid-cols-3">
@@ -234,8 +233,7 @@ export function ReactionRegulatoryCompliancePanel({ reactionProjectId }: { react
               </EmptyMedia>
               <EmptyTitle>Nothing to evaluate yet</EmptyTitle>
               <EmptyDescription>
-                Record experiment outcomes and activate a regulatory constraint with a numeric limit
-                to see compliance here.
+                Record an outcome and activate a constraint with a numeric limit.
               </EmptyDescription>
             </EmptyHeader>
           </Empty>

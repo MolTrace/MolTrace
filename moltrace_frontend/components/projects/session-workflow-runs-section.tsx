@@ -122,13 +122,13 @@ export function SessionWorkflowRunsSection({ sessionIds }: SessionWorkflowRunsSe
       <CardHeader>
         <CardTitle className="text-lg">Workflow runs</CardTitle>
         <CardDescription>
-          Workflow runs across every analysis session in this project.
+          Across every analysis session in this project.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
         {loading ? <p className="text-sm text-muted-foreground">Loading workflow runs…</p> : null}
         {failedFetch ? (
-          <p className="text-xs text-muted-foreground">One or more session workflow lists could not be loaded.</p>
+          <p className="text-xs text-muted-foreground">Some sessions could not be loaded.</p>
         ) : null}
         {flatRuns.length === 0 && !loading ? (
           <p className="text-sm text-muted-foreground">No workflow runs recorded for linked sessions.</p>

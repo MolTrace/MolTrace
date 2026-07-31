@@ -269,7 +269,7 @@ export function DataIntegrityWorkspace() {
             </span>
           }
           icon={ShieldCheck}
-          description="Run a data integrity assessment across a defined scope — checks ALCOA+ principles, audit trail coverage, and access-control compliance."
+          description="Checks ALCOA+ principles, audit trail coverage, and access control."
         >
           <div className="space-y-4">
             <div className="grid gap-3 sm:grid-cols-2">
@@ -309,7 +309,7 @@ export function DataIntegrityWorkspace() {
           eyebrow="Detail"
           title="Assessment detail"
           icon={FileSearch}
-          description="Selected assessment detail — scope, findings, ALCOA+ flags, and recommended remediation actions."
+          description="Findings, ALCOA+ flags, and recommended remediation."
         >
           <div className="space-y-5">
             {detailAssessment ? (
@@ -396,7 +396,7 @@ export function DataIntegrityWorkspace() {
         eyebrow="Assessments"
         title="Data integrity assessments"
         icon={ClipboardList}
-        description="All data integrity assessments — scope, status, and findings summary across all completed and in-progress runs."
+        description="Completed and in-progress runs."
       >
         <div className="space-y-3">
           <div className="flex justify-end">

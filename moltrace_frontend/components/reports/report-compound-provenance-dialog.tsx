@@ -382,7 +382,7 @@ export function ReportCompoundProvenanceDialog({
         <Alert>
           <AlertTitle className="text-sm">Provenance only</AlertTitle>
           <AlertDescription className="text-xs leading-relaxed">
-            Fields below are copied from the stored report record for traceability. They are not independent
+            Copied from the stored report record for traceability. They are not independent
             regulatory claims.
           </AlertDescription>
         </Alert>
@@ -421,8 +421,8 @@ export function ReportCompoundProvenanceDialog({
             </Button>
           ) : (
             <p className="text-xs text-muted-foreground">
-              No link stored in this browser session yet. Linking below records the compound — plus an optional batch
-              and sample ID — for this report; the saved report record does not report the registry link back to this
+              No link stored in this browser session yet. Linking records the compound, plus an optional batch
+              and sample ID. The saved report record does not report the registry link back to this
               view.
             </p>
           )}

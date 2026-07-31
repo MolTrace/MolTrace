@@ -189,7 +189,7 @@ export default function ProjectDetailPage() {
         </p>
         <h1 className="font-mono text-2xl font-bold tracking-tight">Project workspace</h1>
         <p className="max-w-3xl text-sm text-muted-foreground">
-          Project metadata, samples, value summary, member access, and connected SpectraCheck / Regulatory / Reaction campaigns.
+          Metadata, samples, value summary, member access, and connected SpectraCheck / Regulatory / Reaction campaigns.
         </p>
       </div>
 
@@ -201,7 +201,7 @@ export default function ProjectDetailPage() {
               Project unavailable
             </CardTitle>
             <CardDescription className="text-warning/90">
-              We couldn&apos;t load this project. Try refreshing in a moment, or contact your administrator if this keeps happening.
+              Try refreshing, or contact your administrator if this keeps happening.
             </CardDescription>
           </CardHeader>
         </Card>
@@ -276,8 +276,8 @@ export default function ProjectDetailPage() {
               <DialogHeader>
                 <DialogTitle>Create sample</DialogTitle>
                 <DialogDescription>
-                  A sample ID is required; the other fields are optional. Structure and NMR data are captured later by
-                  linking an analysis to the sample.
+                  A sample ID is required; other fields are optional. Structure and NMR data come later, when you
+                  link an analysis.
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-3">

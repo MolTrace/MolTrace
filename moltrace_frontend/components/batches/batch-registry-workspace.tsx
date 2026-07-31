@@ -361,7 +361,7 @@ export function BatchRegistryWorkspace() {
         eyebrow="Form"
         title="Create batch"
         icon={Plus}
-        description="Register a new compound batch with synthesis route, purity, mass, and source provenance for compound registry traceability."
+        description="Synthesis route, purity, mass, and source provenance for registry traceability."
       >
         <div>
           <form className="space-y-4" onSubmit={handleCreateBatch}>
@@ -457,7 +457,7 @@ export function BatchRegistryWorkspace() {
         eyebrow="Registry"
         title="Batches"
         icon={Boxes}
-        description="All registered compound batches — synthesis route, purity, mass, status, and compound provenance across the compound registry."
+        description="Synthesis route, purity, mass, status, and compound provenance."
         badge={
           <Button type="button" variant="outline" size="sm" onClick={() => void loadBatches()}>
             Refresh
@@ -647,9 +647,8 @@ export function BatchRegistryWorkspace() {
         icon={FileText}
         description={
           <span>
-            Enter a regulatory dossier ID. If the selected batch is already linked to a dossier, it is filled in
-            automatically. The assessment below is scoped to that dossier and includes the selected batch and its compound
-            when available.
+            Enter a regulatory dossier ID. The assessment is scoped to that dossier, plus the selected batch and its
+            compound.
           </span>
         }
       >
@@ -677,8 +676,7 @@ export function BatchRegistryWorkspace() {
             />
           ) : (
             <p className="text-sm text-muted-foreground">
-              Enter a valid dossier ID (digits only). Selecting a batch that is already linked to a dossier fills this
-              field in automatically.
+              Enter a valid dossier ID (digits only). Selecting a linked batch fills it automatically.
             </p>
           )}
         </div>
