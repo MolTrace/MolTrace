@@ -87,7 +87,7 @@ export function MlModelArtifactsList() {
         eyebrow="Artifacts"
         title="Artifacts"
         icon={Boxes}
-        description="Model artifacts produced by completed training runs — name, task type, framework, and training dataset version."
+        description="Produced by completed training runs."
       >
         <div className="table-scroll min-w-0">
           {loading ? (

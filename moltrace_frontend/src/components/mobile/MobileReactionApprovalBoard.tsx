@@ -238,10 +238,8 @@ export function MobileReactionApprovalBoard({
   return (
     <Card>
       <CardHeader className="pb-2">
-        <CardTitle className="text-base">Mobile Reaction Approval Board</CardTitle>
-        <CardDescription>
-          Reaction project approval summary optimized for phone workflows — recommended conditions, safety flags, and human review decision panel.
-        </CardDescription>
+        <CardTitle className="text-base">Reaction Approval Board</CardTitle>
+        <CardDescription>Recommended conditions, safety flags, and the human review decision.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-3 text-sm">
         {!online ? (
@@ -250,7 +248,7 @@ export function MobileReactionApprovalBoard({
           </p>
         ) : null}
         {!reactionProjectId ? (
-          <p className="text-xs text-muted-foreground">Open a reaction project to load mobile approval summary.</p>
+          <p className="text-xs text-muted-foreground">Open a reaction project to see its approval summary.</p>
         ) : null}
         {error ? <p className="text-xs text-destructive">{error}</p> : null}
         {loading ? <p className="text-xs text-muted-foreground">Loading reaction approval summary…</p> : null}
@@ -309,7 +307,7 @@ export function MobileReactionApprovalBoard({
         <div className="grid gap-2 sm:grid-cols-2">
           <div className="space-y-1">
             <Label htmlFor="mobile-reaction-rationale" className="text-xs">
-              rationale (required for approval/rejection)
+              rationale (required)
             </Label>
             <Textarea
               id="mobile-reaction-rationale"

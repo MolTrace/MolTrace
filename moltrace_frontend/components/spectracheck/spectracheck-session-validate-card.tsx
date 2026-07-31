@@ -182,7 +182,7 @@ export function SessionValidateCard({
       eyebrow="Session · Step 4 · Validate"
       title="Validate session inputs (optional)"
       icon={ShieldCheck}
-      description="Optional pre-flight check. Confirms the SMILES, 1H NMR text, and 13C NMR text parse, and cross-checks each spectrum text against the structure when it is supplied. Analysis still works without running validate, and with only one input layer."
+      description="Confirms the SMILES and 1H/13C text parse, and cross-checks each spectrum against the structure. Analysis runs without it, and with only one input layer."
       className="min-w-0"
     >
       <div className="space-y-4" data-testid="session-validate-card">
@@ -216,10 +216,10 @@ export function SessionValidateCard({
               Heads up
             </p>
             <p className="mt-1 text-muted-foreground">
-              All three textareas still hold the bundled example values
+              All three inputs still hold the bundled example
               (methanol / ethanol / propanol). Replace them with your
-              sample&apos;s data — validation here would only confirm the
-              example, not your sample.
+              sample&apos;s data — otherwise you validate the example,
+              not your sample.
             </p>
           </div>
         ) : null}
@@ -228,8 +228,8 @@ export function SessionValidateCard({
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p className="text-[11px] text-muted-foreground">
             {anyModified
-              ? "Click Validate to cross-check your structure against the supplied 1H and 13C NMR text."
-              : "You can still validate the example SMILES, 1H NMR text, and 13C NMR text, or modify the inputs above to validate your own."}
+              ? "Cross-checks your structure against the supplied 1H and 13C text."
+              : "Validate the bundled example, or replace the inputs above with your own first."}
           </p>
           <Button
             type="button"
@@ -502,7 +502,7 @@ function ValidationResultPanel({
 
       <p className="pt-1 text-[10px] text-muted-foreground">
         Validation is informational — you can still upload spectra and run
-        analysis below regardless of this status.
+        analysis.
       </p>
     </div>
   )

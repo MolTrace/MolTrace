@@ -140,7 +140,7 @@ export function CtdModule3BundleCard({ dossierId }: Props) {
             />
           </CardTitle>
           <CardDescription>
-            Assembles analytical evidence, impurity data, residual solvents, nitrosamine watch, qNMR/validation, AI governance, and source citations into a{" "}
+            Assembles dossier evidence into a{" "}
             <span className="font-medium text-foreground">draft CTD Module 3 support bundle</span> —{" "}
             <span className="font-medium text-foreground">review required</span> before submission use.
           </CardDescription>

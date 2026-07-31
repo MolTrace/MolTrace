@@ -288,7 +288,7 @@ export function PlateDesignPanel({
       accent="violet"
       eyebrow="Optimization · HTE / DoE Plate Designs"
       title="plate designs"
-      description="Generate a deterministic high-throughput experimentation plate (Sobol / Latin-hypercube / factorial / BO-seed) over the design space, view it as a physical plate map, and export CSV/JSON for lab robotics. Advisory; requires human review before execution."
+      description="Generate a deterministic plate over the design space; export CSV/JSON for lab robotics. Advisory; requires human review before execution."
     >
       <div className="space-y-5">
         {error ? (

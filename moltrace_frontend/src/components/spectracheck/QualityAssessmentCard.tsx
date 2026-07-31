@@ -9,7 +9,7 @@ import { humanizeTokenForDisplay } from "@/src/components/spectracheck/spectrach
 import { cn } from "@/lib/utils"
 
 const QC_TITLE_TOOLTIP =
-  "Quality control checks whether uploaded files, artifacts, and evidence records are reliable enough to be used in Unified Evidence. QC does not confirm molecular identity."
+  "Checks whether uploaded files, artifacts, and evidence records are reliable enough for Unified Evidence. QC does not confirm molecular identity."
 
 export type QualityAssessmentCardProps = {
   qcStatus: QualityGateStatus

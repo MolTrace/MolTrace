@@ -191,7 +191,7 @@ export function KnowledgeReviewWorkspace() {
         eyebrow="Filters"
         title="Filters"
         icon={Filter}
-        description="Filter review tasks by status and record type to focus on the most relevant claims in the curation queue."
+        description="By status and record type."
       >
         <div className="flex flex-wrap items-end gap-4">
           <div className="space-y-2">
@@ -326,7 +326,7 @@ export function KnowledgeReviewWorkspace() {
           eyebrow="Action"
           title="Update task"
           icon={ClipboardCheck}
-          description="Record an expert review decision on this extracted knowledge claim — approve, reject, or flag for further review."
+          description="Approve, reject, or flag for further review."
         >
           <div className="space-y-4">
             {patchErr ? (

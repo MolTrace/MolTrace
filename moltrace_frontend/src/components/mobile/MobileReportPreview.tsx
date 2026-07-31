@@ -183,13 +183,11 @@ export function MobileReportPreview({ reportId: reportIdProp = null }: { reportI
   return (
     <Card>
       <CardHeader className="pb-2">
-        <CardTitle className="text-base">Mobile Report Preview</CardTitle>
-        <CardDescription>
-          Compact report preview optimized for phone-based review workflows — sample, QC summary, regulatory action status, and human approval state.
-        </CardDescription>
+        <CardTitle className="text-base">Report Preview</CardTitle>
+        <CardDescription>Sample, QC summary, regulatory action status, and human approval state.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-3 text-sm">
-        {!reportId ? <p className="text-xs text-muted-foreground">Open a report to load mobile preview.</p> : null}
+        {!reportId ? <p className="text-xs text-muted-foreground">Open a report to see its preview.</p> : null}
         {loading ? <p className="text-xs text-muted-foreground">Loading report preview…</p> : null}
         {error ? <p className="text-xs text-destructive">{error}</p> : null}
 

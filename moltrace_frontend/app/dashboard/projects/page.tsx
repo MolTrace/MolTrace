@@ -60,7 +60,7 @@ export default function ProjectsPage() {
           </p>
           <h1 className="font-mono text-2xl font-bold tracking-tight">Projects</h1>
           <p className="max-w-3xl text-sm text-muted-foreground">
-            Cross-program project overview — sample counts, activity timelines, and quick links into spectroscopy, regulatory, and reaction workspaces.
+            Sample counts, activity timelines, and quick links into spectroscopy, regulatory, and reaction workspaces.
           </p>
         </div>
         <Button className="gap-2">

@@ -34,8 +34,7 @@ export function OfflineBanner() {
       <div className="mx-auto flex min-h-10 max-w-screen-2xl items-center gap-2 px-3 py-2 text-sm">
         <AlertTriangle className="h-4 w-4 shrink-0" />
         <p className="min-w-0 flex-1">
-          You&rsquo;re offline. Spectral analysis and report generation need a connection — they&rsquo;ll
-          work again once you&rsquo;re back online.
+          You&rsquo;re offline. Spectral analysis and report generation resume when you reconnect.
         </p>
         <Button type="button" size="sm" variant="ghost" className="h-8 px-2 text-warning" onClick={() => setDismissed(true)}>
           Dismiss

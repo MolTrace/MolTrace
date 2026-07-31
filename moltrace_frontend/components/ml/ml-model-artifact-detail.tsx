@@ -327,7 +327,7 @@ export function MlModelArtifactDetail() {
             eyebrow="Metrics"
             title="Evaluation runs"
             icon={BarChart3}
-            description="Evaluation runs filtered to this model artifact — status and dataset version for each completed or pending evaluation."
+            description="Scoped to this artifact."
           >
             <div className="table-scroll min-w-0">
               {errEval ? (
@@ -374,7 +374,7 @@ export function MlModelArtifactDetail() {
               </span>
             }
             icon={FileText}
-            description="Structured model card for this artifact — intended use, limitations, training data summary, and evaluation summary."
+            description="Intended use, limitations, training data, and evaluation."
           >
             <div className="space-y-3">
               {errCards ? <p className="text-sm text-destructive">{errCards}</p> : null}
@@ -412,7 +412,7 @@ export function MlModelArtifactDetail() {
             eyebrow="Lineage"
             title="Deployment candidates"
             icon={Boxes}
-            description="Deployment candidate records for this artifact — open the ML factory dashboard for the full deployment workflow."
+            description="Open Model Factory for the full deployment workflow."
           >
             <div className="space-y-3">
               {errDeploy ? <p className="text-sm text-destructive">{errDeploy}</p> : null}
@@ -469,7 +469,7 @@ export function MlModelArtifactDetail() {
                 </span>
               }
               icon={Plus}
-              description="Draft a structured model card capturing intended use, limitations, training data summary, and evaluation summary for governance review."
+              description="Documents intended use and limitations for governance review."
             >
               <div className="space-y-4">
                 <div className="space-y-2">

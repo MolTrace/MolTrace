@@ -587,7 +587,7 @@ export function KnowledgeDatasetsDashboard() {
           eyebrow="Training"
           title="1. Training dataset candidates"
           icon={Database}
-          description="Curated knowledge claims nominated for ML model training — identifiers, record type, review metadata, and curation status."
+          description="Curated claims nominated for model training."
         >
           <div className="space-y-4">
             <div className="flex flex-wrap items-end gap-3">
@@ -623,7 +623,7 @@ export function KnowledgeDatasetsDashboard() {
                   </EmptyMedia>
                   <EmptyTitle>No training candidates</EmptyTitle>
                   <EmptyDescription>
-                    Nominate curated knowledge claims for ML training to see them here.
+                    Nominate curated claims for ML training.
                   </EmptyDescription>
                 </EmptyHeader>
               </Empty>
@@ -691,9 +691,6 @@ export function KnowledgeDatasetsDashboard() {
             <Card className="border-dashed">
               <CardHeader className="pb-2">
                 <CardTitle className="text-base">Nominate training candidate</CardTitle>
-                <CardDescription>
-                  Nominate a knowledge claim as a training candidate by specifying the record type, record ID, dataset type, source, citation IDs, and quality flags.
-                </CardDescription>
               </CardHeader>
               <CardContent className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
                 <div className="space-y-2">
@@ -806,7 +803,7 @@ export function KnowledgeDatasetsDashboard() {
           eyebrow="Benchmark"
           title="2. Benchmark dataset candidates"
           icon={Database}
-          description="Knowledge claims nominated for ML benchmark evaluation — includes leakage risk label and split recommendation. Benchmark candidates do not carry citation IDs, so that column stays blank."
+          description="Includes leakage risk and split recommendation. Benchmark candidates carry no citation IDs, so that column stays blank."
         >
           <div className="space-y-4">
             <div className="flex flex-wrap items-end gap-3">
@@ -842,7 +839,7 @@ export function KnowledgeDatasetsDashboard() {
                   </EmptyMedia>
                   <EmptyTitle>No benchmark candidates</EmptyTitle>
                   <EmptyDescription>
-                    Nominate reviewed knowledge claims for ML benchmark evaluation to see them here.
+                    Nominate reviewed claims for benchmark evaluation.
                   </EmptyDescription>
                 </EmptyHeader>
               </Empty>
@@ -915,9 +912,6 @@ export function KnowledgeDatasetsDashboard() {
             <Card className="border-dashed">
               <CardHeader className="pb-2">
                 <CardTitle className="text-base">Nominate benchmark candidate</CardTitle>
-                <CardDescription>
-                  Nominate a knowledge claim as a benchmark evaluation candidate by specifying the record type, record ID, benchmark type, and leakage risk classification.
-                </CardDescription>
               </CardHeader>
               <CardContent className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
                 <div className="space-y-2">
@@ -1052,7 +1046,7 @@ export function KnowledgeDatasetsDashboard() {
           eyebrow="Versions"
           title="3. Dataset versions"
           icon={GitBranch}
-          description="Versioned snapshots of training and benchmark splits — each version locks candidate IDs into train, validation, test, and holdout partitions for reproducible model training."
+          description="Each version locks candidate IDs into train, validation, test, and holdout splits."
         >
           <div className="space-y-4">
             <div className="flex flex-wrap items-end gap-3">
@@ -1078,8 +1072,8 @@ export function KnowledgeDatasetsDashboard() {
               <CardHeader className="pb-2">
                 <CardTitle className="text-base">Create dataset version</CardTitle>
                 <CardDescription>
-                  Assign candidate IDs to the train, validation, test, and holdout splits (comma-separated per field). The
-                  version&apos;s source record list is the deduplicated union of all four splits.
+                  Assign candidate IDs to each split, comma-separated. The source record list is the
+                  deduplicated union of all four.
                 </CardDescription>
               </CardHeader>
               <CardContent className="grid gap-3 md:grid-cols-2">
@@ -1159,7 +1153,7 @@ export function KnowledgeDatasetsDashboard() {
                   </EmptyMedia>
                   <EmptyTitle>No dataset versions</EmptyTitle>
                   <EmptyDescription>
-                    Lock candidate splits into a versioned snapshot to see it here.
+                    Lock candidate splits into a versioned snapshot.
                   </EmptyDescription>
                 </EmptyHeader>
               </Empty>

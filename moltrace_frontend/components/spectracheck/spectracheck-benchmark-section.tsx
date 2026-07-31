@@ -230,7 +230,7 @@ export function SpectraCheckBenchmarkSection() {
         eyebrow="Step 1 · Suite"
         title="5-layer SpectraCheck benchmark"
         icon={Sparkles}
-        description="Score curated (structure, observed NMR) cases across peak-level accuracy, structural ranking, explainability, robustness, and regulatory evidence. Reuses the same prediction and categorization pipeline as the processed-NMR analysis so results are directly comparable."
+        description="Score curated (structure, observed NMR) cases across peak-level accuracy, structural ranking, explainability, robustness, and regulatory evidence. Same pipeline as the processed-NMR analysis, so results are comparable."
       >
         <div className="space-y-4">
           <div data-testid="benchmark-suite-input">
@@ -242,7 +242,7 @@ export function SpectraCheckBenchmarkSection() {
               fields={BENCHMARK_CASE_FIELDS}
               initialValue={cases}
               onChange={setCases}
-              description="Each case is a (structure, observed NMR) pair. Nucleus is 1H or 13C; audit fields (sample ID, SHA-256 checksum, operator, instrument) and anything else are editable via each case's raw-JSON toggle."
+              description="Each case is a (structure, observed NMR) pair, nucleus 1H or 13C. Audit fields (sample ID, SHA-256, operator, instrument) live under the raw-JSON toggle."
               idPrefix="bench-cases"
             />
           </div>
@@ -365,7 +365,7 @@ function BenchmarkResultPanels({ result }: { result: BenchmarkResponse }) {
         eyebrow="Step 3 · Per-case"
         title="Per-case scorecards"
         icon={Activity}
-        description="Each row shows the per-layer score with the components used. Click into a case to see notes."
+        description="Per-layer score and the components used. Expand a case for notes."
       >
         <div className="space-y-3" data-testid="benchmark-cases">
           {result.cases.map((row) => (

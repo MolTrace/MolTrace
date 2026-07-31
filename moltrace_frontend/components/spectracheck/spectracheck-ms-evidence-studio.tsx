@@ -45,12 +45,11 @@ export function SpectraCheckMsEvidenceStudio({
           MS Evidence Studio
           <InfoTooltip
             label="About MS Evidence Studio"
-            content="High-resolution MS and MS/MS tools use shared sample ID and candidate structures from the session. Expand LC-MS when you need import through the consensus bridge."
+            content="Uses the shared sample ID and candidate structures from the session. Expand LC-MS for import through the consensus bridge."
           />
         </h2>
         <p className="text-sm text-muted-foreground">
-          HRMS exact mass, formula search, adduct & isotope inference, processed MS/MS, and fragmentation
-          tree — plus optional LC-MS pipeline & unified confidence bridge.
+          HRMS and MS/MS evidence, plus an optional LC-MS pipeline.
         </p>
       </div>
 
@@ -60,7 +59,7 @@ export function SpectraCheckMsEvidenceStudio({
         eyebrow="MS · Step 1 · Setup"
         title="Inputs from shared session"
         icon={Atom}
-        description="MS analyzers use the sample ID and candidates from the workspace header — no extra inputs needed at this level."
+        description="Sample ID and candidates from the session header. No extra inputs required."
         className="min-w-0"
       >
         <div className="grid gap-2 sm:grid-cols-2">
@@ -111,7 +110,7 @@ export function SpectraCheckMsEvidenceStudio({
         eyebrow="MS · Step 3 · Advanced"
         title="LC-MS pipeline & confidence bridge"
         icon={Settings2}
-        description="Optional: LC-MS import, feature detection, grouping / blank-subtraction / RT alignment, family consensus, library dereplication, and LC-MS → unified confidence bridge."
+        description="Optional: LC-MS import, feature detection, grouping / blank-subtraction / RT alignment, family consensus, and library dereplication."
         className="min-w-0"
       >
         <Accordion type="single" collapsible className="w-full min-w-0 rounded-lg border bg-card px-1">

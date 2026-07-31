@@ -25,7 +25,7 @@ import { Loader2, Network } from "lucide-react"
 import { trackCompoundGraphViewed } from "@/src/lib/analytics/analytics-client"
 
 const GRAPH_TOOLTIP =
-  "The scientific knowledge graph links compounds, batches, analytical evidence, reactions, reports, and regulatory dossiers for traceable decision-making."
+  "Links compounds, batches, analytical evidence, reactions, reports, and regulatory dossiers for traceable decision-making."
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return Boolean(v) && typeof v === "object" && !Array.isArray(v)
@@ -211,7 +211,7 @@ export function CompoundScientificKnowledgeGraphPanel({
       <Alert variant="destructive">
         <AlertTitle>Invalid compound id</AlertTitle>
         <AlertDescription className="text-sm">
-          {err || "This view needs a numeric compound ID. Open a compound from the registry to see its graph."}
+          {err || "Open a compound from the registry to see its graph."}
         </AlertDescription>
       </Alert>
     )
@@ -233,8 +233,8 @@ export function CompoundScientificKnowledgeGraphPanel({
             )}
           </div>
           <CardDescription>
-            Nodes and edges are shown exactly as recorded for this compound. Labels can be missing for items other than
-            compounds until those records are expanded.
+            Nodes and edges are shown exactly as recorded for this compound. Labels can be missing until those
+            records are expanded.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

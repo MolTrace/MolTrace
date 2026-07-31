@@ -224,7 +224,7 @@ export function MlErrorAnalysisWorkspace() {
         eyebrow="Create"
         title="Create error analysis slice"
         icon={Plus}
-        description="Define an error analysis slice on an evaluation run — specify slice type, severity, sample count, per-slice metrics, and representative failure cases."
+        description="Slice type, severity, metrics, and representative failure cases."
       >
         <div className="space-y-4">
           <div className="space-y-2">
@@ -318,7 +318,7 @@ export function MlErrorAnalysisWorkspace() {
         eyebrow="Records"
         title="Slices"
         icon={ListChecks}
-        description="Error analysis slices recorded for your organization — slice type, severity, sample count, and linked evaluation run."
+        description="Every error analysis slice on record."
       >
         <div className="space-y-4">
           <div className="table-scroll min-w-0">

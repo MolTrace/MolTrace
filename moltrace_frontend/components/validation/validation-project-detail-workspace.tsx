@@ -994,9 +994,8 @@ export function ValidationProjectDetailWorkspace() {
         <div className="space-y-2 rounded-md border border-amber-500/45 bg-amber-500/10 p-3">
           <p className="text-sm font-medium">Validated state — change control active</p>
           <p className="text-xs text-muted-foreground">
-            This project is <span className="font-mono">{readStr(project?.status)}</span>. Edits to its records (URS,
-            functional specs, risk, test protocols, test cases) require a documented reason — enter it here before
-            editing; it is recorded as the change-control reason. Draft / in-progress projects are unaffected.
+            This project is <span className="font-mono">{readStr(project?.status)}</span>. Editing its records requires
+            a documented reason, which is recorded.
           </p>
           <div className="space-y-1">
             <Label htmlFor="change-reason" className="text-xs">
@@ -1079,7 +1078,7 @@ export function ValidationProjectDetailWorkspace() {
               <CardHeader>
                 <CardTitle className="text-base">Create URS requirement</CardTitle>
                 <CardDescription>
-                  Add a User Requirement Specification entry — specify requirement code, text, module, criticality, and GxP impact.
+                  Adds a User Requirement Specification entry.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -1140,7 +1139,7 @@ export function ValidationProjectDetailWorkspace() {
               <CardHeader>
                 <CardTitle className="text-base">URS</CardTitle>
                 <CardDescription>
-                  URS entries for this validation project — requirement code, module, criticality, GxP impact, and approval status.
+                  User Requirement Specifications for this project.
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -1165,7 +1164,7 @@ export function ValidationProjectDetailWorkspace() {
               <CardHeader>
                 <CardTitle className="text-base">Create functional spec</CardTitle>
                 <CardDescription>
-                  Adds a functional specification to this project — linked requirement, function code, name, description, and expected behavior.
+                  Links a function to a URS requirement.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -1244,9 +1243,6 @@ export function ValidationProjectDetailWorkspace() {
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">Functional Specs</CardTitle>
-                <CardDescription>
-                  Functional specifications defined for this project.
-                </CardDescription>
               </CardHeader>
               <CardContent>
                 <GenericTable
@@ -1270,9 +1266,6 @@ export function ValidationProjectDetailWorkspace() {
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">Create risk assessment</CardTitle>
-                <CardDescription>
-                  Records a risk assessment for this project.
-                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 {riskError ? <p className="text-xs text-destructive">{riskError}</p> : null}
@@ -1354,9 +1347,6 @@ export function ValidationProjectDetailWorkspace() {
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">Risk Assessment</CardTitle>
-                <CardDescription>
-                  Risk assessments recorded for this project.
-                </CardDescription>
               </CardHeader>
               <CardContent>
                 <GenericTable
@@ -1382,9 +1372,6 @@ export function ValidationProjectDetailWorkspace() {
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">Create test protocol</CardTitle>
-                <CardDescription>
-                  Adds a test protocol to this project.
-                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 {protocolError ? <p className="text-xs text-destructive">{protocolError}</p> : null}
@@ -1436,9 +1423,6 @@ export function ValidationProjectDetailWorkspace() {
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">Test Protocols</CardTitle>
-                <CardDescription>
-                  Test protocols defined for this project.
-                </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="overflow-x-auto rounded-md border">
@@ -1501,9 +1485,6 @@ export function ValidationProjectDetailWorkspace() {
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">Selected protocol detail</CardTitle>
-                <CardDescription>
-                  Details for the selected test protocol — protocol code, title, type, module, and status.
-                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
                 {protocolDetailError ? <p className="text-xs text-destructive">{protocolDetailError}</p> : null}
@@ -1532,7 +1513,7 @@ export function ValidationProjectDetailWorkspace() {
               <CardHeader>
                 <CardTitle className="text-base">Create test case</CardTitle>
                 <CardDescription>
-                  Add a test case to this protocol — specify code, title, preconditions, steps, expected results, and linked requirement and risk IDs.
+                  Attaches to the selected protocol.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -1631,7 +1612,7 @@ export function ValidationProjectDetailWorkspace() {
               <CardHeader>
                 <CardTitle className="text-base">Test Cases</CardTitle>
                 <CardDescription>
-                  Test cases associated with the selected protocol — status, linked requirements, and linked risks.
+                  For the selected protocol.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
@@ -1704,7 +1685,7 @@ export function ValidationProjectDetailWorkspace() {
               <CardHeader>
                 <CardTitle className="text-base">Execute test case</CardTitle>
                 <CardDescription>
-                  Record a test execution result — executor, execution status, actual results, and evidence file or artifact IDs.
+                  Records the result and its supporting evidence.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -1769,7 +1750,7 @@ export function ValidationProjectDetailWorkspace() {
               <CardHeader>
                 <CardTitle className="text-base">Test Executions</CardTitle>
                 <CardDescription>
-                  Test execution records for this project — execution status, executor, timestamp, and linked deviation.
+                  Across every protocol in this project.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
@@ -1837,9 +1818,6 @@ export function ValidationProjectDetailWorkspace() {
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">Selected execution detail</CardTitle>
-                <CardDescription>
-                  Detail for the selected test execution — execution status, executor, actual results, and linked deviation.
-                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
                 {executionDetailError ? <p className="text-xs text-destructive">{executionDetailError}</p> : null}
@@ -1872,7 +1850,6 @@ export function ValidationProjectDetailWorkspace() {
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">e-Signatures</CardTitle>
-                <CardDescription>Signature records included with this validation project.</CardDescription>
               </CardHeader>
               <CardContent>
                 <GenericTable
@@ -1894,7 +1871,6 @@ export function ValidationProjectDetailWorkspace() {
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">Deviations</CardTitle>
-                <CardDescription>Deviation records included with this validation project.</CardDescription>
               </CardHeader>
               <CardContent>
                 <GenericTable
@@ -1913,7 +1889,6 @@ export function ValidationProjectDetailWorkspace() {
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">CAPA</CardTitle>
-                <CardDescription>CAPA records included with this validation project.</CardDescription>
               </CardHeader>
               <CardContent>
                 <GenericTable
@@ -1935,7 +1910,6 @@ export function ValidationProjectDetailWorkspace() {
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">Inspection Package</CardTitle>
-                <CardDescription>Inspection package records included with this validation project.</CardDescription>
               </CardHeader>
               <CardContent>
                 <GenericTable

@@ -34,7 +34,7 @@ import {
 } from "lucide-react"
 
 const SYSTEM_STATUS_TOOLTIP =
-  "System Status checks whether the platform, database, storage, job queue, and environment configuration are ready for scientific workflows."
+  "Checks whether the platform, database, storage, job queue, and configuration are ready."
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return Boolean(v) && typeof v === "object" && !Array.isArray(v)
@@ -280,7 +280,7 @@ export function SystemStatusWorkspace() {
           {!loading && backendUnreachable ? (
             <p className="mt-1 flex items-center gap-1.5 text-xs text-destructive">
               <ServerOff className="h-3.5 w-3.5 shrink-0" aria-hidden />
-              The platform is unavailable — try again in a moment, or contact your platform administrator.
+              The platform is unavailable — try again, or contact your administrator.
             </p>
           ) : null}
         </div>
@@ -297,7 +297,7 @@ export function SystemStatusWorkspace() {
         <AlertCard
           variant="error"
           title="Platform unavailable"
-          description="System status checks could not be reached. Refresh once the platform is back online."
+          description="Refresh once the platform is back online."
         />
       ) : null}
 
@@ -321,7 +321,6 @@ export function SystemStatusWorkspace() {
           eyebrow="Health"
           title="Overall health"
           icon={Heart}
-          description="Live health check and overall service status."
         >
           <div className="space-y-3 text-sm">
             {loading ? (
@@ -357,7 +356,7 @@ export function SystemStatusWorkspace() {
           eyebrow="Version"
           title="Platform version"
           icon={Tag}
-          description="Platform build, version, and Git commit identifier."
+          description="Build, version, and Git commit identifier."
         >
           <div className="space-y-2 text-sm">
             {loading ? (
@@ -405,7 +404,7 @@ export function SystemStatusWorkspace() {
           eyebrow="Dependencies"
           title="Dependency checks"
           icon={ListChecks}
-          description="Status of upstream services the platform depends on, plus availability checks."
+          description="Status of upstream services the platform depends on."
         >
           <div className="space-y-4 text-sm">
             {loading ? (
@@ -591,7 +590,7 @@ export function SystemStatusWorkspace() {
             eyebrow="API Docs"
             title="API documentation"
             icon={BookOpen}
-            description="Whether the public API documentation is reachable."
+            description="Reachability of the public API reference."
           >
             <div>
               {loading ? (
@@ -619,7 +618,7 @@ export function SystemStatusWorkspace() {
             eyebrow="Environment"
             title="Environment"
             icon={Settings2}
-            description="Required environment variable check for the active deployment."
+            description="Required variable check for the active deployment."
             className="sm:col-span-2 lg:col-span-2"
           >
             <div className="space-y-2 text-xs">
@@ -685,7 +684,7 @@ export function SystemStatusWorkspace() {
           eyebrow="Warnings"
           title="Recent warnings"
           icon={Bell}
-          description="All non-fatal warnings and notes reported by the health, status, and environment checks."
+          description="Non-fatal notes from the health, status, and environment checks."
         >
           <div>
             {mergedWarnings.length === 0 ? (

@@ -343,7 +343,7 @@ export function FeatureFlagsWorkspace() {
         eyebrow="Order"
         title="Entitlements display order"
         icon={ListOrdered}
-        description="Program display order is fixed for tenant entitlement and feature flag views."
+        description="Fixed across tenant entitlement and feature flag views."
       >
         <div className="space-y-2 text-sm">
           {PROGRAM_ORDER.map((item, index) => (
@@ -359,7 +359,7 @@ export function FeatureFlagsWorkspace() {
         eyebrow="Flags"
         title="Feature flags"
         icon={ToggleRight}
-        description="All registered feature flags with their default values and tenant overrides."
+        description="Default values and tenant overrides for every registered flag."
       >
         <div className="space-y-3">
           {error ? <p className="text-xs text-destructive">{error}</p> : null}
@@ -456,7 +456,7 @@ export function FeatureFlagsWorkspace() {
         eyebrow="Detail"
         title="Feature flag detail"
         icon={FileText}
-        description="Definition, current value, and override history for the selected flag."
+        description="Definition, current value, and override history."
       >
         <div className="space-y-3">
           {selectedFlagDetailError ? <p className="text-xs text-destructive">{selectedFlagDetailError}</p> : null}
@@ -512,7 +512,7 @@ export function FeatureFlagsWorkspace() {
         eyebrow="Form"
         title="Create feature flag"
         icon={PlusCircle}
-        description="Register a new feature flag with its key, default value, and tenant scope."
+        description="Key, default value, and tenant scope."
       >
         <div className="space-y-4">
           <div className="grid gap-3 sm:grid-cols-2">
@@ -597,7 +597,7 @@ export function FeatureFlagsWorkspace() {
         eyebrow="Plans"
         title="Subscription plans"
         icon={CreditCard}
-        description="All subscription plan tiers with their feature entitlements."
+        description="Tiers and the feature entitlements they grant."
       >
         <div className="space-y-3">
           <div className="overflow-x-auto rounded-md border">
@@ -652,7 +652,7 @@ export function FeatureFlagsWorkspace() {
         eyebrow="Form"
         title="Create subscription plan"
         icon={PlusCircle}
-        description="Register a new subscription tier with the entitlements and quotas it grants."
+        description="Entitlements and quotas the new tier grants."
       >
         <div className="space-y-4">
           <div className="grid gap-3 sm:grid-cols-2">

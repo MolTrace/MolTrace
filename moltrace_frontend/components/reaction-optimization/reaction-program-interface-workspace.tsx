@@ -21,7 +21,7 @@ export function ReactionProgramInterfaceWorkspace() {
         </p>
         <h1 className="font-mono text-2xl font-bold tracking-tight">Reaction program workspace</h1>
         <p className="max-w-3xl text-sm text-muted-foreground">
-          Review next-best-experiment recommendations across campaigns, or open the program-level Reaction Studio for direct experiment authoring.
+          Review next-best-experiment recommendations across campaigns, or author experiments in Reaction Studio.
         </p>
       </div>
 

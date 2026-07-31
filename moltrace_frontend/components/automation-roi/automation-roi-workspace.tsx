@@ -81,8 +81,7 @@ export default function AutomationRoiWorkspace() {
           </div>
           <p className="max-w-2xl text-sm text-muted-foreground">
             Executive view of automation leverage and review load. Figures below are{" "}
-            <strong className="font-medium text-foreground">not</strong> connected to live billing or model telemetry;
-            they are styled for credible narrative discussions with R&amp;D and finance stakeholders.
+            <strong className="font-medium text-foreground">not</strong> connected to live billing or model telemetry.
           </p>
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-2">

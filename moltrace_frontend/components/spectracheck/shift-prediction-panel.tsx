@@ -283,7 +283,7 @@ export function ShiftPredictionPanel({
         eyebrow="Candidate tool · Predicted shifts"
         title="Per-atom ¹H / ¹³C shift prediction"
         icon={Atom}
-        description="Structure-derived chemical-shift prediction from a candidate SMILES. The method is server-configured (NMRNet when available, else the HOSE-code / NMRShiftDB2 fallback) and reported along with the compute device it ran on."
+        description="Predicted from a candidate SMILES. Method is server-configured (NMRNet, else the HOSE-code / NMRShiftDB2 fallback) and reported with each result."
         className="min-w-0 overflow-visible shadow-none"
       >
         <div className="space-y-4">

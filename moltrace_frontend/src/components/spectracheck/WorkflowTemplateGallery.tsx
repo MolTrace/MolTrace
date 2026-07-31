@@ -181,7 +181,7 @@ function templatesFromPayload(data: unknown): WorkflowTemplateCardModel[] {
 }
 
 const GALLERY_TOOLTIP =
-  "Workflow templates run a predefined sequence of analysis, QC, evidence, unified confidence, and report steps so the session can be reproduced."
+  "A predefined sequence of analysis, QC, evidence, unified confidence, and report steps. Reproduces the session."
 
 type LoadState =
   | { status: "loading" }

@@ -11,7 +11,7 @@ import { parseSessionQualityControlPayload } from "@/src/lib/spectracheck/qualit
 import { humanizeTokenForDisplay } from "@/src/components/spectracheck/spectracheck-display-labels"
 
 const CARD_TOOLTIP =
-  "Session-level quality control summarizes whether files, artifacts, and evidence items are ready to influence Unified Evidence and reports."
+  "Whether files, artifacts, and evidence items are ready to influence Unified Evidence and reports."
 
 type Props = {
   sessionId: string | null
@@ -75,7 +75,7 @@ export function SessionEvidenceReadinessCard({ sessionId }: Props) {
       try {
         await loadGet()
       } catch {
-        setError("Session QC could not be completed right now. You can retry when the service is available.")
+        setError("Session QC could not be completed. Try again shortly.")
       }
     } finally {
       setBusy(false)

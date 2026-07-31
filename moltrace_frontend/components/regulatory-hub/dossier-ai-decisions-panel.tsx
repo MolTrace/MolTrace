@@ -130,7 +130,7 @@ export function DossierAIDecisionsPanel({
       eyebrow="Dossier · AI Governance · Draft Annex 22"
       title="AI decision records"
       icon={ShieldCheck}
-      description="Tamper-evident hash chain of governed AI decisions for this dossier under EU GMP Draft Annex 22 — each with its risk level, compliance checklist, and human-review state."
+      description="Tamper-evident hash chain of governed AI decisions under EU GMP Draft Annex 22."
     >
       <div className="space-y-4">
         {/* Draft framing — render the disclaimer the API returns; never claim compliance. */}

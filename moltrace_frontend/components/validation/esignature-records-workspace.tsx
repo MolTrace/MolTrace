@@ -320,7 +320,7 @@ export function ESignatureRecordsWorkspace() {
           <div className="space-y-4">
             <p className="rounded-md border border-dashed border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
               You sign as the authenticated user — signer identity is recorded automatically from your
-              session (§11.100), not from this form. Provide the meaning and reason for the signature.
+              session (§11.100), not from this form.
             </p>
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-1">
@@ -513,7 +513,7 @@ export function ESignatureRecordsWorkspace() {
         eyebrow="Records"
         title="e-Signature records"
         icon={Signature}
-        description="Electronic signature records for GxP-critical actions — approval events, reviewer sign-offs, and controlled-record authorizations."
+        description="GxP-critical approvals, reviewer sign-offs, and controlled-record authorizations."
       >
         <div className="space-y-3">
           <div className="flex justify-end">

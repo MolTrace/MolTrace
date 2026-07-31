@@ -242,8 +242,7 @@ export default function ReviewQueueWorkspace() {
             </EmptyMedia>
             <EmptyTitle>No review tasks yet</EmptyTitle>
             <EmptyDescription>
-              Tasks appear here when SpectraCheck flags an analysis for human review. When your sessions
-              produce findings, they&apos;ll show up in this queue.
+              Tasks appear when SpectraCheck flags an analysis for human review.
             </EmptyDescription>
           </EmptyHeader>
           <EmptyContent>

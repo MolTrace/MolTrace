@@ -265,9 +265,7 @@ export function MobileCommandCenter() {
     <Card>
       <CardHeader className="pb-2">
         <CardTitle className="text-base">Mobile Command Center</CardTitle>
-        <CardDescription>
-          Cross-module status summary for mobile — active alerts, pending actions, and module health across SpectraCheck, Regentry, and Reaction Optimization.
-        </CardDescription>
+        <CardDescription>Active alerts, pending actions, and health for each module.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-3 text-sm">
         {orderedModules.map((module, idx) => (
@@ -301,7 +299,7 @@ export function MobileCommandCenter() {
         ))}
         {loading ? <p className="text-xs text-muted-foreground">Loading your workspace summary…</p> : null}
         {!loading && orderedModules.length === 0 ? (
-          <p className="text-xs text-muted-foreground">Mobile command center summary unavailable.</p>
+          <p className="text-xs text-muted-foreground">Module summary unavailable.</p>
         ) : null}
 
         <div className="rounded-md border bg-muted/20 p-3">
@@ -325,7 +323,7 @@ export function MobileCommandCenter() {
             </p>
           </div>
           <p className="mt-2 text-[11px] text-muted-foreground">
-            Mobile connector actions are view/triage only. Credential edits require admin permissions and backend support.
+            Connector actions here are view/triage only. Credential edits require admin permissions.
           </p>
           {connectorSummaryLoading ? (
             <p className="mt-1 text-xs text-muted-foreground">Loading connector status…</p>

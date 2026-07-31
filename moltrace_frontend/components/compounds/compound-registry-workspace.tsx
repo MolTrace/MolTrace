@@ -286,8 +286,7 @@ export function CompoundRegistryWorkspace() {
           </p>
           <h1 className="font-mono text-2xl font-bold tracking-tight">Compound Registry</h1>
           <p className="text-sm text-muted-foreground">
-            Track compounds, batches, samples, analytical evidence, reactions, reports, and regulatory dossiers in one
-            connected registry.
+            Track compounds, batches, samples, analytical evidence, reactions, reports, and regulatory dossiers.
           </p>
           {listErr && !loading ? <p className="mt-1 text-xs text-destructive">{listErr}</p> : null}
         </div>
@@ -544,7 +543,7 @@ export function CompoundRegistryWorkspace() {
                 <EmptyTitle>{searchActive ? "No matches" : "No compounds yet"}</EmptyTitle>
                 <EmptyDescription>
                   {searchActive
-                    ? "No compounds matched these filters. Try broadening or clearing the search."
+                    ? "Try broadening or clearing the search."
                     : "Register your first compound to start tracking batches, evidence, and dossiers."}
                 </EmptyDescription>
               </EmptyHeader>

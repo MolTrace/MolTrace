@@ -286,7 +286,7 @@ export function GsdTelemetryPanel({
   const resolvedDescription =
     description ??
     (mode === "admin"
-      ? "Pre-aggregated rollup of every GSD analysis audit event over the trailing window. The rollup and the promotion-gate verdict are computed server-side and shown here as recorded."
+      ? "Every GSD analysis audit event over the trailing window. The rollup and the promotion-gate verdict are computed server-side and shown as recorded."
       : "Pre-aggregated rollup of your organization's experimental-engine usage. Use to verify performance on your spectra and size opt-in adoption before the promotion gate clears.")
 
   if (state.status === "loading") {

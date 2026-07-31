@@ -315,7 +315,7 @@ export function DeviationsWorkspace() {
           eyebrow="Create"
           title="Create deviation"
           icon={Plus}
-          description="Log a process or procedural deviation with description, category, severity, and responsible owner for GxP traceability."
+          description="Logs a process or procedural deviation for GxP traceability."
         >
           <div className="space-y-4">
             <div className="grid gap-3 sm:grid-cols-2">
@@ -424,7 +424,7 @@ export function DeviationsWorkspace() {
           eyebrow="Detail"
           title="Selected deviation"
           icon={FileText}
-          description="Selected deviation details — update status, root cause, CAPA linkage, and resolution notes."
+          description="Update status, root cause, and CAPA linkage."
         >
           <div className="space-y-5">
             {detailDeviation ? (
@@ -543,7 +543,7 @@ export function DeviationsWorkspace() {
         eyebrow="Backlog"
         title="Deviation table"
         icon={AlertOctagon}
-        description="All deviation records — filter by category, severity, and status to manage the open deviation backlog."
+        description="Filter by category, severity, or status."
       >
         <div className="space-y-3">
           <div className="flex justify-end">

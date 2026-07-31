@@ -125,7 +125,7 @@ export default function ProjectSampleDetailPage() {
         </p>
         <h1 className="font-mono text-2xl font-bold tracking-tight">Sample workspace</h1>
         <p className="max-w-3xl text-sm text-muted-foreground">
-          Sample metadata, batches, evidence sessions, and direct entry points into SpectraCheck for spectroscopic analysis.
+          Metadata, batches, evidence sessions, and direct entry into SpectraCheck.
         </p>
       </div>
 
@@ -137,7 +137,7 @@ export default function ProjectSampleDetailPage() {
               Sample unavailable
             </CardTitle>
             <CardDescription className="text-warning/90">
-              We couldn&apos;t load this sample. Try refreshing in a moment, or contact your administrator if this keeps happening.
+              Try refreshing, or contact your administrator if this keeps happening.
             </CardDescription>
           </CardHeader>
         </Card>
@@ -198,14 +198,13 @@ export default function ProjectSampleDetailPage() {
         <CardHeader>
           <CardTitle className="text-lg">Sessions</CardTitle>
           <CardDescription>
-            SpectraCheck sessions linked to this sample, shown when session history is recorded on the sample.
+            SpectraCheck sessions linked to this sample.
           </CardDescription>
         </CardHeader>
         <CardContent className="overflow-x-auto">
           {sessionRows.length === 0 ? (
             <p className="text-sm text-muted-foreground">
-              No sessions recorded on this sample. Analyses you saved from SpectraCheck may still be available there in
-              this browser.
+              No sessions recorded. Analyses saved in SpectraCheck may still be there.
             </p>
           ) : (
             <Table>

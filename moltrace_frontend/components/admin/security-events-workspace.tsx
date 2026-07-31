@@ -251,7 +251,7 @@ export function SecurityEventsWorkspace() {
           {!loading && backendUnreachable ? (
             <p className="mt-1 flex items-center gap-1.5 text-xs text-destructive">
               <ServerOff className="h-3.5 w-3.5 shrink-0" aria-hidden />
-              The app is unavailable — try again in a moment, or contact your platform administrator.
+              The app is unavailable — try again, or contact your administrator.
             </p>
           ) : null}
         </div>
@@ -268,7 +268,7 @@ export function SecurityEventsWorkspace() {
         <AlertCard
           variant="error"
           title="Service unavailable"
-          description="Security event services are not reachable. Verify you're signed in as an administrator and try again."
+          description="Check that you're signed in as an administrator, then try again."
         />
       ) : null}
 
@@ -330,7 +330,6 @@ export function SecurityEventsWorkspace() {
             eyebrow="Severity"
             title="Counts by severity"
             icon={ShieldAlert}
-            description="Counts grouped by severity."
             className="sm:col-span-2"
           >
             <div className="text-xs">
@@ -356,7 +355,6 @@ export function SecurityEventsWorkspace() {
             eyebrow="Type"
             title="Counts by event type"
             icon={Layers}
-            description="Counts grouped by event type."
             className="sm:col-span-2 lg:col-span-4"
           >
             <div className="text-xs">
@@ -388,7 +386,7 @@ export function SecurityEventsWorkspace() {
           eyebrow="Filters"
           title="Filters"
           icon={Filter}
-          description="Severity, event type, actor email, and limit are applied automatically. Date range and resource type narrow the already-loaded events in your browser."
+          description="Severity, event type, actor, and limit apply on search. Date range and resource type narrow the loaded results."
         >
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <div className="space-y-2">
@@ -467,7 +465,7 @@ export function SecurityEventsWorkspace() {
           eyebrow="Events"
           title="Events"
           icon={ListChecks}
-          description="Security events matching the filters above, with the most recent shown first."
+          description="Matching the filters above, most recent first."
         >
           <div>
             {loading ? (

@@ -336,7 +336,7 @@ export function ReactionOptimizationLanding() {
           <DataState
             state="unavailable"
             title="Campaign data unavailable."
-            description="Loaded data could not be reached, so no optimization results are shown."
+            description="Refresh the page to try again."
           />
         ) : null}
       </section>
@@ -363,7 +363,7 @@ export function ReactionOptimizationLanding() {
             Recommendation evidence
           </h2>
           <p className="text-sm text-muted-foreground">
-            Top reaction recommendation card aggregated across loaded campaigns — open the project for full reasoning.
+            Aggregated across loaded campaigns — open the project for full reasoning.
           </p>
         </div>
         <EvidenceCard
@@ -514,14 +514,13 @@ export function ReactionOptimizationLanding() {
           </p>
           <h2 className="font-mono text-xl font-bold tracking-tight">All reaction projects in this org</h2>
           <p className="text-sm text-muted-foreground">
-            Per-project status, linked experiments, and pending recommendation counts — open any row for the full workspace.
+            Status, linked experiments, and pending recommendations — open any row.
           </p>
         </div>
         <ModuleCard
           accent="violet"
           eyebrow="Reaction · Projects"
           title="Reaction projects"
-        description="Columns include linked experiment and recommendation counts when project details are available."
         badge={
           <Badge variant="secondary" className="font-normal">
             Project list
@@ -563,8 +562,8 @@ export function ReactionOptimizationLanding() {
                           </EmptyTitle>
                           <EmptyDescription>
                             {showListUnavailable
-                              ? "The reaction project list could not be reached, so no projects are shown."
-                              : "Create a reaction project above to start tracking experiments and recommendations."}
+                              ? "Refresh the page to try again."
+                              : "Create a project to start tracking experiments and recommendations."}
                           </EmptyDescription>
                         </EmptyHeader>
                       </Empty>

@@ -223,7 +223,7 @@ export function ValidationTraceabilityMatrixPanel({
               <InfoTooltip content={TRACEABILITY_TOOLTIP} label="About Traceability Matrix" />
             </CardTitle>
             <CardDescription>
-              Requirement-to-test traceability matrix for this validation project — generate or refresh to map test protocols to validation requirements and identify coverage gaps.
+              Maps test protocols to requirements and flags coverage gaps.
             </CardDescription>
           </div>
           <BackendStatusIndicator />

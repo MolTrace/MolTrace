@@ -242,7 +242,7 @@ export function OpsDashboardWorkspace() {
         <AlertCard
           variant="error"
           title="Admin access required"
-          description="These ops views are admin-only. Sign in with an admin account to view the deployment gate and model lineage."
+          description="Sign in with an admin account to see the deployment gate and model lineage."
         />
       ) : null}
 
@@ -362,7 +362,7 @@ export function OpsDashboardWorkspace() {
         eyebrow="Model lineage"
         title="Production model lineage"
         icon={GitBranch}
-        description="One row per production model: version, training-snapshot hash, metric vector, promotion provenance, and drift status."
+        description="Version, training-snapshot hash, metric vector, promotion provenance, and drift status."
       >
         {loading && !lineage ? (
           <p className="text-sm text-muted-foreground">Loading model lineage…</p>
@@ -377,7 +377,7 @@ export function OpsDashboardWorkspace() {
                 <p className="text-sm font-medium text-foreground">No model lineage yet</p>
                 <p className="max-w-md text-xs text-muted-foreground">
                   {lineage.note ??
-                    "No model registry is configured on this deployment yet; lineage appears once a fine-tuned model is promoted to production."}
+                    "No model registry configured. Lineage appears once a fine-tuned model is promoted."}
                 </p>
               </div>
               <DataModeFooter mode={lineage.data_mode} generatedAt={lineage.generated_at} />
@@ -450,8 +450,7 @@ export function OpsDashboardWorkspace() {
           <Activity className="h-6 w-6 text-muted-foreground" aria-hidden />
           <p className="text-sm font-medium text-foreground">Drift telemetry not available yet</p>
           <p className="max-w-md text-xs text-muted-foreground">
-            The live drift panels arrive once a training baseline and assembled production telemetry
-            are available in this build. The gate posture and lineage above ship now.
+            Arrives once a training baseline and production telemetry are available.
           </p>
         </div>
       </ModuleCard>

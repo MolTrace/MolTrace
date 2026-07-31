@@ -369,7 +369,7 @@ export function MlTrainingRunLauncher() {
         eyebrow="Launch"
         title="Start training run"
         icon={PlayCircle}
-        description="Launch a supervised ML training run against a curated knowledge dataset version. Only dataset IDs and hyperparameters are sent — no raw data."
+        description="Against a curated knowledge dataset version. Only dataset IDs and hyperparameters are sent — no raw data."
       >
         <div className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
@@ -509,7 +509,7 @@ export function MlTrainingRunLauncher() {
         eyebrow="Runs"
         title="Training runs"
         icon={Activity}
-        description="ML training run history — status, metrics, and artifact IDs for each completed or in-progress run. Artifact IDs appear when a run succeeds."
+        description="Artifact IDs appear once a run succeeds."
       >
         <div className="space-y-4">
           <p className="text-xs text-muted-foreground">

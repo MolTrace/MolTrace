@@ -62,7 +62,7 @@ export function MlCapabilitiesPanel() {
       eyebrow="Developer · ML capabilities"
       title="Heavy-ML capability readout"
       icon={Cpu}
-      description="What this deployment has actually enabled. Heavy generative paths (route proposal, forward generation, GNN training, SDL execution) are optional, default-off extras — their absence here is the designed state, not an error."
+      description="What this deployment has actually enabled. Heavy generative paths are optional, default-off extras — their absence here is the designed state, not an error."
     >
       <div className="space-y-4 text-sm">
         {loading ? (

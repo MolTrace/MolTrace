@@ -364,8 +364,7 @@ export default function SavedReportsWorkspace() {
                 </EmptyMedia>
                 <EmptyTitle>No saved reports yet</EmptyTitle>
                 <EmptyDescription>
-                  Reports are generated when you complete a SpectraCheck analysis. Start a session to
-                  produce your first one.
+                  Complete a SpectraCheck analysis to produce your first one.
                 </EmptyDescription>
               </EmptyHeader>
               <EmptyContent>

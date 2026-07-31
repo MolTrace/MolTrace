@@ -144,9 +144,12 @@ describe("mobile QA", () => {
     render(<MobilePage />)
     await waitFor(() => {
       expect(screen.getAllByText("Mobile Command Center").length).toBeGreaterThan(0)
-      expect(screen.getByText("Mobile SpectraCheck Review")).toBeInTheDocument()
-      expect(screen.getByText("Mobile Regulatory Action Queue")).toBeInTheDocument()
-      expect(screen.getByText("Mobile Reaction Approval Board")).toBeInTheDocument()
+      // Re-baselined: the three card titles dropped their "Mobile " prefix. A
+      // card must not name the surface it is already rendered on (docs/ui_copy_style.md
+      // rule 4) — the reader can see they are on a phone.
+      expect(screen.getByText("SpectraCheck Review")).toBeInTheDocument()
+      expect(screen.getByText("Regulatory Action Queue")).toBeInTheDocument()
+      expect(screen.getByText("Reaction Approval Board")).toBeInTheDocument()
     })
   })
 
@@ -158,8 +161,8 @@ describe("mobile QA", () => {
       expect(screen.getByText("Desktop Workspace")).toBeInTheDocument()
     })
     expect(screen.queryByText("Mobile Command Center")).not.toBeInTheDocument()
-    expect(screen.queryByText("Mobile SpectraCheck Review")).not.toBeInTheDocument()
-    expect(screen.queryByText("Mobile Regulatory Action Queue")).not.toBeInTheDocument()
+    expect(screen.queryByText("SpectraCheck Review")).not.toBeInTheDocument()
+    expect(screen.queryByText("Regulatory Action Queue")).not.toBeInTheDocument()
   })
 
   it("renders offline banner on mobile regulatory queue", async () => {

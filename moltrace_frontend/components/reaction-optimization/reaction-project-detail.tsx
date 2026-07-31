@@ -137,7 +137,7 @@ const VARIABLES_TOOLTIP =
   "Reaction variables define the condition space for experiment planning and recommendation."
 
 const OBJECTIVE_PROFILE_TOOLTIP =
-  "Defines what the optimizer should improve, such as yield, selectivity, impurity, conversion, or a weighted multi-objective score."
+  "What the optimizer should improve — one metric, or a weighted multi-objective score."
 
 const DESIGN_SPACE_TOOLTIP =
   "Defines the reaction conditions the optimizer is allowed to explore."
@@ -179,7 +179,7 @@ const MECHANISTIC_CONFIDENCE_LABELS = ["low", "medium", "high", "speculative"] a
 const MECHANISTIC_HYPOTHESIS_STATUS = ["proposed", "accepted", "rejected", "revised"] as const
 
 const MECHANISTIC_HYPOTHESES_TOOLTIP =
-  "Mechanistic hypotheses document the chemical reasoning behind optimization decisions and can be revised as new experiments are added."
+  "The chemical reasoning behind optimization decisions; revise as new experiments are added."
 
 const LITERATURE_PRIOR_SOURCE_TYPES = [
   "user_note",
@@ -190,10 +190,10 @@ const LITERATURE_PRIOR_SOURCE_TYPES = [
 ] as const
 
 const LITERATURE_PRIORS_TOOLTIP =
-  "Reaction priors capture literature, internal history, or user-provided mechanistic context that can inform optimization decisions."
+  "Literature, internal history, or your own mechanistic context that can inform optimization."
 
 const BO_ADVISOR_COMPARISON_TOOLTIP =
-  "Comparison highlights where mathematical optimization and chemical reasoning agree or disagree. Final experiment scheduling still requires human review."
+  "Where mathematical optimization and chemical reasoning agree or disagree. Final experiment scheduling still requires human review."
 
 const ADVISOR_REVIEW_DECISIONS = [
   "accept_for_review",
@@ -203,13 +203,13 @@ const ADVISOR_REVIEW_DECISIONS = [
 ] as const
 
 const BENCHMARK_TOOLTIP =
-  "Benchmarking evaluates how an optimizer would perform on completed or enumerated reaction data. It is used for validation, not proof of universal superiority."
+  "How an optimizer would perform on completed or enumerated reaction data. It is used for validation, not proof of universal superiority."
 
 const ADVISOR_TAB_TOOLTIP =
   "The Advisor critiques optimization recommendations using mechanistic, cost, safety, and practical reasoning. It does not autonomously schedule experiments."
 
 const EXECUTION_TAB_TOOLTIP =
-  "Execution connects approved recommendations to planned experiments, analytical results, confirmed outcomes, and the next optimization cycle. Human confirmation is required."
+  "Connects approved recommendations to planned experiments, analytical results, outcomes, and the next cycle. Human confirmation is required."
 
 const APPROVED_RECOMMENDATIONS_CONVERT_TOOLTIP =
   "Approved recommendations can be converted into planned experiments. This does not mean the experiment has been performed."
@@ -231,7 +231,7 @@ const OUTCOME_EXTRACTION_METHOD_OPTIONS = [
 ] as const
 
 const OPTIMIZATION_CYCLE_TIMELINE_TOOLTIP =
-  "Optimization cycles track how each batch of experiments updates the model and informs the next round of recommendations."
+  "How each batch of experiments updates the model and informs the next round."
 
 const REACTION_OPTIMIZATION_CYCLE_STATUS_OPTIONS = [
   "draft",

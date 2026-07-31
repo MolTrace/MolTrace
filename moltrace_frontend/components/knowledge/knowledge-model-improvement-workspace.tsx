@@ -204,7 +204,7 @@ export function KnowledgeModelImprovementWorkspace() {
       if (lidRaw) {
         const n = Number.parseInt(lidRaw, 10)
         if (!Number.isFinite(n) || n < 1) {
-          setCreateErr("Enter the linked record ID as a positive whole number, or leave it blank.")
+          setCreateErr("Linked record ID must be a positive whole number.")
           setCreateBusy(false)
           return
         }
@@ -254,7 +254,7 @@ export function KnowledgeModelImprovementWorkspace() {
           </p>
           <h1 className="font-mono text-2xl font-bold tracking-tight">Model improvement queue</h1>
           <p className="max-w-3xl text-sm text-muted-foreground">
-            Operational backlog for model iteration — prioritized cases flagged for retraining, data augmentation, or review.
+            Prioritized cases flagged for retraining, data augmentation, or review.
           </p>
         </div>
 
@@ -272,7 +272,7 @@ export function KnowledgeModelImprovementWorkspace() {
           eyebrow="Backlog"
           title="Queue"
           icon={ListChecks}
-          description="Improvement queue entries filterable by status — each item captures target module, source type, priority, linked record, and a human-readable summary."
+          description="Every open case, filterable by status."
         >
           <div className="space-y-4">
             <div className="flex flex-wrap items-end gap-3">
@@ -312,7 +312,7 @@ export function KnowledgeModelImprovementWorkspace() {
                   </EmptyMedia>
                   <EmptyTitle>No model-improvement items</EmptyTitle>
                   <EmptyDescription>
-                    Nominate records or sources for model improvement to populate this list.
+                    Nominate a record or source for model improvement.
                   </EmptyDescription>
                 </EmptyHeader>
               </Empty>
@@ -390,7 +390,7 @@ export function KnowledgeModelImprovementWorkspace() {
           eyebrow="Create"
           title="Add queue item"
           icon={Plus}
-          description="Add a new model improvement case to the queue — specify source type, target module, priority, linked record, and a summary of the issue."
+          description="Source, target module, priority, and a summary of the issue."
         >
           <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
             <div className="space-y-2">

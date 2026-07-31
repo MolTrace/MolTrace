@@ -161,8 +161,7 @@ export function ReactionStudioCompoundLinkSummary({
       <CardHeader className="pb-2">
         <CardTitle className="text-base">Linked compounds (summary)</CardTitle>
         <CardDescription>
-          Registry links and product batches are managed on the Evidence Links tab. Summaries below are parsed from
-          project and experiment records when available.
+          Registry links and product batches are managed on the Evidence Links tab.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-2 text-sm">
@@ -323,7 +322,7 @@ export function ReactionStudioCompoundLinkingPanel({
       })
       const batchId = readNum(created, "id") ?? readNum(created, "batch_id")
       if (batchId == null) {
-        setBatchErr("Batch created, but no batch ID came back — link the batch manually once an ID is available.")
+        setBatchErr("Batch created without an ID — link it manually once one is available.")
         await onRefresh()
         return
       }
@@ -494,12 +493,12 @@ export function ReactionStudioCompoundLinkingPanel({
         <CardHeader className="pb-2">
           <CardTitle className="text-base">Product batch from completed experiment</CardTitle>
           <CardDescription>
-            Register a product batch in the compound registry and link it to the completed experiment with batch provenance context.
+            Registers the batch in the compound registry with provenance context.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="rs-bcid">Compound ID for batch (defaults to selected compound)</Label>
+            <Label htmlFor="rs-bcid">Compound ID for batch</Label>
             <Input
               id="rs-bcid"
               value={batchCompoundId}

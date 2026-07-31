@@ -45,7 +45,7 @@ export function ProjectValueSummaryCard({ projectId }: { projectId: string }) {
       <CardHeader className="pb-2">
         <CardTitle className="text-base">Project Value Summary</CardTitle>
         <CardDescription>
-          Project-level automation and value metrics aggregated across every session in this project.
+          Automation and value metrics across every session in this project.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4 text-sm">
@@ -77,7 +77,7 @@ export function ProjectValueSummaryCard({ projectId }: { projectId: string }) {
           <p className="text-xs text-muted-foreground">Loading project ROI…</p>
         ) : !live ? (
           <p className="text-xs text-muted-foreground">
-            Project ROI snapshot unavailable — administrator access may be required, or no data has been recorded yet.
+            ROI snapshot unavailable — administrator access may be required, or nothing recorded yet.
           </p>
         ) : null}
       </CardContent>

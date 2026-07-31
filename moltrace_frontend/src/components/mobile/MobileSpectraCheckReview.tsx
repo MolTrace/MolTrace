@@ -155,10 +155,8 @@ export function MobileSpectraCheckReview({ sessionId: sessionIdProp = null }: { 
   return (
     <Card>
       <CardHeader className="pb-2">
-        <CardTitle className="text-base">Mobile SpectraCheck Review</CardTitle>
-        <CardDescription>
-          Compact SpectraCheck session summary optimized for phone review workflows — analytical flags, identity confirmation, and reviewer decision panel.
-        </CardDescription>
+        <CardTitle className="text-base">SpectraCheck Review</CardTitle>
+        <CardDescription>Analytical flags, identity confirmation, and the reviewer decision.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-3 text-sm">
         {!sessionId ? (
@@ -228,7 +226,7 @@ export function MobileSpectraCheckReview({ sessionId: sessionIdProp = null }: { 
                   />
                 </div>
               ) : (
-                <p className="text-xs text-muted-foreground">No spectrum preview available for this session yet.</p>
+                <p className="text-xs text-muted-foreground">No spectrum preview yet.</p>
               )}
             </div>
           </>

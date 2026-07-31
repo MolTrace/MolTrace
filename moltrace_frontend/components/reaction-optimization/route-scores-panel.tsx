@@ -277,7 +277,7 @@ export function RouteScoresPanel({ projectId }: { projectId: number }) {
       eyebrow="Routes · Scoring"
       title="Score a synthesis route"
       icon={GitBranch}
-      description="Paste or build a route tree and score it with the frozen safety and green-chemistry engines. Advisory decision support — never a safety determination or synthesis instruction. Route GENERATION is not available in this app; input is manual by design."
+      description="Scores a route tree with the frozen safety and green-chemistry engines. Advisory decision support — never a safety determination or synthesis instruction. Route GENERATION is not available in this app; input is manual by design."
     >
       <form className="space-y-3" onSubmit={(e) => void score(e)}>
         <div className="space-y-1">
@@ -285,7 +285,7 @@ export function RouteScoresPanel({ projectId }: { projectId: number }) {
             label="Route tree"
             initialValue={route}
             onChange={setRoute}
-            description="Build the target product and its precursors, or paste a route with the JSON toggle."
+            description="Build the target product and its precursors, or paste JSON."
           />
           {inputError ? (
             <p role="alert" className="text-[11px] text-destructive">

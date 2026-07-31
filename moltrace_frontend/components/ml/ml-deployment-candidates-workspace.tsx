@@ -433,7 +433,7 @@ export function MlDeploymentCandidatesWorkspace() {
         eyebrow="Create"
         title="Create deployment candidate"
         icon={Plus}
-        description="Submit a model artifact and its approved model card for deployment review. New candidates start in &ldquo;proposed&rdquo; status."
+        description="Needs a model artifact and its approved model card. New candidates start in &ldquo;proposed&rdquo; status."
       >
         <div className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
@@ -517,7 +517,7 @@ export function MlDeploymentCandidatesWorkspace() {
         eyebrow="Records"
         title="Candidates"
         icon={ListChecks}
-        description="All proposed and reviewed deployment candidates. Click a row to review and record an approval or rejection."
+        description="All proposed and reviewed candidates. Select a row to approve or reject."
       >
         <div className="space-y-4">
           <div className="table-scroll min-w-0">

@@ -118,7 +118,7 @@ export default function ProjectsIndexPage() {
           </p>
           <h1 className="font-mono text-2xl font-bold tracking-tight">Projects</h1>
           <p className="max-w-3xl text-sm text-muted-foreground">
-            Manage your analytical projects and collaborations. Each project binds spectroscopy sessions, regulatory dossiers, and reaction campaigns under a single shared sample-id namespace.
+            Manage your analytical projects and collaborations. Each binds spectroscopy, regulatory, and reaction work under one sample-id namespace.
           </p>
         </div>
         <Dialog open={createOpen} onOpenChange={setCreateOpen}>
@@ -131,7 +131,7 @@ export default function ProjectsIndexPage() {
           <DialogContent className="sm:max-w-md">
             <DialogHeader>
               <DialogTitle>Create project</DialogTitle>
-              <DialogDescription>Add a new project. Required fields are checked before it is saved.</DialogDescription>
+              <DialogDescription>Required fields are checked before it is saved.</DialogDescription>
             </DialogHeader>
             <div className="space-y-3">
               <div className="space-y-2">
@@ -174,7 +174,7 @@ export default function ProjectsIndexPage() {
               Projects unavailable
             </CardTitle>
             <CardDescription className="text-warning/90">
-              We couldn&apos;t load your projects. Try refreshing in a moment, or contact your administrator if this keeps happening.
+              Try refreshing, or contact your administrator if this keeps happening.
             </CardDescription>
           </CardHeader>
         </Card>

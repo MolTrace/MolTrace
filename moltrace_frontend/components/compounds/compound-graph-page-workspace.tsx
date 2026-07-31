@@ -17,7 +17,7 @@ export function CompoundGraphPageWorkspace() {
         <div>
           <h1 className="font-mono text-2xl font-bold tracking-tight">Scientific knowledge graph</h1>
           <p className="text-sm text-muted-foreground">
-            Compound ID <span className="font-mono">{compoundId || "—"}</span> — knowledge graph of linked reactions, regulatory data, and analytical evidence
+            Compound ID <span className="font-mono">{compoundId || "—"}</span> — linked reactions, regulatory data, and analytical evidence
           </p>
         </div>
         {compoundId ? (
@@ -30,7 +30,7 @@ export function CompoundGraphPageWorkspace() {
         <CompoundScientificKnowledgeGraphPanel compoundId={compoundId} hideFullPageLink />
       ) : (
         <p className="text-sm text-muted-foreground">
-          No compound selected. Open a compound from the registry to see its knowledge graph.
+          Open a compound from the registry to see its knowledge graph.
         </p>
       )}
     </div>

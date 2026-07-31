@@ -638,7 +638,7 @@ function EntitlementsPanel({
 
       <SectionCard
         title="Entitlements"
-        description="Module feature entitlements for this tenant — enabled/disabled state, program, and effective date range for each feature key."
+        description="Enabled state, program, and effective date range for each feature key."
         error={error || formError}
       >
         <div className="space-y-2 text-sm">
@@ -704,7 +704,7 @@ function EntitlementsPanel({
 
       <SectionCard
         title="Create entitlement"
-        description="Grant a new entitlement to this tenant — specify feature key, program, enabled state, and effective date range."
+        description="Feature key, program, enabled state, and effective date range."
       >
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="space-y-1">
@@ -900,7 +900,7 @@ function PilotProgramsPanel({
     <div className="space-y-6">
       <SectionCard
         title="Pilot Programs"
-        description="Pilot programs active for this tenant — objectives, status, target modules, and start/end timeline."
+        description="Objectives, status, target modules, and start/end timeline."
         error={error || formError}
       >
         <GenericTable
@@ -957,7 +957,7 @@ function PilotProgramsPanel({
         ) : null}
       </SectionCard>
 
-      <SectionCard title="Pilot program detail" description="Detail view of the selected pilot program — objectives, success criteria, risks, and current status." error={selectedPilotError}>
+      <SectionCard title="Pilot program detail" description="Objectives, success criteria, risks, and current status." error={selectedPilotError}>
         <RecordFields
           row={selectedPilot}
           empty="Choose Load detail on one of the pilot programs above."
@@ -1266,7 +1266,7 @@ function OnboardingPanel({
     <div className="space-y-6">
       <SectionCard
         title="Onboarding"
-        description="Onboarding projects for this tenant — implementation stage, owner, status, and customer contact."
+        description="Implementation stage, owner, status, and customer contact."
         error={error || formError}
       >
         <GenericTable
@@ -1382,7 +1382,7 @@ function OnboardingPanel({
         </div>
       </SectionCard>
 
-      <SectionCard title="Task board" description="Implementation task board for the selected onboarding project — move tasks across planned, in-progress, and complete columns.">
+      <SectionCard title="Task board" description="Move tasks across planned, in-progress, and complete columns.">
         <div className="grid gap-4 lg:grid-cols-4">
           {TASK_BOARD_COLUMNS.map((column) => {
             const columnTasks = orderedTasks.filter((task) => readFirst(task, ["status"]) === column.value)
@@ -1428,7 +1428,7 @@ function OnboardingPanel({
         </div>
       </SectionCard>
 
-      <SectionCard title="Create implementation task" description="Add an implementation task to the selected onboarding project — specify title, owner, type, and initial status.">
+      <SectionCard title="Create implementation task" description="Title, owner, type, and initial status.">
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="space-y-1">
             <Label htmlFor="tenant-task-title">Title</Label>
@@ -1595,7 +1595,7 @@ function DataBoundaryPanel({
 
       <SectionCard
         title="Data Boundary"
-        description="Data boundary configuration for this tenant — isolation mode, encryption profile, storage prefix, allowed regions, and data residency policy."
+        description="Isolation mode, encryption profile, storage prefix, allowed regions, and data residency policy."
         error={error || formError}
       >
         <RecordFields
@@ -1614,7 +1614,7 @@ function DataBoundaryPanel({
 
       <SectionCard
         title="Configure data boundary"
-        description="Set or update the data boundary — isolation mode, encryption profile, storage prefix, allowed regions, and residency notes."
+        description="Isolation mode, encryption profile, storage prefix, allowed regions, and residency notes."
       >
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="space-y-1">
@@ -1780,7 +1780,7 @@ function SecurityProfilePanel({
 
       <SectionCard
         title="Security Profile"
-        description="Security profile for this tenant — SSO, MFA, allowed domains, session timeout, IP allowlist, and security frameworks."
+        description="SSO, MFA, allowed domains, session timeout, IP allowlist, and security frameworks."
         error={error || formError}
       >
         <RecordFields
@@ -1801,7 +1801,7 @@ function SecurityProfilePanel({
 
       <SectionCard
         title="Configure security profile"
-        description="Set or update the security profile — SSO, MFA, session timeout, allowed domains, IP allowlist, security frameworks, and risk summary."
+        description="SSO, MFA, session timeout, allowed domains, IP allowlist, security frameworks, and risk summary."
       >
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="space-y-1">
@@ -1999,7 +1999,7 @@ function ValidationProfilePanel({
 
       <SectionCard
         title="Validation Profile"
-        description="Validation profile for this tenant — validation requirements, linked projects, controlled record policy, e-signature requirements, and readiness status."
+        description="Validation requirements, linked projects, controlled record policy, e-signature requirements, and readiness status."
         error={error || formError}
       >
         <RecordFields
@@ -2041,7 +2041,7 @@ function ValidationProfilePanel({
 
       <SectionCard
         title="Configure validation profile"
-        description="Set or update the validation profile — validation requirements, linked projects, controlled record policy, e-signature setting, and linked assessment/package IDs."
+        description="Validation requirements, linked projects, controlled record policy, e-signature setting, and linked assessment/package IDs."
       >
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="space-y-1">
@@ -2223,7 +2223,7 @@ function UsageRoiPanel({
     <div className="space-y-6">
       <SectionCard
         title="Usage / ROI Summary"
-        description="Usage and ROI summary for this tenant — reports generated, tasks automated, hours saved, and regulatory and reaction optimization activity metrics."
+        description="Reports generated, tasks automated, hours saved, plus regulatory and reaction optimization activity."
         error={usageError || roiError}
       >
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -2316,7 +2316,7 @@ function HealthScorePanel({
 
   return (
     <div className="space-y-6">
-      <SectionCard title="Health Score" description="Computed health score for this tenant — overall score, status, onboarding progress, usage trends, ROI indicators, blockers, and recommended actions." error={error}>
+      <SectionCard title="Health Score" description="Overall score, status, onboarding progress, usage trends, ROI indicators, blockers, and recommended actions." error={error}>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <MetricCard label="Score" value={healthScore?.score ?? "-"} />
           <div className="rounded-md border bg-muted/20 p-3">
@@ -2507,7 +2507,7 @@ function ProcurementPackagesPanel({
 
       <SectionCard
         title="Procurement Packages"
-        description="Procurement evidence packages generated for this tenant — type, status, SHA-256 integrity hash, and creation date."
+        description="Type, status, SHA-256 integrity hash, and creation date."
         error={error || formError}
       >
         <div className="overflow-x-auto rounded-md border">
@@ -2570,7 +2570,7 @@ function ProcurementPackagesPanel({
         </div>
       </SectionCard>
 
-      <SectionCard title="Create procurement evidence package" description="Generate a procurement evidence package — specify type and choose which summaries to include: security profile, data boundary, validation, AI governance, audit, mobile safety, connectors, and ROI.">
+      <SectionCard title="Create procurement evidence package" description="Choose a type and which summaries to include.">
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="space-y-1">
             <Label htmlFor="tenant-procurement-title">Title</Label>
@@ -2654,7 +2654,7 @@ function ProcurementPackagesPanel({
 
       <SectionCard
         title="Selected procurement package"
-        description="Detail for the selected procurement package — status, SHA-256 integrity hash, type, and included summaries."
+        description="Status, SHA-256 integrity hash, type, and included summaries."
         error={selectedPackageError}
       >
         <RecordFields
@@ -2805,7 +2805,7 @@ function AuditExportPanel({ tenantId }: { tenantId: string }) {
     <div className="space-y-6">
       <NoSecretsWarning />
 
-      <SectionCard title="Request tenant audit export" description="Request an audit trail export for this tenant — specify export scope, optional date range, and whether to include metadata and hashes." error={error}>
+      <SectionCard title="Request tenant audit export" description="Export scope, optional date range, and whether to include metadata and hashes." error={error}>
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="space-y-1">
             <Label htmlFor="tenant-audit-export-scope">Export scope</Label>
@@ -2861,7 +2861,7 @@ function AuditExportPanel({ tenantId }: { tenantId: string }) {
         </div>
       </SectionCard>
 
-      <SectionCard title="Load audit export" description="Load a completed audit export by ID — view export status, scope, and download link.">
+      <SectionCard title="Load audit export" description="Status, scope, and download link for a completed export.">
         <div className="flex flex-col gap-2 sm:flex-row">
           <Input value={exportId} onChange={(event) => setExportId(event.target.value)} placeholder="Export ID" />
           <Button type="button" variant="outline" disabled={busy || !exportId.trim()} onClick={() => void loadAuditExport()}>
@@ -3142,7 +3142,7 @@ export function TenantDetailWorkspace() {
         <TabsContent value="environments">
           <SectionCard
             title="Environments"
-            description="Deployment environments for this tenant — environment type, base URL, status, and data retention policy."
+            description="Environment type, base URL, status, and data retention policy."
             error={sections.environments.error}
           >
             <GenericTable

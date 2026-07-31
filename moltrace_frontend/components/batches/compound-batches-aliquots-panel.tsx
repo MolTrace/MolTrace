@@ -145,7 +145,7 @@ export function CompoundBatchesAliquotsPanel({ compoundId }: Props) {
     }
     const compound_id = Number.parseInt(compoundId, 10)
     if (!Number.isFinite(compound_id)) {
-      setCreateErr("This compound could not be identified, so a batch cannot be created for it.")
+      setCreateErr("Select a valid compound before creating a batch.")
       return
     }
     setCreateBusy(true)
@@ -277,13 +277,13 @@ export function CompoundBatchesAliquotsPanel({ compoundId }: Props) {
         </Button>
       </div>
       <p className="text-sm text-muted-foreground">
-        Registered batches for compound <span className="font-mono text-xs">{compoundId}</span> — filtered to this compound.
+        Registered batches for compound <span className="font-mono text-xs">{compoundId}</span>.
       </p>
 
       <Card>
         <CardHeader>
           <CardTitle className="text-sm font-medium">Create batch for this compound</CardTitle>
-          <CardDescription>Register a new batch for this compound — compound ID is carried forward from the current compound page.</CardDescription>
+          <CardDescription>Compound ID is carried forward from this page.</CardDescription>
         </CardHeader>
         <CardContent>
           <form className="space-y-4" onSubmit={handleCreateBatch}>
@@ -445,7 +445,7 @@ export function CompoundBatchesAliquotsPanel({ compoundId }: Props) {
           <CardTitle className="text-sm font-medium">Aliquots</CardTitle>
           <CardDescription>
             {selectedBatchId
-              ? `Aliquots recorded for the selected batch (${selectedBatchId}). Add one below to register a new aliquot.`
+              ? `Recorded for batch ${selectedBatchId}. Add one below.`
               : "Select a batch above to list or add aliquots."}
           </CardDescription>
         </CardHeader>

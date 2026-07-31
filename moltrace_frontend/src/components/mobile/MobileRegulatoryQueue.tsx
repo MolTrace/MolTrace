@@ -270,9 +270,9 @@ export function MobileRegulatoryQueue() {
   return (
     <Card>
       <CardHeader className="pb-2">
-        <CardTitle className="text-base">Mobile Regulatory Action Queue</CardTitle>
+        <CardTitle className="text-base">Regulatory Action Queue</CardTitle>
         <CardDescription>
-          Regulatory action items pending review on mobile — dossier updates, change alerts, and compliance decisions. Operational workflow support only; not legal advice.
+          Dossier updates, change alerts, and compliance decisions awaiting review. Operational workflow support only; not legal advice.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3 text-sm">
@@ -284,7 +284,7 @@ export function MobileRegulatoryQueue() {
         {error ? <p className="text-xs text-destructive">{error}</p> : null}
         {loading ? <p className="text-xs text-muted-foreground">Loading action queue…</p> : null}
         {!loading && queueRows.length === 0 ? (
-          <p className="text-xs text-muted-foreground">No action items were returned.</p>
+          <p className="text-xs text-muted-foreground">No open action items.</p>
         ) : null}
 
         {queueRows.map((item) => {

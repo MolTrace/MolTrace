@@ -217,8 +217,7 @@ export function ValidationCenterWorkspace() {
           </p>
           <h1 className="font-mono text-2xl font-bold tracking-tight">Validation Center</h1>
           <p className="text-sm text-muted-foreground">
-            Build validation projects, risk assessments, traceability matrices, test evidence, e-signatures, controlled
-            records, and inspection-ready packages.
+            Build validation evidence, from requirements through to inspection-ready packages.
           </p>
         </div>
         <BackendStatusIndicator />
@@ -396,7 +395,7 @@ export function ValidationCenterWorkspace() {
         eyebrow="Projects"
         title="Validation projects"
         icon={ClipboardList}
-        description="All validation projects for this tenant — title, scope, validation type, status, owner, and QA reviewer."
+        description="Across this tenant."
       >
         <div className="space-y-3">
           {error ? <p className="text-xs text-destructive">{error}</p> : null}
@@ -468,7 +467,7 @@ export function ValidationCenterWorkspace() {
         eyebrow="Create"
         title="Create validation project"
         icon={Plus}
-        description="Create a new validation project — specify title, scope, validation type, owner, and QA reviewer to open the project workspace."
+        description="Opens the project workspace once created."
       >
         <div className="space-y-4">
           <div className="grid gap-3 sm:grid-cols-2">

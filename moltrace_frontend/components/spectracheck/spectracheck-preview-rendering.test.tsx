@@ -606,7 +606,15 @@ describe("SpectraCheck preview rendering", () => {
     expect(
       screen.getByText(/Legacy spectrum, peak markers, phase, and baseline remain authoritative/i),
     ).toBeInTheDocument()
-    expect(screen.getByText(/Not used for plot/i)).toBeInTheDocument()
+    // Re-baselined: the three exclusions shared one stem and repeated it
+    // ("Not used for plot · Not used for peak markers · Not used for phase/baseline"),
+    // now stated once (docs/ui_copy_style.md rule 1). Same meaning, so this asserts
+    // all three exclusions are still named rather than matching the old phrasing.
+    const notUsedFor = screen.getByText(/Not used for:/i)
+    expect(notUsedFor).toBeInTheDocument()
+    for (const excluded of ["plot", "peak markers", "phase/baseline"]) {
+      expect(notUsedFor.textContent).toContain(excluded)
+    }
     expect(screen.getByTestId("spectrum-viewer")).toHaveAttribute("data-peak-count", "0")
   })
 
@@ -648,7 +656,15 @@ describe("SpectraCheck preview rendering", () => {
     expect(await screen.findByTestId("prompt-sidecar-consistency-card")).toBeInTheDocument()
     expect(screen.getByTestId("prompt-sidecar-qa-details")).toBeInTheDocument()
     expect(screen.getByText(/review required/i)).toBeInTheDocument()
-    expect(screen.getByText(/Not used for plot/i)).toBeInTheDocument()
+    // Re-baselined: the three exclusions shared one stem and repeated it
+    // ("Not used for plot · Not used for peak markers · Not used for phase/baseline"),
+    // now stated once (docs/ui_copy_style.md rule 1). Same meaning, so this asserts
+    // all three exclusions are still named rather than matching the old phrasing.
+    const notUsedFor = screen.getByText(/Not used for:/i)
+    expect(notUsedFor).toBeInTheDocument()
+    for (const excluded of ["plot", "peak markers", "phase/baseline"]) {
+      expect(notUsedFor.textContent).toContain(excluded)
+    }
     expect(screen.getByTestId("spectrum-viewer")).toHaveAttribute("data-peak-count", "0")
   })
 

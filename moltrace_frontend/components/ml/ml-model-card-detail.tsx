@@ -262,7 +262,7 @@ export function MlModelCardDetail() {
               </span>
             }
             icon={ListChecks}
-            description="Update the model card — revise intended use, limitations, training data summary, and evaluation summary for governance review."
+            description="Revise intended use, limitations, training data, and evaluation."
           >
             <div className="space-y-4">
               <div className="space-y-2">
