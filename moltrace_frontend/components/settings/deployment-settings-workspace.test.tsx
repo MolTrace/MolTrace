@@ -312,7 +312,7 @@ describe("DeploymentSettingsWorkspace release diagnostics", () => {
   })
 
   it("downloads the current read-only fixture report as local JSON and CSV", async () => {
-    const createObjectURL = vi.fn(() => "blob:raw-fid-sidecar-report")
+    const createObjectURL = vi.fn((_obj: Blob) => "blob:raw-fid-sidecar-report")
     const revokeObjectURL = vi.fn()
     Object.defineProperty(window.URL, "createObjectURL", { configurable: true, value: createObjectURL })
     Object.defineProperty(window.URL, "revokeObjectURL", { configurable: true, value: revokeObjectURL })
