@@ -21,6 +21,11 @@ import { FlaskConical } from "lucide-react"
 import { apiFetch } from "@/lib/api/client"
 import { useGsdTelemetry } from "@/components/spectracheck/gsd-telemetry-panel"
 import type { components } from "@/src/lib/api/schema"
+import { InfoTooltip } from "@/components/ui/info-tooltip"
+
+const QC_COLUMN_TOOLTIP =
+  "Per-peak fit quality: signal-to-noise (green above 10, yellow 3-10, red below 3) combined with fit RMSE over baseline sigma (green below 2, yellow 2-5, red above 5). The worse of the two wins."
+
 
 // Quarter-target denominator for the "X / N runs collected" tooltip
 // suffix now comes from the backend's flip_readiness_policy.min_invocations
@@ -717,7 +722,14 @@ export function DetectionResultsPanel({
                     {showIntegration ? <th className="px-3 py-2 text-right">∫H</th> : null}
                     {showJ ? <th className="px-3 py-2 text-right">J (Hz)</th> : null}
                     {showConfidence ? <th className="px-3 py-2 text-right">Conf</th> : null}
-                    {showQc ? <th className="px-3 py-2" title="Per-peak fit-quality indicator: S/N (green > 10, yellow 3-10, red < 3) combined with fit RMSE / baseline σ (green < 2, yellow 2-5, red > 5). Worst-of-two wins.">QC</th> : null}
+                    {showQc ? (
+                      <th className="px-3 py-2">
+                        <span className="inline-flex items-center gap-1">
+                          QC
+                          <InfoTooltip label="How QC is scored" content={QC_COLUMN_TOOLTIP} />
+                        </span>
+                      </th>
+                    ) : null}
                     {showMatches ? <th className="px-3 py-2">Matches</th> : null}
                   </tr>
                 </thead>

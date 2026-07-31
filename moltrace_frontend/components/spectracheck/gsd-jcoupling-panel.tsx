@@ -20,6 +20,18 @@ import {
   type MultipletState,
 } from "@/components/spectracheck/gsd-multiplet-panel"
 import type { components } from "@/src/lib/api/schema"
+import { InfoTooltip } from "@/components/ui/info-tooltip"
+
+// Method detail for the three J-prediction radiogroups. Previously native
+// `title` attributes, which never appear on a touch device — these panels are
+// used on tablets, so the explanation was unreachable there.
+const J_MODEL_TOOLTIP =
+  "Topological: empirical prediction from RDKit bond topology — fast, no 3D geometry, and the default. Karplus 3D: RDKit embeds a conformer ensemble (ETKDGv3 + MMFF) and reads each H–C–C–H dihedral, which is sharper for conformationally locked vicinal couplings and selects the recommended Generic + Boltzmann pair."
+const KARPLUS_RELATION_TOOLTIP =
+  "Generic: the three-term Karplus relation 3J = A·cos²θ + B·cosθ + C, which under Boltzmann weighting separates locked from mobile better than HLA. HLA: the Haasnoot–de Leeuw–Altona generalization corrected for electronegativity and orientation — more literature-faithful per conformer, with a wider dynamic range."
+const CONFORMER_WEIGHTING_TOOLTIP =
+  "Uniform averages every embedded conformer equally. Boltzmann weights each by its MMFF-energy population at 298 K, which resolves the sugar-diaxial blind spot and is recommended with the Generic relation."
+
 
 /**
  * Multiplet J-coupling → candidate-comparison panel (Phase 26b /
@@ -568,6 +580,7 @@ function KarplusControls({
     <div className="flex flex-wrap items-center gap-2 rounded-md border border-dashed bg-muted/20 px-3 py-2 text-sm">
       <span className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
         J prediction model
+        <InfoTooltip label="How J couplings are predicted" content={J_MODEL_TOOLTIP} />
       </span>
       <div role="radiogroup" aria-label="J prediction model" className="inline-flex overflow-hidden rounded-md border bg-card">
         <button
@@ -577,7 +590,6 @@ function KarplusControls({
           disabled={busy}
           onClick={() => onChange({ ...karplus, useKarplus: false })}
           className={seg(!karplus.useKarplus)}
-          title="Topological-empirical prediction from RDKit bond topology — fast, no 3D geometry. The byte-identical default."
         >
           Topological
         </button>
@@ -597,7 +609,6 @@ function KarplusControls({
             )
           }
           className={cn(seg(karplus.useKarplus), "border-l")}
-          title="Karplus 3D refinement — RDKit embeds a conformer ensemble (ETKDGv3 + MMFF) and reads each H–C–C–H dihedral. Sharper for conformationally locked vicinal couplings. Opt-in lands on the recommended Generic + Boltzmann combo."
         >
           Karplus 3D
         </button>
@@ -607,6 +618,7 @@ function KarplusControls({
         <>
           <span className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
             Relation
+            <InfoTooltip label="Which Karplus relation is used" content={KARPLUS_RELATION_TOOLTIP} />
           </span>
           <div role="radiogroup" aria-label="Karplus relation" className="inline-flex overflow-hidden rounded-md border bg-card">
             <button
@@ -616,7 +628,6 @@ function KarplusControls({
               disabled={busy}
               onClick={() => onChange({ ...karplus, method: "generic" })}
               className={seg(karplus.method === "generic")}
-              title="Three-term Karplus relation ³J = A·cos²θ + B·cosθ + C. Under Boltzmann weighting (v0.7.5) it discriminates locked-vs-mobile better than HLA."
             >
               Generic
             </button>
@@ -627,7 +638,6 @@ function KarplusControls({
               disabled={busy}
               onClick={() => onChange({ ...karplus, method: "haasnoot_altona" })}
               className={cn(seg(karplus.method === "haasnoot_altona"), "border-l")}
-              title="Haasnoot–de Leeuw–Altona electronegativity/orientation-corrected generalization. More literature-faithful per individual conformer; wider dynamic range."
             >
               Haasnoot–Altona
             </button>
@@ -635,6 +645,7 @@ function KarplusControls({
 
           <span className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
             Weighting
+            <InfoTooltip label="How conformers are weighted" content={CONFORMER_WEIGHTING_TOOLTIP} />
           </span>
           <div role="radiogroup" aria-label="Conformer weighting" className="inline-flex overflow-hidden rounded-md border bg-card">
             <button
@@ -644,7 +655,6 @@ function KarplusControls({
               disabled={busy}
               onClick={() => onChange({ ...karplus, weighting: "uniform" })}
               className={seg(karplus.weighting === "uniform")}
-              title="Average every embedded conformer equally."
             >
               Uniform
             </button>
@@ -655,7 +665,6 @@ function KarplusControls({
               disabled={busy}
               onClick={() => onChange({ ...karplus, weighting: "boltzmann" })}
               className={cn(seg(karplus.weighting === "boltzmann"), "border-l")}
-              title="Weight each conformer by its MMFF-energy Boltzmann population at 298 K. Fixes the sugar-diaxial blind spot (v0.7.5). Recommended with the Generic relation."
             >
               Boltzmann
               {karplus.method === "generic" ? (

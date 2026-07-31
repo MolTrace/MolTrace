@@ -38,6 +38,7 @@ import {
   Target,
 } from "lucide-react"
 import { isRecord } from "@/components/spectracheck/spectracheck-nmr-result-parse"
+import { InfoTooltip } from "@/components/ui/info-tooltip"
 
 type RawPeak = Record<string, unknown>
 
@@ -805,11 +806,14 @@ export function ImpurityCandidatesPanel({ payload }: { payload: unknown }) {
                   reconciliation has run (the pre-reconciliation spectrum integral lives
                   on spectrum_integration_h), so it is "as reported", not "raw".
                   Labelled distinctly so the two ∫ H columns are not read as comparable. */}
-              <TableHead
-                className="text-[10px] uppercase tracking-wide"
-                title="Integral as reported for this peak — not the proton-inventory scale (solvent-excluded peaks count 0 H there)"
-              >
-                Reported ∫ H
+              <TableHead className="text-[10px] uppercase tracking-wide">
+                <span className="inline-flex items-center gap-1">
+                  Reported ∫ H
+                  <InfoTooltip
+                    label="What this integral is"
+                    content="Integral as reported for this peak — not the proton-inventory scale, where solvent-excluded peaks count 0 H."
+                  />
+                </span>
               </TableHead>
               <TableHead className="text-[10px] uppercase tracking-wide">Match</TableHead>
               <TableHead className="text-[10px] uppercase tracking-wide">Reason</TableHead>

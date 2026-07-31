@@ -1504,12 +1504,17 @@ export function SpectraCheckRawFidSection({
               <span className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
                 Background job
               </span>
+              {/* Stated in visible text, not a `title`: these buttons are disabled, and a
+                  disabled control never fires its native tooltip — so the reason was
+                  unreachable by mouse, keyboard and touch alike. */}
+              <span className="text-[11px] text-muted-foreground">
+                Not available for raw FID yet — use the buttons above.
+              </span>
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
                 disabled
-                title="Background processing is not available for raw FID yet — use the buttons above."
                 className="h-7 px-2 font-mono text-[11px]"
               >
                 Preview
@@ -1519,7 +1524,6 @@ export function SpectraCheckRawFidSection({
                 variant="outline"
                 size="sm"
                 disabled
-                title="Background processing is not available for raw FID yet — use the buttons above."
                 className="h-7 px-2 font-mono text-[11px]"
               >
                 Process

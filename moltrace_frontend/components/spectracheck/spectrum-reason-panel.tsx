@@ -449,10 +449,13 @@ export function SpectrumReasonPanel({
                     <Badge
                       variant="outline"
                       className="gap-1 border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300"
-                      title="The reasoning model is not enabled — ask your administrator to enable it."
                     >
                       <CircleSlash className="h-3 w-3" aria-hidden />
                       Reasoner unavailable
+                      <InfoTooltip
+                        label="Why the reasoner is unavailable"
+                        content="The reasoning model is not enabled for this deployment — ask your administrator to turn it on."
+                      />
                     </Badge>
                   )}
                   <span className="font-mono text-[10px] tabular-nums text-muted-foreground">
