@@ -4639,6 +4639,15 @@ class RegulatoryDossierORM(Base):
         ForeignKey("users.id", ondelete="SET NULL"),
         nullable=True,
     )
+    # The team that may work this dossier. Regulatory affairs is a team activity — a reviewer, a
+    # toxicologist and a QA lead all touch one filing — but ownership was creator-only, so a
+    # colleague could not even see it. Stamped from the creator's organization when they have
+    # exactly one; NULL keeps the original creator-only behaviour, so existing rows are unchanged.
+    organization_id: Mapped[int | None] = mapped_column(
+        ForeignKey("organizations.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     project_id: Mapped[int | None] = mapped_column(
         ForeignKey("projects.id", ondelete="SET NULL"),
         nullable=True,

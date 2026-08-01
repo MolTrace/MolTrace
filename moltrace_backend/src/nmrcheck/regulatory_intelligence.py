@@ -10,10 +10,11 @@ from io import BytesIO
 from typing import Any
 from xml.etree import ElementTree
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
 
+from . import org_membership
 from .database import session_scope
 from .models import (
     RegulatoryAnswer,
@@ -274,6 +275,9 @@ def create_dossier(
         _validate_dossier_links(session, payload, actor=actor)
         row = RegulatoryDossierORM(
             created_by_user_id=actor.user_id,  # owner; NULL for a system api key
+            # The creator's team, when they have exactly one. See ``sole_active_org_id`` for why
+            # ambiguity falls back to creator-only rather than guessing.
+            organization_id=org_membership.sole_active_org_id(session, actor.user_id),
             project_id=payload.project_id,
             sample_id=payload.sample_id,
             spectracheck_session_id=payload.spectracheck_session_id,
@@ -312,13 +316,24 @@ def list_dossiers(
     """List dossiers, scoped to ``owner_scope_id`` when set.
 
     ``owner_scope_id is None`` (a system api key or admin) lists every dossier; a
-    user-scoped caller sees only the dossiers they own. NULL-owner rows (system-created
-    or un-backfilled legacy) are therefore invisible to a user-scoped caller.
+    user-scoped caller sees the dossiers they own **and** those owned by an organization they
+    are an active member of. NULL-owner rows with no organization (system-created or
+    un-backfilled legacy) remain invisible to a user-scoped caller.
+
+    The organization arm mirrors :func:`dossier_owned_by` exactly — the list a caller sees and
+    the dossiers they may open have to agree, or the queue shows rows that 404 when clicked.
     """
     with session_scope(session_factory) as session:
         stmt = select(RegulatoryDossierORM)
         if owner_scope_id is not None:
-            stmt = stmt.where(RegulatoryDossierORM.created_by_user_id == owner_scope_id)
+            org_ids = org_membership.active_org_ids_for_user(session, owner_scope_id)
+            owned = RegulatoryDossierORM.created_by_user_id == owner_scope_id
+            if org_ids:
+                stmt = stmt.where(
+                    or_(owned, RegulatoryDossierORM.organization_id.in_(org_ids))
+                )
+            else:
+                stmt = stmt.where(owned)
         rows = session.scalars(
             stmt.order_by(RegulatoryDossierORM.id.desc()).limit(limit)
         ).all()
@@ -340,19 +355,28 @@ def dossier_owned_by(
     """In-session check: may a caller scoped to ``owner_scope_id`` access dossier ``dossier_id``?
 
     ``owner_scope_id is None`` (a system api key or admin) may access any dossier; a
-    user-scoped caller may access only a dossier they own (``created_by_user_id ==
-    owner_scope_id``). A missing dossier, an unowned one, and ``dossier_id is None`` are all
-    indistinguishable (``False``) so cross-tenant existence is never leaked. This is the single
-    source of truth for dossier access — :func:`can_read_dossier` (the route dependency) and the
-    by-child-id read/write gates all funnel through it. Use this variant when you already hold a
-    session (e.g. gating a write to a dossier child).
+    user-scoped caller may access a dossier they own (``created_by_user_id == owner_scope_id``)
+    **or** one owned by an organization they are an active member of. A missing dossier, an
+    unowned one, and ``dossier_id is None`` are all indistinguishable (``False``) so cross-tenant
+    existence is never leaked. This is the single source of truth for dossier access —
+    :func:`can_read_dossier` (the route dependency) and the by-child-id read/write gates all funnel
+    through it. Use this variant when you already hold a session (e.g. gating a write to a dossier
+    child).
+
+    The organization arm is what makes regulatory affairs a team activity rather than a private
+    one. It only ever *widens* access, and only for a dossier that carries an ``organization_id``:
+    a dossier with none behaves exactly as it did when ownership was creator-only.
     """
     if owner_scope_id is None:
         return True
     if dossier_id is None:
         return False
     row = session.get(RegulatoryDossierORM, dossier_id)
-    return row is not None and row.created_by_user_id == owner_scope_id
+    if row is None:
+        return False
+    if row.created_by_user_id == owner_scope_id:
+        return True
+    return org_membership.user_shares_org(session, owner_scope_id, row.organization_id)
 
 
 def can_read_dossier(
@@ -381,6 +405,26 @@ def dossier_owner_id(
     with session_scope(session_factory) as session:
         row = session.get(RegulatoryDossierORM, dossier_id)
         return row.created_by_user_id if row is not None else None
+
+
+def dossier_access_facts(
+    session_factory: sessionmaker[Session], dossier_id: int | None, user_id: int | None
+) -> tuple[int | None, bool]:
+    """``(owner_user_id, caller_has_team_access)`` for the policy engine, resolved in one session.
+
+    The PDP's conditions are pure — they receive no database session — so the two facts it needs
+    to decide dossier access are gathered here and handed in. Returning both together keeps the
+    route gate to a single round trip, and keeps this module the only place that knows *how*
+    dossier access is established.
+    """
+    if dossier_id is None:
+        return None, False
+    with session_scope(session_factory) as session:
+        row = session.get(RegulatoryDossierORM, dossier_id)
+        if row is None:
+            return None, False
+        team_access = org_membership.user_shares_org(session, user_id, row.organization_id)
+        return row.created_by_user_id, team_access
 
 
 def patch_dossier(

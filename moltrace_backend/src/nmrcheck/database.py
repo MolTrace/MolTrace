@@ -164,6 +164,19 @@ def _ensure_sqlite_schema(engine: Engine) -> None:
             for column, ddl in nmr2d_missing_columns.items():
                 if column not in nmr2d_existing:
                     connection.exec_driver_sql(f"ALTER TABLE nmr2d_runs ADD COLUMN {column} {ddl}")
+        if "regulatory_dossiers" in tables:
+            # Team ownership (migration 0032) on a pre-existing dev SQLite DB. NULL preserves the
+            # original creator-only behaviour, so an un-migrated dev database keeps working.
+            dossier_existing = {
+                str(row[1])
+                for row in connection.exec_driver_sql(
+                    "PRAGMA table_info(regulatory_dossiers)"
+                ).fetchall()
+            }
+            if "organization_id" not in dossier_existing:
+                connection.exec_driver_sql(
+                    "ALTER TABLE regulatory_dossiers ADD COLUMN organization_id INTEGER"
+                )
         if "session_tokens" in tables:
             # MFA/step-up columns (Prompt 3 / migration 0019) on a pre-existing dev SQLite DB.
             session_existing = {
