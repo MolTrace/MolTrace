@@ -151,16 +151,39 @@ export function ReactionStudioWorkspace() {
     return Number.isInteger(n) && n >= 1 ? n : null
   }
 
-  function readWarnings(result: Record<string, unknown> | null): string[] {
+  function readStringList(result: Record<string, unknown> | null, keys: string[]): string[] {
     if (!result) return []
-    const warnings = result.warnings
-    if (Array.isArray(warnings)) {
-      return warnings
-        .map((item) => (typeof item === "string" ? item.trim() : ""))
-        .filter((item) => item.length > 0)
+    for (const key of keys) {
+      const value = result[key]
+      if (Array.isArray(value)) {
+        return value
+          .map((item) => (typeof item === "string" ? item.trim() : ""))
+          .filter((item) => item.length > 0)
+      }
+      if (typeof value === "string" && value.trim()) return [value.trim()]
     }
-    if (typeof warnings === "string" && warnings.trim()) return [warnings.trim()]
     return []
+  }
+
+  function readBool(result: Record<string, unknown> | null, key: string): boolean | null {
+    if (!result) return null
+    const value = result[key]
+    return typeof value === "boolean" ? value : null
+  }
+
+  /** Display-only: "requires_review" → "Requires review". */
+  function prettyStatus(raw: string): string {
+    if (!raw) return ""
+    const spaced = raw.replace(/_/g, " ")
+    return spaced.charAt(0).toUpperCase() + spaced.slice(1)
+  }
+
+  function yesNo(value: boolean | null): string {
+    return value == null ? "—" : value ? "Yes" : "No"
+  }
+
+  function idText(id: number | null): string {
+    return id != null ? `#${id}` : "—"
   }
 
   async function importExperimentTable() {
@@ -512,19 +535,32 @@ export function ReactionStudioWorkspace() {
               {importResult ? (
                 <div className="space-y-2 rounded-md border p-3 text-sm">
                   <p>
-                    <span className="text-muted-foreground">imported experiment count:</span>{" "}
-                    {readNumber(importResult, ["imported_experiment_count", "imported_count"]) ?? "—"}
+                    <span className="text-muted-foreground">Status:</span>{" "}
+                    {prettyStatus(readString(importResult, ["status"])) || "—"}
                   </p>
                   <p>
-                    <span className="text-muted-foreground">skipped count:</span>{" "}
-                    {readNumber(importResult, ["skipped_count"]) ?? "—"}
+                    <span className="text-muted-foreground">Review required:</span> {yesNo(readBool(importResult, "review_required"))}
                   </p>
                   <p>
-                    <span className="text-muted-foreground">records requiring review:</span>{" "}
-                    {readNumber(importResult, ["records_requiring_review", "requiring_review_count"]) ?? "—"}
+                    <span className="text-muted-foreground">Imported file:</span> {idText(readNumber(importResult, ["file_id"]))}
                   </p>
                   <p>
-                    <span className="text-muted-foreground">warnings:</span> {readWarnings(importResult).join("; ") || "—"}
+                    <span className="text-muted-foreground">Normalization run:</span>{" "}
+                    {idText(readNumber(importResult, ["normalization_run_id"]))}
+                  </p>
+                  {readNumber(importResult, ["external_link_id"]) != null ? (
+                    <p>
+                      <span className="text-muted-foreground">External link:</span>{" "}
+                      {idText(readNumber(importResult, ["external_link_id"]))}
+                    </p>
+                  ) : null}
+                  <p>
+                    <span className="text-muted-foreground">Warnings:</span>{" "}
+                    {readStringList(importResult, ["warnings_json", "warnings"]).join("; ") || "—"}
+                  </p>
+                  <p>
+                    <span className="text-muted-foreground">Notes:</span>{" "}
+                    {readStringList(importResult, ["notes_json", "notes"]).join("; ") || "—"}
                   </p>
                   <DeveloperOnly>
                     <details className="rounded-md border p-2">
@@ -625,12 +661,22 @@ export function ReactionStudioWorkspace() {
               {exportResult ? (
                 <div className="space-y-2 rounded-md border p-3 text-sm">
                   <p>
-                    <span className="text-muted-foreground">status:</span>{" "}
-                    {readString(exportResult, ["status", "export_status"]) || "—"}
+                    <span className="text-muted-foreground">Status:</span>{" "}
+                    {prettyStatus(readString(exportResult, ["status", "export_status"])) || "—"}
                   </p>
                   <p>
-                    <span className="text-muted-foreground">warnings:</span>{" "}
-                    {readWarnings(exportResult).join("; ") || "—"}
+                    <span className="text-muted-foreground">Review required:</span> {yesNo(readBool(exportResult, "review_required"))}
+                  </p>
+                  <p>
+                    <span className="text-muted-foreground">Sync job:</span> {idText(readNumber(exportResult, ["sync_job_id"]))}
+                  </p>
+                  <p>
+                    <span className="text-muted-foreground">Warnings:</span>{" "}
+                    {readStringList(exportResult, ["warnings_json", "warnings"]).join("; ") || "—"}
+                  </p>
+                  <p>
+                    <span className="text-muted-foreground">Notes:</span>{" "}
+                    {readStringList(exportResult, ["notes_json", "notes"]).join("; ") || "—"}
                   </p>
                   <DeveloperOnly>
                     <details className="rounded-md border p-2">

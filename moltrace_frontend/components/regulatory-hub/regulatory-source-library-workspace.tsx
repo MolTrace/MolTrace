@@ -323,25 +323,49 @@ export function RegulatorySourceLibraryWorkspace() {
     ? (asArray(searchResult.citations).filter(isRecord) as Record<string, unknown>[])
     : []
 
-  function readConnectorImportString(keys: string[]): string {
-    if (!connectorImportResult) return ""
+  const connectorImportMeta = isRecord(connectorImportResult?.metadata_json)
+    ? (connectorImportResult!.metadata_json as Record<string, unknown>)
+    : null
+
+  function readStr(rec: Record<string, unknown> | null, keys: string[]): string {
+    if (!rec) return ""
     for (const key of keys) {
-      const value = connectorImportResult[key]
+      const value = rec[key]
       if (typeof value === "string" && value.trim()) return value.trim()
       if (typeof value === "number" && Number.isFinite(value)) return String(value)
     }
     return ""
   }
 
-  function readConnectorImportWarnings(): string[] {
-    if (!connectorImportResult) return []
-    const warnings = connectorImportResult.warnings
-    if (Array.isArray(warnings)) {
-      return warnings
-        .map((item) => (typeof item === "string" ? item.trim() : ""))
-        .filter((item) => item.length > 0)
+  function readConnectorImportString(keys: string[]): string {
+    return readStr(connectorImportResult, keys)
+  }
+
+  function readConnectorImportNumber(keys: string[]): number | null {
+    if (!connectorImportResult) return null
+    for (const key of keys) {
+      const value = connectorImportResult[key]
+      if (typeof value === "number" && Number.isInteger(value)) return value
     }
-    if (typeof warnings === "string" && warnings.trim()) return [warnings.trim()]
+    return null
+  }
+
+  function readConnectorImportBool(key: string): boolean | null {
+    const value = connectorImportResult?.[key]
+    return typeof value === "boolean" ? value : null
+  }
+
+  function readConnectorImportList(keys: string[]): string[] {
+    if (!connectorImportResult) return []
+    for (const key of keys) {
+      const value = connectorImportResult[key]
+      if (Array.isArray(value)) {
+        return value
+          .map((item) => (typeof item === "string" ? item.trim() : ""))
+          .filter((item) => item.length > 0)
+      }
+      if (typeof value === "string" && value.trim()) return [value.trim()]
+    }
     return []
   }
 
@@ -627,25 +651,47 @@ export function RegulatorySourceLibraryWorkspace() {
                   <CardTitle className="text-base">Imported source</CardTitle>
                 </CardHeader>
                 <CardContent className="grid gap-2 text-sm sm:grid-cols-2">
-                  <p className="sm:col-span-2">
-                    <span className="text-muted-foreground">Imported source title:</span>{" "}
-                    {readConnectorImportString(["imported_source_title", "title", "source_title"]) || "—"}
+                  <p>
+                    <span className="text-muted-foreground">Status:</span>{" "}
+                    {statusLabel(readConnectorImportString(["status"])) || "—"}
                   </p>
+                  <p>
+                    <span className="text-muted-foreground">Review required:</span>{" "}
+                    {readConnectorImportBool("review_required") == null
+                      ? "—"
+                      : readConnectorImportBool("review_required")
+                        ? "Yes"
+                        : "No"}
+                  </p>
+                  <p>
+                    <span className="text-muted-foreground">Imported file:</span>{" "}
+                    {readConnectorImportNumber(["file_id"]) != null
+                      ? `#${readConnectorImportNumber(["file_id"])}`
+                      : "—"}
+                  </p>
+                  <p>
+                    <span className="text-muted-foreground">Ingestion run:</span>{" "}
+                    {readConnectorImportNumber(["ingestion_run_id"]) != null
+                      ? `#${readConnectorImportNumber(["ingestion_run_id"])}`
+                      : "—"}
+                  </p>
+                  {readConnectorImportNumber(["external_link_id"]) != null ? (
+                    <p className="sm:col-span-2">
+                      <span className="text-muted-foreground">External link:</span>{" "}
+                      {`#${readConnectorImportNumber(["external_link_id"])}`}
+                    </p>
+                  ) : null}
                   <p className="sm:col-span-2">
                     <span className="text-muted-foreground">SHA-256:</span>{" "}
-                    {readConnectorImportString(["sha256", "file_sha256"]) || "—"}
-                  </p>
-                  <p>
-                    <span className="text-muted-foreground">Source type:</span>{" "}
-                    {sourceTypeLabel(readConnectorImportString(["source_type"]))}
-                  </p>
-                  <p>
-                    <span className="text-muted-foreground">Citation extraction:</span>{" "}
-                    {statusLabel(readConnectorImportString(["citation_extraction_status", "citation_status"]))}
+                    {readStr(connectorImportMeta, ["file_sha256", "sha256"]) || "—"}
                   </p>
                   <p className="sm:col-span-2">
                     <span className="text-muted-foreground">Warnings:</span>{" "}
-                    {readConnectorImportWarnings().join("; ") || "—"}
+                    {readConnectorImportList(["warnings_json", "warnings"]).join("; ") || "—"}
+                  </p>
+                  <p className="sm:col-span-2">
+                    <span className="text-muted-foreground">Notes:</span>{" "}
+                    {readConnectorImportList(["notes_json", "notes"]).join("; ") || "—"}
                   </p>
                   <details className="sm:col-span-2 rounded-md border p-2">
                     <summary className="cursor-pointer text-xs font-medium">{RAW_DATA_DISCLOSURE}</summary>
