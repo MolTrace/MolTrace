@@ -92,9 +92,9 @@ import { SessionValueSummaryCard } from "@/components/spectracheck/session-value
 import { SpectraCheckLinkedCompoundCard } from "@/components/spectracheck/spectracheck-linked-compound-card"
 import { SpectraCheckKnowledgeLinksCard } from "@/components/knowledge/knowledge-links-integration"
 import {
-  SpectraCheckSectionNav,
-  type SpectraNavGroup,
-} from "@/components/spectracheck/spectracheck-section-nav"
+  WorkspaceStageNav,
+  type WorkspaceStageGroup,
+} from "@/components/app/workspace-stage-nav"
 import { SpectraCheckSessionControls } from "@/components/spectracheck/spectracheck-session-controls"
 import { SpectraCheckSystemStatusBadges } from "@/components/spectracheck/spectracheck-system-status-badges"
 import type { SessionSaveFeedback } from "@/components/spectracheck/spectracheck-session-controls"
@@ -149,7 +149,7 @@ import { RAW_DATA_DISCLOSURE } from "@/lib/ui/copy"
 // why the two tiers are split rather than shown as one strip. The per-section
 // blurb (formerly a hover Tooltip on every tab — which obstructed moving
 // between tabs) is a single caption line below the nav.
-const SPECTRACHECK_NAV: SpectraNavGroup[] = [
+const SPECTRACHECK_NAV: WorkspaceStageGroup[] = [
   {
     id: "session",
     label: "Session",
@@ -1156,10 +1156,12 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
             sit directly under the page header rather than below the session
             controls and standing notices, which used to push them out of the
             first screenful entirely. */}
-        <SpectraCheckSectionNav
+        <WorkspaceStageNav
           groups={visibleSpectraNav}
           activeValue={activeTab}
           onSelect={setActiveTab}
+          label="SpectraCheck"
+          accent="teal"
         />
 
         {/* The one thing that does NOT move into the Session tab. It states that
