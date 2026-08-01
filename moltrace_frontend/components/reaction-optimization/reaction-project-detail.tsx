@@ -41,6 +41,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Tabs, TabsContent } from "@/components/ui/tabs"
+import { StructureEditorPanel } from "@/src/components/chemistry/StructureEditorPanel"
 import {
   WorkspaceStageNav,
   type WorkspaceStageGroup,
@@ -6309,6 +6310,29 @@ export function ReactionProjectDetail() {
             </p>
           </div>
           <RouteScoresPanel key={reactionProjectId} projectId={reactionProjectId} />
+
+          {/* The drawing canvas belongs on a page that knows which project it is
+              looking at. Its first home was the program-level demo workspace,
+              where a captured scheme had no entity to belong to — so it sits
+              here too, carrying the project it was drawn for. */}
+          <section aria-labelledby="route-scheme-heading" className="space-y-3 border-t pt-6">
+            <div className="space-y-1">
+              <p
+                className="font-mono text-[11px] font-bold uppercase tracking-[0.2em]"
+                style={{ color: "var(--mt-violet-ink)" }}
+              >
+                Project · Scheme
+              </p>
+              <h2 id="route-scheme-heading" className="font-mono text-2xl font-bold tracking-tight">
+                Draw or import a scheme
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                Sketch a route step, or bring in a structure or reaction you already have, and
+                capture it as a molfile or reaction block.
+              </p>
+            </div>
+            <StructureEditorPanel contextLabel={`Project ${reactionProjectId}`} />
+          </section>
         </TabsContent>
 
         <TabsContent value="optimization" className="mt-4 space-y-6">
