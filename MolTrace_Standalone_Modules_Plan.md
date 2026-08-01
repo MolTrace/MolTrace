@@ -160,9 +160,12 @@ The good news: `TenantProvider` **already** fetches entitlements and derives `mo
 **Done when:** a review task, approval and share link can be created against a regulatory dossier and a reaction project; program order accepts `["spectracheck"]`.
 
 ### Layer 0.F — Anti-rot: the mechanism that keeps this true in six months
-**Lane: both.**
+**Lane: both.** *Backend half landed — `tests/test_single_module_deployments.py`.*
 
-- **ADD** — Single-module CI matrix: boot the app three times with one module enabled each, and assert (a) every classified route for the disabled modules returns `module_not_licensed`, (b) no 5xx anywhere, (c) the rendered nav contains no unlicensed entry, (d) no cross-module card mounts.
+- **DONE (backend)** — Single-module matrix: boots the app once per product and asserts (a) disabled products' routes return `module_not_licensed`, (b) no 5xx anywhere. Two tiers, because exhaustiveness costs ~2 minutes: a fast guard over the nine cross-product aggregation surfaces plus a served-routes floor (27s, every commit), and an exhaustive sweep of all ~163 parameterless GETs per configuration behind the existing `slow` marker (66s, sharded CI job).
+- **Finding worth recording:** all three single-product configurations already return **zero 5xx** across every parameterless GET. The cross-module machinery — bridges, command centre, product registry, mobile aggregation — degrades cleanly when a sibling's data cannot exist. That reframes Layer 0.E: the missing collaboration primitives for Regentry/Repho are a *feature* gap, not a crash risk, so 0.E can be sequenced by commercial need rather than urgency.
+- **The floor matters as much as the ceiling:** the sweep also asserts ≥100 routes still serve, so a map that accidentally claimed everything for one product could not pass by refusing everything.
+- **ADD (frontend)** — the rendered nav contains no unlicensed entry, and no cross-module card mounts.
 - **ADD** — Per-module smoke: the G1 activation path for each module runs green in single-module mode.
 - **MODIFY** — Existing tests pin the three-module shape (`test_phase60_product_orchestration_api.py`, `test_phase64_tenant_saas_api.py`, `test_phase61_mobile_pwa_api.py`). Keep them as the all-modules variant; add single-module variants; change positional `modules[2]` lookups to key lookups. Re-baseline deliberately, with a comment.
 
