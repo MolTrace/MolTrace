@@ -179,16 +179,16 @@ export function AiModulePredictionAugmentation({
       const session = Number.parseInt(sessionId, 10)
       const res = await apiFetch<unknown>("/ai/predictions", {
         method: "POST",
+        // Same shape as the predictions workspace: PredictionRequest is extra="forbid", and the
+        // module/task are derived server-side from service_key rather than sent.
         body: {
           service_key: selected.serviceKey,
-          target_module: moduleKey,
-          task_key: selected.taskKey,
-          input_summary_json: parsedSummary,
-          artifact_id: Number.isFinite(artifact) && artifact > 0 ? artifact : null,
+          model_artifact_id: Number.isFinite(artifact) && artifact > 0 ? artifact : null,
+          request_json: parsedSummary,
+          experimental: experimentalMode,
           evidence_item_id: Number.isFinite(evidence) && evidence > 0 ? evidence : null,
           compound_id: Number.isFinite(compound) && compound > 0 ? compound : null,
           session_id: Number.isFinite(session) && session > 0 ? session : null,
-          experimental_mode: experimentalMode,
           notes: notes.trim() || null,
         },
       })

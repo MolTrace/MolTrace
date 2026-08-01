@@ -26,6 +26,27 @@ function isRecord(v: unknown): v is Row {
   return Boolean(v) && typeof v === "object" && !Array.isArray(v)
 }
 
+/**
+ * A run's context references (evidence item, compound, session) are provenance, not columns: the
+ * server persists them under request_summary_json.context, mirrored into metadata_json.context.
+ * Reading them from the top level — as this file used to — silently yields null.
+ *
+ * The top-level lookup is kept as a last resort so a record that does carry them directly, now or
+ * later, still reads.
+ */
+function readPredictionContextNumber(prediction: unknown, key: string): number | null {
+  if (!isRecord(prediction)) return null
+  for (const holder of ["request_summary_json", "metadata_json"]) {
+    const outer = prediction[holder]
+    if (!isRecord(outer)) continue
+    const context = outer.context
+    if (!isRecord(context)) continue
+    const found = readRecordNumber(context, key)
+    if (found != null) return found
+  }
+  return readRecordNumber(prediction, key) ?? null
+}
+
 function summarizeValue(v: unknown): string {
   if (v == null) return "-"
   if (typeof v === "boolean") return v ? "Yes" : "No"
@@ -241,7 +262,7 @@ export function AiPredictionDetailWorkspace({ predictionId }: { predictionId: st
             <FeedbackButton
               module="ai-predictions-detail"
               projectId={readRecordNumber(prediction, "project_id") ?? null}
-              sessionId={readRecordNumber(prediction, "session_id") ?? null}
+              sessionId={readPredictionContextNumber(prediction, "session_id")}
             />
           </ModuleCard>
 

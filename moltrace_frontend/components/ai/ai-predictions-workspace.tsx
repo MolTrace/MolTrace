@@ -133,8 +133,11 @@ export function AiPredictionsWorkspace() {
   async function submitRunPrediction() {
     setFormErr("")
     setFormOk("")
-    if (!serviceKey.trim() || !targetModule.trim() || !taskKey.trim()) {
-      setFormErr("Service key, target module, and task key are required.")
+    // The service key is the only thing the request carries: the server derives the module and
+    // task from it, so requiring them here blocked a submission on fields it never sends. They
+    // stay on the form as display, and still label the analytics events below.
+    if (!serviceKey.trim()) {
+      setFormErr("Service key is required.")
       return
     }
 
@@ -145,16 +148,16 @@ export function AiPredictionsWorkspace() {
     const compound = Number.parseInt(compoundId, 10)
     const session = Number.parseInt(sessionId, 10)
 
+    // PredictionRequest is extra="forbid", so a key it does not declare is a 422, not an ignored
+    // field. target_module/task_key are dropped because the server derives them from service_key.
     const body: Record<string, unknown> = {
       service_key: serviceKey.trim(),
-      target_module: targetModule,
-      task_key: taskKey.trim(),
-      input_summary_json: parsedSummary,
-      artifact_id: Number.isFinite(artifact) && artifact > 0 ? artifact : null,
+      model_artifact_id: Number.isFinite(artifact) && artifact > 0 ? artifact : null,
+      request_json: parsedSummary,
+      experimental: experimentalMode,
       evidence_item_id: Number.isFinite(evidence) && evidence > 0 ? evidence : null,
       compound_id: Number.isFinite(compound) && compound > 0 ? compound : null,
       session_id: Number.isFinite(session) && session > 0 ? session : null,
-      experimental_mode: experimentalMode,
       notes: notes.trim() || null,
     }
 

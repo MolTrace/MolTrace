@@ -19202,7 +19202,7 @@ export interface components {
         /** ElectronicSignatureRecordCreate */
         ElectronicSignatureRecordCreate: {
             /** Signer Name */
-            signer_name?: string | null;
+            signer_name: string;
             /** Signer Email */
             signer_email?: string | null;
             /**
@@ -29018,6 +29018,14 @@ export interface components {
              * @default false
              */
             development_mode: boolean;
+            /** Evidence Item Id */
+            evidence_item_id?: number | null;
+            /** Compound Id */
+            compound_id?: number | null;
+            /** Session Id */
+            session_id?: number | null;
+            /** Notes */
+            notes?: string | null;
             /** Metadata Json */
             metadata_json?: {
                 [key: string]: unknown;

@@ -91,7 +91,7 @@ beforeEach(() => {
   apiFetchMock.mockResolvedValue({})
 })
 
-describe("AiModulePredictionAugmentation — contract preservation", () => {
+describe("AiModulePredictionAugmentation — request contract", () => {
   it("renders the module-titled card title for all 4 variants", () => {
     const { unmount: u1 } = render(<AiModulePredictionAugmentation {...REGULATORY_PROPS} />)
     expect(screen.getByText(/Regulatory Dossier: Optional controlled AI prediction/i)).toBeInTheDocument()
@@ -127,7 +127,14 @@ describe("AiModulePredictionAugmentation — contract preservation", () => {
     expect(screen.getByText(/^experimental mode/i)).toBeInTheDocument()
   })
 
-  it("submits POST /ai/predictions with the correct module/service/task keys when Run is clicked", async () => {
+  // RE-BASELINED, deliberately. This test previously asserted target_module, task_key,
+  // experimental_mode and input_summary_json — the exact four keys PredictionRequest rejects.
+  // Under extra="forbid" those are not ignored extras, they are a 422 for the whole request, so
+  // every "Run" click failed and the test guarded the failure. "Preserve existing behaviour" was
+  // the wrong criterion here; the server model is the contract, and it was checked directly:
+  // the old body reports extra_forbidden on target_module, task_key, input_summary_json,
+  // artifact_id and experimental_mode, while the body asserted below validates clean.
+  it("submits POST /ai/predictions with the keys the server actually declares", async () => {
     const user = userEvent.setup()
     render(<AiModulePredictionAugmentation {...REGULATORY_PROPS} />)
     await user.click(screen.getByRole("button", { name: /Run approved AI model/i }))
@@ -142,10 +149,15 @@ describe("AiModulePredictionAugmentation — contract preservation", () => {
     expect(init?.method).toBe("POST")
     const body = init?.body as Record<string, unknown>
     expect(body.service_key).toBe("regulatory_extraction_classifier")
-    expect(body.target_module).toBe("regulatory")
-    expect(body.task_key).toBe("regulatory_extraction_classification")
-    expect(body.experimental_mode).toBe(false)
-    // input_summary_json should be a parsed object, not a string
-    expect(typeof body.input_summary_json).toBe("object")
+    expect(body.experimental).toBe(false)
+    // request_json should be a parsed object, not a string
+    expect(typeof body.request_json).toBe("object")
+    expect(body).toHaveProperty("model_artifact_id")
+    // The module and task are derived server-side from service_key, and sending them 422s.
+    expect(body).not.toHaveProperty("target_module")
+    expect(body).not.toHaveProperty("task_key")
+    expect(body).not.toHaveProperty("input_summary_json")
+    expect(body).not.toHaveProperty("experimental_mode")
+    expect(body).not.toHaveProperty("artifact_id")
   })
 })
