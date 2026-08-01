@@ -150,6 +150,21 @@ describe("Marketing Footer", () => {
     expect(labels).toEqual(["GitHub"])
   })
 
+  it("keeps LinkedIn, X and Crunchbase artwork ready so publishing is a URL-only edit", () => {
+    // These three are the priority profiles. Their glyphs must stay registered
+    // (and renderable) while unclaimed, so going live is a one-line change:
+    // swap `href: null` for the profile URL here + add it to the Organization
+    // `sameAs` in components/seo/json-ld.tsx.
+    for (const label of ["LinkedIn", "X", "Crunchbase"]) {
+      const entry = socialLinks.find((link) => link.label === label)
+      expect(entry, `${label} registry entry`).toBeDefined()
+      const Glyph = entry!.Glyph
+      const { container, unmount } = render(<Glyph />)
+      expect(container.querySelector("svg"), `${label} artwork`).not.toBeNull()
+      unmount()
+    }
+  })
+
   it("never renders a placeholder or dead social link", () => {
     render(<Footer />)
     const socialNav = screen.getByTestId("footer-social-nav")
@@ -213,7 +228,7 @@ describe("Marketing Footer", () => {
     // Asserted over the whole registry, not just the rendered footer, so the
     // artwork of an as-yet-unclaimed platform stays covered and drops into a
     // uniform row the moment its profile is claimed.
-    expect(socialLinks.length).toBe(9)
+    expect(socialLinks.length).toBe(10)
     for (const { label, Glyph } of socialLinks) {
       const { container, unmount } = render(<Glyph />)
       const svg = container.querySelector("svg")
