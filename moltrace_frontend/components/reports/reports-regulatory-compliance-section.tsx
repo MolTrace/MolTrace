@@ -4,6 +4,7 @@ import Link from "next/link"
 import { ShieldCheck } from "lucide-react"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { apiFetch } from "@/lib/api/client"
+import { ModuleGate } from "@/src/lib/modules/module-not-included-tile"
 import { formatApiError } from "@/components/spectracheck/spectracheck-helpers"
 import { readRecordNumber, readRecordString } from "@/components/projects/project-workspace-utils"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -27,7 +28,7 @@ type Props = {
   live: boolean
 }
 
-export function ReportsRegulatoryComplianceSection({ reportRows, live }: Props) {
+function ReportsRegulatoryComplianceSectionInner({ reportRows, live }: Props) {
   const sessionNums = useMemo(() => {
     const s = new Set<number>()
     for (const r of reportRows) {
@@ -189,5 +190,20 @@ export function ReportsRegulatoryComplianceSection({ reportRows, live }: Props) 
         ))}
       </CardContent>
     </Card>
+  )
+}
+
+/**
+ * Regentry-owned. /reports is a SpectraCheck surface, so on a SpectraCheck-only deployment this
+ * section is mounted for a customer who has no Regentry — and its six dossier requests are refused.
+ * The gate WRAPS rather than guards inline: the inner component never mounts, so its load effect
+ * never runs. Note the sub-requests use .catch(() => []) — swallowing the error still leaves a red
+ * line in the console, so swallowing was never gating.
+ */
+export function ReportsRegulatoryComplianceSection(props: Props) {
+  return (
+    <ModuleGate module="regulatory_hub" what="Regulatory compliance for these reports">
+      <ReportsRegulatoryComplianceSectionInner {...props} />
+    </ModuleGate>
   )
 }
