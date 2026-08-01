@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { AlertCard } from "@/components/dashboard/alert-card"
 import { ModuleCard } from "@/components/dashboard/module-card"
+import { StructureEditorPanel } from "@/src/components/chemistry/StructureEditorPanel"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -24,7 +25,6 @@ import {
 } from "@/components/ui/table"
 import {
   AlertTriangle,
-  Beaker,
   CheckCircle2,
   FlaskConical,
   Grid3X3,
@@ -244,7 +244,7 @@ export function ReactionStudioWorkspace() {
           </p>
           <h2 className="font-mono text-xl font-bold tracking-tight">Structure drawing &amp; SMARTS canvas</h2>
           <p className="text-sm text-muted-foreground">
-            Placeholder canvas — connect a structure editor or ELN link when chemistry services are available.
+            Draw structures and reaction schemes, or paste a SMILES, molfile, or reaction string.
           </p>
         </div>
         <ModuleCard
@@ -252,15 +252,9 @@ export function ReactionStudioWorkspace() {
           eyebrow="Studio · Scheme"
           title={<span id="scheme-heading">Reaction scheme</span>}
           icon={FlaskConical}
-          description="Placeholder — attach a structure editor or ELN link when integrated."
+          description="Draw a scheme in the browser, then capture it as a molfile and SMILES."
         >
-          <div className="scientific-grid-subtle flex min-h-[200px] flex-col items-center justify-center rounded-lg border border-dashed bg-muted/30 px-6 py-12 text-center">
-            <Beaker className="mb-3 h-10 w-10 text-muted-foreground/70" aria-hidden />
-            <p className="text-sm font-medium text-foreground">Scheme preview area</p>
-            <p className="mt-2 max-w-md text-xs text-muted-foreground">
-              Demo layout only. Import a molfile / CXSMILES or render from the route when chemistry services exist.
-            </p>
-          </div>
+          <StructureEditorPanel />
         </ModuleCard>
       </section>
 

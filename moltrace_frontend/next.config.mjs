@@ -48,7 +48,12 @@ const nextConfig = {
     // @vercel/analytics loads from same-origin (/_vercel/insights/*) → 'self'.
     const csp = [
       "default-src 'self'",
-      `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}`,
+      // 'wasm-unsafe-eval' is for the in-browser chemistry engine behind the
+      // structure editor (Ketcher/Indigo compiles to WebAssembly). It permits
+      // WASM compilation ONLY — it does not re-enable eval() of JavaScript, so
+      // it is materially narrower than 'unsafe-eval'. Without it the editor
+      // fails the moment this policy is flipped from Report-Only to enforcing.
+      `script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'${isDev ? " 'unsafe-eval'" : ""}`,
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob:",
       "font-src 'self' data:",
