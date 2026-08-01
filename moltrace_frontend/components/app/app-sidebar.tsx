@@ -4,7 +4,6 @@ import { useMemo } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { Button } from "@/components/ui/button"
 import { moltraceTraceClassName } from "@/components/branding/moltrace-wordmark"
 import { MoleculeLogoMark } from "@/components/branding/molecule-logo-mark"
 import { SpectraCheckLogoIcon } from "@/components/branding/spectracheck-logo-icon"
@@ -209,12 +208,17 @@ export function AppSidebar({ collapsed, onToggle }: AppSidebarProps) {
           // Solid bg-sidebar (no alpha) + no backdrop-blur — a blurred sidebar
           // promotes itself to a persistent GPU layer and can cull/repaint the
           // main scroll column. Solid stays in flow and never triggers promotion.
-          "flex h-full flex-col border-r border-border/70 bg-sidebar transition-[width] duration-200",
+          //
+          // `relative` is load-bearing: the edge handle below is absolutely
+          // positioned against this element. Without it the handle resolved
+          // against <body> and landed at the far edge of the *viewport* — which
+          // is how the collapsed rail ended up with no way to reopen it.
+          "relative flex h-full flex-col border-r border-border/70 bg-sidebar transition-[width] duration-200",
           collapsed ? "w-14" : "w-56",
         )}
       >
         {/* Logo / home */}
-        <div className={cn("flex h-14 items-center border-b border-border/70 px-3", collapsed ? "justify-center" : "justify-between")}>
+        <div className={cn("flex h-14 items-center border-b border-border/70 px-3", collapsed ? "justify-center" : "justify-start")}>
           <Link href="/" className="flex items-center gap-2" aria-label="MolTrace home">
             <MoleculeLogoMark className="h-7 w-7" />
             {!collapsed && (
@@ -224,16 +228,51 @@ export function AppSidebar({ collapsed, onToggle }: AppSidebarProps) {
               </span>
             )}
           </Link>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={onToggle}
-            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-            className={cn("h-7 w-7", collapsed && "absolute -right-3.5 top-3.5 z-10 rounded-full border border-border/70 bg-background/95 shadow-sm backdrop-blur-sm")}
-          >
-            {collapsed ? <ChevronRight className="h-3.5 w-3.5" /> : <ChevronLeft className="h-3.5 w-3.5" />}
-          </Button>
         </div>
+
+        {/* Edge handle — the one control that shows or hides the item names.
+            It rides the sidebar's own border at mid-height rather than hiding in
+            the header, so it is in the same place and the same shape whichever
+            state you are in. At rest it is a quiet vertical bar that reads as an
+            edge you can take hold of; on hover or keyboard focus it swells into
+            a chevron chip. Its predecessor only appeared once the rail was
+            already collapsed, which is precisely when it was hardest to find. */}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              type="button"
+              onClick={onToggle}
+              aria-label={collapsed ? "Show item names" : "Hide item names"}
+              aria-expanded={!collapsed}
+              className="group/edge absolute -right-2.5 top-1/2 z-20 flex h-20 w-5 -translate-y-1/2 cursor-pointer items-center justify-center focus-visible:outline-none"
+            >
+              {/* Always a visible chip, never a hidden hover target. An earlier
+                  pass had this rest as a faint hairline on the border and only
+                  become a chip on hover — which reproduces the very problem it
+                  exists to solve, since a control you cannot see is one you
+                  cannot find. Hover and focus deepen it; they do not reveal it.
+                  `motion-reduce` drops the tween but keeps every state change,
+                  as globals.css carries no global reduced-motion rule. */}
+              <span
+                className={cn(
+                  "flex h-6 w-6 items-center justify-center rounded-full border border-border/70 bg-background text-muted-foreground shadow-sm",
+                  "transition-all duration-200 motion-reduce:transition-none",
+                  "group-hover/edge:h-7 group-hover/edge:w-7 group-hover/edge:text-foreground group-hover/edge:shadow-md",
+                  "group-focus-visible/edge:h-7 group-focus-visible/edge:w-7 group-focus-visible/edge:text-foreground group-focus-visible/edge:shadow-md",
+                  "group-focus-visible/edge:ring-2 group-focus-visible/edge:ring-ring group-focus-visible/edge:ring-offset-1",
+                )}
+                style={{ borderColor: "color-mix(in srgb, var(--mt-teal) 35%, var(--border))" }}
+              >
+                {collapsed ? (
+                  <ChevronRight className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                ) : (
+                  <ChevronLeft className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                )}
+              </span>
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="right">{collapsed ? "Show item names" : "Hide item names"}</TooltipContent>
+        </Tooltip>
 
         {/* Primary navigation — grouped by job */}
         <nav className="flex-1 space-y-3 overflow-y-auto p-2" aria-label="Primary">
