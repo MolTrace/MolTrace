@@ -66,6 +66,7 @@ import {
   Shield,
   Code2,
 } from "lucide-react"
+import { useIncludedModules } from "@/src/lib/modules/included-modules-provider"
 
 interface AppTopbarProps {
   onToggleEvidenceQueue: () => void
@@ -127,6 +128,8 @@ type NotificationItem = {
 }
 
 export function AppTopbar({ onToggleEvidenceQueue, evidenceQueueOpen = false }: AppTopbarProps) {
+  // Which products this deployment serves — gates shell-wide fetches below.
+  const { isIncluded } = useIncludedModules()
   const [commandOpen, setCommandOpen] = useState(false)
   const router = useRouter()
   const isMobile = useIsMobile()
@@ -186,8 +189,12 @@ export function AppTopbar({ onToggleEvidenceQueue, evidenceQueueOpen = false }: 
   const loadNotifications = useCallback(async () => {
     setNotifLoading(true)
     try {
+      // Shell-wide fetch: only ask for Regentry notifications when this deployment
+      // serves Regentry. Hiding the UI but still requesting its data is not gating.
       const [regRaw, aiRows] = await Promise.all([
-        apiFetch<unknown>("/regulatory/notifications?limit=20", { method: "GET" }).catch(() => []),
+        isIncluded("regulatory_hub")
+          ? apiFetch<unknown>("/regulatory/notifications?limit=20", { method: "GET" }).catch(() => [])
+          : Promise.resolve([]),
         fetchAiEvidenceQueue(20).catch(() => []),
       ])
       const regItems: NotificationItem[] = asArray(regRaw)
@@ -233,7 +240,7 @@ export function AppTopbar({ onToggleEvidenceQueue, evidenceQueueOpen = false }: 
     } finally {
       setNotifLoading(false)
     }
-  }, [])
+  }, [isIncluded])
   useEffect(() => {
     // Seeded from the cross-navigation snapshot — the bell is already populated,
     // so don't spend two more requests on every route change.
