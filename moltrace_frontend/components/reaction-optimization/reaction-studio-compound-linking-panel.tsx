@@ -230,8 +230,9 @@ export function ReactionStudioCompoundLinkingPanel({
     setSearchHits([])
     try {
       const body: Record<string, unknown> = {}
+      // CompoundRegistrySearchRequest (extra="forbid") field is `name` (matches aliases too).
       const q = searchQuery.trim()
-      if (q) body.name_alias = q
+      if (q) body.name = q
       const raw = await apiFetch<unknown>("/compound-registry/search", { method: "POST", body })
       setSearchHits(normalizeCompoundSearchList(raw))
     } catch (e) {
@@ -265,9 +266,11 @@ export function ReactionStudioCompoundLinkingPanel({
     setLinkBusy(true)
     setLinkErr("")
     try {
+      // CompoundRegistryLinkRequest (extra="forbid") has no link_role; keep the role
+      // in metadata_json (non-lossy) rather than as a rejected top-level key.
       const body: Record<string, unknown> = {
         compound_id,
-        link_role: linkRole,
+        metadata_json: { link_role: linkRole },
       }
       const res = await apiFetch<Record<string, unknown>>(
         `/reaction-experiments/${encodeURIComponent(String(expId))}/link-compound`,
@@ -341,7 +344,7 @@ export function ReactionStudioCompoundLinkingPanel({
           body: {
             compound_id,
             batch_id: batchId,
-            link_role: "product_batch",
+            metadata_json: { link_role: "product_batch" },
           },
         },
       )
