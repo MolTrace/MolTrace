@@ -1,6 +1,7 @@
 import { Suspense } from "react"
 import Link from "next/link"
 import { AppShell } from "@/components/app/app-shell"
+import { RegentryModuleNav } from "@/components/regulatory-hub/regentry-module-nav"
 import {
   ACTION_QUEUE_TOOLTIP,
   RegulatoryActionQueue,
@@ -11,28 +12,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 export default function RegulatoryActionQueuePage() {
   return (
     <AppShell>
+      <RegentryModuleNav />
       <Suspense fallback={<p className="p-6 text-sm text-muted-foreground">Loading…</p>}>
         <div className="mx-auto max-w-[1400px] space-y-6 p-4 md:p-6">
-          <div className="flex flex-wrap gap-2">
-            <Link
-              href="/regulatory/surveillance"
-              className="inline-flex h-8 items-center rounded-md border px-3 text-sm hover:bg-accent"
-            >
-              Surveillance dashboard
-            </Link>
-            <Link
-              href="/regulatory/rule-updates"
-              className="inline-flex h-8 items-center rounded-md border px-3 text-sm hover:bg-accent"
-            >
-              Rule update proposals
-            </Link>
-            <Link
-              href="/regulatory/sources"
-              className="inline-flex h-8 items-center rounded-md border px-3 text-sm hover:bg-accent"
-            >
-              Source library
-            </Link>
-          </div>
           <Card>
             <CardHeader>
               <div className="flex flex-wrap items-center gap-2">

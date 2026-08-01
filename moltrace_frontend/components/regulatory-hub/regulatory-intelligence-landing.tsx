@@ -557,17 +557,6 @@ export function RegulatoryIntelligenceLanding() {
             Review impurity, qNMR, nitrosamine, and jurisdictional action cards. Promote evidence into dossiers and dispatch reviewer actions.
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Button asChild size="sm">
-            <Link href="/regulatory/impurities">Impurity assessment</Link>
-          </Button>
-          <Button asChild variant="outline" size="sm">
-            <Link href="/regulatory/notifications">Notifications</Link>
-          </Button>
-          <Button asChild variant="outline" size="sm">
-            <Link href="/regulatory/action-queue">Action queue</Link>
-          </Button>
-        </div>
       </header>
 
       <AlertCard
