@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { ChevronDown } from "lucide-react"
+import { ModuleGate } from "@/src/lib/modules/module-not-included-tile"
 
 const TOOLTIP =
   "Turns regulatory action items into reaction optimization constraints, such as impurity limits, residual solvent limits, nitrosamine risk avoidance, and method-validation requirements."
@@ -53,7 +54,7 @@ type ReactionOptimizationHandoffCardProps = {
   batchId?: number | null
 }
 
-export function ReactionOptimizationHandoffCard({
+function ReactionOptimizationHandoffCardInner({
   dossierId,
   reactionProjectId,
   compoundId = null,
@@ -293,5 +294,20 @@ export function ReactionOptimizationHandoffCard({
         </Collapsible>
       </CardContent>
     </Card>
+  )
+}
+
+/**
+ * Cross-module surface: this belongs to another product.
+ *
+ * The gate wraps rather than early-returns inside ReactionOptimizationHandoffCardInner, so on a deployment
+ * without that product the inner component NEVER MOUNTS — its hooks do not run and its requests
+ * are never made. Hiding the UI while still fetching its data would not be gating.
+ */
+export function ReactionOptimizationHandoffCard(props: React.ComponentProps<typeof ReactionOptimizationHandoffCardInner>) {
+  return (
+    <ModuleGate module="reaction_optimization" what="Handing this dossier to reaction optimization">
+      <ReactionOptimizationHandoffCardInner {...props} />
+    </ModuleGate>
   )
 }

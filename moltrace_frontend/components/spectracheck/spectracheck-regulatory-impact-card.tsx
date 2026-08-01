@@ -12,6 +12,7 @@ import { DeveloperJsonPanel } from "@/components/spectracheck/spectracheck-resul
 import { ChevronDown } from "lucide-react"
 import { ModuleCard } from "@/components/dashboard/module-card"
 import { AlertCard } from "@/components/dashboard/alert-card"
+import { ModuleGate } from "@/src/lib/modules/module-not-included-tile"
 
 const TOOLTIP =
   "Converts SpectraCheck evidence such as impurity peaks, residual solvent flags, nitrosamine-like signals, qNMR outputs, QC warnings, and AI provenance into regulatory action items for review."
@@ -42,7 +43,7 @@ type Props = {
   evidenceItemIds?: Array<string | number>
 }
 
-export function SpectraCheckRegulatoryImpactCard({ sessionId, evidenceItemIds = [] }: Props) {
+function SpectraCheckRegulatoryImpactCardInner({ sessionId, evidenceItemIds = [] }: Props) {
   const [loading, setLoading] = useState(false)
   const [sending, setSending] = useState(false)
   const [err, setErr] = useState("")
@@ -256,5 +257,20 @@ export function SpectraCheckRegulatoryImpactCard({ sessionId, evidenceItemIds = 
           </CollapsibleContent>
         </Collapsible>
     </ModuleCard>
+  )
+}
+
+/**
+ * Cross-module surface: this belongs to another product.
+ *
+ * The gate wraps rather than early-returns inside SpectraCheckRegulatoryImpactCardInner, so on a deployment
+ * without that product the inner component NEVER MOUNTS — its hooks do not run and its requests
+ * are never made. Hiding the UI while still fetching its data would not be gating.
+ */
+export function SpectraCheckRegulatoryImpactCard(props: React.ComponentProps<typeof SpectraCheckRegulatoryImpactCardInner>) {
+  return (
+    <ModuleGate module="regulatory_hub" what="Regulatory impact of this result">
+      <SpectraCheckRegulatoryImpactCardInner {...props} />
+    </ModuleGate>
   )
 }
