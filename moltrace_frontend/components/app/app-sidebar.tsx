@@ -231,12 +231,11 @@ export function AppSidebar({ collapsed, onToggle }: AppSidebarProps) {
         </div>
 
         {/* Edge handle — the one control that shows or hides the item names.
-            It rides the sidebar's own border at mid-height rather than hiding in
-            the header, so it is in the same place and the same shape whichever
-            state you are in. At rest it is a quiet vertical bar that reads as an
-            edge you can take hold of; on hover or keyboard focus it swells into
-            a chevron chip. Its predecessor only appeared once the rail was
-            already collapsed, which is precisely when it was hardest to find. */}
+            It rides the sidebar's own border, level with the header band, so it
+            sits where the eye already goes on arrival and stays in the same
+            place and the same shape whichever state you are in. Its predecessor
+            only appeared once the rail was already collapsed, which is precisely
+            when it was hardest to find. */}
         <Tooltip>
           <TooltipTrigger asChild>
             <button
@@ -244,7 +243,9 @@ export function AppSidebar({ collapsed, onToggle }: AppSidebarProps) {
               onClick={onToggle}
               aria-label={collapsed ? "Show item names" : "Hide item names"}
               aria-expanded={!collapsed}
-              className="group/edge absolute -right-2.5 top-1/2 z-20 flex h-20 w-5 -translate-y-1/2 cursor-pointer items-center justify-center focus-visible:outline-none"
+              // h-14 matches the header band exactly, so the chip lands on its
+              // vertical centre — level with the wordmark, on the border.
+              className="group/edge absolute -right-2.5 top-0 z-20 flex h-14 w-5 cursor-pointer items-center justify-center focus-visible:outline-none"
             >
               {/* Always a visible chip, never a hidden hover target. An earlier
                   pass had this rest as a faint hairline on the border and only
