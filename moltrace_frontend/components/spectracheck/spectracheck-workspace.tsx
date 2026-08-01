@@ -91,6 +91,10 @@ import {
 import { SessionValueSummaryCard } from "@/components/spectracheck/session-value-summary-card"
 import { SpectraCheckLinkedCompoundCard } from "@/components/spectracheck/spectracheck-linked-compound-card"
 import { SpectraCheckKnowledgeLinksCard } from "@/components/knowledge/knowledge-links-integration"
+import {
+  SpectraCheckSectionNav,
+  type SpectraNavGroup,
+} from "@/components/spectracheck/spectracheck-section-nav"
 import { SpectraCheckSessionControls } from "@/components/spectracheck/spectracheck-session-controls"
 import { SpectraCheckSystemStatusBadges } from "@/components/spectracheck/spectracheck-system-status-badges"
 import type { SessionSaveFeedback } from "@/components/spectracheck/spectracheck-session-controls"
@@ -136,17 +140,27 @@ import {
   Zap,
 } from "lucide-react"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
+import { RAW_DATA_DISCLOSURE } from "@/lib/ui/copy"
 
 // ── Two-tier SpectraCheck section navigation ─────────────────────────────
-// The engine has 13 sections. They group into the structure-elucidation
-// pipeline (orient → input evidence → analyse → output); each multi-section
-// group exposes a persistent secondary tablist so siblings stay visible. The
-// per-section blurb (formerly a hover Tooltip on every tab — which obstructed
-// moving between tabs) is relocated to a single caption line below the nav.
-type SpectraNavSection = { value: string; label: string; desc: string }
-type SpectraNavGroup = { id: string; label: string; sections: SpectraNavSection[] }
-
+// The engine has 13 sections, grouped into the structure-elucidation pipeline
+// (orient → input evidence → analyse → output). The stage is the primary tab
+// and its sections are the secondary tabs; see spectracheck-section-nav.tsx for
+// why the two tiers are split rather than shown as one strip. The per-section
+// blurb (formerly a hover Tooltip on every tab — which obstructed moving
+// between tabs) is a single caption line below the nav.
 const SPECTRACHECK_NAV: SpectraNavGroup[] = [
+  {
+    id: "session",
+    label: "Session",
+    sections: [
+      {
+        value: "tab-session",
+        label: "Session",
+        desc: "Choose the project and sample this work belongs to, load or save a session, and link supporting knowledge records.",
+      },
+    ],
+  },
   {
     id: "start",
     label: "Overview",
@@ -177,7 +191,7 @@ const SPECTRACHECK_NAV: SpectraNavGroup[] = [
   },
   {
     id: "output",
-    label: "Output",
+    label: "Outputs",
     sections: [
       { value: "tab-report", label: "Report", desc: "Prepare a reviewer-ready structure elucidation report with evidence, warnings, provenance, and human approval state." },
       { value: "tab-benchmark", label: "Benchmark", desc: "Run the 5-layer SpectraCheck benchmark — peak-level accuracy, structural ranking, explainability, robustness, regulatory evidence." },
@@ -192,7 +206,6 @@ const SPECTRACHECK_NAV: SpectraNavGroup[] = [
   },
 ]
 
-const SPECTRACHECK_SECTIONS = SPECTRACHECK_NAV.flatMap((g) => g.sections)
 
 const defaultCandidates = `Methanol | CO | starting material
 Ethanol | CCO | proposed
@@ -300,12 +313,6 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
         : SPECTRACHECK_NAV.filter((g) => g.id !== "developer"),
     [developerModeEnabled],
   )
-  const visibleSpectraSections = useMemo(
-    () => visibleSpectraNav.flatMap((g) => g.sections),
-    [visibleSpectraNav],
-  )
-  // Active section's metadata, for the relocated description caption.
-  const activeSpectraSection = SPECTRACHECK_SECTIONS.find((s) => s.value === activeTab)
   const [sessionRecord, setSessionRecord] = useState<unknown>(null)
   const tabStateCtx = useOptionalSpectraCheckTabState()
 
@@ -1109,14 +1116,14 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
     <div className="min-w-0 space-y-6">
       <div className="space-y-1">
         <p
-          className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+          className="font-mono text-[11px] font-bold uppercase tracking-[0.2em]"
           style={{ color: "var(--mt-teal-ink)" }}
         >
           MolTrace · SpectraCheck
         </p>
         <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2">
           <div className="flex min-w-0 flex-wrap items-center gap-2">
-            <h1 className="font-mono text-2xl font-bold tracking-tight">SpectraCheck</h1>
+            <h1 className="font-mono text-2xl font-bold tracking-tight sm:text-3xl">SpectraCheck</h1>
             <InfoTooltip
               className="shrink-0"
               content="SpectraCheck combines NMR and MS evidence to rank candidate structures, surface contradictions, and prepare report-ready results."
@@ -1128,45 +1135,10 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
             <SpectraCheckSystemStatusBadges />
           </div>
         </div>
-        <p className="text-sm text-muted-foreground">
+        <p className="text-base text-muted-foreground">
           Review spectral evidence, structure candidates, contradictions, and human sign-off.
         </p>
       </div>
-
-      <SpectraCheckSessionControls
-        projects={projectsRows}
-        samples={samplesRows}
-        selectedProjectId={selectedProjectId}
-        selectedSampleId={selectedSampleId}
-        onProjectChange={setSelectedProjectId}
-        onSampleChange={setSelectedSampleId}
-        backendSessionId={backendSessionId}
-        sessionIdInput={sessionIdInput}
-        onSessionIdInputChange={setSessionIdInput}
-        reviewState={reviewState}
-        saveFeedback={saveFeedback}
-        saveMessage={saveMessage}
-        busy={sessionBusy}
-        onLoadSession={handleLoadSessionClick}
-        onSaveSession={() => void handleSaveSession()}
-        onNewSession={handleNewSession}
-        onSaveEvidenceQueue={() => void handleSaveEvidenceQueue()}
-        onSaveUnified={() => void handleSaveUnified()}
-        onSaveReview={() => void handleSaveReview()}
-      />
-
-      <SpectraCheckKnowledgeLinksCard backendSessionId={backendSessionId} />
-
-      <AlertCard
-        variant="warning"
-        title="Human review required · local session"
-        description="AI spectral interpretation requires chemist review before final reporting. Session state is stored locally in this browser — not for regulated storage."
-        action={
-          <Button type="button" variant="outline" size="sm" className="shrink-0" onClick={clearSessionEvidence}>
-            Clear session evidence
-          </Button>
-        }
-      />
 
       <SpectraCheckWorkspaceSessionProvider
         value={{
@@ -1180,72 +1152,66 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
       >
       <div className="min-h-0 min-w-0">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full min-w-0">
-        {/* Section nav — one grouped tablist: every section is visible and
-            one click away (this is the engine — power users move fast), but
-            organised into the structure-elucidation pipeline by labelled
-            groups. Arrow / Home / End roam across all sections. The per-section
-            blurb is the caption below (the old per-tab hover tooltip obstructed
-            moving between tabs). Drives the same activeTab the 13 panels read. */}
-        <div className="space-y-2">
-          <div className="min-w-0 overflow-x-auto pb-1 [-webkit-overflow-scrolling:touch]">
-            <div
-              role="tablist"
-              aria-label="SpectraCheck sections"
-              className="inline-flex w-max items-center gap-1 rounded-lg border bg-muted/20 p-1"
-              onKeyDown={(e) => {
-                const all = visibleSpectraSections
-                const idx = all.findIndex((s) => s.value === activeTab)
-                let next: number
-                if (e.key === "ArrowRight" || e.key === "ArrowDown") next = (idx + 1) % all.length
-                else if (e.key === "ArrowLeft" || e.key === "ArrowUp") next = (idx - 1 + all.length) % all.length
-                else if (e.key === "Home") next = 0
-                else if (e.key === "End") next = all.length - 1
-                else return
-                e.preventDefault()
-                setActiveTab(all[next].value)
-                e.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]')[next]?.focus()
-              }}
-            >
-              {visibleSpectraNav.map((g, gi) => (
-                <div key={g.id} className="inline-flex items-center gap-1">
-                  {gi > 0 ? <span aria-hidden className="mx-1 h-5 w-px shrink-0 bg-border" /> : null}
-                  <span
-                    aria-hidden
-                    className="shrink-0 px-1 font-mono text-[9px] font-bold uppercase tracking-[0.12em] text-muted-foreground/70"
-                  >
-                    {g.label}
-                  </span>
-                  {g.sections.map((s) => {
-                    const on = activeTab === s.value
-                    return (
-                      <button
-                        key={s.value}
-                        type="button"
-                        role="tab"
-                        aria-selected={on}
-                        tabIndex={on ? 0 : -1}
-                        data-testid={`spectracheck-tab-${s.value}`}
-                        onClick={() => setActiveTab(s.value)}
-                        className={cn(
-                          "inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-md px-2.5 py-1 font-mono text-xs transition-colors",
-                          on
-                            ? "[background-color:var(--mt-teal)] font-bold text-[#04080F] shadow-sm"
-                            : "text-muted-foreground hover:bg-muted hover:text-foreground",
-                        )}
-                      >
-                        {s.label}
-                      </button>
-                    )
-                  })}
-                </div>
-              ))}
-            </div>
-          </div>
+        {/* Stage nav first: the sections are what a reader navigates by, so they
+            sit directly under the page header rather than below the session
+            controls and standing notices, which used to push them out of the
+            first screenful entirely. */}
+        <SpectraCheckSectionNav
+          groups={visibleSpectraNav}
+          activeValue={activeTab}
+          onSelect={setActiveTab}
+        />
 
-          {activeSpectraSection ? (
-            <p className="text-xs text-muted-foreground">{activeSpectraSection.desc}</p>
-          ) : null}
-        </div>
+        {/* The one thing that does NOT move into the Session tab. It states that
+            AI output needs a chemist's sign-off and that this session is not
+            regulated storage — a claim about every section, which a reader must
+            not have to open a tab to discover. Kept to a single compact strip so
+            it costs almost no vertical space. */}
+        <AlertCard
+          className="mt-5"
+          variant="warning"
+          title="Human review required · local session"
+          description="AI spectral interpretation requires chemist review before final reporting. Session state is stored locally in this browser — not for regulated storage."
+        />
+
+        <TabsContent value="tab-session" className="mt-4 space-y-6">
+          <SpectraCheckSessionControls
+            projects={projectsRows}
+            samples={samplesRows}
+            selectedProjectId={selectedProjectId}
+            selectedSampleId={selectedSampleId}
+            onProjectChange={setSelectedProjectId}
+            onSampleChange={setSelectedSampleId}
+            backendSessionId={backendSessionId}
+            sessionIdInput={sessionIdInput}
+            onSessionIdInputChange={setSessionIdInput}
+            reviewState={reviewState}
+            saveFeedback={saveFeedback}
+            saveMessage={saveMessage}
+            busy={sessionBusy}
+            onLoadSession={handleLoadSessionClick}
+            onSaveSession={() => void handleSaveSession()}
+            onNewSession={handleNewSession}
+            onSaveEvidenceQueue={() => void handleSaveEvidenceQueue()}
+            onSaveUnified={() => void handleSaveUnified()}
+            onSaveReview={() => void handleSaveReview()}
+          />
+
+          <SpectraCheckKnowledgeLinksCard backendSessionId={backendSessionId} />
+
+          {/* The destructive action lives with the session it clears, rather than
+              riding along on the standing notice above. */}
+          <section className="rounded-lg border p-4">
+            <h2 className="font-mono text-base font-bold tracking-tight">Reset this session</h2>
+            <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+              Clears candidates, spectra text, queued evidence, and any unified-confidence or report
+              result held in this browser. Saved sessions are not affected.
+            </p>
+            <Button type="button" variant="outline" size="sm" className="mt-3" onClick={clearSessionEvidence}>
+              Clear session evidence
+            </Button>
+          </section>
+        </TabsContent>
 
         <TabsContent value="tab-overview" className="mt-4 space-y-12">
           {/* ── Section 1 · KPI summary ───────────────────────────────────────────── */}
@@ -1253,12 +1219,12 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
             <div className="flex flex-wrap items-end justify-between gap-3">
               <div className="space-y-1">
                 <p
-                  className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+                  className="font-mono text-[11px] font-bold uppercase tracking-[0.2em]"
                   style={{ color: "var(--mt-teal-ink)" }}
                 >
                   Spectroscopy · At a glance
                 </p>
-                <h2 id="spectracheck-summary-heading" className="font-mono text-xl font-bold tracking-tight">
+                <h2 id="spectracheck-summary-heading" className="font-mono text-2xl font-bold tracking-tight">
                   Analysis summary
                 </h2>
                 <p className="text-sm text-muted-foreground">
@@ -1323,12 +1289,12 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
           <section className="space-y-4" aria-labelledby="spectracheck-evidence-workbench-heading">
             <div className="space-y-1">
               <p
-                className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+                className="font-mono text-[11px] font-bold uppercase tracking-[0.2em]"
                 style={{ color: "var(--mt-teal-ink)" }}
               >
                 Spectroscopy · Triage
               </p>
-              <h2 id="spectracheck-evidence-workbench-heading" className="font-mono text-xl font-bold tracking-tight">
+              <h2 id="spectracheck-evidence-workbench-heading" className="font-mono text-2xl font-bold tracking-tight">
                 Evidence queue preview
               </h2>
               <p className="text-sm text-muted-foreground">
@@ -1377,12 +1343,12 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
           <section className="space-y-4">
             <div className="space-y-1">
               <p
-                className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+                className="font-mono text-[11px] font-bold uppercase tracking-[0.2em]"
                 style={{ color: "var(--mt-teal-ink)" }}
               >
                 Spectroscopy · Session context
               </p>
-              <h2 className="font-mono text-xl font-bold tracking-tight">Saved-session value & linked compound</h2>
+              <h2 className="font-mono text-2xl font-bold tracking-tight">Saved-session value & linked compound</h2>
               <p className="text-sm text-muted-foreground">
                 Snapshot of the current saved session and any compound it is bound to.
               </p>
@@ -1402,12 +1368,12 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
           <section className="space-y-4">
             <div className="space-y-1">
               <p
-                className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+                className="font-mono text-[11px] font-bold uppercase tracking-[0.2em]"
                 style={{ color: "var(--mt-teal-ink)" }}
               >
                 Spectroscopy · How it works
               </p>
-              <h2 className="font-mono text-xl font-bold tracking-tight">Quick orientation</h2>
+              <h2 className="font-mono text-2xl font-bold tracking-tight">Quick orientation</h2>
               <p className="text-sm text-muted-foreground">
                 What the workflow does, and how to read the evidence.
               </p>
@@ -1444,12 +1410,12 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
           <section className="space-y-4">
             <div className="space-y-1">
               <p
-                className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+                className="font-mono text-[11px] font-bold uppercase tracking-[0.2em]"
                 style={{ color: "var(--mt-teal-ink)" }}
               >
                 Spectroscopy · Readiness & impact
               </p>
-              <h2 className="font-mono text-xl font-bold tracking-tight">Evidence, validation & regulatory readiness</h2>
+              <h2 className="font-mono text-2xl font-bold tracking-tight">Evidence, validation & regulatory readiness</h2>
               <p className="text-sm text-muted-foreground">
                 Pre-flight checks across analytical evidence, validation packages, and regulatory exposure.
               </p>
@@ -1465,12 +1431,12 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
           <section className="space-y-4">
             <div className="space-y-1">
               <p
-                className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+                className="font-mono text-[11px] font-bold uppercase tracking-[0.2em]"
                 style={{ color: "var(--mt-teal-ink)" }}
               >
                 Spectroscopy · Activity
               </p>
-              <h2 className="font-mono text-xl font-bold tracking-tight">Uploads, artifacts & recent jobs</h2>
+              <h2 className="font-mono text-2xl font-bold tracking-tight">Uploads, artifacts & recent jobs</h2>
               <p className="text-sm text-muted-foreground">
                 Files attached to this session, downstream artifacts, and the most recent analysis runs.
               </p>
@@ -1489,14 +1455,14 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
           <section aria-labelledby="spectracheck-gsd-telemetry-heading" className="space-y-3">
             <div className="space-y-1">
               <p
-                className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+                className="font-mono text-[11px] font-bold uppercase tracking-[0.2em]"
                 style={{ color: "var(--mt-teal-ink)" }}
               >
                 Spectroscopy · GSD telemetry
               </p>
               <h2
                 id="spectracheck-gsd-telemetry-heading"
-                className="font-mono text-xl font-bold tracking-tight"
+                className="font-mono text-2xl font-bold tracking-tight"
               >
                 Experimental engine usage on your spectra
               </h2>
@@ -1514,12 +1480,12 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div className="space-y-1">
               <p
-                className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+                className="font-mono text-[11px] font-bold uppercase tracking-[0.2em]"
                 style={{ color: "var(--mt-teal-ink)" }}
               >
                 Spectroscopy · Workflow Runner
               </p>
-              <h2 className="font-mono text-xl font-bold tracking-tight">Pre-built analysis pipelines</h2>
+              <h2 className="font-mono text-2xl font-bold tracking-tight">Pre-built analysis pipelines</h2>
               <p className="text-sm text-muted-foreground">
                 Pick a template, then launch it against the current session.
               </p>
@@ -1572,12 +1538,12 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
         <TabsContent value="tab-nmr-text" className="mt-4 space-y-12">
           <div className="space-y-1">
             <p
-              className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+              className="font-mono text-[11px] font-bold uppercase tracking-[0.2em]"
               style={{ color: "var(--mt-teal-ink)" }}
             >
               Spectroscopy · Shared Session
             </p>
-            <h2 className="font-mono text-xl font-bold tracking-tight">NMR text & candidate structures</h2>
+            <h2 className="font-mono text-2xl font-bold tracking-tight">NMR text & candidate structures</h2>
             <p className="text-sm text-muted-foreground">
               These values flow into every analyzer in SpectraCheck. Edit once, use everywhere.
             </p>
@@ -2823,7 +2789,7 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
           {/* ── Section 1 · 1H / 13C evidence match ──────────────────────────────────── */}
           <section className="space-y-6">
             <p
-              className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+              className="font-mono text-[11px] font-bold uppercase tracking-[0.2em]"
               style={{ color: "var(--mt-teal-ink)" }}
             >
               Spectroscopy · Evidence Match
@@ -2977,7 +2943,7 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
           {/* ── Section 2 · Spectral similarity ───────────────────────────────────────── */}
           <section className="space-y-6">
             <p
-              className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+              className="font-mono text-[11px] font-bold uppercase tracking-[0.2em]"
               style={{ color: "var(--mt-teal-ink)" }}
             >
               Spectroscopy · Similarity
@@ -3336,7 +3302,7 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
           {/* ── Section 3 · Candidate compare ─────────────────────────────────────────── */}
           <section className="space-y-6">
             <p
-              className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+              className="font-mono text-[11px] font-bold uppercase tracking-[0.2em]"
               style={{ color: "var(--mt-teal-ink)" }}
             >
               Spectroscopy · Candidate Compare
@@ -3695,12 +3661,12 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
         <TabsContent value="tab-evidence-queue" className="mt-4 space-y-8">
           <div className="space-y-1">
             <p
-              className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+              className="font-mono text-[11px] font-bold uppercase tracking-[0.2em]"
               style={{ color: "var(--mt-teal-ink)" }}
             >
               Spectroscopy · Review Queue
             </p>
-            <h2 className="font-mono text-xl font-bold tracking-tight">AI Evidence Queue</h2>
+            <h2 className="font-mono text-2xl font-bold tracking-tight">AI Evidence Queue</h2>
             <p className="text-sm text-muted-foreground">
               Triage queued spectral evidence, resolve contradictions, and promote items to the Unified Evidence build.
             </p>
@@ -3715,12 +3681,12 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div className="space-y-1">
               <p
-                className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+                className="font-mono text-[11px] font-bold uppercase tracking-[0.2em]"
                 style={{ color: "var(--mt-teal-ink)" }}
               >
                 Spectroscopy · Unified Evidence
               </p>
-              <h2 className="font-mono text-xl font-bold tracking-tight">Cross-modal evidence build</h2>
+              <h2 className="font-mono text-2xl font-bold tracking-tight">Cross-modal evidence build</h2>
               <p className="text-sm text-muted-foreground">
                 Combine queued evidence across NMR, MS, and predicted layers into a single unified confidence package.
               </p>
@@ -3731,7 +3697,7 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
           {/* Regulatory impact */}
           <section className="space-y-3">
             <p
-              className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+              className="font-mono text-[11px] font-bold uppercase tracking-[0.2em]"
               style={{ color: "var(--mt-teal-ink)" }}
             >
               Unified · Regulatory impact
@@ -3742,7 +3708,7 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
           {/* Evidence queue summary */}
           <section className="space-y-3">
             <p
-              className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+              className="font-mono text-[11px] font-bold uppercase tracking-[0.2em]"
               style={{ color: "var(--mt-teal-ink)" }}
             >
               Unified · Queue summary
@@ -3753,7 +3719,7 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
           {/* Confidence suite (unified-only) */}
           <section className="space-y-3">
             <p
-              className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+              className="font-mono text-[11px] font-bold uppercase tracking-[0.2em]"
               style={{ color: "var(--mt-teal-ink)" }}
             >
               Unified · Confidence build
@@ -3773,7 +3739,7 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
           {/* Review collaboration */}
           <section className="space-y-3">
             <p
-              className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+              className="font-mono text-[11px] font-bold uppercase tracking-[0.2em]"
               style={{ color: "var(--mt-teal-ink)" }}
             >
               Unified · Review & collaboration
@@ -3786,12 +3752,12 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div className="space-y-1">
               <p
-                className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+                className="font-mono text-[11px] font-bold uppercase tracking-[0.2em]"
                 style={{ color: "var(--mt-teal-ink)" }}
               >
                 Spectroscopy · Report
               </p>
-              <h2 className="font-mono text-xl font-bold tracking-tight">Reviewer-ready report</h2>
+              <h2 className="font-mono text-2xl font-bold tracking-tight">Reviewer-ready report</h2>
               <p className="text-sm text-muted-foreground">
                 Generate, preview, and finalize the SpectraCheck report — ready for downstream review and sign-off.
               </p>
@@ -3802,7 +3768,7 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
           {/* Confidence suite (report-only) */}
           <section className="space-y-3">
             <p
-              className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+              className="font-mono text-[11px] font-bold uppercase tracking-[0.2em]"
               style={{ color: "var(--mt-teal-ink)" }}
             >
               Report · Build & preview
@@ -3822,7 +3788,7 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
           {/* Review collaboration */}
           <section className="space-y-3">
             <p
-              className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+              className="font-mono text-[11px] font-bold uppercase tracking-[0.2em]"
               style={{ color: "var(--mt-teal-ink)" }}
             >
               Report · Review & collaboration
@@ -3839,12 +3805,12 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
           <DeveloperOnly>
           <div className="space-y-1">
             <p
-              className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+              className="font-mono text-[11px] font-bold uppercase tracking-[0.2em]"
               style={{ color: "var(--mt-teal-ink)" }}
             >
               Spectroscopy · Developer JSON
             </p>
-            <h2 className="inline-flex items-center gap-2 font-mono text-xl font-bold tracking-tight">
+            <h2 className="inline-flex items-center gap-2 font-mono text-2xl font-bold tracking-tight">
               JSON snapshot hub
               <InfoTooltip
                 content="Use this for troubleshooting result shape, warnings, and raw evidence data."
@@ -3900,7 +3866,7 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
           <ModuleCard
             accent="teal"
             eyebrow="Dev JSON · Step 2 · Raw results"
-            title="Raw data (for troubleshooting)"
+            title={RAW_DATA_DISCLOSURE}
             icon={FileText}
             description="Each panel below holds the most recent raw result for a single analysis step."
             className="min-w-0"
