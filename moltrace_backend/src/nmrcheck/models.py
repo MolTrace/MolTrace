@@ -7178,6 +7178,7 @@ class CompoundRegistrySearchRequest(BaseModel):
     registry_id: str | None = Field(default=None, max_length=160)
     inchikey: str | None = Field(default=None, max_length=64)
     formula: str | None = Field(default=None, max_length=120)
+    compound_type: CompoundType | None = None
     exact_mass_min: float | None = Field(default=None, ge=0)
     exact_mass_max: float | None = Field(default=None, ge=0)
     metadata_json: dict[str, Any] | None = None

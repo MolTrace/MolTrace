@@ -309,3 +309,60 @@ def test_compound_registry_endpoints_appear_in_openapi(client):
         "ScientificKnowledgeGraphEdge",
     ]:
         assert schema_name in schemas
+
+
+def test_compound_registry_search_filters_by_compound_type(client, api_headers):
+    headers = api_headers
+    with client:
+        product = client.post(
+            "/compound-registry/compounds",
+            headers=headers,
+            json={
+                "preferred_name": "Type-filter product",
+                "compound_type": "product",
+                "original_structure_input": "OCC",
+                "original_structure_format": "smiles",
+            },
+        )
+        assert product.status_code == 201, product.text
+        product_id = product.json()["id"]
+
+        impurity = client.post(
+            "/compound-registry/compounds",
+            headers=headers,
+            json={
+                "preferred_name": "Type-filter impurity",
+                "compound_type": "impurity",
+                "original_structure_input": "CC=O",
+                "original_structure_format": "smiles",
+            },
+        )
+        assert impurity.status_code == 201, impurity.text
+        impurity_id = impurity.json()["id"]
+
+        # A valid compound_type is accepted and actually restricts the results.
+        filtered = client.post(
+            "/compound-registry/search",
+            headers=headers,
+            json={"compound_type": "impurity"},
+        )
+        assert filtered.status_code == 200, filtered.text
+        ids = {row["id"] for row in filtered.json()["compounds"]}
+        assert impurity_id in ids
+        assert product_id not in ids
+
+        # An invalid compound_type is rejected by the Literal (not silently ignored).
+        bad_value = client.post(
+            "/compound-registry/search",
+            headers=headers,
+            json={"compound_type": "not_a_real_type"},
+        )
+        assert bad_value.status_code == 422, bad_value.text
+
+        # extra="forbid" still rejects unknown keys — the guard is not weakened.
+        unknown_field = client.post(
+            "/compound-registry/search",
+            headers=headers,
+            json={"bogus_field": "x"},
+        )
+        assert unknown_field.status_code == 422, unknown_field.text

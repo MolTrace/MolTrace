@@ -17160,6 +17160,8 @@ export interface components {
             inchikey?: string | null;
             /** Formula */
             formula?: string | null;
+            /** Compound Type */
+            compound_type?: ("target" | "product" | "starting_material" | "reagent" | "impurity" | "intermediate" | "metabolite" | "unknown" | "reference_standard" | "other") | null;
             /** Exact Mass Min */
             exact_mass_min?: number | null;
             /** Exact Mass Max */
