@@ -25,20 +25,30 @@ import type { Ketcher } from "ketcher-core"
 const structServiceProvider = new StandaloneStructServiceProvider()
 
 export type StructureSnapshot = {
-  /** MDL molfile — the lossless form, and what the registry stores. */
-  molfile: string
+  /**
+   * The lossless form, and what the registry should store: an MDL molfile for a
+   * single structure, an MDL RXN block for a reaction. Which one it is, is in
+   * `format` — a reaction is NOT a molfile, and asking the engine for one
+   * throws outright ("cannot be saved as *.MOL due to reaction arrows").
+   */
+  block: string
+  format: "mol" | "rxn"
   /** Daylight SMILES, for display and quick comparison. Empty when unavailable. */
   smiles: string
-  /** True when the canvas holds a reaction (has an arrow), not a single structure. */
-  isReaction: boolean
+}
+
+/** What the panel can do to a live canvas once the engine has started. */
+export type StructureEditorApi = {
+  /** Accepts molfile, RXN, SMILES, or CXSMILES — the engine sniffs the format. */
+  load: (text: string) => Promise<void>
 }
 
 type Props = {
   /** Fired whenever the reader asks to capture what they have drawn. */
   onCapture: (snapshot: StructureSnapshot) => void
   onError: (message: string) => void
-  /** Called once the engine is ready, so the panel can drop its loading state. */
-  onReady?: () => void
+  /** Called once the engine is ready, handing back the imperative entry points. */
+  onReady?: (api: StructureEditorApi) => void
 }
 
 export function StructureEditorCanvas({ onCapture, onError, onReady }: Props) {
@@ -55,7 +65,14 @@ export function StructureEditorCanvas({ onCapture, onError, onReady }: Props) {
       // upstream: this is a chemistry sandbox, not an authority. Nothing drawn
       // here is trusted until it has been through the chemistry service.
       ;(window as unknown as { ketcher?: Ketcher }).ketcher = ketcher
-      onReady?.()
+      onReady?.({
+        load: async (text: string) => {
+          // One entry point for every inbound format: the engine sniffs molfile
+          // vs RXN vs SMILES vs CXSMILES itself, so the panel never has to guess
+          // from a file extension — which lies often enough to matter.
+          await ketcher.setMolecule(text)
+        },
+      })
     },
     [onReady],
   )
@@ -68,9 +85,17 @@ export function StructureEditorCanvas({ onCapture, onError, onReady }: Props) {
     }
     setBusy(true)
     try {
-      const molfile = await ketcher.getMolfile()
+      // Ask the editor which it is, then ask for THAT format. getMolfile()
+      // throws on anything with a reaction arrow, so a Reaction Studio that
+      // always reached for a molfile could never capture the very thing it is
+      // named after.
+      const isReaction =
+        typeof ketcher.containsReaction === "function" ? Boolean(ketcher.containsReaction()) : false
+      const format: StructureSnapshot["format"] = isReaction ? "rxn" : "mol"
+      const block = isReaction ? await ketcher.getRxn() : await ketcher.getMolfile()
+
       // SMILES generation fails on some valid-but-exotic drawings (query atoms,
-      // R-groups). That is not a reason to lose the molfile, which is the form
+      // R-groups). That is not a reason to lose the block, which is the form
       // that actually round-trips — so degrade rather than reject.
       let smiles = ""
       try {
@@ -78,17 +103,12 @@ export function StructureEditorCanvas({ onCapture, onError, onReady }: Props) {
       } catch {
         smiles = ""
       }
-      // Ask the editor rather than sniffing the molfile text: it knows whether
-      // the canvas holds a reaction, and a regex over V2000/V3000 headers would
-      // be guessing at two formats at once.
-      const isReaction =
-        typeof ketcher.containsReaction === "function" ? Boolean(ketcher.containsReaction()) : false
 
-      if (!molfile.trim()) {
+      if (!block.trim()) {
         onError("There is nothing on the canvas yet.")
         return
       }
-      onCapture({ molfile, smiles, isReaction })
+      onCapture({ block, format, smiles })
     } catch (err) {
       onError(err instanceof Error ? err.message : "Could not read the drawing from the canvas.")
     } finally {
