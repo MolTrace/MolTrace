@@ -35,6 +35,7 @@ import {
   type EvidenceQueueCard,
   type WorkflowRunStatusCounts,
 } from "@/src/lib/dashboard/overview-metrics"
+import { useIncludedModules } from "@/src/lib/modules/included-modules-provider"
 
 export type OverviewDataContextValue = {
   loading: boolean
@@ -85,10 +86,18 @@ const EMPTY_OVERVIEW_SNAPSHOT: OverviewSnapshot = {
   workflowRunsDataAvailable: false,
 }
 
-async function fetchOverviewSnapshot(): Promise<OverviewSnapshot> {
+/**
+ * Shell-wide snapshot, fetched on every page.
+ *
+ * `includesSpectraCheck` gates the SpectraCheck sessions request: on a deployment that does not
+ * serve it, that route is refused, and a UI that hides the product while still requesting its
+ * data has not actually been gated. Defaults to true so an unknown capability readout keeps
+ * today's behaviour.
+ */
+async function fetchOverviewSnapshot(includesSpectraCheck = true): Promise<OverviewSnapshot> {
   const [pr, sr, jr, wr] = await Promise.allSettled([
     apiFetch<unknown>("/projects", { method: "GET" }),
-    fetchSpectraCheckSessionsList(),
+    includesSpectraCheck ? fetchSpectraCheckSessionsList() : Promise.reject(new Error("not included")),
     apiFetch<unknown>("/jobs", { method: "GET" }),
     apiFetch<unknown>("/workflow-runs", { method: "GET" }),
   ])
@@ -105,6 +114,7 @@ async function fetchOverviewSnapshot(): Promise<OverviewSnapshot> {
 }
 
 export function OverviewDataProvider({ children }: { children: ReactNode }) {
+  const { isIncluded } = useIncludedModules()
   // The shell is re-created on every top-level route change (each page renders
   // its own <AppShell>), so seed from the cross-navigation snapshot instead of
   // re-issuing all four requests and flashing a loading state on every tap.
@@ -130,7 +140,9 @@ export function OverviewDataProvider({ children }: { children: ReactNode }) {
     if (readShellSnapshot<OverviewSnapshot>(SHELL_SNAPSHOT_KEYS.overviewData) == null) {
       setLoading(true)
     }
-    void loadShellSnapshot(SHELL_SNAPSHOT_KEYS.overviewData, fetchOverviewSnapshot).then((next) => {
+    void loadShellSnapshot(SHELL_SNAPSHOT_KEYS.overviewData, () =>
+      fetchOverviewSnapshot(isIncluded("spectracheck")),
+    ).then((next) => {
       if (!active) return
       setProjects(next.projects)
       setProjectsDataAvailable(next.projectsDataAvailable)
@@ -145,7 +157,7 @@ export function OverviewDataProvider({ children }: { children: ReactNode }) {
     return () => {
       active = false
     }
-  }, [])
+  }, [isIncluded])
 
   const value = useMemo((): OverviewDataContextValue => {
     const projectById = buildProjectNameIndex(projects)

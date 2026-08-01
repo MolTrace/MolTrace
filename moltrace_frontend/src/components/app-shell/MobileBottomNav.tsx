@@ -27,6 +27,7 @@ import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 import { cn } from "@/lib/utils"
 import { useTenant } from "@/src/lib/tenant/tenant-context"
+import { useIncludedModules } from "@/src/lib/modules/included-modules-provider"
 
 type PrimaryNavItem = {
   href: string
@@ -104,6 +105,8 @@ function NavItemPendingSurface() {
 }
 
 export function MobileBottomNav() {
+  // Only offer what the deployment serves — routes for an unlicensed product 403.
+  const { isRouteOffered } = useIncludedModules()
   const pathname = usePathname()
   const { isAdmin } = useTenant()
   // The "More" sheet is CONTROLLED so it can be dismissed the instant a
@@ -118,8 +121,11 @@ export function MobileBottomNav() {
   // still settling competes with it on a phone's single slow connection.
   const [prefetchArmed, setPrefetchArmed] = useState(false)
   const moreNavItems = useMemo(
-    () => (isAdmin ? [...baseMoreNavItems, ...adminMoreNavItems] : baseMoreNavItems),
-    [isAdmin],
+    () =>
+      (isAdmin ? [...baseMoreNavItems, ...adminMoreNavItems] : baseMoreNavItems).filter((i) =>
+        isRouteOffered(i.href),
+      ),
+    [isAdmin, isRouteOffered],
   )
   const moreActive = useMemo(
     () => moreNavItems.some((item) => pathname === hrefPath(item.href) || pathname.startsWith(`${hrefPath(item.href)}/`)),
@@ -162,7 +168,7 @@ export function MobileBottomNav() {
           ``w-full`` (cell-wide) + ``text-center`` so it stays centred but
           can clip overflow with an ellipsis. */}
       <div className="mx-auto grid max-w-screen-sm grid-cols-6 gap-1 px-2 pt-2 pb-[calc(env(safe-area-inset-bottom)+0.5rem)]">
-        {primaryNavItems.map((item) => {
+        {primaryNavItems.filter((item) => isRouteOffered(item.href)).map((item) => {
           const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`)
           return (
             <Link
