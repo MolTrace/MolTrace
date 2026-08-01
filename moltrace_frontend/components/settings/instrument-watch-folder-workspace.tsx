@@ -244,7 +244,7 @@ export function InstrumentWatchFolderWorkspace() {
         body: {
           connector_id: connectorId,
           folder_path: folderPath.trim(),
-          file_patterns: filePatterns.trim(),
+          file_patterns_json: filePatterns.trim() ? filePatterns.split(/[,\s]+/).filter(Boolean) : ["*"],
           recursive,
           target_program: targetProgram,
           target_route: targetRoute,
@@ -271,7 +271,7 @@ export function InstrumentWatchFolderWorkspace() {
         body: {
           connector_id: connectorId,
           folder_path: folderPath.trim(),
-          file_patterns: filePatterns.trim(),
+          file_patterns_json: filePatterns.trim() ? filePatterns.split(/[,\s]+/).filter(Boolean) : ["*"],
           recursive,
           target_program: targetProgram,
           target_route: targetRoute,
@@ -292,7 +292,7 @@ export function InstrumentWatchFolderWorkspace() {
     setScanBusy(true)
     setDetailsError("")
     try {
-      const payload = await apiFetch<unknown>(`/instrument-watch-folders/${selectedWatchFolderId}/scan`, { method: "POST" })
+      const payload = await apiFetch<unknown>(`/instrument-watch-folders/${selectedWatchFolderId}/scan`, { method: "POST", body: {} })
       const rec = isRecord(payload) ? payload : {}
       const warningCount =
         Array.isArray(rec.warnings) ? rec.warnings.filter((item) => typeof item === "string" && item.trim()).length : 0

@@ -237,7 +237,8 @@ export function TeamSettingsWorkspace() {
     setInviteInfo("")
     try {
       const body: Record<string, unknown> = {
-        email,
+        // OrganizationMember invite model (extra="forbid") field is user_email.
+        user_email: email,
         role: inviteRole,
       }
       const dn = inviteDisplayName.trim()
