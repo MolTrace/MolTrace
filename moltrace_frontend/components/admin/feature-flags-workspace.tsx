@@ -170,6 +170,7 @@ export function FeatureFlagsWorkspace() {
 
   const [flagKey, setFlagKey] = useState("")
   const [flagDisplayName, setFlagDisplayName] = useState("")
+  const [flagDescription, setFlagDescription] = useState("")
   const [flagProgram, setFlagProgram] = useState<(typeof PROGRAM_OPTIONS)[number]>("spectracheck")
   const [flagDefaultEnabled, setFlagDefaultEnabled] = useState("false")
   const [flagRolloutRules, setFlagRolloutRules] = useState<Record<string, unknown>>({})
@@ -249,6 +250,7 @@ export function FeatureFlagsWorkspace() {
         body: {
           flag_key: flagKey.trim(),
           display_name: flagDisplayName.trim(),
+          description: flagDescription.trim(),
           program: flagProgram,
           default_enabled: flagDefaultEnabled === "true",
           rollout_rules_json: flagRolloutRules,
@@ -262,6 +264,7 @@ export function FeatureFlagsWorkspace() {
       })
       setFlagKey("")
       setFlagDisplayName("")
+      setFlagDescription("")
       setFlagProgram("spectracheck")
       setFlagDefaultEnabled("false")
       setFlagRolloutRules({})
@@ -528,6 +531,16 @@ export function FeatureFlagsWorkspace() {
                 onChange={(event) => setFlagDisplayName(event.target.value)}
               />
             </div>
+            <div className="space-y-1 sm:col-span-2">
+              <Label htmlFor="feature-flag-description">Description</Label>
+              <Textarea
+                id="feature-flag-description"
+                value={flagDescription}
+                onChange={(event) => setFlagDescription(event.target.value)}
+                rows={2}
+              />
+              <p className="text-xs text-muted-foreground">What this flag controls. Required.</p>
+            </div>
             <div className="space-y-1">
               <Label htmlFor="feature-flag-program">Program</Label>
               <Select value={flagProgram} onValueChange={(value) => setFlagProgram(value as typeof flagProgram)}>
@@ -582,7 +595,11 @@ export function FeatureFlagsWorkspace() {
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button type="button" disabled={flagBusy} onClick={() => void createFeatureFlag()}>
+            <Button
+              type="button"
+              disabled={flagBusy || !flagKey.trim() || !flagDisplayName.trim() || !flagDescription.trim()}
+              onClick={() => void createFeatureFlag()}
+            >
               {flagBusy ? "Creating..." : "Create feature flag"}
             </Button>
             <Button type="button" variant="outline" disabled={loading} onClick={() => void load()}>
