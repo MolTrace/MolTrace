@@ -67,12 +67,16 @@ export function AlertCard({
     <div
       role={role}
       className={cn(
-        "rounded-r-lg border border-border/40 px-4 py-3 text-sm",
+        "@container/alert rounded-r-lg border border-border/40 px-4 py-3 text-sm",
         className,
       )}
       style={style}
     >
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+      {/* Sizes against its OWN width, not the viewport's. With a viewport
+          breakpoint, an alert placed in a half-width column on a desktop screen
+          still took the wide layout: the action stayed pinned beside the text
+          and squeezed the description down to roughly one word per line. */}
+      <div className="flex flex-col gap-2 @md/alert:flex-row @md/alert:items-start @md/alert:justify-between">
         <div className="flex min-w-0 items-start gap-3">
           <Icon
             className="h-4 w-4 shrink-0 translate-y-0.5"

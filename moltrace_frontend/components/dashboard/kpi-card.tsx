@@ -63,25 +63,33 @@ export function KpiCard({
   const card = (
     <Card
       className={cn(
-        "h-full overflow-hidden rounded-xl py-0 transition-all duration-200",
+        "@container/kpi h-full overflow-hidden rounded-xl py-0 transition-all duration-200",
         SEVERITY_CARD_CLASS[severity],
         interactive && "hover:-translate-y-px hover:border-foreground/20 hover:shadow-md",
       )}
       style={cardStyle}
     >
-      <CardHeader className="flex flex-row items-center justify-between gap-2 pt-5 pb-2">
-        <CardTitle className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+      {/* 10px uppercase labels read as decoration rather than as the name of the
+          number under them; 12px with tighter tracking keeps the same compact
+          look while staying legible at arm's length. */}
+      <CardHeader className="flex flex-row items-center justify-between gap-2 pt-6 pb-2">
+        <CardTitle className="text-xs font-semibold uppercase tracking-[0.11em] text-muted-foreground">
           {title}
         </CardTitle>
         <Icon
-          className="h-4 w-4 shrink-0"
+          className="h-[18px] w-[18px] shrink-0"
           style={{ color: stripeColor }}
           aria-hidden
         />
       </CardHeader>
-      <CardContent className="pb-5">
+      <CardContent className="pb-6">
+        {/* Steps up only once the card is wide enough to hold it. These cards
+            sit in a 4-column grid on some pages and a 5-column grid on others,
+            and a flat 4xl clipped the widest values ("94.2%") in the narrower
+            one. Keyed to the card, not the viewport, so the grid it happens to
+            be in is what decides. */}
         <div
-          className="font-mono text-3xl font-bold leading-none tracking-tight tabular-nums"
+          className="font-mono text-3xl font-bold leading-none tracking-tight tabular-nums @[11rem]/kpi:text-4xl"
           style={{ color: stripeColor }}
         >
           {value}
