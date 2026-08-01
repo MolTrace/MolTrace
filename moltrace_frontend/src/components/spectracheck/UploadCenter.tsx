@@ -40,6 +40,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { RAW_DATA_DISCLOSURE } from "@/lib/ui/copy"
 
 const FILE_KIND_OPTIONS = [
   "processed_nmr",
@@ -641,7 +642,7 @@ export function UploadCenter({ sessionId = null, onUseFile }: Props) {
                     )}
                   </div>
                   <details className="sm:col-span-2 rounded-md border p-2">
-                    <summary className="cursor-pointer text-xs font-medium">Raw data (for troubleshooting)</summary>
+                    <summary className="cursor-pointer text-xs font-medium">{RAW_DATA_DISCLOSURE}</summary>
                     <pre className="mt-2 overflow-x-auto text-[10px]">{JSON.stringify(connectorImportResult, null, 2)}</pre>
                   </details>
                 </CardContent>

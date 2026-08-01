@@ -25,6 +25,7 @@ import {
   Plus,
   RotateCcw,
 } from "lucide-react"
+import { PLOT_DOWNLOAD_PNG_HINT, PLOT_DOWNSAMPLED_NOTE } from "@/lib/ui/copy"
 
 const Plot = dynamic(() => import("react-plotly.js"), { ssr: false }) as React.ComponentType<
   Record<string, unknown>
@@ -639,7 +640,7 @@ export function SpectrumViewer1D({
             </Button>
           </TooltipTrigger>
           <TooltipContent side="bottom">
-            <p className="max-w-xs">Download the current plot as a PNG image.</p>
+            <p className="max-w-xs">{PLOT_DOWNLOAD_PNG_HINT}</p>
           </TooltipContent>
         </Tooltip>
           </>
@@ -752,7 +753,7 @@ export function SpectrumViewer1D({
         />
       </div>
       {isDisplayDownsampled ? (
-        <p className="text-xs text-muted-foreground">Display downsampled on mobile. Full resolution available on desktop.</p>
+        <p className="text-xs text-muted-foreground">{PLOT_DOWNSAMPLED_NOTE}</p>
       ) : null}
     </div>
   )

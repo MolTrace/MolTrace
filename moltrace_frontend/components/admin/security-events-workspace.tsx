@@ -32,6 +32,7 @@ import {
   ShieldAlert,
   ServerOff,
 } from "lucide-react"
+import { RAW_DATA_DISCLOSURE } from "@/lib/ui/copy"
 
 const SECURITY_EVENTS_TOOLTIP =
   "Security events record authentication, permission, sharing, admin, and suspicious activity signals."
@@ -555,7 +556,7 @@ export function SecurityEventsWorkspace() {
       {/* 4. Raw data, developer-mode only */}
       <DeveloperOnly>
         <div>
-          <h2 className="mb-3 text-sm font-medium text-muted-foreground">Raw data (for troubleshooting)</h2>
+          <h2 className="mb-3 text-sm font-medium text-muted-foreground">{RAW_DATA_DISCLOSURE}</h2>
           <Collapsible className="group rounded-md border">
             <CollapsibleTrigger className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm font-medium hover:bg-muted/50">
               Raw security records (sensitive values redacted)

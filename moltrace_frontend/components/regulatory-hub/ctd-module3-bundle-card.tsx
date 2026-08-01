@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { InfoTooltip } from "@/components/ui/info-tooltip"
 import { ChevronDown, Loader2 } from "lucide-react"
+import { RAW_DATA_DISCLOSURE } from "@/lib/ui/copy"
 
 type Props = {
   dossierId: number
@@ -239,7 +240,7 @@ export function CtdModule3BundleCard({ dossierId }: Props) {
 
             <Collapsible className="rounded-md border">
               <CollapsibleTrigger className="flex w-full items-center justify-between px-3 py-2 text-left text-xs font-medium hover:bg-muted/50">
-                Raw data (for troubleshooting)
+                {RAW_DATA_DISCLOSURE}
                 <ChevronDown className="h-4 w-4" />
               </CollapsibleTrigger>
               <CollapsibleContent className="border-t px-3 py-3">

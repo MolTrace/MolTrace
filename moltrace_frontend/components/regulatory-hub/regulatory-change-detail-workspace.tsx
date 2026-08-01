@@ -42,6 +42,7 @@ import {
   ScrollText,
   Tag,
 } from "lucide-react"
+import { RAW_DATA_DISCLOSURE } from "@/lib/ui/copy"
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return Boolean(v) && typeof v === "object" && !Array.isArray(v)
@@ -764,7 +765,7 @@ export function RegulatoryChangeDetailWorkspace({ changeId }: { changeId: number
         <ModuleCard
           accent="cyan"
           eyebrow="Audit"
-          title="Raw data (for troubleshooting)"
+          title={RAW_DATA_DISCLOSURE}
           icon={FileSearch}
           description="Collapsed raw records kept for troubleshooting and audit."
         >
