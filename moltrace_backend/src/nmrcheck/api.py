@@ -95,6 +95,7 @@ from . import reaction_retro_store as reaction_retro_store
 from . import reaction_regulatory_compliance as reaction_regulatory_compliance
 from . import reaction_safety as reaction_safety
 from . import reaction_store as reaction_store
+from . import reaction_structures as reaction_structures
 from . import reaction_yield_store as reaction_yield_store
 from . import regulatory_compliance_store as compliance_store
 from . import regulatory_intelligence as regulatory_store
@@ -687,6 +688,9 @@ from .models import (
     ReactionSafetyReviewRequest,
     ReactionSafetyScreening,
     ReactionSafetyScreenRequest,
+    ReactionStructureScheme,
+    ReactionStructureSchemeCreate,
+    ReactionStructureSchemeDeleteRequest,
     ReactionVariable,
     ReactionVariableCreate,
     ReactionVariableUpdate,
@@ -858,7 +862,11 @@ from .models import (
     StoredReportRecord,
     StructureElucidationReportRequest,
     StructureElucidationReportResult,
+    StructureSmartsMatchRequest,
+    StructureSmartsMatchResponse,
     StructureSummary,
+    StructureValidateRequest,
+    StructureValidateResponse,
     SubscriptionPlan,
     SubscriptionPlanCreate,
     SystemCapabilities,
@@ -2425,6 +2433,10 @@ def _reaction_actor(context: AccessContext) -> reaction_store.ReactionActor:
 def _raise_reaction_http_error(exc: Exception) -> None:
     if isinstance(exc, KeyError):
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+    if isinstance(exc, alcoa.ReasonForChangeRequired):
+        # Matches the controlled-record mapping: a missing/blank why is a validation failure,
+        # not a generic bad request.
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     if isinstance(exc, reaction_safety.ReactionSafetyGateBlockedError):
         # Subclass of ReactionError — must be checked first so it maps to 409, not 400.
         raise HTTPException(status_code=409, detail=str(exc)) from exc
@@ -4307,6 +4319,156 @@ def review_reaction_safety_screening_route(
     if record is None:
         raise HTTPException(status_code=404, detail="Reaction safety screening not found.")
     return record
+
+
+# --- Structure & reaction scheme service: RDKit is the authority, the editor is the pencil ---
+# The drawing canvas captures an MDL molfile or RXN block in the browser. These routes are where
+# that drawing meets the same chemistry engine every other MolTrace decision runs on. Validation
+# is deliberately stateless and project-independent — a chemist checks a structure long before
+# deciding it belongs to a project — so it carries authentication but no owner gate.
+@router.post(
+    "/reactions/structures/validate",
+    response_model=StructureValidateResponse,
+    dependencies=[Depends(require_access_context)],
+)
+def validate_structure_route(
+    payload: StructureValidateRequest,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> StructureValidateResponse:
+    """Check a captured drawing with RDKit and report what it is — and what checking changed.
+
+    A structure that fails its chemistry checks still answers 200: the verdict is in the body,
+    because "is this sound?" answered with "no" is a successful question, not a failed request.
+    """
+    verdict = reaction_structures.validate_structure(
+        block=payload.block, fmt=payload.format, smiles=payload.smiles
+    )
+    return StructureValidateResponse.model_validate(verdict)
+
+
+@router.post(
+    "/reactions/structures/smarts-match",
+    response_model=StructureSmartsMatchResponse,
+    dependencies=[Depends(require_access_context)],
+)
+def smarts_match_structures_route(
+    payload: StructureSmartsMatchRequest,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> StructureSmartsMatchResponse:
+    """Match a query structure against target structures, on the R6 safety screen's engine."""
+    try:
+        result = reaction_structures.match_smarts(
+            smarts=payload.smarts, targets=payload.targets
+        )
+    except Exception as exc:
+        _raise_reaction_http_error(exc)
+        raise
+    return StructureSmartsMatchResponse.model_validate(result)
+
+
+@router.post(
+    "/reaction-projects/{reaction_project_id}/schemes",
+    response_model=ReactionStructureScheme,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
+)
+def create_reaction_structure_scheme_route(
+    reaction_project_id: int,
+    payload: ReactionStructureSchemeCreate,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> ReactionStructureScheme:
+    """Attach a captured drawing to a reaction project, storing the original and the normalized form."""
+    try:
+        record = reaction_structures.create_scheme(
+            _state(request).session_factory,
+            reaction_project_id,
+            payload,
+            actor=_reaction_actor(context),
+        )
+    except Exception as exc:
+        _raise_reaction_http_error(exc)
+        raise
+    return ReactionStructureScheme.model_validate(record)
+
+
+@router.get(
+    "/reaction-projects/{reaction_project_id}/schemes",
+    response_model=list[ReactionStructureScheme],
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
+)
+def list_reaction_structure_schemes_route(
+    reaction_project_id: int,
+    request: Request,
+    include_deleted: bool = Query(default=False),
+    context: AccessContext = Depends(require_access_context),
+) -> list[ReactionStructureScheme]:
+    # ALCOA+: archived schemes are retained, not destroyed, and are excluded from the default
+    # read; include_deleted=true surfaces them for inspection.
+    try:
+        records = reaction_structures.list_schemes(
+            _state(request).session_factory,
+            reaction_project_id,
+            include_deleted=include_deleted,
+        )
+    except Exception as exc:
+        _raise_reaction_http_error(exc)
+        raise
+    return [ReactionStructureScheme.model_validate(record) for record in records]
+
+
+@router.get(
+    "/reaction-projects/{reaction_project_id}/schemes/{scheme_id}",
+    response_model=ReactionStructureScheme,
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
+)
+def get_reaction_structure_scheme_route(
+    reaction_project_id: int,
+    scheme_id: int,
+    request: Request,
+    include_deleted: bool = Query(default=False),
+    context: AccessContext = Depends(require_access_context),
+) -> ReactionStructureScheme:
+    record = reaction_structures.get_scheme(
+        _state(request).session_factory,
+        reaction_project_id,
+        scheme_id,
+        include_deleted=include_deleted,
+    )
+    if record is None:
+        raise HTTPException(status_code=404, detail="Reaction scheme not found.")
+    return ReactionStructureScheme.model_validate(record)
+
+
+@router.post(
+    "/reaction-projects/{reaction_project_id}/schemes/{scheme_id}/archive",
+    response_model=ReactionStructureScheme,
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
+)
+def archive_reaction_structure_scheme_route(
+    reaction_project_id: int,
+    scheme_id: int,
+    payload: ReactionStructureSchemeDeleteRequest,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> ReactionStructureScheme:
+    """Archive a scheme: retained in full, marked removed, with the reason recorded."""
+    try:
+        record = reaction_structures.delete_scheme(
+            _state(request).session_factory,
+            reaction_project_id,
+            scheme_id,
+            reason=payload.reason_for_change,
+            actor=_reaction_actor(context),
+        )
+    except Exception as exc:
+        _raise_reaction_http_error(exc)
+        raise
+    if record is None:
+        raise HTTPException(status_code=404, detail="Reaction scheme not found.")
+    return ReactionStructureScheme.model_validate(record)
 
 
 # --- R9: chemist feedback -> advisory preference re-ranker -> A/B promotion gate ---
