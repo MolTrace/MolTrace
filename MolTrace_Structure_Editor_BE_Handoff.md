@@ -54,7 +54,43 @@ Three things to design around, all observed rather than assumed:
 
 ---
 
-## 3. Endpoint 1 — validate & canonicalize
+## 2b. What already exists — check before building
+
+**A single structure already has a home, and it already gets canonicalized.**
+`POST /compound-registry/compounds/{compound_id}/structures` accepts a drawn
+structure today, and the frontend now uses it (`a9…`, this session). Verified
+against the running service:
+
+```
+→ { structure_input: "<molfile>", structure_format: "mol", source: "user_entered",
+    validation_status: "not_checked", reviewer_status: "unreviewed", metadata_json: {…} }
+← 201 { id, canonical_smiles, inchi, inchikey, formula, exact_mass,
+        normalization_warnings_json: [...], validation_status, reviewer_status }
+```
+
+RDKit runs on the way in, and the response carries the verdict — for a drawn
+aspirin it returned `formula: "C9H8O4"` and a canonical SMILES. So **do not
+rebuild single-structure canonicalization**; §3 below is now only needed for
+(a) checking *before* committing a record, and (b) reactions, which this
+endpoint cannot hold.
+
+Three enum traps, each of which produced a 422 during integration — the values
+are literals, not free text:
+
+| field | allowed |
+|---|---|
+| `structure_format` | `smiles` `mol` `sdf` `inchi` `name_only` `unknown` — **no `rxn`** |
+| `source` | `user_entered` `spectracheck_candidate` `reaction_product` `regulatory_dossier` `imported_sdf` `report` `other` |
+| `validation_status` | `valid` `invalid` `ambiguous` `not_checked` |
+| `reviewer_status` | `unreviewed` `accepted` `rejected` `needs_changes` |
+
+The absence of `rxn` from `structure_format` is the registry stating that a
+reaction is not a compound structure. Respect that rather than widening the enum
+— reactions want §4.
+
+---
+
+## 3. Endpoint 1 — validate & canonicalize (reactions, and pre-commit checks)
 
 ```
 POST /reactions/structures/validate
