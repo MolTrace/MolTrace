@@ -12,7 +12,8 @@ export function buildAnalysisJobPayload(args: {
     session_id: args.sessionId ?? null,
     sample_id: args.sampleId.trim() ? args.sampleId.trim() : null,
     job_type: args.jobType,
-    input_file_ids: args.inputFileIds,
-    parameters: args.parameters,
+    // AnalysisJobCreate (extra="forbid") fields are *_json-suffixed.
+    input_file_ids_json: args.inputFileIds,
+    parameters_json: args.parameters,
   }
 }

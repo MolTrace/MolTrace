@@ -247,7 +247,8 @@ export function SpectraCheckReviewCollaborationPanel({ sessionId }: SpectraCheck
     try {
       await apiFetch(`/spectracheck/sessions/${encodeURIComponent(sid)}/reviewers`, {
         method: "POST",
-        body: { email },
+        // SessionReviewerCreate (extra="forbid") field is reviewer_email, not email.
+        body: { reviewer_email: email },
       })
       setReviewerEmail("")
       await refresh()
@@ -372,7 +373,9 @@ export function SpectraCheckReviewCollaborationPanel({ sessionId }: SpectraCheck
       }
       const an = approvalName.trim()
       const ae = approvalEmail.trim()
-      if (an) body.approver_name = an
+      // The approval model (extra="forbid") accepts approver_email but not approver_name;
+      // keep the typed name in metadata_json (non-lossy).
+      if (an) body.metadata_json = { approver_name: an }
       if (ae) body.approver_email = ae
 
       await apiFetch(`/spectracheck/sessions/${encodeURIComponent(sid)}/approvals`, {
