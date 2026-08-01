@@ -1063,6 +1063,14 @@ class OrganizationORM(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     name: Mapped[str] = mapped_column(String(200))
+    # SaaS-tenant binding (module-entitlement enforcement). NULL = the org is not bound to a
+    # billing tenant yet, so no module entitlement resolves through it and access stays open
+    # (allow-by-default). Set by an operator via the tenant→org link endpoint. This is the single
+    # edge that lets the server resolve a caller's tenant from their org membership; the caller
+    # never asserts it.
+    tenant_id: Mapped[int | None] = mapped_column(
+        ForeignKey("tenants.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, onupdate=utcnow

@@ -133,6 +133,20 @@ def _ensure_sqlite_schema(engine: Engine) -> None:
                 connection.exec_driver_sql(
                     "ALTER TABLE users ADD COLUMN gsd_graduated_at TIMESTAMP"
                 )
+        if "organizations" in tables:
+            # SaaS-tenant binding for module-entitlement enforcement — add the column
+            # idempotently for pre-existing dev SQLite DBs. Production Postgres picks it up
+            # via the matching Alembic migration.
+            org_existing = {
+                str(row[1])
+                for row in connection.exec_driver_sql(
+                    "PRAGMA table_info(organizations)"
+                ).fetchall()
+            }
+            if "tenant_id" not in org_existing:
+                connection.exec_driver_sql(
+                    "ALTER TABLE organizations ADD COLUMN tenant_id INTEGER"
+                )
         if "fid_runs" in tables:
             existing = {
                 str(row[1])
