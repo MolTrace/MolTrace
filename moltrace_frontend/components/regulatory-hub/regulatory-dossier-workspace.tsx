@@ -77,6 +77,7 @@ import { BatchRegulatoryAssessmentPanel } from "@/components/regulatory-hub/batc
 import { SPCProcessCapabilityPanel } from "@/components/regulatory-hub/spc-process-capability-panel"
 import { ReactionOptimizationHandoffCard } from "@/components/regulatory-hub/reaction-optimization-handoff-card"
 import { CtdModule3BundleCard } from "@/components/regulatory-hub/ctd-module3-bundle-card"
+import { RAW_DATA_DISCLOSURE } from "@/lib/ui/copy"
 
 const DOSSIER_STATUSES = ["draft", "in_review", "ready", "blocked", "approved", "archived"] as const
 
@@ -2184,16 +2185,22 @@ export function RegulatoryDossierWorkspace() {
       const rec = await apiFetch<Record<string, unknown>>(`/regulatory/dossiers/${dossierId}/submission-package`, {
         method: "POST",
         body: {
+          // RegulatorySubmissionPackageCreate (extra="forbid") has no include_* fields;
+          // it accepts package_type + metadata_json (persisted verbatim). Nest the nine
+          // section toggles in metadata_json (non-lossy, auditable) so they aren't
+          // rejected as extra top-level keys.
           package_type: submissionPackageType,
-          include_spectracheck_report: spIncludeSpectraCheckReport,
-          include_impurity_register: spIncludeImpurityRegister,
-          include_residual_solvent_assessment: spIncludeResidualSolventAssessment,
-          include_nitrosamine_watch: spIncludeNitrosamineWatch,
-          include_qnmr_method_validation: spIncludeQnmrValidation,
-          include_ai_governance_record: spIncludeAiGovernanceRecord,
-          include_source_citations: spIncludeSourceCitations,
-          include_provenance_hashes: spIncludeProvenanceHashes,
-          include_review_decisions: spIncludeReviewDecisions,
+          metadata_json: {
+            include_spectracheck_report: spIncludeSpectraCheckReport,
+            include_impurity_register: spIncludeImpurityRegister,
+            include_residual_solvent_assessment: spIncludeResidualSolventAssessment,
+            include_nitrosamine_watch: spIncludeNitrosamineWatch,
+            include_qnmr_method_validation: spIncludeQnmrValidation,
+            include_ai_governance_record: spIncludeAiGovernanceRecord,
+            include_source_citations: spIncludeSourceCitations,
+            include_provenance_hashes: spIncludeProvenanceHashes,
+            include_review_decisions: spIncludeReviewDecisions,
+          },
         },
       })
       setSubmissionPackageByDossier(rec)
@@ -6577,7 +6584,7 @@ export function RegulatoryDossierWorkspace() {
                 >
                   Dossier · Developer JSON
                 </p>
-                <h2 className="font-mono text-xl font-bold tracking-tight">Raw data (for troubleshooting)</h2>
+                <h2 className="font-mono text-xl font-bold tracking-tight">{RAW_DATA_DISCLOSURE}</h2>
                 <p className="text-sm text-muted-foreground">
                   Aggregated dossier records loaded in this browser session — use to inspect exact values, warnings, and
                   audit fields.

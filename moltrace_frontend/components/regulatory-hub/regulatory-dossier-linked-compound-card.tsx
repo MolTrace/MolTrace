@@ -260,8 +260,9 @@ export function RegulatoryDossierLinkedCompoundCard({
     setSearchHits([])
     try {
       const body: Record<string, unknown> = {}
+      // CompoundRegistrySearchRequest (extra="forbid") field is `name` (matches aliases too).
       const q = searchQuery.trim()
-      if (q) body.name_alias = q
+      if (q) body.name = q
       const raw = await apiFetch<unknown>("/compound-registry/search", { method: "POST", body })
       setSearchHits(normalizeCompoundSearchList(raw))
     } catch (e) {

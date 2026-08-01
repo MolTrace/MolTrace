@@ -132,6 +132,7 @@ import {
   trackReactionSafetyProfileSaved,
   trackSpectracheckLinkedToReaction,
 } from "@/src/lib/analytics/analytics-client"
+import { RAW_DATA_DISCLOSURE } from "@/lib/ui/copy"
 
 const VARIABLES_TOOLTIP =
   "Reaction variables define the condition space for experiment planning and recommendation."
@@ -3383,12 +3384,19 @@ export function ReactionProjectDetail() {
       const runRecord = await apiFetch<unknown>(`/reaction-projects/${reactionProjectId}/optimization/benchmark`, {
         method: "POST",
         body: {
-          benchmark_name: benchmarkName.trim() || null,
-          algorithm: benchmarkAlgorithm.trim() || null,
-          objective: benchmarkObjective.trim() || objective || null,
-          experiment_budget,
-          random_seed,
-          use_completed_project_data: useCompletedProjectData,
+          // ReactionOptimizationBenchmarkRequest (extra="forbid") accepts only
+          // benchmark_name (non-null str), algorithm (enum), and metadata_json.
+          // The objective/budget/seed/use-completed controls have no model slot, so
+          // carry them in metadata_json (non-lossy, auditable) rather than as rejected
+          // top-level keys; a BE change is needed for them to affect the benchmark.
+          benchmark_name: benchmarkName.trim() || "phase50_replay",
+          algorithm: benchmarkAlgorithm.trim() || "rule_based_fallback",
+          metadata_json: {
+            objective: benchmarkObjective.trim() || objective || null,
+            experiment_budget,
+            random_seed,
+            use_completed_project_data: useCompletedProjectData,
+          },
         },
       })
       const t1 = typeof performance !== "undefined" ? performance.now() : Date.now()
@@ -11143,7 +11151,7 @@ export function ReactionProjectDetail() {
               >
                 Project · Developer JSON
               </p>
-              <h2 className="font-mono text-xl font-bold tracking-tight">Raw data (for troubleshooting)</h2>
+              <h2 className="font-mono text-xl font-bold tracking-tight">{RAW_DATA_DISCLOSURE}</h2>
               <p className="text-sm text-muted-foreground">
                 Everything this reaction project loaded in the current browser session — useful for checking exact
                 values, audit fields, and warnings.
