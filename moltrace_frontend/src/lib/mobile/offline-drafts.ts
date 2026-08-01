@@ -135,13 +135,18 @@ function saveOneDraft(update: MobileOfflineDraft) {
 }
 
 function toApiBody(draft: MobileOfflineDraft): Record<string, unknown> {
+  // MobileActionDraftCreate/Update (extra="forbid") accept action_type/target_type/
+  // target_id + draft_payload_json; the free-form fields have no top-level slot, so
+  // nest them in draft_payload_json rather than send them as rejected extra keys.
   return {
     action_type: draft.action_type,
     target_type: draft.target_type,
     target_id: draft.target_id,
-    short_comment: draft.short_comment,
-    decision_status: draft.decision_status,
-    timestamp: draft.timestamp,
+    draft_payload_json: {
+      short_comment: draft.short_comment,
+      decision_status: draft.decision_status,
+      timestamp: draft.timestamp,
+    },
   }
 }
 
@@ -167,7 +172,9 @@ export async function syncOfflineDraftsNow(): Promise<MobileOfflineDraft[]> {
       let nextReason = ""
       const syncResult = await apiFetch<unknown>("/mobile/sync", {
         method: "POST",
-        body: { draft_id: serverDraftId, local_id: draft.local_id },
+        // MobileSync request (extra="forbid") field is draft_ids: list[int]; local_id is a
+        // client-only correlation id with no server field.
+        body: { draft_ids: serverDraftId != null ? [serverDraftId] : [] },
       })
       if (isRecord(syncResult)) {
         const status = readStr(syncResult.status).toLowerCase()
