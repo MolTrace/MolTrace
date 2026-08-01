@@ -39,7 +39,6 @@ type Props = {
   onNewSession: () => void
   onSaveEvidenceQueue: () => void
   onSaveUnified: () => void
-  onSaveReview: () => void
 }
 
 function projectLabel(p: unknown): string {
@@ -127,7 +126,6 @@ export function SpectraCheckSessionControls({
   onNewSession,
   onSaveEvidenceQueue,
   onSaveUnified,
-  onSaveReview,
 }: Props) {
   const sessionNumericId = useMemo(() => {
     const s = backendSessionId?.trim()
@@ -247,9 +245,6 @@ export function SpectraCheckSessionControls({
           </Button>
           <Button type="button" size="sm" variant="outline" disabled={busy || !backendSessionId} onClick={onSaveUnified}>
             Save unified evidence
-          </Button>
-          <Button type="button" size="sm" variant="outline" disabled={busy || !backendSessionId} onClick={onSaveReview}>
-            Save review
           </Button>
         </div>
 
