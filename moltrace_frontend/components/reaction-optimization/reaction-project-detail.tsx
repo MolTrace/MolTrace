@@ -3,9 +3,9 @@
 import Link from "next/link"
 import { useParams } from "next/navigation"
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react"
-import { ArrowLeft, ChevronDown, ExternalLink, FlaskConical, Info, Lightbulb } from "lucide-react"
+import { ArrowLeft, ChevronDown, ExternalLink, FlaskConical, Lightbulb } from "lucide-react"
 import { DeveloperJsonPanel } from "@/components/spectracheck/spectracheck-result-panels"
-import { DeveloperOnly } from "@/components/developer-mode-provider"
+import { DeveloperOnly, useDeveloperMode } from "@/components/developer-mode-provider"
 import { MlModelProvenanceSummary } from "@/components/ml/ml-model-provenance-summary"
 import { formatApiError } from "@/components/spectracheck/spectracheck-helpers"
 import { apiFetch, ApiError } from "@/lib/api/client"
@@ -20,16 +20,6 @@ import { AlertCard } from "@/components/dashboard/alert-card"
 import { ModuleCard } from "@/components/dashboard/module-card"
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription } from "@/components/ui/empty"
 
-/** Reaction Studio tab styling. Uses arbitrary *values* (`bg-[…]`/`text-[…]`), never arbitrary
- *  *properties* (`[background-color:…]`): tailwind-merge cannot dedupe an arbitrary property
- *  against the TabsTrigger base's `data-[state=active]:bg-background`, so both survived and CSS
- *  source order decided the winner — the active tab kept the near-white `#EBF4F8` text but lost the
- *  violet pill, rendering invisible on the light background. The dark-mode variants are spelled out
- *  because variant sets only dedupe against themselves (`dark:…:bg-input/30` and
- *  `dark:…:text-foreground` would otherwise survive and wash the pill out). #EBF4F8 on
- *  var(--mt-violet) (#6B3FE0) is 5.52:1 — WCAG AA for normal text, in both modes. */
-const reactionProjectTabClass =
-  "font-mono text-xs sm:text-sm data-[state=active]:bg-[var(--mt-violet)] dark:data-[state=active]:bg-[var(--mt-violet)] data-[state=active]:text-[#EBF4F8] dark:data-[state=active]:text-[#EBF4F8] data-[state=active]:border-transparent dark:data-[state=active]:border-transparent data-[state=active]:font-bold data-[state=active]:shadow-sm data-[state=inactive]:text-muted-foreground"
 /** Shared style for inline, baseline-aligned link-buttons rendered inside prose
  *  (e.g. the safety-gate deep-link). `inline min-h-0 align-baseline` neutralizes
  *  the global button min-height; the focus-visible ring matches house style. */
@@ -50,7 +40,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Tabs, TabsContent } from "@/components/ui/tabs"
+import {
+  WorkspaceStageNav,
+  type WorkspaceStageGroup,
+} from "@/components/app/workspace-stage-nav"
 import { Textarea } from "@/components/ui/textarea"
 import {
   Table,
@@ -62,7 +56,6 @@ import {
 } from "@/components/ui/table"
 import { Separator } from "@/components/ui/separator"
 import { InfoTooltip } from "@/components/ui/info-tooltip"
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { Switch } from "@/components/ui/switch"
 import {
@@ -211,6 +204,124 @@ const ADVISOR_TAB_TOOLTIP =
 
 const EXECUTION_TAB_TOOLTIP =
   "Connects approved recommendations to planned experiments, analytical results, outcomes, and the next cycle. Human confirmation is required."
+
+// ── Two-tier Reaction Studio section navigation ──────────────────────────
+// Fourteen sections, grouped into the way a campaign is actually run: orient,
+// define the problem, lay out experiments, optimise, execute and record. The
+// stage is the primary tab and its sections are the secondary tabs — see
+// components/app/workspace-stage-nav.tsx for why the tiers are split.
+//
+// The per-section blurb below replaces the hover tooltips that used to hang off
+// the Advisor and Execution tabs alone: a caption states the same thing for
+// every section, without an info target to hit on the way past.
+const REACTION_STUDIO_NAV: WorkspaceStageGroup[] = [
+  {
+    id: "overview",
+    label: "Overview",
+    sections: [
+      {
+        value: "overview",
+        label: "Overview",
+        desc: "Project details, campaign aggregates, and recent activity — the source of truth for the rest of the workspace.",
+      },
+    ],
+  },
+  {
+    id: "design",
+    label: "Design",
+    sections: [
+      {
+        value: "variables",
+        label: "Variables",
+        desc: "The factors this campaign can change, and the range each one is allowed to take.",
+      },
+      {
+        value: "objective",
+        label: "Objective",
+        desc: "What the campaign is optimising for, and the constraints a candidate has to satisfy.",
+      },
+      {
+        value: "cost-safety",
+        label: "Cost & Safety",
+        desc: "Cost per experiment and the structural safety screen — decision support that gates on your review, not on its own.",
+      },
+      {
+        value: "green",
+        label: "Green",
+        desc: "Green-chemistry metrics for the campaign, and how candidate conditions compare on them.",
+      },
+    ],
+  },
+  {
+    id: "experiments",
+    label: "Experiments",
+    sections: [
+      {
+        value: "experiments",
+        label: "Experiments",
+        desc: "The experiment matrix for this project — conditions run, outcomes recorded, and what each one contributed.",
+      },
+      {
+        value: "plates",
+        label: "Plates",
+        desc: "High-throughput plate layouts generated from the campaign variables, ready to export.",
+      },
+      {
+        value: "routes",
+        label: "Routes",
+        desc: "Candidate synthetic routes scored against this project's objective and constraints.",
+      },
+    ],
+  },
+  {
+    id: "optimization",
+    label: "Optimization",
+    sections: [
+      {
+        value: "optimization",
+        label: "Optimization",
+        desc: "Optimisation runs, their diagnostics, and the trade-off front they produced.",
+      },
+      {
+        value: "advisor",
+        label: "Advisor",
+        desc: ADVISOR_TAB_TOOLTIP,
+      },
+      {
+        value: "recommendations",
+        label: "Recommendations",
+        desc: "Proposed next conditions, each with the reasoning and the evidence behind it. Nothing is scheduled without your approval.",
+      },
+    ],
+  },
+  {
+    id: "execution",
+    label: "Execution",
+    sections: [
+      {
+        value: "execution",
+        label: "Execution",
+        desc: EXECUTION_TAB_TOOLTIP,
+      },
+      {
+        value: "evidence",
+        label: "Evidence Links",
+        desc: "Analytical evidence attached to this project, and what each item supports.",
+      },
+    ],
+  },
+  {
+    id: "developer",
+    label: "Developer JSON",
+    sections: [
+      {
+        value: "developer",
+        label: "Developer JSON",
+        desc: "Raw results for troubleshooting, validation, and data-shape inspection.",
+      },
+    ],
+  },
+]
 
 // Mechanism only — the matching caveat ("Recording a planned experiment is not
 // confirmation that laboratory work occurred") is visible in the card description.
@@ -1707,6 +1818,17 @@ export function ReactionProjectDetail() {
   // Controlled tab value so the half-closed-loop banner can deep-link to the
   // Cost & Safety tab (where the R6 structural-safety screening / gate lives).
   const [activeTab, setActiveTab] = useState("overview")
+  // Developer-mode gate: the raw-payload section is debugging surface, so it is
+  // dropped from the nav (and from keyboard roaming) unless developer mode is on.
+  // It used to be wrapped in <DeveloperOnly> around a single TabsTrigger.
+  const reactionStudioDeveloperMode = useDeveloperMode().enabled
+  const visibleReactionStudioNav = useMemo(
+    () =>
+      reactionStudioDeveloperMode
+        ? REACTION_STUDIO_NAV
+        : REACTION_STUDIO_NAV.filter((g) => g.id !== "developer"),
+    [reactionStudioDeveloperMode],
+  )
   const [project, setProject] = useState<Record<string, unknown> | null>(null)
   const [variables, setVariables] = useState<unknown[]>([])
   const [experiments, setExperiments] = useState<unknown[]>([])
@@ -4902,12 +5024,12 @@ export function ReactionProjectDetail() {
             </Badge>
           </div>
           <p
-            className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+            className="font-mono text-[11px] font-bold uppercase tracking-[0.2em]"
             style={{ color: "var(--mt-violet-ink)" }}
           >
             MolTrace · Reaction Studio (project-level)
           </p>
-          <h1 className="font-mono text-2xl font-bold tracking-tight">Reaction Studio (project-level)</h1>
+          <h1 className="font-mono text-2xl font-bold tracking-tight sm:text-3xl">Reaction Studio (project-level)</h1>
           <p className="text-sm text-muted-foreground">{loading ? "Loading…" : projectName}</p>
         </div>
         <div className="flex items-center gap-2">
@@ -4927,117 +5049,30 @@ export function ReactionProjectDetail() {
         />
       ) : null}
 
-      <ReactionStudioKnowledgeLinksCard reactionProjectId={reactionProjectId} />
-
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full min-w-0">
-        <div className="min-w-0 overflow-x-auto pb-2 [-webkit-overflow-scrolling:touch]">
-          <TabsList className="inline-flex h-auto min-h-9 w-max max-w-full flex-nowrap justify-start gap-1">
-            <TabsTrigger value="overview" className={reactionProjectTabClass}>
-              Overview
-            </TabsTrigger>
-            <TabsTrigger value="variables" className={reactionProjectTabClass}>
-              Variables
-            </TabsTrigger>
-            <TabsTrigger value="experiments" className={reactionProjectTabClass}>
-              Experiments
-            </TabsTrigger>
-            <TabsTrigger value="objective" className={reactionProjectTabClass}>
-              Objective
-            </TabsTrigger>
-            <TabsTrigger value="cost-safety" className={reactionProjectTabClass}>
-              {"Cost & Safety"}
-            </TabsTrigger>
-            <TabsTrigger value="green" className={reactionProjectTabClass}>
-              Green
-            </TabsTrigger>
-            <TabsTrigger value="plates" className={reactionProjectTabClass}>
-              Plates
-            </TabsTrigger>
-            <TabsTrigger value="routes" className={reactionProjectTabClass}>
-              Routes
-            </TabsTrigger>
-            <TabsTrigger value="optimization" className={reactionProjectTabClass}>
-              Optimization
-            </TabsTrigger>
-            <TabsTrigger value="advisor" className={reactionProjectTabClass}>
-              <span className="inline-flex items-center gap-1">
-                Advisor
-                <span
-                  className="inline-flex shrink-0"
-                  onClick={(e) => {
-                    e.preventDefault()
-                    e.stopPropagation()
-                  }}
-                  onPointerDown={(e) => e.stopPropagation()}
-                >
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <span
-                        className="inline-flex size-5 shrink-0 cursor-default items-center justify-center rounded-full text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                        aria-label="About Advisor"
-                        tabIndex={0}
-                      >
-                        <Info className="size-3.5" aria-hidden strokeWidth={2} />
-                      </span>
-                    </TooltipTrigger>
-                    <TooltipContent sideOffset={4} className="max-w-xs text-xs">
-                      {ADVISOR_TAB_TOOLTIP}
-                    </TooltipContent>
-                  </Tooltip>
-                </span>
-              </span>
-            </TabsTrigger>
-            <TabsTrigger value="recommendations" className={reactionProjectTabClass}>
-              Recommendations
-            </TabsTrigger>
-            <TabsTrigger value="execution" className={reactionProjectTabClass}>
-              <span className="inline-flex items-center gap-1">
-                Execution
-                <span
-                  className="inline-flex shrink-0"
-                  onClick={(e) => {
-                    e.preventDefault()
-                    e.stopPropagation()
-                  }}
-                  onPointerDown={(e) => e.stopPropagation()}
-                >
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <span
-                        className="inline-flex size-5 shrink-0 cursor-default items-center justify-center rounded-full text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                        aria-label="About Execution"
-                        tabIndex={0}
-                      >
-                        <Info className="size-3.5" aria-hidden strokeWidth={2} />
-                      </span>
-                    </TooltipTrigger>
-                    <TooltipContent sideOffset={4} className="max-w-xs text-xs">
-                      {EXECUTION_TAB_TOOLTIP}
-                    </TooltipContent>
-                  </Tooltip>
-                </span>
-              </span>
-            </TabsTrigger>
-            <TabsTrigger value="evidence" className={reactionProjectTabClass}>
-              Evidence Links
-            </TabsTrigger>
-            <DeveloperOnly>
-              <TabsTrigger value="developer" className={reactionProjectTabClass}>
-                Developer JSON
-              </TabsTrigger>
-            </DeveloperOnly>
-          </TabsList>
+        <WorkspaceStageNav
+          groups={visibleReactionStudioNav}
+          activeValue={activeTab}
+          onSelect={setActiveTab}
+          label="Reaction Studio"
+          accent="violet"
+        />
+
+        {/* Reference material for the project, below the nav rather than above
+            it: the sections are what a reader navigates by. */}
+        <div className="mt-4">
+          <ReactionStudioKnowledgeLinksCard reactionProjectId={reactionProjectId} />
         </div>
 
         <TabsContent value="overview" className="mt-4 space-y-6">
           <div className="space-y-1">
             <p
-              className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+              className="font-mono text-[11px] font-bold uppercase tracking-[0.2em]"
               style={{ color: "var(--mt-violet-ink)" }}
             >
               Project · Overview
             </p>
-            <h2 className="font-mono text-xl font-bold tracking-tight">Reaction project at a glance</h2>
+            <h2 className="font-mono text-2xl font-bold tracking-tight">Reaction project at a glance</h2>
             <p className="text-sm text-muted-foreground">
               Project metadata, campaign aggregates, and recent activity — the source of truth for the rest of the workspace.
             </p>
@@ -5157,12 +5192,12 @@ export function ReactionProjectDetail() {
         <TabsContent value="variables" className="mt-4 space-y-6">
           <div className="space-y-1">
             <p
-              className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+              className="font-mono text-[11px] font-bold uppercase tracking-[0.2em]"
               style={{ color: "var(--mt-violet-ink)" }}
             >
               Project · Variables
             </p>
-            <h2 className="font-mono text-xl font-bold tracking-tight">Optimization variable definitions</h2>
+            <h2 className="font-mono text-2xl font-bold tracking-tight">Optimization variable definitions</h2>
             <p className="text-sm text-muted-foreground">
               Continuous and categorical variables, their bounds, units, and encoding. Drives the design space and recommendation generation.
             </p>
@@ -5308,12 +5343,12 @@ export function ReactionProjectDetail() {
         <TabsContent value="experiments" className="mt-4 space-y-6">
           <div className="space-y-1">
             <p
-              className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+              className="font-mono text-[11px] font-bold uppercase tracking-[0.2em]"
               style={{ color: "var(--mt-violet-ink)" }}
             >
               Project · Experiments
             </p>
-            <h2 className="font-mono text-xl font-bold tracking-tight">Experiment matrix &amp; outcomes</h2>
+            <h2 className="font-mono text-2xl font-bold tracking-tight">Experiment matrix &amp; outcomes</h2>
             <p className="text-sm text-muted-foreground">
               All experiments in this project — variable values, outcomes, and SpectraCheck-linked analytical results.
             </p>
@@ -5734,12 +5769,12 @@ export function ReactionProjectDetail() {
         <TabsContent value="objective" className="mt-4 space-y-6">
           <div className="space-y-1">
             <p
-              className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+              className="font-mono text-[11px] font-bold uppercase tracking-[0.2em]"
               style={{ color: "var(--mt-violet-ink)" }}
             >
               Project · Objective
             </p>
-            <h2 className="font-mono text-xl font-bold tracking-tight">Optimization objective &amp; weights</h2>
+            <h2 className="font-mono text-2xl font-bold tracking-tight">Optimization objective &amp; weights</h2>
             <p className="text-sm text-muted-foreground">
               Single- or multi-objective definition with per-target weights and direction (maximize / minimize).
             </p>
@@ -5916,12 +5951,12 @@ export function ReactionProjectDetail() {
         <TabsContent value="cost-safety" className="mt-4 space-y-6">
           <div className="space-y-1">
             <p
-              className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+              className="font-mono text-[11px] font-bold uppercase tracking-[0.2em]"
               style={{ color: "var(--mt-violet-ink)" }}
             >
               Project · Cost &amp; Safety
             </p>
-            <h2 className="font-mono text-xl font-bold tracking-tight">Cost profile &amp; safety constraints</h2>
+            <h2 className="font-mono text-2xl font-bold tracking-tight">Cost profile &amp; safety constraints</h2>
             <p className="text-sm text-muted-foreground">
               Per-reagent costs and safety guard-rails — fed into the recommendation generator and Reaction Advisor.
             </p>
@@ -6261,12 +6296,12 @@ export function ReactionProjectDetail() {
         <TabsContent value="routes" className="mt-4 space-y-6">
           <div className="space-y-1">
             <p
-              className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+              className="font-mono text-[11px] font-bold uppercase tracking-[0.2em]"
               style={{ color: "var(--mt-violet-ink)" }}
             >
               Project · Routes
             </p>
-            <h2 className="font-mono text-xl font-bold tracking-tight">Synthesis route scoring</h2>
+            <h2 className="font-mono text-2xl font-bold tracking-tight">Synthesis route scoring</h2>
             <p className="text-sm text-muted-foreground">
               Score pasted or hand-built route trees with the frozen safety and green-chemistry
               engines. Route generation is not available on this deployment; routes are entered manually by
@@ -6279,12 +6314,12 @@ export function ReactionProjectDetail() {
         <TabsContent value="optimization" className="mt-4 space-y-6">
           <div className="space-y-1">
             <p
-              className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+              className="font-mono text-[11px] font-bold uppercase tracking-[0.2em]"
               style={{ color: "var(--mt-violet-ink)" }}
             >
               Project · Optimization
             </p>
-            <h2 className="font-mono text-xl font-bold tracking-tight">Bayesian optimization &amp; benchmark runs</h2>
+            <h2 className="font-mono text-2xl font-bold tracking-tight">Bayesian optimization &amp; benchmark runs</h2>
             <p className="text-sm text-muted-foreground">
               Launch optimization cycles with regulatory constraints, compare BO vs LLM advisors, and inspect benchmark history.
             </p>
@@ -7136,12 +7171,12 @@ export function ReactionProjectDetail() {
         <TabsContent value="advisor" className="mt-4 space-y-6">
           <div className="space-y-1">
             <p
-              className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+              className="font-mono text-[11px] font-bold uppercase tracking-[0.2em]"
               style={{ color: "var(--mt-violet-ink)" }}
             >
               Project · Optimization Advisor
             </p>
-            <h2 className="font-mono text-xl font-bold tracking-tight">LLM-assisted optimization advisor</h2>
+            <h2 className="font-mono text-2xl font-bold tracking-tight">LLM-assisted optimization advisor</h2>
             <p className="text-sm text-muted-foreground">
               Run the LLM advisor against literature priors and mechanistic hypotheses; inspect rationale and side-by-side BO comparisons.
             </p>
@@ -8331,12 +8366,12 @@ export function ReactionProjectDetail() {
         <TabsContent value="recommendations" className="mt-4 space-y-6">
           <div className="space-y-1">
             <p
-              className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+              className="font-mono text-[11px] font-bold uppercase tracking-[0.2em]"
               style={{ color: "var(--mt-violet-ink)" }}
             >
               Project · Recommendations
             </p>
-            <h2 className="font-mono text-xl font-bold tracking-tight">Reviewer queue &amp; approvals</h2>
+            <h2 className="font-mono text-2xl font-bold tracking-tight">Reviewer queue &amp; approvals</h2>
             <p className="text-sm text-muted-foreground">
               Approve, reject, or convert recommendations to experiments. Chemist sign-off is required before execution.
             </p>
@@ -8978,12 +9013,12 @@ export function ReactionProjectDetail() {
         <TabsContent value="execution" className="mt-4 min-w-0 max-w-full space-y-6">
           <div className="space-y-1">
             <p
-              className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+              className="font-mono text-[11px] font-bold uppercase tracking-[0.2em]"
               style={{ color: "var(--mt-violet-ink)" }}
             >
               Project · Execution
             </p>
-            <h2 className="font-mono text-xl font-bold tracking-tight">Lab execution batches &amp; outcomes</h2>
+            <h2 className="font-mono text-2xl font-bold tracking-tight">Lab execution batches &amp; outcomes</h2>
             <p className="text-sm text-muted-foreground">
               Track approved recommendations through execution batches, mark items running / completed / failed, and confirm outcomes against SpectraCheck-linked analytics. Not autonomous — requires human confirmation.
             </p>
@@ -11035,12 +11070,12 @@ export function ReactionProjectDetail() {
         <TabsContent value="evidence" className="mt-4 space-y-6">
           <div className="space-y-1">
             <p
-              className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+              className="font-mono text-[11px] font-bold uppercase tracking-[0.2em]"
               style={{ color: "var(--mt-violet-ink)" }}
             >
               Project · Evidence Links
             </p>
-            <h2 className="font-mono text-xl font-bold tracking-tight">SpectraCheck-linked analytical evidence</h2>
+            <h2 className="font-mono text-2xl font-bold tracking-tight">SpectraCheck-linked analytical evidence</h2>
             <p className="text-sm text-muted-foreground">
               Compound &amp; batch linking to SpectraCheck sessions for outcome-extraction provenance — the SpectraCheck ↔ Reaction integration seam.
             </p>
@@ -11146,12 +11181,12 @@ export function ReactionProjectDetail() {
             <MlCapabilitiesPanel />
             <div className="space-y-1">
               <p
-                className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+                className="font-mono text-[11px] font-bold uppercase tracking-[0.2em]"
                 style={{ color: "var(--mt-violet-ink)" }}
               >
                 Project · Developer JSON
               </p>
-              <h2 className="font-mono text-xl font-bold tracking-tight">{RAW_DATA_DISCLOSURE}</h2>
+              <h2 className="font-mono text-2xl font-bold tracking-tight">{RAW_DATA_DISCLOSURE}</h2>
               <p className="text-sm text-muted-foreground">
                 Everything this reaction project loaded in the current browser session — useful for checking exact
                 values, audit fields, and warnings.
