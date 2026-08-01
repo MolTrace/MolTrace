@@ -105,6 +105,31 @@ function LinkedInGlyph() {
   )
 }
 
+// ─── Crunchbase — solid brand blue (#146AFF) ───────────────────────────
+// House-style mark: brand-blue rounded square with the two knocked-out "cb"
+// bowls. Drawn to match the weight of the other glyphs in this row rather than
+// traced from Crunchbase's official asset — if you need the pixel-exact
+// registered mark, drop in the SVG from Crunchbase's brand page and keep the
+// COMMON_SVG_PROPS wrapper so sizing stays uniform.
+function CrunchbaseGlyph() {
+  return (
+    <svg {...COMMON_SVG_PROPS}>
+      <path
+        fill="#146AFF"
+        d="M21.6 0H2.4A2.4 2.4 0 0 0 0 2.4v19.2A2.4 2.4 0 0 0 2.4 24h19.2a2.4 2.4 0 0 0 2.4-2.4V2.4A2.4 2.4 0 0 0 21.6 0z"
+      />
+      <path
+        fill="#fff"
+        d="M8.02 15.13a2.13 2.13 0 1 1 1.86-3.16h1.67a3.71 3.71 0 1 0 0 2.06H9.88a2.13 2.13 0 0 1-1.86 1.1z"
+      />
+      <path
+        fill="#fff"
+        d="M16.02 9.29c-.77 0-1.49.24-2.08.64V5.4h-1.56v9.94h1.56v-.4c.59.4 1.31.64 2.08.64a3.14 3.14 0 1 0 0-6.29zm0 4.73a1.59 1.59 0 1 1 0-3.18 1.59 1.59 0 0 1 0 3.18z"
+      />
+    </svg>
+  )
+}
+
 // ─── Facebook — solid blue (#1877F2) ────────────────────────────────────
 function FacebookGlyph() {
   return (
@@ -269,6 +294,7 @@ export const socialLinks: SocialLink[] = [
   { label: "Facebook",  href: null, Glyph: FacebookGlyph  },
   { label: "Instagram", href: null, Glyph: InstagramGlyph },
   { label: "X",         href: null, Glyph: XGlyph         },
+  { label: "Crunchbase", href: null, Glyph: CrunchbaseGlyph },
   { label: "YouTube",   href: null, Glyph: YouTubeGlyph   },
   { label: "GitHub",    href: "https://github.com/MolTrace/MolTrace", Glyph: GitHubGlyph },
   { label: "WhatsApp",  href: null, Glyph: WhatsAppGlyph  },
