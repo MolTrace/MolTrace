@@ -31,6 +31,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { DeveloperJsonPanel } from "@/components/spectracheck/spectracheck-result-panels"
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
 import { ChevronDown, Loader2, Scale } from "lucide-react"
+import { ModuleGate } from "@/src/lib/modules/module-not-included-tile"
 
 const CONSTRAINT_TYPES = [
   "impurity_limit",
@@ -121,7 +122,7 @@ function jsonStringFromObject(obj: Record<string, unknown>): string {
   return Object.keys(obj).length > 0 ? JSON.stringify(obj) : ""
 }
 
-export function ReactionRegulatoryConstraintsPanel({
+function ReactionRegulatoryConstraintsPanelInner({
   reactionProjectId,
   onPayloadChange,
   onUseInOptimizationChange,
@@ -521,5 +522,20 @@ export function ReactionRegulatoryConstraintsPanel({
         </CardContent>
       </Card>
     </div>
+  )
+}
+
+/**
+ * Cross-module surface: this belongs to another product.
+ *
+ * The gate wraps rather than early-returns inside ReactionRegulatoryConstraintsPanelInner, so on a deployment
+ * without that product the inner component NEVER MOUNTS — its hooks do not run and its requests
+ * are never made. Hiding the UI while still fetching its data would not be gating.
+ */
+export function ReactionRegulatoryConstraintsPanel(props: React.ComponentProps<typeof ReactionRegulatoryConstraintsPanelInner>) {
+  return (
+    <ModuleGate module="regulatory_hub" what="Regulatory constraints for this campaign">
+      <ReactionRegulatoryConstraintsPanelInner {...props} />
+    </ModuleGate>
   )
 }
