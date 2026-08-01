@@ -14094,7 +14094,11 @@ class TraceabilityMatrix(BaseModel):
 class ElectronicSignatureRecordCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    signer_name: str = Field(min_length=1, max_length=200)
+    # §11.100: the `/esignatures/records` route signs as the authenticated server principal and
+    # ignores any client-supplied identity, so the FE (server-authoritative) sends no signer_name.
+    # Kept optional for the inline callers (system-release approval, pilot signoff) that still
+    # populate it as a fallback identity when no principal is threaded through.
+    signer_name: str | None = Field(default=None, max_length=200)
     signer_email: str | None = Field(default=None, max_length=255)
     signature_meaning: SignatureMeaning
     target_type: str = Field(min_length=1, max_length=100)
