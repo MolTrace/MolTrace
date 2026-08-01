@@ -42,6 +42,7 @@ import { statusLabel } from "@/lib/ui/status"
 import { Boxes, FileText, FlaskConical, Package, Plus } from "lucide-react"
 import { readRecordNumber, readRecordString } from "@/components/projects/project-workspace-utils"
 import { BatchRegulatoryAssessmentPanel } from "@/components/regulatory-hub/batch-regulatory-assessment-panel"
+import { ModuleGate } from "@/src/lib/modules/module-not-included-tile"
 import { trackAliquotCreated, trackBatchCreated } from "@/src/lib/analytics/analytics-client"
 
 const SOURCE_TYPES = [
@@ -640,6 +641,11 @@ export function BatchRegistryWorkspace() {
         </div>
       </ModuleCard>
 
+      {/* Regentry-owned: it reads /regulatory/dossiers/{id}/batch-assessment. Gate the whole
+          card, not just the panel — the dossier-ID input above it is equally pointless
+          without Regentry, and inviting an id only to refuse the request is worse than
+          saying so up front. */}
+      <ModuleGate module="regulatory_hub" what="Regulatory assessment of a batch">
       <ModuleCard
         accent="teal"
         eyebrow="Detail"
@@ -681,6 +687,7 @@ export function BatchRegistryWorkspace() {
           )}
         </div>
       </ModuleCard>
+      </ModuleGate>
 
       <p className="text-xs text-muted-foreground">
         <Link href="/compounds" className="underline underline-offset-4">

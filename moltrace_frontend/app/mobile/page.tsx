@@ -9,6 +9,7 @@ import { MobileCommandCenter } from "@/src/components/mobile/MobileCommandCenter
 import { MobileDraftQueue } from "@/src/components/mobile/MobileDraftQueue"
 import { MobileReactionApprovalBoard } from "@/src/components/mobile/MobileReactionApprovalBoard"
 import { MobileRegulatoryQueue } from "@/src/components/mobile/MobileRegulatoryQueue"
+import { ModuleGate } from "@/src/lib/modules/module-not-included-tile"
 import { MobileReportPreview } from "@/src/components/mobile/MobileReportPreview"
 import { MobileSpectraCheckReview } from "@/src/components/mobile/MobileSpectraCheckReview"
 
@@ -30,10 +31,18 @@ export default function MobileCommandCenterPage() {
           <Suspense fallback={<div className="text-xs text-muted-foreground">Loading report preview…</div>}>
             <MobileReportPreview />
           </Suspense>
-          <Suspense fallback={<div className="text-xs text-muted-foreground">Loading reaction approval board…</div>}>
-            <MobileReactionApprovalBoard />
-          </Suspense>
-          <MobileRegulatoryQueue />
+          {/* Both of these belong to a product this deployment may not serve, and /mobile is not
+              owned by any module — so nav filtering never reaches them and the page is reachable
+              on any phone viewport. Hidden rather than tiled: the phone workflow is a short task
+              list, and a card explaining an absent product is noise on a small screen. */}
+          <ModuleGate module="reaction_optimization" what="Reaction approvals" fallback="hide">
+            <Suspense fallback={<div className="text-xs text-muted-foreground">Loading reaction approval board…</div>}>
+              <MobileReactionApprovalBoard />
+            </Suspense>
+          </ModuleGate>
+          <ModuleGate module="regulatory_hub" what="Regulatory queue" fallback="hide">
+            <MobileRegulatoryQueue />
+          </ModuleGate>
           <MobileDraftQueue />
         </div>
       ) : (
