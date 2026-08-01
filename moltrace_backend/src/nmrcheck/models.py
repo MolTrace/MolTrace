@@ -11189,6 +11189,148 @@ class ReactionSafetyGateStatus(BaseModel):
     summary: str = ""
 
 
+MAX_STRUCTURE_BLOCK_CHARS = 1_000_000
+
+
+class StructureIssue(BaseModel):
+    """One plain-language note about a drawn structure.
+
+    ``atom_indices`` are positions in the drawing's atom list, counted from 0 in the same order
+    the atoms appear in the block, so the editor can highlight them. For a reaction they are
+    positions **within** the component the message names, not across the whole scheme.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    code: str
+    message: str
+    atom_indices: list[int] = Field(default_factory=list)
+
+
+class StructureComponentCounts(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    reactants: int = 0
+    agents: int = 0
+    products: int = 0
+
+
+class StructureValidateRequest(BaseModel):
+    """A drawing captured from the editor, for checking against RDKit.
+
+    ``format`` selects the parser and is trusted over the contents of ``block`` — an RXN block
+    is not a molfile. ``smiles`` may legitimately be empty (structure drawings with R-groups or
+    query atoms have no SMILES), and when present it is cross-checked, not trusted.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    block: str
+    format: Literal["mol", "rxn"]
+    smiles: str = ""
+
+    @field_validator("block")
+    @classmethod
+    def _block_within_limit(cls, value: str) -> str:
+        if len(value) > MAX_STRUCTURE_BLOCK_CHARS:
+            raise ValueError(
+                "This drawing is too large to check. Try attaching a single scheme rather "
+                "than a whole structure file."
+            )
+        return value
+
+
+class StructureValidateResponse(BaseModel):
+    """RDKit's reading of a drawing. A structure that fails its checks still returns here.
+
+    The verdict lives in ``ok`` and ``errors`` rather than in a transport status code: asking
+    "is this structure sound?" and getting an answer of "no" is a successful question.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    ok: bool
+    format: Literal["mol", "rxn"]
+    canonical_smiles: str | None = None
+    normalized_block: str | None = None
+    inchikey: str | None = None
+    atom_count: int = 0
+    bond_count: int = 0
+    component_counts: StructureComponentCounts | None = None
+    warnings: list[StructureIssue] = Field(default_factory=list)
+    errors: list[StructureIssue] = Field(default_factory=list)
+    validator_version: str = ""
+
+
+class ReactionStructureSchemeCreate(StructureValidateRequest):
+    """A captured drawing to attach to a reaction project."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str | None = None
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class ReactionStructureScheme(BaseModel):
+    """A stored scheme: what the chemist drew, what RDKit made of it, and what they were told."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: int
+    reaction_project_id: int
+    name: str | None = None
+    format: Literal["mol", "rxn"]
+    source_block: str
+    normalized_block: str | None = None
+    canonical_smiles: str | None = None
+    inchikey: str | None = None
+    atom_count: int = 0
+    bond_count: int = 0
+    component_counts: StructureComponentCounts | None = None
+    warnings: list[StructureIssue] = Field(default_factory=list)
+    created_by_user_id: int | None = None
+    created_at: datetime
+    updated_at: datetime
+    reason_for_change: str | None = None
+    deleted_at: datetime | None = None
+    deleted_by: str | None = None
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class ReactionStructureSchemeDeleteRequest(BaseModel):
+    """Removal of a controlled record requires a reason (ALCOA+ Attributable)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    reason_for_change: str = Field(min_length=1, max_length=2000)
+
+
+class StructureSmartsMatchRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    smarts: str
+    targets: list[str] = Field(default_factory=list)
+
+
+class StructureSmartsMatchResult(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    smiles: str
+    parsed: bool
+    matched: bool
+    match_count: int = 0
+    atom_indices: list[int] = Field(default_factory=list)
+
+
+class StructureSmartsMatchResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    smarts: str
+    results: list[StructureSmartsMatchResult] = Field(default_factory=list)
+    matched_count: int = 0
+    unreadable_count: int = 0
+
+
 class ReactionSurrogateModelRecord(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

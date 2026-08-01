@@ -3860,6 +3860,59 @@ class ReactionSafetyScreeningORM(Base):
     metadata_json: Mapped[str] = mapped_column(Text, default="{}")
 
 
+class ReactionStructureSchemeORM(Base):
+    """A structure or reaction scheme drawn in Reaction Studio and attached to a project.
+
+    Retains **both** blocks on purpose. ``source_block`` is what the chemist actually drew and
+    is the audit record; ``normalized_block`` is RDKit's reading of it and is what downstream
+    chemistry should compute on. Keeping only one would either lose the original intent or make
+    every consumer re-derive it — and re-deriving it separately is how two engines drift apart.
+
+    ``warnings_json`` stores the plain-language notes the chemist was shown at capture time, so
+    the record says what they were told, not just what was stored.
+    """
+
+    __tablename__ = "reaction_structure_schemes"
+    __table_args__ = (
+        Index(
+            "ix_reaction_structure_schemes_project_created",
+            "reaction_project_id",
+            "created_at",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    reaction_project_id: Mapped[int] = mapped_column(
+        ForeignKey("reaction_projects.id", ondelete="CASCADE"),
+        index=True,
+    )
+    name: Mapped[str] = mapped_column(String(200), default="")
+    # "mol" or "rxn" — load-bearing: an RXN block is not a molfile and must not be parsed as one.
+    format: Mapped[str] = mapped_column(String(8), default="mol")
+    source_block: Mapped[str] = mapped_column(Text, default="")
+    normalized_block: Mapped[str] = mapped_column(Text, default="")
+    canonical_smiles: Mapped[str] = mapped_column(Text, default="")
+    # Empty for reactions and for query/R-group drawings, where a key would name a compound
+    # the chemist never drew.
+    inchikey: Mapped[str] = mapped_column(String(27), default="", index=True)
+    atom_count: Mapped[int] = mapped_column(Integer, default=0)
+    bond_count: Mapped[int] = mapped_column(Integer, default=0)
+    component_counts_json: Mapped[str] = mapped_column(Text, default="{}")
+    warnings_json: Mapped[str] = mapped_column(Text, default="[]")
+    created_by_user_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow
+    )
+    # --- ALCOA+ (Security Prompt 12): reversible-by-record removal with an attributable why. ---
+    reason_for_change: Mapped[str | None] = mapped_column(String(2000), nullable=True)
+    deleted_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, index=True
+    )
+    deleted_by: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    metadata_json: Mapped[str] = mapped_column(Text, default="{}")
+
+
 class ReactionFeedbackORM(Base):
     """A chemist's accept/edit/reject feedback on a reaction proposal (R9).
 

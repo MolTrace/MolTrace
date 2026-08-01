@@ -87,6 +87,9 @@ MODULE_ROUTE_PREFIXES: tuple[tuple[str, ModuleKey], ...] = (
     ("/regulatory", "regulatory_hub"),
     ("/ctd-module3-bundles", "regulatory_hub"),
     # ---- Repho: campaigns, optimization, execution, advisory -------------------------------
+    # Note the two spellings: the campaign surfaces are ``/reaction-*`` (hyphen), while the
+    # structure/scheme capture service is nested under ``/reactions/`` (plural). Both are Repho.
+    ("/reactions", "reaction_optimization"),
     ("/reaction-projects", "reaction_optimization"),
     ("/reaction-variables", "reaction_optimization"),
     ("/reaction-experiments", "reaction_optimization"),
