@@ -3657,6 +3657,11 @@ class ReactionDesignSpaceORM(Base):
     boolean_variables_json: Mapped[str] = mapped_column(Text, default="{}")
     fixed_conditions_json: Mapped[str] = mapped_column(Text, default="{}")
     excluded_conditions_json: Mapped[str] = mapped_column(Text, default="[]")
+    # Per-variable exploration state (free/fixed/excluded) chosen in the design-space
+    # editor. Stored as a JSON list of {reaction_variable_id, exploration_state}. This
+    # is the lightweight per-variable scoping the UI manages, layered additively on top
+    # of fixed_conditions_json/excluded_conditions_json.
+    exploration_states_json: Mapped[str] = mapped_column(Text, default="[]")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

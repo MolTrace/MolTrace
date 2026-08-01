@@ -19,6 +19,7 @@ from .models import (
     ReactionCostProfileUpdate,
     ReactionDesignSpace,
     ReactionDesignSpaceCreate,
+    ReactionDesignSpaceEntry,
     ReactionDesignSpaceUpdate,
     ReactionObjectiveProfile,
     ReactionObjectiveProfileCreate,
@@ -125,6 +126,7 @@ def create_design_space(
             boolean_variables_json=_json_dump(payload.boolean_variables_json),
             fixed_conditions_json=_json_dump(payload.fixed_conditions_json),
             excluded_conditions_json=_json_dump(payload.excluded_conditions_json),
+            exploration_states_json=_json_dump(_entries_to_storage(payload.entries)),
             metadata_json=_json_dump(payload.metadata_json),
         )
         session.add(row)
@@ -175,6 +177,13 @@ def patch_design_space(
         ):
             if field in update:
                 setattr(row, field, _json_dump(update[field] if update[field] is not None else {}))
+        # ``entries`` is a list (not a dict) and is validated by the Pydantic model, so
+        # persist it from the parsed payload rather than the raw model_dump; a cleared
+        # value (None) resets the per-variable states to empty.
+        if "entries" in update:
+            row.exploration_states_json = _json_dump(
+                _entries_to_storage(payload.entries or [])
+            )
         row.updated_at = utcnow()
         _audit(
             session,
@@ -1219,6 +1228,45 @@ def _score_outcome(outcome: dict[str, Any], objective_type: str, weights: dict[s
     )
 
 
+@dataclass(frozen=True)
+class _ExplorationDirectives:
+    """Resolved per-variable exploration state, keyed by variable name.
+
+    ``excluded_names`` — variables dropped from the search space entirely.
+    ``fixed_pins`` — name → value for variables held constant (pinned at their
+    default value). Variables marked ``fixed`` with no default value are absent
+    here (they cannot be pinned to a concrete value, so they stay free).
+    """
+
+    excluded_names: frozenset[str]
+    fixed_pins: dict[str, Any]
+
+
+def _exploration_directives(
+    design_space: ReactionDesignSpaceORM | None,
+    variables: list[ReactionVariableORM],
+) -> _ExplorationDirectives:
+    if design_space is None:
+        return _ExplorationDirectives(frozenset(), {})
+    entries = _entries_from_storage(design_space.exploration_states_json)
+    if not entries:
+        return _ExplorationDirectives(frozenset(), {})
+    by_id = {variable.id: variable for variable in variables}
+    excluded: set[str] = set()
+    fixed_pins: dict[str, Any] = {}
+    for entry in entries:
+        variable = by_id.get(entry.reaction_variable_id)
+        if variable is None:
+            continue
+        if entry.exploration_state == "excluded":
+            excluded.add(variable.name)
+        elif entry.exploration_state == "fixed":
+            pin = _json_value(variable.default_value)
+            if pin is not None:
+                fixed_pins[variable.name] = pin
+    return _ExplorationDirectives(frozenset(excluded), fixed_pins)
+
+
 def _build_domain(
     design_space: ReactionDesignSpaceORM | None,
     variables: list[ReactionVariableORM],
@@ -1230,6 +1278,10 @@ def _build_domain(
     boolean: dict[str, list[bool]] = {}
     fixed: dict[str, Any] = {}
     excluded: list[dict[str, Any]] = []
+
+    # Per-variable exploration state (free/fixed/excluded) from the design-space editor.
+    # This layers on top of fixed_conditions_json/excluded_conditions_json below.
+    directives = _exploration_directives(design_space, variables)
 
     if design_space is not None:
         fixed.update(_json_dict(design_space.fixed_conditions_json))
@@ -1255,7 +1307,14 @@ def _build_domain(
                 boolean=boolean,
             )
 
+    # A "fixed" variable is held at its default value unless an explicit fixed condition
+    # already sets it (that explicit value wins).
+    for name, value in directives.fixed_pins.items():
+        fixed.setdefault(name, value)
+
     for variable in variables:
+        if variable.name in directives.excluded_names:
+            continue
         if variable.name in fixed:
             continue
         if variable.variable_type == "numeric" and variable.name not in numeric:
@@ -1275,6 +1334,17 @@ def _build_domain(
             boolean[variable.name] = [False, True]
 
     _fill_domain_from_observed(numeric, numeric_ranges, categorical, boolean, fixed, experiments)
+
+    # "excluded" variables are dropped from the search space entirely — prune any
+    # dimension (design-space spec, variable-derived, or observed) that named them,
+    # including a fixed pin, so an excluded variable never appears in a candidate.
+    for name in directives.excluded_names:
+        numeric.pop(name, None)
+        numeric_ranges.pop(name, None)
+        categorical.pop(name, None)
+        boolean.pop(name, None)
+        fixed.pop(name, None)
+
     return _ConditionDomain(
         numeric=numeric,
         numeric_ranges=numeric_ranges,
@@ -1584,6 +1654,7 @@ def _design_space_to_record(row: ReactionDesignSpaceORM) -> ReactionDesignSpace:
         boolean_variables_json=_json_dict(row.boolean_variables_json),
         fixed_conditions_json=_json_dict(row.fixed_conditions_json),
         excluded_conditions_json=_json_value(row.excluded_conditions_json) or [],
+        entries=_entries_from_storage(row.exploration_states_json),
         created_at=row.created_at,
         updated_at=row.updated_at,
         metadata_json=_json_dict(row.metadata_json),
@@ -2298,6 +2369,44 @@ def _json_value(value: str | None) -> Any:
         return json.loads(value)
     except json.JSONDecodeError:
         return value
+
+
+_EXPLORATION_STATES = {"free", "fixed", "excluded"}
+
+
+def _entries_to_storage(entries: list[ReactionDesignSpaceEntry]) -> list[dict[str, Any]]:
+    """Normalize validated entries for storage: dedup by variable id (last wins),
+    drop the redundant default ``free`` rows so the persisted list stays compact."""
+    by_variable: dict[int, str] = {}
+    for entry in entries:
+        by_variable[entry.reaction_variable_id] = entry.exploration_state
+    return [
+        {"reaction_variable_id": vid, "exploration_state": state}
+        for vid, state in sorted(by_variable.items())
+        if state != "free"
+    ]
+
+
+def _entries_from_storage(value: str | None) -> list[ReactionDesignSpaceEntry]:
+    rows = _json_list(value)
+    entries: list[ReactionDesignSpaceEntry] = []
+    seen: set[int] = set()
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        raw_id = row.get("reaction_variable_id", row.get("variable_id"))
+        state = row.get("exploration_state", row.get("state"))
+        try:
+            vid = int(raw_id)
+        except (TypeError, ValueError):
+            continue
+        if vid in seen or state not in _EXPLORATION_STATES:
+            continue
+        seen.add(vid)
+        entries.append(
+            ReactionDesignSpaceEntry(reaction_variable_id=vid, exploration_state=state)
+        )
+    return entries
 
 
 def _audit(
