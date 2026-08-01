@@ -863,6 +863,107 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/reactions/structures/validate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Validate Structure Route
+         * @description Check a captured drawing with RDKit and report what it is — and what checking changed.
+         *
+         *     A structure that fails its chemistry checks still answers 200: the verdict is in the body,
+         *     because "is this sound?" answered with "no" is a successful question, not a failed request.
+         */
+        post: operations["validate_structure_route_reactions_structures_validate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reactions/structures/smarts-match": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Smarts Match Structures Route
+         * @description Match a query structure against target structures, on the R6 safety screen's engine.
+         */
+        post: operations["smarts_match_structures_route_reactions_structures_smarts_match_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reaction-projects/{reaction_project_id}/schemes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Reaction Structure Schemes Route */
+        get: operations["list_reaction_structure_schemes_route_reaction_projects__reaction_project_id__schemes_get"];
+        put?: never;
+        /**
+         * Create Reaction Structure Scheme Route
+         * @description Attach a captured drawing to a reaction project, storing the original and the normalized form.
+         */
+        post: operations["create_reaction_structure_scheme_route_reaction_projects__reaction_project_id__schemes_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reaction-projects/{reaction_project_id}/schemes/{scheme_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Reaction Structure Scheme Route */
+        get: operations["get_reaction_structure_scheme_route_reaction_projects__reaction_project_id__schemes__scheme_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reaction-projects/{reaction_project_id}/schemes/{scheme_id}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Archive Reaction Structure Scheme Route
+         * @description Archive a scheme: retained in full, marked removed, with the reason recorded.
+         */
+        post: operations["archive_reaction_structure_scheme_route_reaction_projects__reaction_project_id__schemes__scheme_id__archive_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/reaction-projects/{reaction_project_id}/feedback": {
         parameters: {
             query?: never;
@@ -29018,6 +29119,10 @@ export interface components {
              * @default false
              */
             development_mode: boolean;
+            /** Metadata Json */
+            metadata_json?: {
+                [key: string]: unknown;
+            };
             /** Evidence Item Id */
             evidence_item_id?: number | null;
             /** Compound Id */
@@ -29026,10 +29131,6 @@ export interface components {
             session_id?: number | null;
             /** Notes */
             notes?: string | null;
-            /** Metadata Json */
-            metadata_json?: {
-                [key: string]: unknown;
-            };
         };
         /** PredictionResponse */
         PredictionResponse: {
@@ -32946,6 +33047,98 @@ export interface components {
              * @default SDL execution is a hardware-automation layer under the same safety, regulatory, and human-approval gates as manual execution. Manual mode is the default; autonomy automates make/test inside a human-approved envelope and never bypasses a gate.
              */
             disclaimer: string;
+        };
+        /**
+         * ReactionStructureScheme
+         * @description A stored scheme: what the chemist drew, what RDKit made of it, and what they were told.
+         */
+        ReactionStructureScheme: {
+            /** Id */
+            id: number;
+            /** Reaction Project Id */
+            reaction_project_id: number;
+            /** Name */
+            name?: string | null;
+            /**
+             * Format
+             * @enum {string}
+             */
+            format: "mol" | "rxn";
+            /** Source Block */
+            source_block: string;
+            /** Normalized Block */
+            normalized_block?: string | null;
+            /** Canonical Smiles */
+            canonical_smiles?: string | null;
+            /** Inchikey */
+            inchikey?: string | null;
+            /**
+             * Atom Count
+             * @default 0
+             */
+            atom_count: number;
+            /**
+             * Bond Count
+             * @default 0
+             */
+            bond_count: number;
+            component_counts?: components["schemas"]["StructureComponentCounts"] | null;
+            /** Warnings */
+            warnings?: components["schemas"]["StructureIssue"][];
+            /** Created By User Id */
+            created_by_user_id?: number | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Reason For Change */
+            reason_for_change?: string | null;
+            /** Deleted At */
+            deleted_at?: string | null;
+            /** Deleted By */
+            deleted_by?: string | null;
+            /** Metadata Json */
+            metadata_json?: {
+                [key: string]: unknown;
+            };
+        };
+        /**
+         * ReactionStructureSchemeCreate
+         * @description A captured drawing to attach to a reaction project.
+         */
+        ReactionStructureSchemeCreate: {
+            /** Block */
+            block: string;
+            /**
+             * Format
+             * @enum {string}
+             */
+            format: "mol" | "rxn";
+            /**
+             * Smiles
+             * @default
+             */
+            smiles: string;
+            /** Name */
+            name?: string | null;
+            /** Metadata Json */
+            metadata_json?: {
+                [key: string]: unknown;
+            };
+        };
+        /**
+         * ReactionStructureSchemeDeleteRequest
+         * @description Removal of a controlled record requires a reason (ALCOA+ Attributable).
+         */
+        ReactionStructureSchemeDeleteRequest: {
+            /** Reason For Change */
+            reason_for_change: string;
         };
         /** ReactionVariable */
         ReactionVariable: {
@@ -38645,6 +38838,24 @@ export interface components {
             title: string;
             report: components["schemas"]["AnalysisEvidenceReport"];
         };
+        /** StructureComponentCounts */
+        StructureComponentCounts: {
+            /**
+             * Reactants
+             * @default 0
+             */
+            reactants: number;
+            /**
+             * Agents
+             * @default 0
+             */
+            agents: number;
+            /**
+             * Products
+             * @default 0
+             */
+            products: number;
+        };
         /** StructureElucidationReportCandidateSummary */
         StructureElucidationReportCandidateSummary: {
             /** Rank */
@@ -38827,6 +39038,62 @@ export interface components {
              */
             html_report: string;
         };
+        /**
+         * StructureIssue
+         * @description One plain-language note about a drawn structure.
+         *
+         *     ``atom_indices`` are positions in the drawing's atom list, counted from 0 in the same order
+         *     the atoms appear in the block, so the editor can highlight them. For a reaction they are
+         *     positions **within** the component the message names, not across the whole scheme.
+         */
+        StructureIssue: {
+            /** Code */
+            code: string;
+            /** Message */
+            message: string;
+            /** Atom Indices */
+            atom_indices?: number[];
+        };
+        /** StructureSmartsMatchRequest */
+        StructureSmartsMatchRequest: {
+            /** Smarts */
+            smarts: string;
+            /** Targets */
+            targets?: string[];
+        };
+        /** StructureSmartsMatchResponse */
+        StructureSmartsMatchResponse: {
+            /** Smarts */
+            smarts: string;
+            /** Results */
+            results?: components["schemas"]["StructureSmartsMatchResult"][];
+            /**
+             * Matched Count
+             * @default 0
+             */
+            matched_count: number;
+            /**
+             * Unreadable Count
+             * @default 0
+             */
+            unreadable_count: number;
+        };
+        /** StructureSmartsMatchResult */
+        StructureSmartsMatchResult: {
+            /** Smiles */
+            smiles: string;
+            /** Parsed */
+            parsed: boolean;
+            /** Matched */
+            matched: boolean;
+            /**
+             * Match Count
+             * @default 0
+             */
+            match_count: number;
+            /** Atom Indices */
+            atom_indices?: number[];
+        };
         /** StructureSummary */
         StructureSummary: {
             /** Smiles */
@@ -38877,6 +39144,70 @@ export interface components {
              * @default 0
              */
             aldehyde_proton_count: number;
+        };
+        /**
+         * StructureValidateRequest
+         * @description A drawing captured from the editor, for checking against RDKit.
+         *
+         *     ``format`` selects the parser and is trusted over the contents of ``block`` — an RXN block
+         *     is not a molfile. ``smiles`` may legitimately be empty (structure drawings with R-groups or
+         *     query atoms have no SMILES), and when present it is cross-checked, not trusted.
+         */
+        StructureValidateRequest: {
+            /** Block */
+            block: string;
+            /**
+             * Format
+             * @enum {string}
+             */
+            format: "mol" | "rxn";
+            /**
+             * Smiles
+             * @default
+             */
+            smiles: string;
+        };
+        /**
+         * StructureValidateResponse
+         * @description RDKit's reading of a drawing. A structure that fails its checks still returns here.
+         *
+         *     The verdict lives in ``ok`` and ``errors`` rather than in a transport status code: asking
+         *     "is this structure sound?" and getting an answer of "no" is a successful question.
+         */
+        StructureValidateResponse: {
+            /** Ok */
+            ok: boolean;
+            /**
+             * Format
+             * @enum {string}
+             */
+            format: "mol" | "rxn";
+            /** Canonical Smiles */
+            canonical_smiles?: string | null;
+            /** Normalized Block */
+            normalized_block?: string | null;
+            /** Inchikey */
+            inchikey?: string | null;
+            /**
+             * Atom Count
+             * @default 0
+             */
+            atom_count: number;
+            /**
+             * Bond Count
+             * @default 0
+             */
+            bond_count: number;
+            component_counts?: components["schemas"]["StructureComponentCounts"] | null;
+            /** Warnings */
+            warnings?: components["schemas"]["StructureIssue"][];
+            /** Errors */
+            errors?: components["schemas"]["StructureIssue"][];
+            /**
+             * Validator Version
+             * @default
+             */
+            validator_version: string;
         };
         /** SubscriptionPlan */
         SubscriptionPlan: {
@@ -44373,6 +44704,232 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ReactionSafetyScreening"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    validate_structure_route_reactions_structures_validate_post: {
+        parameters: {
+            query?: {
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StructureValidateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StructureValidateResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    smarts_match_structures_route_reactions_structures_smarts_match_post: {
+        parameters: {
+            query?: {
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StructureSmartsMatchRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StructureSmartsMatchResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_reaction_structure_schemes_route_reaction_projects__reaction_project_id__schemes_get: {
+        parameters: {
+            query?: {
+                include_deleted?: boolean;
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path: {
+                reaction_project_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReactionStructureScheme"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_reaction_structure_scheme_route_reaction_projects__reaction_project_id__schemes_post: {
+        parameters: {
+            query?: {
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path: {
+                reaction_project_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReactionStructureSchemeCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReactionStructureScheme"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_reaction_structure_scheme_route_reaction_projects__reaction_project_id__schemes__scheme_id__get: {
+        parameters: {
+            query?: {
+                include_deleted?: boolean;
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path: {
+                reaction_project_id: number;
+                scheme_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReactionStructureScheme"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    archive_reaction_structure_scheme_route_reaction_projects__reaction_project_id__schemes__scheme_id__archive_post: {
+        parameters: {
+            query?: {
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path: {
+                reaction_project_id: number;
+                scheme_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReactionStructureSchemeDeleteRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReactionStructureScheme"];
                 };
             };
             /** @description Validation Error */

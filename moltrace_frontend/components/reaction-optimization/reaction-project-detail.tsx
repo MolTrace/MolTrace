@@ -6331,7 +6331,12 @@ export function ReactionProjectDetail() {
                 capture it as a molfile or reaction block.
               </p>
             </div>
-            <StructureEditorPanel contextLabel={`Project ${reactionProjectId}`} />
+            {/* The project is already in scope here, so a captured scheme attaches straight to
+                it — no need to make the chemist pick the project they are standing in. */}
+            <StructureEditorPanel
+              contextLabel={`Project ${reactionProjectId}`}
+              reactionProjectId={Number.isFinite(reactionProjectId) ? reactionProjectId : null}
+            />
           </section>
         </TabsContent>
 
