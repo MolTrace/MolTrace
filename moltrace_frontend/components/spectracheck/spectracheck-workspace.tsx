@@ -84,7 +84,6 @@ import {
   patchSessionEvidence,
   patchSpectraCheckSession,
   postSessionEvidence,
-  postSessionReview,
   postSpectraCheckSession,
   postUnifiedEvidence,
 } from "@/src/lib/spectracheck/spectracheck-backend-session"
@@ -969,26 +968,6 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
     }
   }
 
-  async function handleSaveReview() {
-    if (!backendSessionId) return
-    setSessionBusy(true)
-    setSaveMessage("")
-    setSaveFeedback("saving")
-    try {
-      await postSessionReview(backendSessionId, reviewState ?? {})
-      establishSnapshot()
-      setSaveFeedback("saved")
-    } catch (err) {
-      setSaveFeedback("error")
-      setSaveMessage(formatApiError(err, "Save review failed."))
-      if (err instanceof ApiError && (err.status >= 502 || err.status === 0)) {
-        setSaveFeedback("unavailable")
-      }
-    } finally {
-      setSessionBusy(false)
-    }
-  }
-
   function handleLoadSessionClick() {
     const id = sessionIdInput.trim()
     if (!id) {
@@ -1198,7 +1177,6 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
             onNewSession={handleNewSession}
             onSaveEvidenceQueue={() => void handleSaveEvidenceQueue()}
             onSaveUnified={() => void handleSaveUnified()}
-            onSaveReview={() => void handleSaveReview()}
           />
 
           <SpectraCheckKnowledgeLinksCard backendSessionId={backendSessionId} />

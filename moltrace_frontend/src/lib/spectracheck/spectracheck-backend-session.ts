@@ -6,7 +6,7 @@ import { apiFetch } from "@/lib/api/client"
 import type { EvidenceItem, EvidenceItemStatus, EvidenceLayerType } from "@/src/lib/spectracheck/evidence-types"
 import { extractMethodProvenanceFromUnknown } from "@/src/lib/spectracheck/evidence-method-provenance"
 import { extractMlModelProvenanceFromUnknown } from "@/src/lib/ml/model-provenance-extract"
-import { sanitizeEvidenceItemsForStorage, sanitizeForSpectraCheckStorage } from "@/src/lib/spectracheck/spectracheck-evidence-session"
+import { sanitizeForSpectraCheckStorage } from "@/src/lib/spectracheck/spectracheck-evidence-session"
 import { readRecordNumber, readRecordString } from "@/components/projects/project-workspace-utils"
 import { NMR_SOLVENT_OPTIONS, NMR_SOLVENT_OTHER_VALUE } from "@/src/lib/nmr/solvents"
 
@@ -261,12 +261,70 @@ export async function patchSpectraCheckSession(sessionId: string, body: unknown)
   return apiFetch<unknown>(`/spectracheck/sessions/${sid}`, { method: "PATCH", body })
 }
 
+/** Sanitize a value down to a JSON object for a backend `*_json` dict field. */
+function asBackendJsonObject(value: unknown): Record<string, unknown> | undefined {
+  const s = sanitizeForSpectraCheckStorage(value)
+  if (s && typeof s === "object" && !Array.isArray(s)) return s as Record<string, unknown>
+  if (s == null) return undefined
+  // Arrays / primitives have no home in a dict-typed field; wrap rather than 422.
+  return { value: s }
+}
+
+/** Trimmed non-empty string, or undefined (so the key is omitted, not sent as "" / null). */
+function asBackendString(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim() ? value.trim() : undefined
+}
+
+/** Confidence-style score constrained to the backend's [0, 1] range, else undefined. */
+function asBackendScore(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 1 ? value : undefined
+}
+
+/** Array of trimmed, non-empty strings, or undefined when the source is not a list. */
+function asBackendStringList(value: unknown): string[] | undefined {
+  if (!Array.isArray(value)) return undefined
+  return value.map((v) => (typeof v === "string" ? v : String(v)).trim()).filter(Boolean)
+}
+
+/**
+ * Map the camelCase {@link EvidenceItem} onto the snake_case SpectraCheckEvidenceCreate /
+ * SpectraCheckEvidenceUpdate contract (both `extra="forbid"`). `source_tab` is required by
+ * Create; the four core strings are always sent so the same mapper serves POST and PATCH.
+ * Client-only fields (id, createdAt, sampleId, QC / readiness / override / quality-assessment
+ * state, backendEvidenceId, registry echoes) have no home on those models and are dropped.
+ */
 export function evidenceApiPayload(item: EvidenceItem): Record<string, unknown> {
-  const clone: EvidenceItem = { ...item }
-  delete clone.backendEvidenceId
-  const sanitized = sanitizeEvidenceItemsForStorage([clone])[0] as Record<string, unknown>
-  delete sanitized.backendEvidenceId
-  return sanitized
+  const payload: Record<string, unknown> = {
+    layer: item.layer,
+    title: item.title,
+    source_tab: item.sourceTab,
+    status: item.status,
+    selected_for_unified: item.selectedForUnified === true,
+    response_json: asBackendJsonObject(item.response) ?? {},
+  }
+  const score = asBackendScore(item.score)
+  if (score !== undefined) payload.score = score
+  const label = asBackendString(item.label)
+  if (label !== undefined) payload.label = label
+  const summary = asBackendString(item.summary)
+  if (summary !== undefined) payload.summary = summary
+  const endpoint = asBackendString(item.endpoint)
+  if (endpoint !== undefined) payload.endpoint = endpoint
+  const evidenceSummary = asBackendStringList(item.evidenceSummary)
+  if (evidenceSummary !== undefined) payload.evidence_summary_json = evidenceSummary
+  const contradictions = asBackendStringList(item.contradictions)
+  if (contradictions !== undefined) payload.contradictions_json = contradictions
+  const warnings = asBackendStringList(item.warnings)
+  if (warnings !== undefined) payload.warnings_json = warnings
+  const notes = asBackendStringList(item.notes)
+  if (notes !== undefined) payload.notes_json = notes
+  if (item.requestPreview !== undefined) {
+    const requestPreview = asBackendJsonObject(item.requestPreview)
+    if (requestPreview !== undefined) payload.request_preview_json = requestPreview
+  }
+  const provenance = asBackendJsonObject(item.provenance)
+  if (provenance !== undefined) payload.provenance_json = provenance
+  return payload
 }
 
 export async function postSessionEvidence(sessionId: string, item: EvidenceItem) {

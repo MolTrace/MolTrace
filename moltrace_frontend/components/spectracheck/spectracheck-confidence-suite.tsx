@@ -24,7 +24,6 @@ import { AlertTriangle, CheckCircle2, ShieldAlert } from "lucide-react"
 import type { EvidenceItem, EvidenceLayerType } from "@/src/lib/spectracheck/evidence-types"
 import {
   buildQcProvenanceForReport,
-  effectiveEvidenceReadiness,
   summarizeUnifiedEvidenceQueueQc,
 } from "@/src/lib/spectracheck/evidence-queue-qc"
 import { useSpectraCheckEvidence } from "@/src/lib/spectracheck/useSpectraCheckEvidence"
@@ -244,31 +243,27 @@ function summarizeUnifiedResultForReport(data: unknown): string | null {
 }
 
 function serializeEvidenceItemsForBundle(items: EvidenceItem[]) {
+  // Trim each item to exactly the EvidenceBundleItem contract (extra="forbid"). Client-only
+  // fields (sample_id, request_preview, QC / readiness / override / quality-assessment state)
+  // have no home on that model and 422 if sent.
   return items.map((i) => ({
     id: i.id,
     layer: i.layer,
     title: i.title,
     source_tab: i.sourceTab,
-    sample_id: i.sampleId ?? null,
     status: i.status,
-    score: i.score ?? null,
+    score: typeof i.score === "number" && Number.isFinite(i.score) && i.score >= 0 && i.score <= 1 ? i.score : null,
     label: i.label ?? null,
     summary: i.summary ?? null,
-    evidence_summary: i.evidenceSummary ?? null,
-    contradictions: i.contradictions ?? null,
-    warnings: i.warnings ?? null,
-    notes: i.notes ?? null,
+    evidence_summary: i.evidenceSummary ?? [],
+    contradictions: i.contradictions ?? [],
+    warnings: i.warnings ?? [],
+    notes: i.notes ?? [],
     endpoint: i.endpoint ?? null,
-    request_preview: i.requestPreview ?? null,
-    response: i.response,
-    created_at: i.createdAt,
-    selected_for_unified: i.selectedForUnified,
-    provenance: i.provenance ?? null,
-    qcStatus: i.qcStatus ?? null,
-    readinessStatus: effectiveEvidenceReadiness(i),
-    qualityAssessmentId: i.qualityAssessmentId ?? null,
-    overrideStatus: i.overrideStatus ?? null,
-    ...(i.overrideReason?.trim() ? { overrideReason: i.overrideReason.trim() } : {}),
+    response: isRecord(i.response) ? i.response : i.response == null ? {} : { value: i.response },
+    created_at: i.createdAt ?? null,
+    provenance: isRecord(i.provenance) ? i.provenance : null,
+    selected_for_unified: i.selectedForUnified === true,
   }))
 }
 
@@ -609,25 +604,27 @@ function UnifiedConfidenceTab({
     setResult(null)
     const serialized = serializeEvidenceItemsForBundle(selectedQueueItems)
     const advancedJson = buildUnifiedConfidenceRequestJson(sampleId, solvent, candidatesText, protonText, carbonText, adv)
+    const rawEvidenceResponses = selectedQueueItems.map((i) => ({
+      id: i.id,
+      layer: i.layer,
+      response: i.response,
+    }))
+    const bundleMetadata = {
+      queue_selected_count: selectedQueueItems.length,
+      layers_present: [...new Set(selectedQueueItems.map((i) => i.layer))],
+      unified_advanced_request: advancedJson,
+      qc_evidence_gate: qcGate,
+    }
+    // UnifiedEvidenceBundleRequest (extra="forbid") accepts only sample_id / solvent /
+    // candidates_text / evidence_items / metadata. Proton & carbon text and the parsed
+    // candidates ride inside metadata.unified_advanced_request; the raw responses stay
+    // client-side for the legacy fallback endpoint below.
     const bundleBody = {
       sample_id: sampleId.trim() || null,
       solvent: solvent.trim() || null,
       candidates_text: candidatesText,
-      candidates: parseCandidateInputs(candidatesText),
-      observed_proton_text: protonText.trim() || null,
-      observed_carbon13_text: carbonText.trim() || null,
-      selected_evidence_items: serialized,
-      raw_evidence_responses: selectedQueueItems.map((i) => ({
-        id: i.id,
-        layer: i.layer,
-        response: i.response,
-      })),
-      metadata: {
-        queue_selected_count: selectedQueueItems.length,
-        layers_present: [...new Set(selectedQueueItems.map((i) => i.layer))],
-        unified_advanced_request: advancedJson,
-        qc_evidence_gate: qcGate,
-      },
+      evidence_items: serialized,
+      metadata: bundleMetadata,
     }
 
     try {
@@ -643,8 +640,8 @@ function UnifiedConfidenceTab({
           const fallbackBody = {
             ...advancedJson,
             selected_evidence_items: serialized,
-            raw_evidence_responses: bundleBody.raw_evidence_responses,
-            evidence_bundle_metadata: bundleBody.metadata,
+            raw_evidence_responses: rawEvidenceResponses,
+            evidence_bundle_metadata: bundleMetadata,
           }
           const data = await apiFetch<unknown>("/confidence/candidates/unified/evidence", {
             method: "POST",
