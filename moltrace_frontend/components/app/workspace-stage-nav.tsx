@@ -29,10 +29,17 @@ type Props = {
   accent?: WorkspaceStageAccent
 }
 
-const ACCENT_VAR: Record<WorkspaceStageAccent, string> = {
-  teal: "var(--mt-teal)",
-  cyan: "var(--mt-cyan)",
-  violet: "var(--mt-violet)",
+/**
+ * Each accent carries the text colour that is legible ON it, because the right
+ * answer flips between them. Near-black clears AA comfortably on teal (11.5:1)
+ * and cyan (8.5:1), but violet is dark enough that near-black falls to 3.3:1 —
+ * below AA — and needs near-white instead (5.5:1). Picking one foreground for
+ * all three would fail one of them.
+ */
+const ACCENT: Record<WorkspaceStageAccent, { bg: string; fg: string }> = {
+  teal: { bg: "var(--mt-teal)", fg: "#04080F" },
+  cyan: { bg: "var(--mt-cyan)", fg: "#04080F" },
+  violet: { bg: "var(--mt-violet)", fg: "#EBF4F8" },
 }
 
 /** Moves focus with the arrow keys inside one tier, wrapping at both ends. */
@@ -64,7 +71,7 @@ export function WorkspaceStageNav({
   label,
   accent = "teal",
 }: Props) {
-  const accentColor = ACCENT_VAR[accent]
+  const { bg: accentBg, fg: accentFg } = ACCENT[accent]
   const activeGroup = groups.find((g) => g.sections.some((s) => s.value === activeValue)) ?? groups[0]
   const activeSection =
     activeGroup?.sections.find((s) => s.value === activeValue) ?? activeGroup?.sections[0]
@@ -153,7 +160,7 @@ export function WorkspaceStageNav({
                 <span
                   aria-hidden
                   className={cn("absolute inset-x-1 -bottom-px h-0.5 rounded-full", !on && "opacity-0")}
-                  style={{ backgroundColor: accentColor }}
+                  style={{ backgroundColor: accentBg }}
                 />
               </button>
             )
@@ -184,10 +191,10 @@ export function WorkspaceStageNav({
                     "inline-flex min-h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-3.5 py-1.5 font-mono text-[13px] transition-colors",
                     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
                     on
-                      ? "border-transparent font-bold text-[#04080F] shadow-sm"
+                      ? "border-transparent font-bold shadow-sm"
                       : "border-border bg-background text-muted-foreground hover:border-foreground/40 hover:bg-muted hover:text-foreground",
                   )}
-                  style={on ? { backgroundColor: accentColor } : undefined}
+                  style={on ? { backgroundColor: accentBg, color: accentFg } : undefined}
                 >
                   {section.label}
                   {section.badge}
