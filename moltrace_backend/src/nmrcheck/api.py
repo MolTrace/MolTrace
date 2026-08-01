@@ -14929,14 +14929,27 @@ def create_esignature_record_route(
     context: AccessContext = Depends(require_access_context),
 ) -> ElectronicSignatureRecord:
     # §11.200: signing requires a fresh step-up re-auth (enforced by the require_step_up dependency).
-    # §11.100: signer identity is the authenticated server principal — the client-supplied
-    #          signer_name/signer_email in the payload are ignored/overridden here.
+    # §11.100: signer identity is the authenticated server principal. For a user session the server
+    #          derives and OVERRIDES the name from the principal, so the client need not (and the SPA
+    #          does not) send signer_name/signer_email; a client-declared name that differs is kept in
+    #          metadata_json.client_declared_signer_name as an impersonation-audit trail. The only path
+    #          without a user principal is the operator break-glass (system api key); there the
+    #          client-declared signer_name is the sole identity and is used as-is.
     # §11.70:  the record content hash is resolved server-side and bound into the signature digest.
     state = _state(request)
     _, step_up_factor, step_up_aal = mfa_store.read_step_up(state.session_factory, context.raw_token)
     signer_user_id = context.user.id if context.user is not None else None
     signer_email = context.user.email if context.user is not None else None
     signer_display_name = signer_email  # UserPublic exposes no separate display name
+    if signer_display_name is None and payload.signer_name is None:
+        # No server principal (operator break-glass) AND no client-declared name -> there is no
+        # identity to attribute the signature to, and ElectronicSignatureRecord.signer_name is a
+        # required string. Fail closed with a clear 422 rather than minting an unattributed signature
+        # (or 500-ing on response serialization).
+        raise HTTPException(
+            status_code=422,
+            detail="signer_name is required when the request has no authenticated user principal.",
+        )
     try:
         record = validation_store.create_record_signature(
             state.session_factory,

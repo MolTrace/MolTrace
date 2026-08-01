@@ -185,6 +185,77 @@ def test_signer_identity_is_server_authoritative(tmp_path):
         assert body["signature_digest"].startswith("sha256:")
 
 
+def test_sign_without_signer_name_uses_server_principal(tmp_path):
+    """Contract regression guard: the SPA posts ONLY the four business fields
+    ({signature_meaning, target_type, target_id, reason}) and deliberately omits signer_name, because
+    §11.100 identity is server-authoritative. When signer_name was a REQUIRED field this real request
+    422'd during body validation — before the handler could apply the server principal. It must now
+    succeed, attribute to the authenticated principal, and (since no name was declared) NOT write a
+    misleading ``client_declared_signer_name`` into the audit trail."""
+    app = _app(tmp_path)
+    with TestClient(app) as client:
+        bearer = _signup(client, "spa@acme.com")
+        rid = _make_controlled_record(client, bearer)
+        _step_up(client, bearer)
+        res = client.post(
+            "/esignatures/records",
+            headers=bearer,
+            json={
+                "signature_meaning": "approved",
+                "target_type": "controlled_record",
+                "target_id": rid,
+                "reason": "approve",
+            },
+        )
+        assert res.status_code == 201, res.text
+        body = res.json()
+        assert body["signer_name"] == "spa@acme.com"  # server principal, not the (absent) client name
+        assert body["signer_email"] == "spa@acme.com"
+        assert body["signer_user_id"] is not None
+        assert "client_declared_signer_name" not in body["metadata_json"]
+        # §11.70 binding still applied when nothing was declared.
+        assert body["record_content_hash"].startswith("sha256:")
+        assert body["signature_digest"].startswith("sha256:")
+
+
+def test_operator_break_glass_signer_name_required_and_used(tmp_path):
+    """The one path with no user principal is the operator break-glass (system api key, which bypasses
+    step-up). There the client-declared signer_name is the SOLE identity, so making the field optional
+    must fail CLOSED when it is omitted — a 422 guard, never a 500 on the required-string response
+    contract — and use the declared name verbatim (no principal to override it) when supplied."""
+    app = _app(tmp_path)
+    with TestClient(app) as client:
+        op = {"x-api-key": "test-key"}  # -> system_api_key context, no user principal
+        missing = client.post(
+            "/esignatures/records",
+            headers=op,
+            json={
+                "signature_meaning": "reviewed",
+                "target_type": "analysis",
+                "target_id": 123,
+                "reason": "operator review",
+            },
+        )
+        assert missing.status_code == 422, missing.text
+        signed = client.post(
+            "/esignatures/records",
+            headers=op,
+            json={
+                "signer_name": "Operator On Call",
+                "signature_meaning": "reviewed",
+                "target_type": "analysis",
+                "target_id": 123,
+                "reason": "operator review",
+            },
+        )
+        assert signed.status_code == 201, signed.text
+        body = signed.json()
+        assert body["signer_name"] == "Operator On Call"  # used as-is; no principal to override
+        assert body["signer_user_id"] is None
+        # No principal to differ from -> not an impersonation event.
+        assert "client_declared_signer_name" not in body["metadata_json"]
+
+
 def test_verify_and_content_change_detection(tmp_path):
     app = _app(tmp_path)
     with TestClient(app) as client:
