@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { apiFetch } from "@/lib/api/client"
 import { trackOutboundSyncJobCreated } from "@/src/lib/analytics/analytics-client"
 import { Badge } from "@/components/ui/badge"
@@ -11,8 +11,14 @@ import { ModuleCard } from "@/components/dashboard/module-card"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { EntityPicker } from "@/components/ui/entity-picker"
-import { loadReactionProjects } from "@/lib/ui/entity-options"
+import { EntityPicker, type EntityOption } from "@/components/ui/entity-picker"
+import {
+  loadReactionProjects,
+  loadManagedFiles,
+  loadConnectors,
+  loadExternalRecords,
+  loadReactionExperiments,
+} from "@/lib/ui/entity-options"
 import { Separator } from "@/components/ui/separator"
 import {
   Table,
@@ -77,22 +83,45 @@ const DEMO_NEXT_EXPERIMENT = {
 }
 
 export function ReactionStudioWorkspace() {
-  const [importConnector, setImportConnector] = useState("")
-  const [importExternalRecord, setImportExternalRecord] = useState("")
-  const [importReactionProjectId, setImportReactionProjectId] = useState("")
-  const [importMappingTemplate, setImportMappingTemplate] = useState("")
-  const [importReviewRequired, setImportReviewRequired] = useState(true)
+  const [importFileId, setImportFileId] = useState<number | string | null>(null)
+  const [importConnectorId, setImportConnectorId] = useState<number | string | null>(null)
+  const [importReactionProjectId, setImportReactionProjectId] = useState<number | string | null>(null)
+  const [importExternalRecordId, setImportExternalRecordId] = useState<number | string | null>(null)
   const [importBusy, setImportBusy] = useState(false)
   const [importError, setImportError] = useState("")
   const [importResult, setImportResult] = useState<Record<string, unknown> | null>(null)
 
-  const [exportConnector, setExportConnector] = useState("")
-  const [exportReactionProjectId, setExportReactionProjectId] = useState("")
-  const [exportApprovedItems, setExportApprovedItems] = useState("")
-  const [exportTargetExternalRecord, setExportTargetExternalRecord] = useState("")
+  const [exportConnectorId, setExportConnectorId] = useState<number | string | null>(null)
+  const [exportTargetSystem, setExportTargetSystem] = useState("")
+  const [exportProjectId, setExportProjectId] = useState<number | string | null>(null)
+  const [exportExperimentOptions, setExportExperimentOptions] = useState<EntityOption[]>([])
+  const [exportExperimentIds, setExportExperimentIds] = useState<number[]>([])
   const [exportBusy, setExportBusy] = useState(false)
   const [exportError, setExportError] = useState("")
   const [exportResult, setExportResult] = useState<Record<string, unknown> | null>(null)
+
+  // Experiments are scoped to the picked project; reload the option list (and drop any
+  // now-out-of-scope selections) whenever the project changes. The project id itself is only
+  // a scope for this picker — it is not part of the export request body.
+  useEffect(() => {
+    if (exportProjectId == null) {
+      setExportExperimentOptions([])
+      setExportExperimentIds([])
+      return
+    }
+    let cancelled = false
+    setExportExperimentIds([])
+    void loadReactionExperiments(exportProjectId)
+      .then((opts) => {
+        if (!cancelled) setExportExperimentOptions(opts)
+      })
+      .catch(() => {
+        if (!cancelled) setExportExperimentOptions([])
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [exportProjectId])
 
   function readString(result: Record<string, unknown> | null, keys: string[]): string {
     if (!result) return ""
@@ -116,6 +145,12 @@ export function ReactionStudioWorkspace() {
     return null
   }
 
+  function toId(value: number | string | null): number | null {
+    if (value == null) return null
+    const n = typeof value === "number" ? value : Number(value)
+    return Number.isInteger(n) && n >= 1 ? n : null
+  }
+
   function readWarnings(result: Record<string, unknown> | null): string[] {
     if (!result) return []
     const warnings = result.warnings
@@ -129,18 +164,24 @@ export function ReactionStudioWorkspace() {
   }
 
   async function importExperimentTable() {
+    const fileId = toId(importFileId)
+    if (fileId == null) {
+      setImportError("Select a managed file to import.")
+      return
+    }
     setImportBusy(true)
     setImportError("")
     try {
+      const body: Record<string, unknown> = { file_id: fileId }
+      const connectorId = toId(importConnectorId)
+      if (connectorId != null) body.connector_id = connectorId
+      const projectId = toId(importReactionProjectId)
+      if (projectId != null) body.reaction_project_id = projectId
+      const externalRecordId = toId(importExternalRecordId)
+      if (externalRecordId != null) body.external_record_id = externalRecordId
       const payload = await apiFetch<unknown>("/integrations/reactions/import-experiment-table", {
         method: "POST",
-        body: {
-          connector: importConnector.trim(),
-          external_record: importExternalRecord.trim(),
-          reaction_project_id: importReactionProjectId.trim(),
-          mapping_template: importMappingTemplate.trim(),
-          review_required: importReviewRequired,
-        },
+        body,
       })
       if (payload && typeof payload === "object" && !Array.isArray(payload)) {
         setImportResult(payload as Record<string, unknown>)
@@ -155,21 +196,41 @@ export function ReactionStudioWorkspace() {
     }
   }
 
+  function addExportExperiment(id: number | string | null) {
+    const experimentId = toId(id)
+    if (experimentId == null) return
+    setExportExperimentIds((prev) => (prev.includes(experimentId) ? prev : [...prev, experimentId]))
+  }
+
+  function removeExportExperiment(id: number) {
+    setExportExperimentIds((prev) => prev.filter((value) => value !== id))
+  }
+
+  function experimentLabel(id: number): string {
+    return exportExperimentOptions.find((o) => Number(o.id) === id)?.label ?? `#${id}`
+  }
+
   async function exportApprovedExperiments() {
-    if (!exportApprovedItems.trim()) {
-      setExportError("Approved recommendations or experiments are required.")
+    const connectorId = toId(exportConnectorId)
+    if (connectorId == null) {
+      setExportError("Select a connector to export to.")
+      return
+    }
+    if (!exportTargetSystem.trim()) {
+      setExportError("A target system name is required.")
+      return
+    }
+    if (exportExperimentIds.length === 0) {
+      setExportError("Select at least one approved experiment.")
       return
     }
     setExportBusy(true)
     setExportError("")
     try {
       const payloadBody: Record<string, unknown> = {
-        connector: exportConnector.trim(),
-        reaction_project_id: exportReactionProjectId.trim(),
-        approved_recommendations_experiments: exportApprovedItems.trim(),
-      }
-      if (exportTargetExternalRecord.trim()) {
-        payloadBody.target_external_record = exportTargetExternalRecord.trim()
+        connector_id: connectorId,
+        target_system: exportTargetSystem.trim(),
+        experiment_ids_json: exportExperimentIds,
       }
       const payload = await apiFetch<unknown>("/integrations/reactions/export-approved-experiments", {
         method: "POST",
@@ -181,7 +242,7 @@ export function ReactionStudioWorkspace() {
         ? rec!.warnings.filter((item) => typeof item === "string" && item.trim()).length
         : 0
       trackOutboundSyncJobCreated({
-        connector_type: exportConnector.trim(),
+        connector_type: exportTargetSystem.trim(),
         target_program: "reaction_optimization",
         status: readString(rec, ["status", "job_status", "sync_status"]) || "created",
         warning_count: warningCount,
@@ -386,46 +447,62 @@ export function ReactionStudioWorkspace() {
             <div className="space-y-4">
               <div className="grid gap-3 md:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="rxn-import-connector">connector</Label>
-                  <Input id="rxn-import-connector" value={importConnector} onChange={(e) => setImportConnector(e.target.value)} />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="rxn-import-external-record">external record</Label>
-                  <Input
-                    id="rxn-import-external-record"
-                    value={importExternalRecord}
-                    onChange={(e) => setImportExternalRecord(e.target.value)}
+                  <Label htmlFor="rxn-import-file-id">Managed file</Label>
+                  <EntityPicker
+                    id="rxn-import-file-id"
+                    ariaLabel="Managed file"
+                    value={importFileId}
+                    onChange={setImportFileId}
+                    load={loadManagedFiles}
+                    allowClear
+                    placeholder="Select a managed file"
+                    searchPlaceholder="Search files…"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="rxn-import-project-id">reaction project</Label>
+                  <Label htmlFor="rxn-import-connector">Connector (optional)</Label>
+                  <EntityPicker
+                    id="rxn-import-connector"
+                    ariaLabel="Connector"
+                    value={importConnectorId}
+                    onChange={setImportConnectorId}
+                    load={loadConnectors}
+                    allowClear
+                    placeholder="Select a connector"
+                    searchPlaceholder="Search connectors…"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="rxn-import-project-id">Reaction project (optional)</Label>
                   <EntityPicker
                     id="rxn-import-project-id"
                     ariaLabel="Reaction project"
-                    value={importReactionProjectId || null}
-                    onChange={(id) => setImportReactionProjectId(id == null ? "" : String(id))}
+                    value={importReactionProjectId}
+                    onChange={setImportReactionProjectId}
                     load={loadReactionProjects}
+                    allowClear
                     placeholder="Select a reaction project"
                     searchPlaceholder="Search projects…"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="rxn-import-mapping-template">mapping template</Label>
-                  <Input
-                    id="rxn-import-mapping-template"
-                    value={importMappingTemplate}
-                    onChange={(e) => setImportMappingTemplate(e.target.value)}
+                  <Label htmlFor="rxn-import-external-record">External record (optional)</Label>
+                  <EntityPicker
+                    id="rxn-import-external-record"
+                    ariaLabel="External record"
+                    value={importExternalRecordId}
+                    onChange={setImportExternalRecordId}
+                    load={loadExternalRecords}
+                    allowClear
+                    placeholder="Select an external record"
+                    searchPlaceholder="Search records…"
                   />
-                </div>
-                <div className="md:col-span-2 flex items-center gap-3 rounded-md border p-3">
-                  <Checkbox
-                    id="rxn-import-review-required"
-                    checked={importReviewRequired}
-                    onCheckedChange={(checked) => setImportReviewRequired(checked === true)}
-                  />
-                  <Label htmlFor="rxn-import-review-required">review required</Label>
                 </div>
               </div>
+              <p className="text-xs text-muted-foreground">
+                A managed file is required. Upload files under Files &amp; ingestion; linking an external
+                record also needs a reaction project.
+              </p>
               {importError ? (
                 <AlertCard variant="error" title="Import failed" description={importError} />
               ) : null}
@@ -471,37 +548,72 @@ export function ReactionStudioWorkspace() {
             <div className="space-y-4">
               <div className="grid gap-3 md:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="rxn-export-connector">connector</Label>
-                  <Input id="rxn-export-connector" value={exportConnector} onChange={(e) => setExportConnector(e.target.value)} />
+                  <Label htmlFor="rxn-export-connector">Connector</Label>
+                  <EntityPicker
+                    id="rxn-export-connector"
+                    ariaLabel="Connector"
+                    value={exportConnectorId}
+                    onChange={setExportConnectorId}
+                    load={loadConnectors}
+                    allowClear
+                    placeholder="Select a connector"
+                    searchPlaceholder="Search connectors…"
+                  />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="rxn-export-project-id">reaction project</Label>
+                  <Label htmlFor="rxn-export-target-system">Target system</Label>
+                  <Input
+                    id="rxn-export-target-system"
+                    value={exportTargetSystem}
+                    onChange={(e) => setExportTargetSystem(e.target.value)}
+                    placeholder="e.g. Benchling, LabWare"
+                  />
+                </div>
+                <div className="space-y-2 md:col-span-2">
+                  <Label htmlFor="rxn-export-project-id">Reaction project</Label>
                   <EntityPicker
                     id="rxn-export-project-id"
                     ariaLabel="Reaction project"
-                    value={exportReactionProjectId || null}
-                    onChange={(id) => setExportReactionProjectId(id == null ? "" : String(id))}
+                    value={exportProjectId}
+                    onChange={setExportProjectId}
                     load={loadReactionProjects}
-                    placeholder="Select a reaction project"
+                    allowClear
+                    placeholder="Select a project to list its experiments"
                     searchPlaceholder="Search projects…"
                   />
                 </div>
                 <div className="space-y-2 md:col-span-2">
-                  <Label htmlFor="rxn-export-approved-items">approved recommendations / experiments</Label>
-                  <Input
-                    id="rxn-export-approved-items"
-                    value={exportApprovedItems}
-                    onChange={(e) => setExportApprovedItems(e.target.value)}
-                    placeholder="IDs from approved recommendations or experiments"
+                  <Label htmlFor="rxn-export-experiments">Approved experiments</Label>
+                  <EntityPicker
+                    id="rxn-export-experiments"
+                    ariaLabel="Approved experiments"
+                    value={null}
+                    onChange={addExportExperiment}
+                    options={exportExperimentOptions}
+                    disabled={exportProjectId == null}
+                    placeholder={
+                      exportProjectId == null ? "Select a project first" : "Add an approved experiment"
+                    }
+                    searchPlaceholder="Search experiments…"
+                    emptyText="No experiments in this project."
                   />
-                </div>
-                <div className="space-y-2 md:col-span-2">
-                  <Label htmlFor="rxn-export-target-external-record">Target external record (optional)</Label>
-                  <Input
-                    id="rxn-export-target-external-record"
-                    value={exportTargetExternalRecord}
-                    onChange={(e) => setExportTargetExternalRecord(e.target.value)}
-                  />
+                  {exportExperimentIds.length > 0 ? (
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      {exportExperimentIds.map((id) => (
+                        <Badge key={id} variant="secondary" className="gap-1">
+                          {experimentLabel(id)}
+                          <button
+                            type="button"
+                            onClick={() => removeExportExperiment(id)}
+                            aria-label={`Remove ${experimentLabel(id)}`}
+                            className="ml-1 rounded-sm text-muted-foreground hover:text-foreground"
+                          >
+                            ×
+                          </button>
+                        </Badge>
+                      ))}
+                    </div>
+                  ) : null}
                 </div>
               </div>
               {exportError ? (
