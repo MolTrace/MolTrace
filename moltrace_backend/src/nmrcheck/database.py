@@ -306,6 +306,20 @@ def _ensure_sqlite_schema(engine: Engine) -> None:
                     connection.exec_driver_sql(
                         f"ALTER TABLE prediction_service_configs ADD COLUMN {column} {ddl}"
                     )
+        if "reaction_design_spaces" in tables:
+            # Per-variable exploration-state column (migration 0032) on a pre-existing dev
+            # SQLite DB. Production Postgres picks it up via 0032.
+            design_space_existing = {
+                str(row[1])
+                for row in connection.exec_driver_sql(
+                    "PRAGMA table_info(reaction_design_spaces)"
+                ).fetchall()
+            }
+            if "exploration_states_json" not in design_space_existing:
+                connection.exec_driver_sql(
+                    "ALTER TABLE reaction_design_spaces "
+                    "ADD COLUMN exploration_states_json TEXT DEFAULT '[]'"
+                )
 
 
 @contextmanager

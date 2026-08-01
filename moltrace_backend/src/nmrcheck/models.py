@@ -10819,6 +10819,29 @@ ReactionRecommendationBatchStatus = Literal[
 ReactionBenchmarkStatus = Literal["queued", "running", "succeeded", "failed", "requires_review"]
 
 
+ReactionExplorationState = Literal["free", "fixed", "excluded"]
+
+
+class ReactionDesignSpaceEntry(BaseModel):
+    """Per-variable exploration state chosen in the design-space editor.
+
+    ``free`` — vary the variable during optimization (the default).
+    ``fixed`` — hold the variable constant; the optimizer pins it at the
+    variable's default value (when the variable has one).
+    ``excluded`` — drop the variable from the search space entirely.
+
+    This is the lightweight, per-variable scoping the reaction design-space UI
+    manages. It is distinct from ``fixed_conditions_json`` (name → explicit
+    value) and ``excluded_conditions_json`` (whole-condition filters), which the
+    optimizer also honors; the two mechanisms layer additively.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    reaction_variable_id: int
+    exploration_state: ReactionExplorationState = "free"
+
+
 class ReactionDesignSpaceCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -10828,6 +10851,7 @@ class ReactionDesignSpaceCreate(BaseModel):
     boolean_variables_json: dict[str, Any] = Field(default_factory=dict)
     fixed_conditions_json: dict[str, Any] = Field(default_factory=dict)
     excluded_conditions_json: list[dict[str, Any]] | dict[str, Any] = Field(default_factory=list)
+    entries: list[ReactionDesignSpaceEntry] = Field(default_factory=list)
     metadata_json: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -10840,6 +10864,7 @@ class ReactionDesignSpaceUpdate(BaseModel):
     boolean_variables_json: dict[str, Any] | None = None
     fixed_conditions_json: dict[str, Any] | None = None
     excluded_conditions_json: list[dict[str, Any]] | dict[str, Any] | None = None
+    entries: list[ReactionDesignSpaceEntry] | None = None
     metadata_json: dict[str, Any] | None = None
 
 
@@ -10854,6 +10879,7 @@ class ReactionDesignSpace(BaseModel):
     boolean_variables_json: dict[str, Any] = Field(default_factory=dict)
     fixed_conditions_json: dict[str, Any] = Field(default_factory=dict)
     excluded_conditions_json: list[dict[str, Any]] | dict[str, Any] = Field(default_factory=list)
+    entries: list[ReactionDesignSpaceEntry] = Field(default_factory=list)
     created_at: datetime
     updated_at: datetime
     metadata_json: dict[str, Any] = Field(default_factory=dict)
