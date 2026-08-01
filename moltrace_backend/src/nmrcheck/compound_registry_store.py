@@ -1013,6 +1013,8 @@ def search_compounds(
             stmt = stmt.where(CompoundEntityORM.id.in_(alias_ids))
         if payload.registry_id:
             stmt = stmt.where(CompoundEntityORM.registry_id == payload.registry_id)
+        if payload.compound_type:
+            stmt = stmt.where(CompoundEntityORM.compound_type == payload.compound_type)
         if payload.inchikey:
             structure_ids = select(CompoundStructureRecordORM.compound_id).where(
                 CompoundStructureRecordORM.inchikey == payload.inchikey
