@@ -1191,10 +1191,15 @@ function ReportComposerTab({
     setBusy(true)
     setError("")
     try {
+      // StructureElucidationReportRequest (extra="forbid") has no provenance_metadata /
+      // evidence_queue_handoff — strip them from this body (kept for other consumers).
+      const reportBody: Record<string, unknown> = { ...(reportPayloadJson as Record<string, unknown>) }
+      delete reportBody.provenance_metadata
+      delete reportBody.evidence_queue_handoff
       const html = await apiFetch("/reports/structure-elucidation/compose/html", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(reportPayloadJson),
+        body: JSON.stringify(reportBody),
       })
       if (typeof html === "string") setHtmlPreview(sanitizeReportHtml(html))
     } catch (err) {

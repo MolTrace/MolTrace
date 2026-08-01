@@ -866,7 +866,9 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
         shared_inputs_json: shared,
       }
       if (backendSessionId) {
-        await patchSpectraCheckSession(backendSessionId, body)
+        // SpectraCheckSessionUpdate (extra="forbid") has no project_id/sample_id
+        // (immutable session attributes); only send the mutable shared_inputs_json.
+        await patchSpectraCheckSession(backendSessionId, { shared_inputs_json: shared })
       } else {
         const created = await postSpectraCheckSession(body)
         const newId = parseSessionIdFromRecord(created)

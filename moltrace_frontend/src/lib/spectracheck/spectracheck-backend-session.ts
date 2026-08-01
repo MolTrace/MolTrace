@@ -289,10 +289,13 @@ export async function patchSessionEvidence(sessionId: string, item: EvidenceItem
 
 export async function postUnifiedEvidence(sessionId: string, payload: unknown) {
   const sid = encodeURIComponent(sessionId)
-  const body = payload == null ? {} : sanitizeForSpectraCheckStorage(payload)
+  // SpectraCheckUnifiedEvidenceSave (extra="forbid") expects the result wrapped under
+  // unified_evidence_json; posting the result object's own top-level keys 422s.
+  const body =
+    payload == null ? {} : { unified_evidence_json: sanitizeForSpectraCheckStorage(payload) }
   return apiFetch<unknown>(`/spectracheck/sessions/${sid}/unified-evidence`, {
     method: "POST",
-    body: body ?? {},
+    body,
   })
 }
 
