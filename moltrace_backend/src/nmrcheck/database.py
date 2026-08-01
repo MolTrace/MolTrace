@@ -177,6 +177,18 @@ def _ensure_sqlite_schema(engine: Engine) -> None:
                 connection.exec_driver_sql(
                     "ALTER TABLE regulatory_dossiers ADD COLUMN organization_id INTEGER"
                 )
+        if "reaction_projects" in tables:
+            # Team ownership (migration 0034), the counterpart of the dossier column above.
+            project_existing = {
+                str(row[1])
+                for row in connection.exec_driver_sql(
+                    "PRAGMA table_info(reaction_projects)"
+                ).fetchall()
+            }
+            if "organization_id" not in project_existing:
+                connection.exec_driver_sql(
+                    "ALTER TABLE reaction_projects ADD COLUMN organization_id INTEGER"
+                )
         if "session_tokens" in tables:
             # MFA/step-up columns (Prompt 3 / migration 0019) on a pre-existing dev SQLite DB.
             session_existing = {

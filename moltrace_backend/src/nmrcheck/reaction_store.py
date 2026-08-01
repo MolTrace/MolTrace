@@ -4,10 +4,12 @@ import json
 from dataclasses import dataclass
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
 
+from . import org_membership
+from . import reaction_access
 from .database import session_scope
 from .models import (
     ReactionExperiment,
@@ -106,6 +108,9 @@ def create_project(
             target_product_name=payload.target_product_name,
             target_product_smiles=payload.target_product_smiles,
             owner_id=owner_id,
+            # The creator's team, when they have exactly one. Ambiguity deliberately falls back to
+            # creator-only rather than guessing — see ``org_membership.sole_active_org_id``.
+            organization_id=org_membership.sole_active_org_id(session, owner_id),
             metadata_json=_json_dump(payload.metadata_json),
         )
         session.add(row)
@@ -134,9 +139,11 @@ def list_projects(
         if status is not None:
             stmt = stmt.where(ReactionProjectORM.status == status)
         if owner_scope_id is not None:
-            # Owner-scope the collection read: a user-scoped caller sees only their own
-            # projects; an unrestricted caller (system/admin) passes None and sees all.
-            stmt = stmt.where(ReactionProjectORM.owner_id == owner_scope_id)
+            # Owner-scope the collection read: a user-scoped caller sees their own projects and
+            # those owned by an organization they belong to; an unrestricted caller (system/admin)
+            # passes None and sees all. This must match the path gate exactly, or the list shows
+            # campaigns that 404 when opened.
+            stmt = stmt.where(reaction_access.project_scope_predicate(session, owner_scope_id))
         return [_project_to_record(row) for row in session.scalars(stmt).all()]
 
 

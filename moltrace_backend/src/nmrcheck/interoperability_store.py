@@ -20,6 +20,7 @@ from . import reaction_access
 # `_dossier_owned_by` is the canonical session-scoped dossier-ownership predicate used by the
 # cross-module routes the 7a8a52d fix landed; reusing it here keeps the body-id check identical.
 from .product_orchestration_store import _dossier_owned_by
+from . import regulatory_intelligence
 from .database import session_scope
 from .models import (
     ConnectorCredentialReference,
@@ -1439,7 +1440,7 @@ def list_outbound_sync_jobs(
             # union of every typed-resource ownership join the predicate set knows about; an
             # unknown source_resource_type is excluded (safe default).
             owned_reaction_projects = select(ReactionProjectORM.id).where(
-                ReactionProjectORM.owner_id == owner_scope_id
+                reaction_access.project_scope_predicate(session, owner_scope_id)
             )
             owned_reaction_experiments = (
                 select(ReactionExperimentORM.id)
@@ -1447,10 +1448,10 @@ def list_outbound_sync_jobs(
                     ReactionProjectORM,
                     ReactionProjectORM.id == ReactionExperimentORM.reaction_project_id,
                 )
-                .where(ReactionProjectORM.owner_id == owner_scope_id)
+                .where(reaction_access.project_scope_predicate(session, owner_scope_id))
             )
             owned_dossiers = select(RegulatoryDossierORM.id).where(
-                RegulatoryDossierORM.created_by_user_id == owner_scope_id
+                regulatory_intelligence.dossier_scope_predicate(session, owner_scope_id)
             )
             owned_spectracheck_sessions = (
                 select(SpectraCheckSessionORM.id)

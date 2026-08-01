@@ -183,3 +183,40 @@ def test_the_creator_and_the_operator_are_unaffected(client, app, api_headers):
 
         assert client.get(f"/regulatory/dossiers/{dossier['id']}", headers=lead).status_code == 200
         assert client.get(f"/regulatory/dossiers/{dossier['id']}", headers=api_headers).status_code == 200
+
+
+def test_a_teammate_sees_the_dossiers_action_items_not_an_empty_inbox(client, app):
+    """The gap the first pass left: opening a dossier is useless if its contents are invisible.
+
+    ``regulatory_compliance_store`` kept its own copy of the ownership predicate, so widening the
+    original did not widen the action-item queue — a colleague could open a filing and find its
+    task inbox empty. The copies now delegate to one implementation, and this pins that they
+    cannot drift apart again.
+    """
+    lead_email, reviewer_email = _emails()
+    with client:
+        lead = _sign_up(client, lead_email)
+        reviewer = _sign_up(client, reviewer_email)
+        _org_with_members(app, "Regulatory Affairs", [(lead_email, "active"), (reviewer_email, "active")])
+        dossier = _dossier(client, lead)
+
+        created = client.post(
+            "/regulatory/action-items",
+            headers=lead,
+            json={
+                "dossier_id": dossier["id"],
+                "action_type": "human_review",
+                "severity": "info",
+                "title": "Confirm the impurity limit",
+                "description": "Check the reported limit against the current guidance.",
+            },
+        )
+        assert created.status_code == 201, created.text
+
+        lead_items = client.get("/regulatory/action-items", headers=lead)
+        reviewer_items = client.get("/regulatory/action-items", headers=reviewer)
+        assert lead_items.status_code == 200 and reviewer_items.status_code == 200
+        assert [row["id"] for row in reviewer_items.json()] == [
+            row["id"] for row in lead_items.json()
+        ], "a teammate must see the same action items as the dossier's creator"
+        assert created.json()["id"] in [row["id"] for row in reviewer_items.json()]

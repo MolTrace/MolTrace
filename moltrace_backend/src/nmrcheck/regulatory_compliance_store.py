@@ -19,6 +19,7 @@ from moltrace.regulatory.compliance import (
 )
 from moltrace.spectroscopy.infra.contract import content_hash
 
+from . import regulatory_intelligence
 from .database import session_scope
 from .models import (
     AIGovernanceRecord,
@@ -602,7 +603,7 @@ def list_action_items(
             stmt = stmt.join(
                 RegulatoryDossierORM,
                 RegulatoryActionItemORM.dossier_id == RegulatoryDossierORM.id,
-            ).where(RegulatoryDossierORM.created_by_user_id == owner_scope_id)
+            ).where(regulatory_intelligence.dossier_scope_predicate(session, owner_scope_id))
         if dossier_id is not None:
             stmt = stmt.where(RegulatoryActionItemORM.dossier_id == dossier_id)
         if status is not None:
@@ -611,15 +612,14 @@ def list_action_items(
 
 
 def _dossier_owned_by(session: Session, dossier_id: int | None, owner_scope_id: int | None) -> bool:
-    """In-session dossier-ownership check (mirrors regulatory_intelligence.dossier_owned_by):
-    system/admin scope (``None``) sees all; else the parent dossier must be owned by the scope
-    user; a missing / ``None`` dossier is hidden from a user-scoped caller."""
-    if owner_scope_id is None:
-        return True
-    if dossier_id is None:
-        return False
-    row = session.get(RegulatoryDossierORM, dossier_id)
-    return row is not None and row.created_by_user_id == owner_scope_id
+    """In-session dossier-ownership check — delegates to the one implementation.
+
+    This used to re-implement ``regulatory_intelligence.dossier_owned_by`` rather than call it,
+    and the copy drifted the moment dossiers gained team ownership: a colleague could open a
+    dossier and then find its action items invisible, because this mirror still compared the
+    creator alone. Delegating removes the drift rather than re-fixing it here.
+    """
+    return regulatory_intelligence.dossier_owned_by(session, dossier_id, owner_scope_id)
 
 
 def update_action_item(

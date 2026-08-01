@@ -2863,13 +2863,21 @@ def require_reaction_access(
     """
     route = request.scope.get("route")
     route_path = getattr(route, "path", request.url.path)
-    owner_id = reaction_access.reaction_route_owner_id(
-        _state(request).session_factory, route_path, dict(request.path_params)
+    owner_id, team_access = reaction_access.reaction_route_access_facts(
+        _state(request).session_factory,
+        route_path,
+        dict(request.path_params),
+        context.user_id,
     )
     decision = authz.authorize(
         authz.principal_from_access_context(context),
         authz.Action("owned:read"),
-        authz.Resource("reaction_project", resource_id=None, owner_id=owner_id),
+        authz.Resource(
+            "reaction_project",
+            resource_id=None,
+            owner_id=owner_id,
+            attrs={"team_access": team_access},
+        ),
     )
     if not decision.allowed:
         detections.emit_cross_tenant_denied(
