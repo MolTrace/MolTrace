@@ -149,6 +149,12 @@ The good news: `TenantProvider` **already** fetches entitlements and derives `mo
 ### Layer 0.E — Carve-out: shared primitives that are secretly SpectraCheck's
 **Lane: backend.** The largest rebuild; can run in parallel with 0.D.
 
+> **Re-sequenced.** The collaboration layer exists so a *team* can act on a subject — but Regentry dossiers and Repho campaigns were single-user owned, so generalizing review-tasks and permissions onto them would have produced a queue only one person could ever see. Team **ownership** is the prerequisite, and it delivers the commercial outcome ("sellable to a team") at a fraction of the risk. Regulatory ownership landed first; the polymorphic carve-out below now has something to attach to.
+>
+> **Done — Regentry team ownership.** `regulatory_dossiers.organization_id` (nullable, migration `0032`), stamped from the creator's sole active organization; `dossier_owned_by`, the dossier list, and the policy engine all widened in lockstep so the queue can never show a row that 404s when opened. New PDP policy `permit-org-member-dossier-rw` with a pure `_shares_owner_org` condition — membership is resolved in the store and passed through `Resource.attrs`, keeping conditions database-free. NULL organization preserves creator-only behaviour exactly, so no existing row changed and no backfill was needed. Shared membership helper: `org_membership.py`.
+>
+> **Next in 0.E:** the same ownership change for `reaction_projects` (structurally identical), then the polymorphic `(subject_type, subject_id)` work below.
+
 - **REBUILD** — Polymorphic `(subject_type, subject_id)` on the collaboration layer, using the pattern the compliance floor already uses (`electronic_signature_records.target_type/target_id`). Retain the legacy spectracheck FK nullable for back-compat; register the existing spectracheck path first so nothing regresses. Without this, Regentry-only and Repho-only SKUs have no approvals, no reviewers, no share links.
 - **MODIFY** — `ai_governance_records.dossier_id`, `qnmr_compliance_profiles.dossier_id` and `analytical_method_validation_profiles.dossier_id` are all **NOT NULL** → a SpectraCheck-only SKU loses AI governance and its own qNMR method metrology. Make nullable + add the polymorphic subject alternative, with a store guard requiring exactly one.
 - **ADD** — A content-bound e-signature path for module reports. `_BINDABLE_TARGET_TYPES` is `{controlled_record, system_release}` only, so signing a SpectraCheck report today yields an **unbound** signature.

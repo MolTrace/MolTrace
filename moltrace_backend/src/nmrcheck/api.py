@@ -2815,11 +2815,18 @@ def require_dossier_access(
     is resolved once and passed in, then the PDP applies the system/admin/owner rules. The
     404 mapping (ownership-secret resource) is preserved exactly.
     """
-    owner_id = regulatory_store.dossier_owner_id(_state(request).session_factory, dossier_id)
+    owner_id, team_access = regulatory_store.dossier_access_facts(
+        _state(request).session_factory, dossier_id, context.user_id
+    )
     decision = authz.authorize(
         authz.principal_from_access_context(context),
         authz.Action("dossier:read"),  # read == write access in this model; one gate
-        authz.Resource("dossier", resource_id=dossier_id, owner_id=owner_id),
+        authz.Resource(
+            "dossier",
+            resource_id=dossier_id,
+            owner_id=owner_id,
+            attrs={"team_access": team_access},
+        ),
     )
     if not decision.allowed:
         detections.emit_cross_tenant_denied(

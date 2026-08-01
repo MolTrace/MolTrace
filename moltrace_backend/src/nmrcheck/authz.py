@@ -251,6 +251,19 @@ def _owns_resource(prin: Principal, act: Action, res: Resource, ctx: Context) ->
     return res.owner_id is not None and res.owner_id == prin.user_id
 
 
+def _shares_owner_org(prin: Principal, act: Action, res: Resource, ctx: Context) -> bool:
+    """Team access: the resource is owned by an organization the caller actively belongs to.
+
+    Membership is a database fact and conditions are pure, so the caller resolves it and passes
+    the answer in as ``attrs["team_access"]`` (see ``regulatory_intelligence.dossier_access_facts``).
+    Anything other than an explicit ``True`` — absent, ``None``, unresolved — is not access, which
+    keeps deny-by-default and the non-leaking 404 intact.
+    """
+    if prin.user_id is None:
+        return False
+    return res.attrs.get("team_access") is True
+
+
 # --------------------------------------------------------------------------- policy set
 
 
@@ -291,6 +304,18 @@ POLICY_SET: tuple[Policy, ...] = (
         resource_types=frozenset({"dossier"}),
         condition=_owns_resource,
         description="User reads/writes only dossiers they created (dossier_owned_by).",
+    ),
+    # 3b. Regulatory affairs is a team activity — a reviewer, a toxicologist and a QA lead all
+    #     touch one filing. A dossier owned by an organization is reachable by its active
+    #     members, alongside (not instead of) the creator rule above.
+    Policy(
+        id="permit-org-member-dossier-rw",
+        effect=Effect.PERMIT,
+        principal_kinds=frozenset({PrincipalKind.USER}),
+        actions=frozenset({"dossier:read", "dossier:write"}),
+        resource_types=frozenset({"dossier"}),
+        condition=_shares_owner_org,
+        description="User reads/writes dossiers owned by an organization they belong to.",
     ),
     # 4. Generic owner pattern for the other inline-scoped resources (projects, FID runs,
     #    analyses, raw archives, …) — same created_by/owner_id == user_id rule.
