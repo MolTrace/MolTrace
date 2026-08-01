@@ -33,7 +33,10 @@ const ROUTE_MODULE_PREFIXES: ReadonlyArray<readonly [string, ModuleKey]> = [
   ["/regulatory", "regulatory_hub"],
   ["/actions", "regulatory_hub"],
   ["/reactions", "reaction_optimization"],
-  ["/projects", "reaction_optimization"],
+  // NOT /projects. It is a Workspace item, it reads the plain /projects list, and a SpectraCheck
+  // session carries a project_id — so SpectraCheck needs it. Repho's own projects are
+  // /reaction-projects, which live under /reactions. Mapping it here hid a page the customer
+  // depends on, and once the route guard exists it would have turned that into a hard wall.
 ]
 
 /**

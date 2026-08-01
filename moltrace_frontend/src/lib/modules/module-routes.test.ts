@@ -47,6 +47,10 @@ describe("routeIsOffered", () => {
     expect(routeIsOffered("/spectracheck", only)).toBe(true)
     expect(routeIsOffered("/review", only)).toBe(true)
     expect(routeIsOffered("/regulatory", only)).toBe(false)
+    // /projects is shared, not Repho's: a SpectraCheck session carries a project_id, so hiding
+    // it from a SpectraCheck-only workspace removed a page that product actually needs.
+    expect(routeIsOffered("/projects", only)).toBe(true)
+    expect(routeIsOffered("/projects/14", only)).toBe(true)
     expect(routeIsOffered("/reactions", only)).toBe(false)
     // shared surfaces survive
     expect(routeIsOffered("/dashboard", only)).toBe(true)

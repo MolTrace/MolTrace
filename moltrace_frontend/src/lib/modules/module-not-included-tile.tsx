@@ -60,7 +60,11 @@ export function ModuleGate({
   /** "tile" states the situation; "hide" renders nothing (for purely decorative surfaces). */
   fallback?: "tile" | "hide"
 }) {
-  const { isIncluded } = useIncludedModules()
+  const { isIncluded, loading } = useIncludedModules()
+  // While the readout is in flight, render NEITHER side: mounting the children would fire their
+  // requests before we know whether this deployment serves them, and showing the tile would
+  // announce "you don't have this" to someone who does, then take it back.
+  if (loading) return null
   if (isIncluded(module)) return <>{children}</>
   return fallback === "hide" ? null : <ModuleNotIncludedTile module={module} what={what} />
 }

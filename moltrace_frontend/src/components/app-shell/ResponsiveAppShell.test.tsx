@@ -7,6 +7,10 @@ import { ResponsiveAppShell } from "@/src/components/app-shell/ResponsiveAppShel
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
+  // The shell now wraps its children in ModuleRouteGuard, which reads the current path to decide
+  // whether the route belongs to a product this deployment serves. A shared path keeps these
+  // shell-mode tests about layout rather than about gating.
+  usePathname: () => "/dashboard",
 }))
 
 vi.mock("@/components/app/app-sidebar", () => ({

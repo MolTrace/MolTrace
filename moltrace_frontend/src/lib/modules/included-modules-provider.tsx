@@ -95,14 +95,24 @@ export function IncludedModulesProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const value = useMemo<IncludedModulesState>(() => {
-    const readable = !state.unavailable && state.included.size > 0
+    const readable = !state.loading && !state.unavailable && state.included.size > 0
     return {
       included: state.included,
       displayNames: state.displayNames,
       loading: state.loading,
       unavailable: state.unavailable,
-      isIncluded: (key) => (readable ? state.included.has(key) : true),
-      isRouteOffered: (href) => routeIsOffered(href, readable ? state.included : null),
+      // Three states, not two. IN FLIGHT is not the same as UNREADABLE, and conflating them was a
+      // real bug: every gated fetch answered "included" and fired before /system/capabilities
+      // returned, so a single-product deployment still filled its console with 403s. Verified
+      // live — the capabilities response landed AFTER eight refused regulatory requests.
+      //
+      //   loading   -> false. Not a verdict, just "don't act yet". Callers that RENDER must check
+      //                `loading` and show a placeholder rather than the not-included state.
+      //   unreadable-> true. Fail OPEN: losing the readout must never hide what a customer bought.
+      //   readable  -> actual membership.
+      isIncluded: (key) => (state.loading ? false : readable ? state.included.has(key) : true),
+      isRouteOffered: (href) =>
+        state.loading ? false : routeIsOffered(href, readable ? state.included : null),
     }
   }, [state])
 
