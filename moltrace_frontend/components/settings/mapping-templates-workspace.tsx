@@ -33,9 +33,10 @@ type MappingTemplateRow = {
 
 type ExternalRecordRow = {
   external_record_id: string
-  connector: string
-  source_type: string
-  external_key: string
+  connector_id: string
+  external_system: string
+  external_object_type: string
+  external_object_id: string
   status: string
   raw: Row
 }
@@ -43,10 +44,15 @@ type ExternalRecordRow = {
 type ExternalObjectLinkRow = {
   external_object_link_id: string
   external_record_id: string
-  target_type: string
-  target_id: string
-  status: string
+  moltrace_resource_type: string
+  moltrace_resource_id: string
+  relation_type: string
   raw: Row
+}
+
+type ConnectorOption = {
+  id: string
+  label: string
 }
 
 const SOURCE_TYPE_OPTIONS = [
@@ -66,6 +72,51 @@ const TARGET_TYPE_OPTIONS = [
   "compound_batch",
   "file_record",
   "action_item",
+  "other",
+] as const
+
+// Enums below mirror the backend create models (extra="forbid"); the option value is
+// the wire token and must stay verbatim — only the displayed label is humanized.
+
+// ExternalSystemRecordCreate.external_object_type
+const EXTERNAL_OBJECT_TYPE_OPTIONS = [
+  "project",
+  "sample",
+  "experiment",
+  "batch",
+  "report",
+  "document",
+  "result",
+  "file",
+  "action_item",
+  "other",
+] as const
+
+// ExternalObjectLinkCreate.moltrace_resource_type
+const MOLTRACE_RESOURCE_TYPE_OPTIONS = [
+  "project",
+  "sample",
+  "spectracheck_session",
+  "regulatory_dossier",
+  "reaction_project",
+  "reaction_experiment",
+  "compound",
+  "batch",
+  "report",
+  "file",
+  "artifact",
+  "action_item",
+  "other",
+] as const
+
+// ExternalObjectLinkCreate.relation_type
+const RELATION_TYPE_OPTIONS = [
+  "source_of",
+  "exported_to",
+  "linked_to",
+  "synchronized_with",
+  "derived_from",
+  "evidence_for",
   "other",
 ] as const
 
@@ -105,29 +156,37 @@ function parseMappingTemplateRow(row: Row): MappingTemplateRow | null {
 }
 
 function parseExternalRecordRow(row: Row): ExternalRecordRow | null {
-  const externalRecordId = readStr(row.external_record_id ?? row.id)
+  const externalRecordId = readStr(row.id ?? row.external_record_id)
   if (!externalRecordId) return null
   return {
     external_record_id: externalRecordId,
-    connector: readStr(row.connector) || "—",
-    source_type: readStr(row.source_type) || "—",
-    external_key: readStr(row.external_key) || "—",
+    connector_id: readStr(row.connector_id),
+    external_system: readStr(row.external_system) || "—",
+    external_object_type: readStr(row.external_object_type) || "—",
+    external_object_id: readStr(row.external_object_id) || "—",
     status: readStr(row.status) || "—",
     raw: row,
   }
 }
 
 function parseExternalObjectLinkRow(row: Row): ExternalObjectLinkRow | null {
-  const externalObjectLinkId = readStr(row.external_object_link_id ?? row.id)
+  const externalObjectLinkId = readStr(row.id ?? row.external_object_link_id)
   if (!externalObjectLinkId) return null
   return {
     external_object_link_id: externalObjectLinkId,
     external_record_id: readStr(row.external_record_id) || "—",
-    target_type: readStr(row.target_type) || "—",
-    target_id: readStr(row.target_id) || "—",
-    status: readStr(row.status) || "—",
+    moltrace_resource_type: readStr(row.moltrace_resource_type) || "—",
+    moltrace_resource_id: readStr(row.moltrace_resource_id) || "—",
+    relation_type: readStr(row.relation_type) || "—",
     raw: row,
   }
+}
+
+function parseConnectorOption(row: Row): ConnectorOption | null {
+  const id = readStr(row.id ?? row.connector_id)
+  if (!id) return null
+  const label = readStr(row.display_name) || readStr(row.connector_key) || `Connector #${id}`
+  return { id, label }
 }
 
 export function MappingTemplatesWorkspace() {
@@ -139,6 +198,7 @@ export function MappingTemplatesWorkspace() {
   const [mappingTemplates, setMappingTemplates] = useState<MappingTemplateRow[]>([])
   const [externalRecords, setExternalRecords] = useState<ExternalRecordRow[]>([])
   const [externalObjectLinks, setExternalObjectLinks] = useState<ExternalObjectLinkRow[]>([])
+  const [connectors, setConnectors] = useState<ConnectorOption[]>([])
 
   const [connector, setConnector] = useState("")
   const [name, setName] = useState("")
@@ -149,16 +209,19 @@ export function MappingTemplatesWorkspace() {
   const [createTemplateBusy, setCreateTemplateBusy] = useState(false)
   const [updateTemplateBusy, setUpdateTemplateBusy] = useState(false)
 
-  const [externalRecordConnector, setExternalRecordConnector] = useState("")
-  const [externalRecordSourceType, setExternalRecordSourceType] =
-    useState<(typeof SOURCE_TYPE_OPTIONS)[number]>("eln_experiment")
-  const [externalRecordExternalKey, setExternalRecordExternalKey] = useState("")
+  const [externalRecordConnectorId, setExternalRecordConnectorId] = useState("")
+  const [externalRecordExternalSystem, setExternalRecordExternalSystem] = useState("")
+  const [externalRecordObjectType, setExternalRecordObjectType] =
+    useState<(typeof EXTERNAL_OBJECT_TYPE_OPTIONS)[number]>("project")
+  const [externalRecordObjectId, setExternalRecordObjectId] = useState("")
   const [createExternalRecordBusy, setCreateExternalRecordBusy] = useState(false)
 
   const [externalLinkExternalRecordId, setExternalLinkExternalRecordId] = useState("")
-  const [externalLinkTargetType, setExternalLinkTargetType] =
-    useState<(typeof TARGET_TYPE_OPTIONS)[number]>("spectracheck_session")
-  const [externalLinkTargetId, setExternalLinkTargetId] = useState("")
+  const [externalLinkResourceType, setExternalLinkResourceType] =
+    useState<(typeof MOLTRACE_RESOURCE_TYPE_OPTIONS)[number]>("project")
+  const [externalLinkResourceId, setExternalLinkResourceId] = useState("")
+  const [externalLinkRelationType, setExternalLinkRelationType] =
+    useState<(typeof RELATION_TYPE_OPTIONS)[number]>("linked_to")
   const [createExternalLinkBusy, setCreateExternalLinkBusy] = useState(false)
 
   const [selectedTemplateId, setSelectedTemplateId] = useState("")
@@ -216,9 +279,23 @@ export function MappingTemplatesWorkspace() {
     }
   }, [])
 
+  const loadConnectors = useCallback(async () => {
+    try {
+      const payload = await apiFetch<unknown>("/connectors", { method: "GET" })
+      const rows = asRows(payload)
+        .map(parseConnectorOption)
+        .filter((row): row is ConnectorOption => row != null)
+      setConnectors(rows)
+    } catch {
+      // A connector list failure should not blank the whole workspace; the record
+      // form simply shows its empty state until connectors load.
+      setConnectors([])
+    }
+  }, [])
+
   useEffect(() => {
-    void Promise.all([loadTemplates(), loadExternalRecords(), loadExternalObjectLinks()])
-  }, [loadTemplates, loadExternalRecords, loadExternalObjectLinks])
+    void Promise.all([loadTemplates(), loadExternalRecords(), loadExternalObjectLinks(), loadConnectors()])
+  }, [loadTemplates, loadExternalRecords, loadExternalObjectLinks, loadConnectors])
 
   useEffect(() => {
     async function loadTemplateDetail() {
@@ -321,18 +398,27 @@ export function MappingTemplatesWorkspace() {
   }
 
   async function createExternalRecord() {
+    const connectorId = Number(externalRecordConnectorId)
+    if (!Number.isInteger(connectorId) || connectorId <= 0) {
+      setError("Choose a connector before creating an external record.")
+      return
+    }
     setCreateExternalRecordBusy(true)
     setError("")
     try {
       await apiFetch("/external-records", {
         method: "POST",
+        // ExternalSystemRecordCreate (extra="forbid"): connector_id (int),
+        // external_system (str), external_object_type (enum), external_object_id (str).
         body: {
-          connector: externalRecordConnector.trim(),
-          source_type: externalRecordSourceType,
-          external_key: externalRecordExternalKey.trim(),
+          connector_id: connectorId,
+          external_system: externalRecordExternalSystem.trim(),
+          external_object_type: externalRecordObjectType,
+          external_object_id: externalRecordObjectId.trim(),
         },
       })
-      setExternalRecordExternalKey("")
+      setExternalRecordExternalSystem("")
+      setExternalRecordObjectId("")
       await loadExternalRecords()
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not create external record.")
@@ -342,28 +428,46 @@ export function MappingTemplatesWorkspace() {
   }
 
   async function createExternalObjectLink() {
+    const externalRecordId = Number(externalLinkExternalRecordId)
+    const resourceId = Number(externalLinkResourceId)
+    if (!Number.isInteger(externalRecordId) || externalRecordId <= 0) {
+      setError("Choose an external record to link.")
+      return
+    }
+    if (!Number.isInteger(resourceId) || resourceId <= 0) {
+      setError("Enter the MolTrace resource ID to link to.")
+      return
+    }
     setCreateExternalLinkBusy(true)
     setError("")
     try {
       await apiFetch("/external-object-links", {
         method: "POST",
+        // ExternalObjectLinkCreate (extra="forbid"): external_record_id (int),
+        // moltrace_resource_type (enum), moltrace_resource_id (int), relation_type (enum).
         body: {
-          external_record_id: externalLinkExternalRecordId.trim(),
-          target_type: externalLinkTargetType,
-          target_id: externalLinkTargetId.trim(),
+          external_record_id: externalRecordId,
+          moltrace_resource_type: externalLinkResourceType,
+          moltrace_resource_id: resourceId,
+          relation_type: externalLinkRelationType,
         },
       })
       trackExternalObjectLinkCreated({
-        target_program: externalLinkTargetType,
+        target_program: externalLinkResourceType,
         status: "created",
       })
-      setExternalLinkTargetId("")
+      setExternalLinkResourceId("")
       await loadExternalObjectLinks()
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not create external object link.")
     } finally {
       setCreateExternalLinkBusy(false)
     }
+  }
+
+  function connectorLabelById(connectorId: string): string {
+    if (!connectorId) return "—"
+    return connectors.find((option) => option.id === connectorId)?.label ?? `#${connectorId}`
   }
 
   return (
@@ -529,40 +633,77 @@ export function MappingTemplatesWorkspace() {
         description="Register a record from an external system (LIMS, ELN, etc.) for cross-referencing within MolTrace."
       >
         <div className="space-y-4">
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1">
               <Label htmlFor="external-record-connector">Connector</Label>
-              <Input
-                id="external-record-connector"
-                value={externalRecordConnector}
-                onChange={(e) => setExternalRecordConnector(e.target.value)}
-              />
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="external-record-source-type">Source type</Label>
               <select
-                id="external-record-source-type"
-                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none"
-                value={externalRecordSourceType}
-                onChange={(e) => setExternalRecordSourceType(e.target.value as (typeof SOURCE_TYPE_OPTIONS)[number])}
+                id="external-record-connector"
+                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none disabled:opacity-60"
+                value={externalRecordConnectorId}
+                onChange={(e) => setExternalRecordConnectorId(e.target.value)}
+                disabled={connectors.length === 0}
               >
-                {SOURCE_TYPE_OPTIONS.map((option) => (
-                  <option key={option} value={option}>
-                    {option}
+                <option value="">
+                  {connectors.length === 0 ? "No connectors registered yet" : "Select a connector"}
+                </option>
+                {connectors.map((option) => (
+                  <option key={option.id} value={option.id}>
+                    {option.label}
                   </option>
                 ))}
               </select>
             </div>
             <div className="space-y-1">
-              <Label htmlFor="external-record-key">External key</Label>
+              <Label htmlFor="external-record-system">External system</Label>
               <Input
-                id="external-record-key"
-                value={externalRecordExternalKey}
-                onChange={(e) => setExternalRecordExternalKey(e.target.value)}
+                id="external-record-system"
+                value={externalRecordExternalSystem}
+                onChange={(e) => setExternalRecordExternalSystem(e.target.value)}
+                placeholder="e.g. Benchling, LabWare"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="external-record-object-type">Object type</Label>
+              <select
+                id="external-record-object-type"
+                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none"
+                value={externalRecordObjectType}
+                onChange={(e) =>
+                  setExternalRecordObjectType(e.target.value as (typeof EXTERNAL_OBJECT_TYPE_OPTIONS)[number])
+                }
+              >
+                {EXTERNAL_OBJECT_TYPE_OPTIONS.map((option) => (
+                  <option key={option} value={option}>
+                    {statusLabel(option)}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="external-record-object-id">Object ID</Label>
+              <Input
+                id="external-record-object-id"
+                value={externalRecordObjectId}
+                onChange={(e) => setExternalRecordObjectId(e.target.value)}
+                placeholder="ID of the record in that system"
               />
             </div>
           </div>
-          <Button type="button" disabled={createExternalRecordBusy} onClick={() => void createExternalRecord()}>
+          {connectors.length === 0 ? (
+            <p className="text-xs text-muted-foreground">
+              Register a connector first before creating an external record.
+            </p>
+          ) : null}
+          <Button
+            type="button"
+            disabled={
+              createExternalRecordBusy ||
+              !externalRecordConnectorId ||
+              !externalRecordExternalSystem.trim() ||
+              !externalRecordObjectId.trim()
+            }
+            onClick={() => void createExternalRecord()}
+          >
             {createExternalRecordBusy ? "Creating…" : "Create external record"}
           </Button>
         </div>
@@ -583,8 +724,9 @@ export function MappingTemplatesWorkspace() {
                   <TableRow>
                     <TableHead>External record ID</TableHead>
                     <TableHead>Connector</TableHead>
-                    <TableHead>Source type</TableHead>
-                    <TableHead>External key</TableHead>
+                    <TableHead>External system</TableHead>
+                    <TableHead>Object type</TableHead>
+                    <TableHead>Object ID</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Open</TableHead>
                   </TableRow>
@@ -592,7 +734,7 @@ export function MappingTemplatesWorkspace() {
                 <TableBody>
                   {externalRecords.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-xs text-muted-foreground">
+                      <TableCell colSpan={7} className="text-xs text-muted-foreground">
                         No external records found.
                       </TableCell>
                     </TableRow>
@@ -600,9 +742,10 @@ export function MappingTemplatesWorkspace() {
                     externalRecords.map((row) => (
                       <TableRow key={row.external_record_id}>
                         <TableCell className="font-mono text-[10px]">{row.external_record_id}</TableCell>
-                        <TableCell className="text-xs">{row.connector}</TableCell>
-                        <TableCell className="text-xs">{row.source_type}</TableCell>
-                        <TableCell className="text-xs">{row.external_key}</TableCell>
+                        <TableCell className="text-xs">{connectorLabelById(row.connector_id)}</TableCell>
+                        <TableCell className="text-xs">{row.external_system}</TableCell>
+                        <TableCell className="text-xs">{statusLabel(row.external_object_type)}</TableCell>
+                        <TableCell className="text-xs">{row.external_object_id}</TableCell>
                         <TableCell className="text-xs">{statusLabel(row.status)}</TableCell>
                         <TableCell>
                           <Button
@@ -635,40 +778,80 @@ export function MappingTemplatesWorkspace() {
         description="Link an external record to a MolTrace object (project, sample, compound, batch) for traceability."
       >
         <div className="space-y-4">
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1">
-              <Label htmlFor="external-link-record-id">External record ID</Label>
-              <Input
+              <Label htmlFor="external-link-record-id">External record</Label>
+              <select
                 id="external-link-record-id"
+                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none disabled:opacity-60"
                 value={externalLinkExternalRecordId}
                 onChange={(e) => setExternalLinkExternalRecordId(e.target.value)}
-              />
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="external-link-target-type">Target type</Label>
-              <select
-                id="external-link-target-type"
-                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none"
-                value={externalLinkTargetType}
-                onChange={(e) => setExternalLinkTargetType(e.target.value as (typeof TARGET_TYPE_OPTIONS)[number])}
+                disabled={externalRecords.length === 0}
               >
-                {TARGET_TYPE_OPTIONS.map((option) => (
-                  <option key={option} value={option}>
-                    {option}
+                <option value="">
+                  {externalRecords.length === 0 ? "No external records yet" : "Select an external record"}
+                </option>
+                {externalRecords.map((record) => (
+                  <option key={record.external_record_id} value={record.external_record_id}>
+                    {`#${record.external_record_id} · ${record.external_object_id}`}
                   </option>
                 ))}
               </select>
             </div>
             <div className="space-y-1">
-              <Label htmlFor="external-link-target-id">Target ID</Label>
+              <Label htmlFor="external-link-resource-type">Resource type</Label>
+              <select
+                id="external-link-resource-type"
+                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none"
+                value={externalLinkResourceType}
+                onChange={(e) =>
+                  setExternalLinkResourceType(e.target.value as (typeof MOLTRACE_RESOURCE_TYPE_OPTIONS)[number])
+                }
+              >
+                {MOLTRACE_RESOURCE_TYPE_OPTIONS.map((option) => (
+                  <option key={option} value={option}>
+                    {statusLabel(option)}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="external-link-resource-id">Resource ID</Label>
               <Input
-                id="external-link-target-id"
-                value={externalLinkTargetId}
-                onChange={(e) => setExternalLinkTargetId(e.target.value)}
+                id="external-link-resource-id"
+                type="number"
+                min={1}
+                value={externalLinkResourceId}
+                onChange={(e) => setExternalLinkResourceId(e.target.value)}
+                placeholder="MolTrace resource ID"
               />
             </div>
+            <div className="space-y-1">
+              <Label htmlFor="external-link-relation-type">Relation type</Label>
+              <select
+                id="external-link-relation-type"
+                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none"
+                value={externalLinkRelationType}
+                onChange={(e) =>
+                  setExternalLinkRelationType(e.target.value as (typeof RELATION_TYPE_OPTIONS)[number])
+                }
+              >
+                {RELATION_TYPE_OPTIONS.map((option) => (
+                  <option key={option} value={option}>
+                    {statusLabel(option)}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
-          <Button type="button" disabled={createExternalLinkBusy} onClick={() => void createExternalObjectLink()}>
+          {externalRecords.length === 0 ? (
+            <p className="text-xs text-muted-foreground">Create an external record above before linking it.</p>
+          ) : null}
+          <Button
+            type="button"
+            disabled={createExternalLinkBusy || !externalLinkExternalRecordId || !externalLinkResourceId.trim()}
+            onClick={() => void createExternalObjectLink()}
+          >
             {createExternalLinkBusy ? "Creating…" : "Create external object link"}
           </Button>
         </div>
@@ -689,9 +872,9 @@ export function MappingTemplatesWorkspace() {
                   <TableRow>
                     <TableHead>External object link ID</TableHead>
                     <TableHead>External record ID</TableHead>
-                    <TableHead>Target type</TableHead>
-                    <TableHead>Target ID</TableHead>
-                    <TableHead>Status</TableHead>
+                    <TableHead>Resource type</TableHead>
+                    <TableHead>Resource ID</TableHead>
+                    <TableHead>Relation type</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -706,9 +889,9 @@ export function MappingTemplatesWorkspace() {
                       <TableRow key={row.external_object_link_id}>
                         <TableCell className="font-mono text-[10px]">{row.external_object_link_id}</TableCell>
                         <TableCell className="font-mono text-[10px]">{row.external_record_id}</TableCell>
-                        <TableCell className="text-xs">{row.target_type}</TableCell>
-                        <TableCell className="text-xs">{row.target_id}</TableCell>
-                        <TableCell className="text-xs">{statusLabel(row.status)}</TableCell>
+                        <TableCell className="text-xs">{statusLabel(row.moltrace_resource_type)}</TableCell>
+                        <TableCell className="text-xs">{row.moltrace_resource_id}</TableCell>
+                        <TableCell className="text-xs">{statusLabel(row.relation_type)}</TableCell>
                       </TableRow>
                     ))
                   )}
