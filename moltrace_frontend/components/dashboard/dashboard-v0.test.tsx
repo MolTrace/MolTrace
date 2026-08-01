@@ -6,6 +6,19 @@ import { DashboardV0 } from "@/components/dashboard/dashboard-v0"
 
 const mockApiFetch = vi.fn<(path: string) => Promise<unknown>>()
 
+/** Which products the deployment serves; every test starts with all three. */
+let includedModules = new Set(["spectracheck", "regulatory_hub", "reaction_optimization"])
+vi.mock("@/src/lib/modules/included-modules-provider", () => ({
+  useIncludedModules: () => ({
+    isIncluded: (key: string) => includedModules.has(key),
+    displayNames: {
+      spectracheck: "SpectraCheck",
+      regulatory_hub: "Regentry",
+      reaction_optimization: "Repho",
+    },
+  }),
+}))
+
 function installDesktopMode() {
   Object.defineProperty(window, "innerWidth", { configurable: true, value: 500 })
   Object.defineProperty(window.navigator, "platform", { configurable: true, value: "Win32" })
@@ -142,6 +155,7 @@ describe("DashboardV0 connector/ingestion fallback", () => {
     mockApiFetch.mockRejectedValue(new Error("backend unavailable"))
     installDesktopMode()
     window.localStorage.clear()
+    includedModules = new Set(["spectracheck", "regulatory_hub", "reaction_optimization"])
   })
 
   it("shows subtle summary unavailable message and keeps dashboard content", async () => {
@@ -204,6 +218,120 @@ describe("DashboardV0 connector/ingestion fallback", () => {
       expect(screen.getAllByText("Repho").length).toBeGreaterThan(0)
       expect(screen.getByText("5 opens")).toBeInTheDocument()
     })
+  })
+
+  // ── What a single-product deployment sees ──────────────────────────────────────────────────
+  // The dashboard is the one page that reaches into all three products, so it is where an absent
+  // module shows up worst: a section that opens onto nothing, and a panel of "—".
+
+  it("drops the Regulatory section entirely when the workspace has no Regentry", async () => {
+    includedModules = new Set(["spectracheck"])
+    render(<DashboardV0 />)
+
+    await waitFor(() => {
+      expect(screen.getByText("Active Analyses")).toBeInTheDocument()
+    })
+    expect(
+      screen.queryByRole("button", { name: /Collapse Regulatory section/i }),
+    ).not.toBeInTheDocument()
+    expect(screen.queryByText("Regulatory compliance")).not.toBeInTheDocument()
+    expect(screen.queryByText("Regulatory Surveillance")).not.toBeInTheDocument()
+    // The sections it DOES own are untouched.
+    expect(
+      screen.getByRole("button", { name: /Collapse Operations section/i }),
+    ).toBeInTheDocument()
+  })
+
+  it("hides the cross-module panel when there is only one product to cross", async () => {
+    includedModules = new Set(["spectracheck"])
+    render(<DashboardV0 />)
+
+    await waitFor(() => {
+      expect(screen.getByText("Active Analyses")).toBeInTheDocument()
+    })
+    expect(screen.queryByText("Cross-Module Command Center")).not.toBeInTheDocument()
+    expect(screen.queryByText("Core module activity")).not.toBeInTheDocument()
+    // The tiles that would have read "—" are gone with it.
+    expect(screen.queryByText("linked regulatory action items")).not.toBeInTheDocument()
+    expect(screen.queryByText("reaction constraints created")).not.toBeInTheDocument()
+  })
+
+  it("gives a reaction-only workspace a section about its own product", async () => {
+    includedModules = new Set(["reaction_optimization"])
+    render(<DashboardV0 />)
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /Collapse Reactions section/i })).toBeInTheDocument()
+    })
+    // DashboardSection renders its description more than once, so assert at-least-one.
+    expect(screen.getAllByText("Reaction optimization projects in flight.").length).toBeGreaterThan(0)
+    // ...and nothing about the products it doesn't have.
+    expect(screen.queryByRole("button", { name: /Collapse Regulatory section/i })).not.toBeInTheDocument()
+    expect(screen.queryByText("Cross-Module Command Center")).not.toBeInTheDocument()
+  })
+
+  it("hides the Reactions section when the workspace has no Repho", async () => {
+    includedModules = new Set(["spectracheck", "regulatory_hub"])
+    render(<DashboardV0 />)
+
+    await waitFor(() => {
+      expect(screen.getByText("Active Analyses")).toBeInTheDocument()
+    })
+    expect(screen.queryByRole("button", { name: /Collapse Reactions section/i })).not.toBeInTheDocument()
+  })
+
+  it("renumbers the section eyebrows to match what is actually rendered", async () => {
+    // With Regentry absent the old hardcoded eyebrows read "01, 02, 04, 05" — a gap where a
+    // section the customer never bought used to be.
+    includedModules = new Set(["spectracheck"])
+    render(<DashboardV0 />)
+
+    await waitFor(() => {
+      expect(screen.getByText("01 · Dashboard")).toBeInTheDocument()
+    })
+    expect(screen.getByText("02 · Spectroscopy")).toBeInTheDocument()
+    expect(screen.getByText("03 · Operations")).toBeInTheDocument()
+    expect(screen.getByText("04 · Activity")).toBeInTheDocument()
+    expect(screen.queryByText("05 · Activity")).not.toBeInTheDocument()
+    expect(screen.queryByText(/· Regulatory/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/· Reactions/)).not.toBeInTheDocument()
+  })
+
+  it("numbers all six sections in order when the workspace has every product", async () => {
+    render(<DashboardV0 />)
+
+    await waitFor(() => {
+      expect(screen.getByText("01 · Dashboard")).toBeInTheDocument()
+    })
+    expect(screen.getByText("02 · Spectroscopy")).toBeInTheDocument()
+    expect(screen.getByText("03 · Regulatory")).toBeInTheDocument()
+    expect(screen.getByText("04 · Reactions")).toBeInTheDocument()
+    expect(screen.getByText("05 · Operations")).toBeInTheDocument()
+    expect(screen.getByText("06 · Activity")).toBeInTheDocument()
+  })
+
+  it("keeps the cross-module panel for two products, showing only their tiles and their counts", async () => {
+    includedModules = new Set(["spectracheck", "regulatory_hub"])
+    render(<DashboardV0 />)
+
+    await waitFor(() => {
+      expect(screen.getByText("Cross-Module Command Center")).toBeInTheDocument()
+    })
+    expect(screen.getByText("linked regulatory action items")).toBeInTheDocument()
+    // Repho's tile — and Repho's share of the activity count — are excluded, so the badge reads
+    // 3 (2 SpectraCheck + 1 Regentry) rather than the server's all-products total of 5.
+    expect(screen.queryByText("reaction constraints created")).not.toBeInTheDocument()
+    await waitFor(() => {
+      expect(screen.getByText("3 opens")).toBeInTheDocument()
+    })
+    expect(screen.queryByText("5 opens")).not.toBeInTheDocument()
+    // And the copy names only what this workspace has. (The description is assembled from two
+    // nodes, so match on the element's own combined text.)
+    expect(
+      screen.getByText((_t, el) => el?.textContent?.startsWith("How SpectraCheck and Regentry connect.") === true, {
+        selector: "div,p",
+      }),
+    ).toBeInTheDocument()
   })
 
   it("collapses and expands all sections with the header controls", async () => {

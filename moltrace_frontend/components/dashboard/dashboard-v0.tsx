@@ -23,6 +23,7 @@ import {
   CheckCircle2,
   AlertTriangle,
   Eye,
+  FlaskConical,
   FolderOpen,
   LayoutDashboard,
   Microscope,
@@ -86,10 +87,17 @@ import {
 import {
   fetchDashboardCoreModuleActivity,
   type DashboardCoreModuleActivity,
+  type DashboardCoreModuleKey,
 } from "@/src/lib/dashboard/dashboard-core-module-activity"
 import { ValidationReadinessDashboardCards } from "@/components/validation/validation-readiness-summary"
 import type { RoiSnapshotData } from "@/src/lib/analytics/roi-dashboard-data"
 import type { DashboardActivityRow, DashboardJobRow } from "@/src/lib/dashboard/overview-metrics"
+import { useIncludedModules } from "@/src/lib/modules/included-modules-provider"
+import { MODULE_DISPLAY_NAMES } from "@/src/lib/modules/module-routes"
+import {
+  fetchDashboardReactionSummary,
+  type DashboardReactionSummary,
+} from "@/src/lib/dashboard/dashboard-reaction-summary"
 
 const ACTIVITY_STRIPE_COLOR: Record<DashboardActivityRow["status"], string> = {
   approved: "var(--mt-green)",
@@ -363,6 +371,15 @@ const DEMO_RECENT_JOBS: DashboardJobRow[] = [
 export function DashboardV0() {
   const overview = useOverviewData()
   const isMobile = useIsMobile()
+  const { isIncluded } = useIncludedModules()
+  // Which products this deployment actually serves. The dashboard is the one page that reaches
+  // into all three, so on a single-product deployment it is where absent modules show up worst:
+  // sections that open onto refused requests, and a cross-module panel with nothing to cross.
+  const hasRegulatory = isIncluded("regulatory_hub")
+  const hasSpectraCheck = isIncluded("spectracheck")
+  const hasReaction = isIncluded("reaction_optimization")
+  // A panel about how the products connect only means something when there are two to connect.
+  const showCrossModule = [hasSpectraCheck, hasRegulatory, hasReaction].filter(Boolean).length >= 2
   const tenantContext = useTenant()
   const {
     currentTenantId,
@@ -427,6 +444,9 @@ export function DashboardV0() {
     null,
   )
 
+  const [reactionLoading, setReactionLoading] = useState(true)
+  const [reactionSummary, setReactionSummary] = useState<DashboardReactionSummary | null>(null)
+
   const [mlLoading, setMlLoading] = useState(true)
   const [mlRollup, setMlRollup] = useState<DashboardMlFactoryRollup | null>(null)
   const [aiSummaryLoading, setAiSummaryLoading] = useState(true)
@@ -462,6 +482,53 @@ export function DashboardV0() {
     warnings: [],
     nextRecommendedAction: null,
   }
+
+  // Products this workspace serves, named the way the sidebar names them, for the copy that used
+  // to list all three unconditionally.
+  const includedProducts = useMemo(() => {
+    const names: string[] = []
+    if (hasSpectraCheck) names.push(MODULE_DISPLAY_NAMES.spectracheck)
+    if (hasRegulatory) names.push(MODULE_DISPLAY_NAMES.regulatory_hub)
+    if (hasReaction) names.push(MODULE_DISPLAY_NAMES.reaction_optimization)
+    return names
+  }, [hasSpectraCheck, hasRegulatory, hasReaction])
+  const includedProductsSentence =
+    includedProducts.length > 2
+      ? `${includedProducts.slice(0, -1).join(", ")}, and ${includedProducts[includedProducts.length - 1]}`
+      : includedProducts.length === 2
+        ? `${includedProducts[0]} and ${includedProducts[1]}` // no comma before "and" for a pair
+        : (includedProducts[0] ?? "the modules in this workspace")
+  const crossModuleDescription = `How ${includedProductsSentence} connect.`
+
+  // Activity is reported per module; keep only the ones this deployment serves so the count and
+  // the tiles agree with what the workspace actually shows.
+  const coreModuleActivityRows = useMemo(() => {
+    const included: Record<DashboardCoreModuleKey, boolean> = {
+      spectracheck: hasSpectraCheck,
+      regulatory_hub: hasRegulatory,
+      reactioniq: hasReaction,
+    }
+    return (coreModuleActivity?.rows ?? []).filter((row) => included[row.module])
+  }, [coreModuleActivity, hasSpectraCheck, hasRegulatory, hasReaction])
+  const coreModuleActivityTotal = coreModuleActivityRows.reduce((sum, row) => sum + row.count, 0)
+
+  // Section eyebrows carry a running number, so it has to follow what is actually rendered —
+  // hardcoded ones would read "01, 02, 04, 05" on a workspace without Regentry.
+  const sectionEyebrow = useMemo(() => {
+    const order = [
+      "Dashboard",
+      "Spectroscopy",
+      ...(hasRegulatory ? ["Regulatory"] : []),
+      ...(hasReaction ? ["Reactions"] : []),
+      "Operations",
+      "Activity",
+    ]
+    const out: Record<string, string> = {}
+    order.forEach((label, i) => {
+      out[label] = `${String(i + 1).padStart(2, "0")} · ${label}`
+    })
+    return out
+  }, [hasRegulatory, hasReaction])
 
   const showCustomerDeploymentCard = isAdmin || tenant.tenant_type === "internal"
 
@@ -632,6 +699,12 @@ export function DashboardV0() {
   }, [])
 
   useEffect(() => {
+    // "Cross-module" needs at least two modules to cross. On a single-product deployment the
+    // panel is hidden, so don't pay for the request either.
+    if (!showCrossModule) {
+      setCrossModuleLoading(false)
+      return
+    }
     function readScopedId(row: unknown, keys: string[]): number | null {
       if (!row || typeof row !== "object" || Array.isArray(row)) return null
       const rec = row as Record<string, unknown>
@@ -660,9 +733,14 @@ export function DashboardV0() {
     return () => {
       cancelled = true
     }
-  }, [overview.sessionsDataAvailable, overview.sessions])
+  }, [overview.sessionsDataAvailable, overview.sessions, showCrossModule])
 
   useEffect(() => {
+    // Only rendered inside the cross-module card, so it follows the same gate.
+    if (!showCrossModule) {
+      setCoreModuleActivityLoading(false)
+      return
+    }
     let cancelled = false
     setCoreModuleActivityLoading(true)
     void fetchDashboardCoreModuleActivity()
@@ -676,7 +754,7 @@ export function DashboardV0() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [showCrossModule])
 
   useEffect(() => {
     if (!overview.sessionsDataAvailable) {
@@ -790,7 +868,13 @@ export function DashboardV0() {
     }
   }, [])
 
+  // The three regulatory fetches below back a section this deployment may not serve. Skip them
+  // rather than let them be refused, and clear "loading" so the section never sits on a spinner.
   useEffect(() => {
+    if (!hasRegulatory) {
+      setRegulatoryLoading(false)
+      return
+    }
     let cancelled = false
     setRegulatoryLoading(true)
     void fetchDashboardRegulatorySummary().then((summary) => {
@@ -801,9 +885,13 @@ export function DashboardV0() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [hasRegulatory])
 
   useEffect(() => {
+    if (!hasRegulatory) {
+      setRegulatoryComplianceLoading(false)
+      return
+    }
     let cancelled = false
     setRegulatoryComplianceLoading(true)
     void fetchRegulatoryComplianceCardData().then((data) => {
@@ -814,9 +902,13 @@ export function DashboardV0() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [hasRegulatory])
 
   useEffect(() => {
+    if (!hasRegulatory) {
+      setSurveillanceLoading(false)
+      return
+    }
     let cancelled = false
     setSurveillanceLoading(true)
     void fetchDashboardRegulatorySurveillanceSummary().then((data) => {
@@ -827,7 +919,24 @@ export function DashboardV0() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [hasRegulatory])
+
+  useEffect(() => {
+    if (!hasReaction) {
+      setReactionLoading(false)
+      return
+    }
+    let cancelled = false
+    setReactionLoading(true)
+    void fetchDashboardReactionSummary().then((summary) => {
+      if (cancelled) return
+      setReactionSummary(summary)
+      setReactionLoading(false)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [hasReaction])
 
   useEffect(() => {
     let cancelled = false
@@ -1002,6 +1111,24 @@ export function DashboardV0() {
         unreadRegulatoryNotifications: null,
       }
 
+  const reactionDisplay = reactionSummary?.available
+    ? {
+        totalProjects: reactionSummary.totalProjects as number | null,
+        activeProjects: reactionSummary.activeProjects as number | null,
+        draftProjects: reactionSummary.draftProjects as number | null,
+        completedProjects: reactionSummary.completedProjects as number | null,
+        latestProjectId: reactionSummary.latestProjectId,
+        latestProjectName: reactionSummary.latestProjectName,
+      }
+    : {
+        totalProjects: null,
+        activeProjects: null,
+        draftProjects: null,
+        completedProjects: null,
+        latestProjectId: null,
+        latestProjectName: null,
+      }
+
   const compoundRegistryDisplay = crSummary?.available
     ? {
         activeCompounds: crSummary.activeCompounds as number | null,
@@ -1135,7 +1262,12 @@ export function DashboardV0() {
     countSignal(mlRollup?.activeModelCount, "models serving", "info"),
     countSignal(aiSummary?.predictionsRequiringReview, "predictions to review", "warning"),
     countSignal(compoundRegistryDisplay.activeCompounds, "compounds"),
-    countSignal(coreModuleActivity?.available ? coreModuleActivity.total : null, "module opens"),
+    countSignal(coreModuleActivity?.available ? coreModuleActivityTotal : null, "module opens"),
+  ])
+
+  const reactionSignals = compactSignals([
+    countSignal(reactionDisplay.activeProjects, "active projects"),
+    countSignal(reactionDisplay.draftProjects, "drafts", "info"),
   ])
 
   const regulatorySignals = compactSignals([
@@ -1205,7 +1337,7 @@ export function DashboardV0() {
         description="Top metrics, validation readiness, and tenant onboarding."
         icon={LayoutDashboard}
         accent="teal"
-        eyebrow="01 · Dashboard"
+        eyebrow={sectionEyebrow.Dashboard}
         storageKey="overview"
         signals={overviewSignals}
         defaultOpen
@@ -1357,7 +1489,7 @@ export function DashboardV0() {
         description="Methods, compounds, ML and AI summaries."
         icon={Microscope}
         accent="teal"
-        eyebrow="02 · Spectroscopy"
+        eyebrow={sectionEyebrow.Spectroscopy}
         storageKey="science"
         signals={scienceSignals}
         defaultOpen
@@ -1466,6 +1598,7 @@ export function DashboardV0() {
           </div>
         </ModuleCard>
 
+      {showCrossModule ? (
       <Card>
         <CardHeader className="pb-2">
           <div className="flex flex-row items-center justify-between gap-2">
@@ -1473,28 +1606,34 @@ export function DashboardV0() {
             <FolderOpen className="h-4 w-4 text-muted-foreground" />
           </div>
           <CardDescription>
-            How SpectraCheck evidence, regulatory blockers, and reaction constraints connect.
-            Draft summary — review before action.
+            {crossModuleDescription} Draft summary — review before action.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4 text-sm">
+          {/* One tile per product this deployment serves. A tile for an absent product could only
+              ever read "—", which looks like missing data rather than a product you don't have. */}
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {hasSpectraCheck ? (
             <div className="rounded-md border bg-muted/20 p-3">
-              <p className="text-xs font-medium uppercase text-muted-foreground">1. SpectraCheck summary</p>
+              <p className="text-xs font-medium uppercase text-muted-foreground">SpectraCheck summary</p>
               <p className="mt-2 text-xs text-muted-foreground">latest SpectraCheck evidence status</p>
               <p className="text-sm font-medium">
                 {statusLabel(crossModuleDisplay.latestSpectraCheckEvidenceStatus)}
               </p>
             </div>
+            ) : null}
+            {hasRegulatory ? (
             <div className="rounded-md border bg-muted/20 p-3">
-              <p className="text-xs font-medium uppercase text-muted-foreground">2. Regentry summary</p>
+              <p className="text-xs font-medium uppercase text-muted-foreground">Regentry summary</p>
               <p className="mt-2 text-xs text-muted-foreground">linked regulatory action items</p>
               <p className="text-2xl font-bold tabular-nums">{fmtCount(crossModuleDisplay.linkedRegulatoryActionItems)}</p>
               <p className="mt-2 text-xs text-muted-foreground">open regulatory blockers</p>
               <p className="text-2xl font-bold tabular-nums">{fmtCount(crossModuleDisplay.openRegulatoryBlockers)}</p>
             </div>
+            ) : null}
+            {hasReaction ? (
             <div className="rounded-md border bg-muted/20 p-3">
-              <p className="text-xs font-medium uppercase text-muted-foreground">3. Repho summary</p>
+              <p className="text-xs font-medium uppercase text-muted-foreground">Repho summary</p>
               <p className="mt-2 text-xs text-muted-foreground">reaction constraints created</p>
               <p className="text-2xl font-bold tabular-nums">{fmtCount(crossModuleDisplay.reactionConstraintsCreated)}</p>
               <p className="mt-2 text-xs text-muted-foreground">recommendations affected by compliance</p>
@@ -1502,21 +1641,22 @@ export function DashboardV0() {
                 {fmtCount(crossModuleDisplay.optimizationRecommendationsAffectedByCompliance)}
               </p>
             </div>
+            ) : null}
           </div>
           <div className="rounded-md border bg-card p-3">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
               <div>
                 <p className="text-xs font-medium uppercase text-muted-foreground">Core module activity</p>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Live opens logged from SpectraCheck, Regentry, and Repho in this testing phase.
+                  Live opens logged from {includedProductsSentence} in this testing phase.
                 </p>
               </div>
               <Badge variant="outline" className="w-fit">
-                {coreModuleActivityLoading ? "Loading" : `${coreModuleActivity?.total ?? 0} opens`}
+                {coreModuleActivityLoading ? "Loading" : `${coreModuleActivityTotal} opens`}
               </Badge>
             </div>
             <div className="mt-3 grid gap-3 sm:grid-cols-3">
-              {(coreModuleActivity?.rows ?? []).map((row) => (
+              {coreModuleActivityRows.map((row) => (
                 <div key={row.module} className="rounded-md border bg-muted/20 px-3 py-2">
                   <p className="text-xs text-muted-foreground">{row.label}</p>
                   <p className="text-2xl font-bold tabular-nums">{row.count}</p>
@@ -1530,7 +1670,7 @@ export function DashboardV0() {
             {!coreModuleActivityLoading && coreModuleActivity && !coreModuleActivity.available ? (
               <p className="mt-3 text-xs text-muted-foreground">Live module activity isn't available right now.</p>
             ) : null}
-            {!coreModuleActivityLoading && coreModuleActivity?.available && coreModuleActivity.total === 0 ? (
+            {!coreModuleActivityLoading && coreModuleActivity?.available && coreModuleActivityTotal === 0 ? (
               <p className="mt-3 text-xs text-muted-foreground">Nothing logged yet.</p>
             ) : null}
           </div>
@@ -1564,6 +1704,7 @@ export function DashboardV0() {
           ) : null}
         </CardContent>
       </Card>
+      ) : null}
 
         <Card>
           <CardHeader className="pb-2">
@@ -1629,12 +1770,14 @@ export function DashboardV0() {
 
       </DashboardSection>
 
+      {/* Whole section belongs to Regentry — drop it rather than open it onto empty cards. */}
+      {hasRegulatory ? (
       <DashboardSection
         title="Regulatory"
         description="Dossiers, compliance, surveillance, and notifications."
         icon={ShieldCheck}
         accent="cyan"
-        eyebrow="03 · Regulatory"
+        eyebrow={sectionEyebrow.Regulatory}
         storageKey="regulatory"
         signals={regulatorySignals}
         defaultOpen
@@ -1774,13 +1917,75 @@ export function DashboardV0() {
       <RegulatoryNotificationsCompactCard />
 
       </DashboardSection>
+      ) : null}
+
+      {/* Repho had no dashboard presence at all, so a reaction-only workspace opened onto a page
+          about other people's products. Deliberately a way back into the work rather than a
+          restatement of optimization results, which only read correctly inside a project. */}
+      {hasReaction ? (
+      <DashboardSection
+        title="Reactions"
+        description="Reaction optimization projects in flight."
+        icon={FlaskConical}
+        accent="violet"
+        eyebrow={sectionEyebrow.Reactions}
+        storageKey="reactions"
+        signals={reactionSignals}
+        defaultOpen
+      >
+        <ModuleCard
+          accent="violet"
+          eyebrow="Reactions · Optimization"
+          title="Repho"
+          icon={FlaskConical}
+          description="Your reaction optimization projects — proposals are decision support, reviewed by a chemist before anything runs."
+          href="/reactions"
+          ctaLabel="Open Repho"
+        >
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div>
+              <p className="text-xs text-muted-foreground">Active projects</p>
+              <p className="text-2xl font-bold tabular-nums">{fmtCount(reactionDisplay.activeProjects)}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Drafts</p>
+              <p className="text-2xl font-bold tabular-nums">{fmtCount(reactionDisplay.draftProjects)}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Completed</p>
+              <p className="text-2xl font-bold tabular-nums">{fmtCount(reactionDisplay.completedProjects)}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">All projects</p>
+              <p className="text-2xl font-bold tabular-nums">{fmtCount(reactionDisplay.totalProjects)}</p>
+              <p className="text-xs text-muted-foreground">Excludes archived.</p>
+            </div>
+          </div>
+          {reactionDisplay.latestProjectId != null ? (
+            <p className="text-xs text-muted-foreground">
+              Most recently updated:{" "}
+              <Link className="underline underline-offset-2" href={`/reactions/${reactionDisplay.latestProjectId}`}>
+                {reactionDisplay.latestProjectName ?? "Open project"}
+              </Link>
+            </p>
+          ) : null}
+          {reactionLoading ? <p className="text-xs text-muted-foreground">Loading reaction projects…</p> : null}
+          {!reactionLoading && !reactionSummary?.available ? (
+            <p className="text-xs text-muted-foreground">Live reaction project data isn&apos;t available right now.</p>
+          ) : null}
+          {!reactionLoading && reactionSummary?.available && reactionSummary.totalProjects === 0 ? (
+            <p className="text-xs text-muted-foreground">No reaction projects yet.</p>
+          ) : null}
+        </ModuleCard>
+      </DashboardSection>
+      ) : null}
 
       <DashboardSection
         title="Operations"
         description="System health, QC, workflows, jobs, and ROI."
         icon={Cpu}
         accent="violet"
-        eyebrow="04 · Operations"
+        eyebrow={sectionEyebrow.Operations}
         storageKey="operations"
         signals={operationsSignals}
         defaultOpen
@@ -2234,7 +2439,7 @@ export function DashboardV0() {
         description="Latest sessions and workflow runs."
         icon={Activity}
         accent="green"
-        eyebrow="05 · Activity"
+        eyebrow={sectionEyebrow.Activity}
         storageKey="activity"
         signals={activitySignals}
         defaultOpen

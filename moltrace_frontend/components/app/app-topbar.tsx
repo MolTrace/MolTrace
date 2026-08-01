@@ -263,9 +263,16 @@ export function AppTopbar({ onToggleEvidenceQueue, evidenceQueueOpen = false }: 
     let cancelled = false
     setSearchLoading(true)
     void Promise.all([
+      // Programs are shared ground; the other two searches belong to one product each, so on a
+      // deployment that does not serve it we skip the request rather than let it be refused. The
+      // groups below already hide when empty, so skipping reads as "nothing to search".
       apiFetch<unknown>("/projects?limit=20", { method: "GET" }).catch(() => []),
-      apiFetch<unknown>("/reaction-projects?limit=20", { method: "GET" }).catch(() => []),
-      apiFetch<unknown>("/spectracheck/sessions?limit=20", { method: "GET" }).catch(() => []),
+      isIncluded("reaction_optimization")
+        ? apiFetch<unknown>("/reaction-projects?limit=20", { method: "GET" }).catch(() => [])
+        : Promise.resolve([]),
+      isIncluded("spectracheck")
+        ? apiFetch<unknown>("/spectracheck/sessions?limit=20", { method: "GET" }).catch(() => [])
+        : Promise.resolve([]),
     ])
       .then(([pRaw, rRaw, sRaw]) => {
         if (cancelled) return
@@ -310,7 +317,7 @@ export function AppTopbar({ onToggleEvidenceQueue, evidenceQueueOpen = false }: 
     return () => {
       cancelled = true
     }
-  }, [commandOpen])
+  }, [commandOpen, isIncluded])
 
   const hasAnyResults = useMemo(
     () => searchProjects.length + searchReactions.length + searchSessions.length > 0,
