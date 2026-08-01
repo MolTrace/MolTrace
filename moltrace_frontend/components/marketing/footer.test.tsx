@@ -1,7 +1,19 @@
 import { describe, expect, it, vi } from "vitest"
 import { render, screen, within } from "@testing-library/react"
 
-import { Footer } from "@/components/marketing/footer"
+import { Footer, socialLinks } from "@/components/marketing/footer"
+
+/**
+ * Brand artwork is asserted against the social registry directly, not via the
+ * rendered footer: unclaimed platforms keep their artwork ready but are not
+ * rendered (no `href="#"` dead links), so these assertions must not depend on
+ * whether a given profile has been claimed yet.
+ */
+function glyphFor(label: string) {
+  const entry = socialLinks.find((link) => link.label === label)
+  if (!entry) throw new Error(`No social registry entry for "${label}"`)
+  return entry.Glyph
+}
 
 vi.mock("next/link", () => ({
   __esModule: true,
@@ -122,35 +134,37 @@ describe("Marketing Footer", () => {
     }
   })
 
-  it("renders the nine brand-accurate social icons under a 'Join our Community' eyebrow title", () => {
+  it("renders only claimed social profiles under a 'Join our Community' eyebrow title", () => {
     render(<Footer />)
     // The eyebrow title sits in the social section above the icon row.
     const title = screen.getByTestId("footer-social-title")
     expect(title).toHaveTextContent(/Join our Community/i)
     expect(title.className).toMatch(/uppercase/)
     expect(title.className).toMatch(/tracking-\[0\.22em\]/)
-    // The nine icons render in order — LinkedIn / Facebook / Instagram / X /
-    // YouTube / GitHub / WhatsApp / Discord / Slack.
+    // Only profiles that actually exist are rendered. The other platforms stay
+    // in the registry (artwork ready) with `href: null` until they're claimed —
+    // previously they shipped as `href="#"` dead links.
     const socialNav = screen.getByTestId("footer-social-nav")
     const links = within(socialNav).getAllByRole("link")
-    expect(links).toHaveLength(9)
     const labels = links.map((l) => l.getAttribute("aria-label"))
-    expect(labels).toEqual([
-      "LinkedIn",
-      "Facebook",
-      "Instagram",
-      "X",
-      "YouTube",
-      "GitHub",
-      "WhatsApp",
-      "Discord",
-      "Slack",
-    ])
+    expect(labels).toEqual(["GitHub"])
+  })
+
+  it("never renders a placeholder or dead social link", () => {
+    render(<Footer />)
+    const socialNav = screen.getByTestId("footer-social-nav")
+    // The invariant that matters: every social icon points at a real absolute
+    // profile URL. A regression here (re-adding `href="#"`) ships broken links
+    // to users and a low-quality signal to crawlers.
+    for (const link of within(socialNav).getAllByRole("link")) {
+      const href = link.getAttribute("href")
+      expect(href, `${link.getAttribute("aria-label")} href`).toBeTruthy()
+      expect(href).not.toBe("#")
+      expect(href).toMatch(/^https?:\/\//i)
+    }
   })
 
   it("paints LinkedIn / Facebook / YouTube / WhatsApp / Discord with their solid brand fills", () => {
-    render(<Footer />)
-    const socialNav = screen.getByTestId("footer-social-nav")
     const cases: Array<[label: string, color: string]> = [
       ["LinkedIn",  "#0A66C2"],
       ["Facebook",  "#1877F2"],
@@ -159,33 +173,35 @@ describe("Marketing Footer", () => {
       ["Discord",   "#5865F2"],
     ]
     for (const [label, color] of cases) {
-      const link = within(socialNav).getByLabelText(label)
+      const Glyph = glyphFor(label)
+      const { container, unmount } = render(<Glyph />)
       // Brand-accurate glyphs paint the path itself (not the svg root) with
       // the official brand colour. The chip wrapper stays neutral.
-      const path = link.querySelector("path")
-      expect(path).not.toBeNull()
-      expect(path?.getAttribute("fill")).toBe(color)
+      const path = container.querySelector("path")
+      expect(path, `${label} path`).not.toBeNull()
+      expect(path?.getAttribute("fill"), `${label} fill`).toBe(color)
+      unmount()
     }
   })
 
   it("renders Instagram with its rainbow brand gradient", () => {
-    render(<Footer />)
-    const instagram = screen.getByLabelText("Instagram")
-    const gradient = instagram.querySelector("linearGradient")
+    const Instagram = glyphFor("Instagram")
+    const { container } = render(<Instagram />)
+    const gradient = container.querySelector("linearGradient")
     expect(gradient).toBeInTheDocument()
     // Five stops define the warm-yellow → orange → magenta → purple → indigo
     // gradient the brand mark is famous for.
-    const stops = instagram.querySelectorAll("stop")
+    const stops = container.querySelectorAll("stop")
     expect(stops.length).toBeGreaterThanOrEqual(4)
     // The glyph path references the gradient by id.
-    const path = instagram.querySelector("path")
+    const path = container.querySelector("path")
     expect(path?.getAttribute("fill") ?? "").toMatch(/moltrace-footer-instagram-gradient/)
   })
 
   it("renders Slack with its four-colour pinwheel (cyan / green / yellow / red)", () => {
-    render(<Footer />)
-    const slack = screen.getByLabelText("Slack")
-    const paths = slack.querySelectorAll("path")
+    const Slack = glyphFor("Slack")
+    const { container } = render(<Slack />)
+    const paths = container.querySelectorAll("path")
     expect(paths).toHaveLength(4)
     const fills = Array.from(paths).map((p) => p.getAttribute("fill"))
     expect(new Set(fills)).toEqual(
@@ -194,16 +210,18 @@ describe("Marketing Footer", () => {
   })
 
   it("renders every social glyph at the same h-5 w-5 size for visual consistency", () => {
-    render(<Footer />)
-    const socialNav = screen.getByTestId("footer-social-nav")
-    const svgs = socialNav.querySelectorAll("svg")
-    // All nine SVGs share the h-5 w-5 size class so the row reads as a
-    // uniform mosaic — the explicit user requirement for this revision.
-    expect(svgs.length).toBe(9)
-    for (const svg of Array.from(svgs)) {
-      expect(svg.className.baseVal).toContain("h-5")
-      expect(svg.className.baseVal).toContain("w-5")
-      expect(svg.getAttribute("viewBox")).toBe("0 0 24 24")
+    // Asserted over the whole registry, not just the rendered footer, so the
+    // artwork of an as-yet-unclaimed platform stays covered and drops into a
+    // uniform row the moment its profile is claimed.
+    expect(socialLinks.length).toBe(9)
+    for (const { label, Glyph } of socialLinks) {
+      const { container, unmount } = render(<Glyph />)
+      const svg = container.querySelector("svg")
+      expect(svg, `${label} svg`).not.toBeNull()
+      expect(svg?.getAttribute("class") ?? "").toContain("h-5")
+      expect(svg?.getAttribute("class") ?? "").toContain("w-5")
+      expect(svg?.getAttribute("viewBox"), `${label} viewBox`).toBe("0 0 24 24")
+      unmount()
     }
   })
 
