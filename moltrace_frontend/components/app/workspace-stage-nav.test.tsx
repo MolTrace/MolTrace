@@ -146,3 +146,78 @@ describe("WorkspaceStageNav", () => {
     expect(onSelect).toHaveBeenCalledWith("tab-nmr-text")
   })
 })
+
+describe("WorkspaceStageNav route mode", () => {
+  const ROUTE_GROUPS: WorkspaceStageGroup[] = [
+    {
+      id: "overview",
+      label: "Overview",
+      sections: [
+        { value: "/regulatory", label: "Overview", desc: "Dossiers and workload.", href: "/regulatory" },
+      ],
+    },
+    {
+      id: "actions",
+      label: "Actions",
+      sections: [
+        {
+          value: "/regulatory/action-queue",
+          label: "Action queue",
+          desc: "Open regulatory work.",
+          href: "/regulatory/action-queue",
+        },
+        {
+          value: "/regulatory/notifications",
+          label: "Notifications",
+          desc: "Change alerts awaiting triage.",
+          href: "/regulatory/notifications",
+        },
+      ],
+    },
+  ]
+
+  it("renders links, not tabs, when sections carry an href", () => {
+    render(
+      <WorkspaceStageNav
+        groups={ROUTE_GROUPS}
+        activeValue="/regulatory/action-queue"
+        label="Regentry"
+      />,
+    )
+
+    // These are page loads; calling them tabs would promise panel switching.
+    expect(screen.queryAllByRole("tab")).toHaveLength(0)
+    const stage = screen.getByTestId("stage-actions")
+    expect(stage.tagName).toBe("A")
+    expect(stage).toHaveAttribute("href", "/regulatory/action-queue")
+  })
+
+  it("marks the current page with aria-current in both tiers", () => {
+    render(
+      <WorkspaceStageNav
+        groups={ROUTE_GROUPS}
+        activeValue="/regulatory/notifications"
+        label="Regentry"
+      />,
+    )
+
+    expect(screen.getByTestId("stage-actions")).toHaveAttribute("aria-current", "page")
+    expect(screen.getByTestId("stage-overview")).not.toHaveAttribute("aria-current")
+    expect(screen.getByTestId("stage-section-/regulatory/notifications")).toHaveAttribute(
+      "aria-current",
+      "page",
+    )
+    expect(screen.getByTestId("stage-section-/regulatory/action-queue")).not.toHaveAttribute(
+      "aria-current",
+    )
+  })
+
+  it("points each stage at its own first route", () => {
+    render(<WorkspaceStageNav groups={ROUTE_GROUPS} activeValue="/regulatory" label="Regentry" />)
+
+    expect(screen.getByTestId("stage-overview")).toHaveAttribute("href", "/regulatory")
+    expect(screen.getByTestId("stage-actions")).toHaveAttribute("href", "/regulatory/action-queue")
+    // Single-section stage: no second row to choose from.
+    expect(screen.queryByTestId("stage-section-/regulatory")).not.toBeInTheDocument()
+  })
+})
