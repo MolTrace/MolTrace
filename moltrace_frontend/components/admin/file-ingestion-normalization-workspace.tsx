@@ -326,7 +326,8 @@ export function FileIngestionNormalizationWorkspace() {
         body: {
           source_system: sourceSystem.trim(),
           source_path: sourcePath.trim(),
-          notes: ingestionNotes.trim(),
+          // IngestionRunCreate (extra="forbid") field is notes_json: list[str].
+          notes_json: ingestionNotes.trim() ? [ingestionNotes.trim()] : [],
         },
       })
       const rec = isRecord(payload) ? payload : {}
@@ -350,7 +351,7 @@ export function FileIngestionNormalizationWorkspace() {
     try {
       const payload = await apiFetch<unknown>(`/files/${fileId.trim()}/normalize`, {
         method: "POST",
-        body: { target_route: targetRoute },
+        body: { target_format: targetRoute },
       })
       const rec = isRecord(payload) ? payload : {}
       trackFileNormalizationRun({

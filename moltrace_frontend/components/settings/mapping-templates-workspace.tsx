@@ -269,11 +269,14 @@ export function MappingTemplatesWorkspace() {
       await apiFetch("/mapping-templates", {
         method: "POST",
         body: {
-          connector: connector.trim(),
+          // MappingTemplateCreate/Update (extra="forbid") has no free-text `connector`;
+          // it wants connector_id (int). Preserve the typed name in metadata_json
+          // (non-lossy) until a numeric connector picker exists.
           name: name.trim(),
           source_type: sourceType,
           target_type: targetType,
           field_map_json: fieldMap,
+          metadata_json: { connector: connector.trim() },
         },
       })
       trackMappingTemplateCreated({
@@ -299,11 +302,14 @@ export function MappingTemplatesWorkspace() {
       await apiFetch(`/mapping-templates/${selectedTemplateId}`, {
         method: "PATCH",
         body: {
-          connector: connector.trim(),
+          // MappingTemplateCreate/Update (extra="forbid") has no free-text `connector`;
+          // it wants connector_id (int). Preserve the typed name in metadata_json
+          // (non-lossy) until a numeric connector picker exists.
           name: name.trim(),
           source_type: sourceType,
           target_type: targetType,
           field_map_json: fieldMap,
+          metadata_json: { connector: connector.trim() },
         },
       })
       await loadTemplates()
