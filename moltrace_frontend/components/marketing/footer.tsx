@@ -245,21 +245,45 @@ function SlackGlyph() {
 
 type SocialLink = {
   label: string
-  href: string
+  /** Full profile URL, or `null` while the profile has not been claimed yet. */
+  href: string | null
   Glyph: React.ComponentType
 }
 
-const socialLinks: SocialLink[] = [
-  { label: "LinkedIn",  href: "#", Glyph: LinkedInGlyph  },
-  { label: "Facebook",  href: "#", Glyph: FacebookGlyph  },
-  { label: "Instagram", href: "#", Glyph: InstagramGlyph },
-  { label: "X",         href: "#", Glyph: XGlyph         },
-  { label: "YouTube",   href: "#", Glyph: YouTubeGlyph   },
+/**
+ * Registry of the social platforms we have artwork for. `href: null` means the
+ * profile does not exist yet — those entries are NOT rendered (see
+ * `claimedSocialLinks`), because a footer full of `href="#"` placeholders is a
+ * dead link for users and a quality signal for crawlers.
+ *
+ * To publish one: claim the profile, put https://moltrace.co in its website
+ * field, then replace `null` with the full profile URL here AND add the same
+ * URL to the Organization `sameAs` array in components/seo/json-ld.tsx — the
+ * two lists must stay in sync, since `sameAs` is what ties this domain to those
+ * profiles as one brand entity.
+ *
+ * Never put "#" back in this list.
+ */
+export const socialLinks: SocialLink[] = [
+  { label: "LinkedIn",  href: null, Glyph: LinkedInGlyph  },
+  { label: "Facebook",  href: null, Glyph: FacebookGlyph  },
+  { label: "Instagram", href: null, Glyph: InstagramGlyph },
+  { label: "X",         href: null, Glyph: XGlyph         },
+  { label: "YouTube",   href: null, Glyph: YouTubeGlyph   },
   { label: "GitHub",    href: "https://github.com/MolTrace/MolTrace", Glyph: GitHubGlyph },
-  { label: "WhatsApp",  href: "#", Glyph: WhatsAppGlyph  },
-  { label: "Discord",   href: "#", Glyph: DiscordGlyph   },
-  { label: "Slack",     href: "#", Glyph: SlackGlyph     },
+  { label: "WhatsApp",  href: null, Glyph: WhatsAppGlyph  },
+  { label: "Discord",   href: null, Glyph: DiscordGlyph   },
+  { label: "Slack",     href: null, Glyph: SlackGlyph     },
 ]
+
+/**
+ * Only profiles that actually exist. The `"#"` guard is belt-and-braces: even
+ * if a placeholder is reintroduced, it can never render as a dead link.
+ */
+const claimedSocialLinks = socialLinks.filter(
+  (link): link is SocialLink & { href: string } =>
+    typeof link.href === "string" && link.href.trim() !== "" && link.href !== "#",
+)
 
 // Framed as design intent ("designed to support"), NOT held certifications — see the
 // label rendered alongside these badges. The regime names alone are accurate; the claim
@@ -381,9 +405,9 @@ export function Footer() {
               data-testid="footer-social-nav"
               className="flex flex-wrap items-center gap-1.5"
             >
-              {socialLinks.map(({ label, href, Glyph }) => {
-                // External profile links (full URLs, e.g. the now-public GitHub repo) open in
-                // a new tab with a safe ``rel``; unset ("#") placeholders stay in-app.
+              {claimedSocialLinks.map(({ label, href, Glyph }) => {
+                // Every rendered entry is a real, claimed profile URL; unclaimed
+                // platforms are filtered out upstream rather than linked to "#".
                 const isExternal = /^https?:\/\//i.test(href)
                 return (
                   <Link
