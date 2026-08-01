@@ -10,6 +10,7 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
 
+from . import org_membership
 from .database import session_scope
 from .models import (
     CompactModuleSummary,
@@ -1074,14 +1075,23 @@ def _apply_synced_draft(
     )
 
 
-def _mobile_can_access_dossier(dossier: RegulatoryDossierORM, actor: MobileActor) -> bool:
+def _mobile_can_access_dossier(
+    session: Session, dossier: RegulatoryDossierORM, actor: MobileActor
+) -> bool:
     """A mobile sync may mutate a dossier only if the actor owns it (a system api key acts
     across users). A NULL-owner dossier is reachable only by the system key — consistent with
     the v0.24.0 read-scoping rule, where unowned and not-yours are indistinguishable.
     """
     if actor.system_api_key:
         return True
-    return actor.user_id is not None and dossier.created_by_user_id == actor.user_id
+    if actor.user_id is None:
+        return False
+    if dossier.created_by_user_id == actor.user_id:
+        return True
+    # A dossier owned by the caller's organization is theirs to review on mobile too — the
+    # approval queue has to match what the desktop workspace shows, or a reviewer sees a filing
+    # on one surface and not the other.
+    return org_membership.user_shares_org(session, actor.user_id, dossier.organization_id)
 
 
 def _mobile_can_access_action_item(
@@ -1094,7 +1104,7 @@ def _mobile_can_access_action_item(
     if target.dossier_id is None:
         return False
     dossier = session.get(RegulatoryDossierORM, target.dossier_id)
-    return dossier is not None and _mobile_can_access_dossier(dossier, actor)
+    return dossier is not None and _mobile_can_access_dossier(session, dossier, actor)
 
 
 def _apply_review_decision(
@@ -1192,7 +1202,7 @@ def _apply_review_decision(
     if target_type in {"regulatory_dossier", "dossier"}:
         target_id = _target_int(row)
         dossier = session.get(RegulatoryDossierORM, target_id)
-        if dossier is None or not _mobile_can_access_dossier(dossier, actor):
+        if dossier is None or not _mobile_can_access_dossier(session, dossier, actor):
             raise MobileSyncValidationError(["target_not_found: regulatory_dossier"])
         decision = _normalized_decision(payload)
         if decision not in {"approve", "approved", "needs_changes", "reject", "rejected", "defer", "deferred"}:

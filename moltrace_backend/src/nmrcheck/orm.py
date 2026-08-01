@@ -3508,6 +3508,15 @@ class ReactionProjectORM(Base):
         nullable=True,
         index=True,
     )
+    # The team that may work this campaign. A process-chemistry campaign is run by a group —
+    # someone designs the plate, someone runs it, someone reads the results — but ownership was
+    # creator-only, so a five-chemist team had to share one login. Stamped from the creator's
+    # organization when they have exactly one; NULL keeps creator-only behaviour for existing rows.
+    organization_id: Mapped[int | None] = mapped_column(
+        ForeignKey("organizations.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

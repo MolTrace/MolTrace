@@ -15,8 +15,12 @@ prefix, not the param name alone.
 
 from __future__ import annotations
 
+from typing import Any
+
+from sqlalchemy import or_
 from sqlalchemy.orm import Session, sessionmaker
 
+from . import org_membership
 from .database import session_scope
 from .orm import (
     ReactionBayesianOptimizationRunORM,
@@ -77,9 +81,35 @@ def _project_owner(session: Session, project_id: int | None) -> int | None:
     return row.owner_id if row is not None else None
 
 
-def _child_owner(
+def project_scope_predicate(session: Session, owner_scope_id: int) -> Any:
+    """The SQL predicate for reaction projects a user-scoped caller may see.
+
+    The row-level counterpart of :func:`reaction_project_owned_by`, and it must stay in step with
+    it: any query that scopes campaigns (or joins to them to scope their children) uses this, so a
+    caller is never shown a campaign they cannot open, nor allowed to open one whose children are
+    then invisible. Only call this for a user-scoped caller.
+    """
+    org_ids = org_membership.active_org_ids_for_user(session, owner_scope_id)
+    owned = ReactionProjectORM.owner_id == owner_scope_id
+    if not org_ids:
+        return owned
+    return or_(owned, ReactionProjectORM.organization_id.in_(org_ids))
+
+
+def project_team_access(session: Session, project_id: int | None, user_id: int | None) -> bool:
+    """Whether ``user_id`` reaches ``project_id`` through its owning organization."""
+    if project_id is None:
+        return False
+    row = session.get(ReactionProjectORM, project_id)
+    return row is not None and org_membership.user_shares_org(
+        session, user_id, row.organization_id
+    )
+
+
+def _child_project_id(
     session: Session, orm: type, child_id: int | None, *, hop_attr: str | None
 ) -> int | None:
+    """The owning project's id for a reaction child row, following one optional hop."""
     if child_id is None:
         return None
     child = session.get(orm, child_id)
@@ -90,7 +120,13 @@ def _child_owner(
         item_id = getattr(child, hop_attr, None)
         item = session.get(ReactionExecutionItemORM, item_id) if item_id is not None else None
         project_id = getattr(item, "reaction_project_id", None) if item is not None else None
-    return _project_owner(session, project_id)
+    return project_id
+
+
+def _child_owner(
+    session: Session, orm: type, child_id: int | None, *, hop_attr: str | None
+) -> int | None:
+    return _project_owner(session, _child_project_id(session, orm, child_id, hop_attr=hop_attr))
 
 
 def reaction_owner_id(
@@ -117,11 +153,14 @@ def reaction_project_owned_by(
     reach (cross-module import/export/bridge routes). ``owner_scope_id is None`` means a system
     api-key / admin (unrestricted). Otherwise the project must exist and be owned by the caller; a
     missing project, ``None`` id, or owner mismatch is False, so the route returns a non-leaking
-    404.
+    404 — unless the caller reaches it through the project's owning organization, which widens
+    access the same way the path gate does.
     """
     if owner_scope_id is None:
         return True
-    return _project_owner(session, project_id) == owner_scope_id
+    if _project_owner(session, project_id) == owner_scope_id:
+        return True
+    return project_team_access(session, project_id, owner_scope_id)
 
 
 def reaction_experiment_owned_by(
@@ -135,7 +174,44 @@ def reaction_experiment_owned_by(
     experiment = session.get(ReactionExperimentORM, experiment_id)
     if experiment is None:
         return False
-    return _project_owner(session, experiment.reaction_project_id) == owner_scope_id
+    return reaction_project_owned_by(session, experiment.reaction_project_id, owner_scope_id)
+
+
+def reaction_route_access_facts(
+    session_factory: sessionmaker[Session],
+    route_path: str,
+    path_params: dict[str, object],
+    user_id: int | None,
+) -> tuple[int | None, bool]:
+    """``(owner_user_id, caller_has_team_access)`` for a reaction route, in one session.
+
+    The policy engine's conditions are pure — they receive no database session — so both facts it
+    needs are gathered here and handed in. Mirrors
+    ``regulatory_intelligence.dossier_access_facts``; see that docstring for the reasoning.
+    """
+    with session_scope(session_factory) as session:
+        project_id = _route_project_id(session, route_path, path_params)
+        if project_id is None:
+            return None, False
+        row = session.get(ReactionProjectORM, project_id)
+        if row is None:
+            return None, False
+        team_access = org_membership.user_shares_org(session, user_id, row.organization_id)
+        return row.owner_id, team_access
+
+
+def _route_project_id(
+    session: Session, route_path: str, path_params: dict[str, object]
+) -> int | None:
+    """The owning project's id for a reaction route, or ``None`` when none is addressed."""
+    if "reaction_project_id" in path_params:
+        return _to_int(path_params.get("reaction_project_id"))
+    for prefix, id_param, orm, hop_attr in _CHILD_RESOLVERS:
+        if route_path.startswith(prefix):
+            return _child_project_id(
+                session, orm, _to_int(path_params.get(id_param)), hop_attr=hop_attr
+            )
+    return None
 
 
 def reaction_route_owner_id(

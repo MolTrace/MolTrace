@@ -9,6 +9,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
+from . import regulatory_intelligence
 from .database import session_scope
 from .models import (
     RegulatoryChangeEvent,
@@ -727,7 +728,7 @@ def list_notifications(
             stmt = stmt.join(
                 RegulatoryDossierORM,
                 RegulatoryImpactNotificationORM.dossier_id == RegulatoryDossierORM.id,
-            ).where(RegulatoryDossierORM.created_by_user_id == owner_scope_id)
+            ).where(regulatory_intelligence.dossier_scope_predicate(session, owner_scope_id))
         if status is not None:
             stmt = stmt.where(RegulatoryImpactNotificationORM.status == status)
         if dossier_id is not None:
@@ -736,15 +737,12 @@ def list_notifications(
 
 
 def _dossier_owned_by(session: Session, dossier_id: int | None, owner_scope_id: int | None) -> bool:
-    """In-session dossier-ownership check (mirrors regulatory_intelligence.dossier_owned_by):
-    system/admin scope (``None``) sees all; else the parent dossier must be owned by the scope
-    user; a missing / ``None`` dossier is hidden from a user-scoped caller."""
-    if owner_scope_id is None:
-        return True
-    if dossier_id is None:
-        return False
-    row = session.get(RegulatoryDossierORM, dossier_id)
-    return row is not None and row.created_by_user_id == owner_scope_id
+    """In-session dossier-ownership check — delegates to the one implementation.
+
+    See the identical note in ``regulatory_compliance_store``: this was a copy that drifted when
+    dossiers gained team ownership, so it now calls the source of truth instead.
+    """
+    return regulatory_intelligence.dossier_owned_by(session, dossier_id, owner_scope_id)
 
 
 def update_notification(

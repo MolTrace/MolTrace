@@ -312,15 +312,24 @@ def test_bridge_by_id_reads_404_for_unknown_id(tmp_path):
 # --------------------------------------------------------------------------- #
 # Mobile review-decision sync: a draft may mutate a dossier only if the actor owns it.
 # --------------------------------------------------------------------------- #
-def test_mobile_dossier_access_rule():
-    owned = RegulatoryDossierORM(title="owned", created_by_user_id=7)
-    system_made = RegulatoryDossierORM(title="system", created_by_user_id=None)
-    assert _mobile_can_access_dossier(owned, MobileActor(user_id=7)) is True
-    assert _mobile_can_access_dossier(owned, MobileActor(user_id=8)) is False
-    assert _mobile_can_access_dossier(owned, MobileActor(system_api_key=True)) is True
-    # A NULL-owner (system-created) dossier is reachable only by the system key.
-    assert _mobile_can_access_dossier(system_made, MobileActor(user_id=7)) is False
-    assert _mobile_can_access_dossier(system_made, MobileActor(system_api_key=True)) is True
+def test_mobile_dossier_access_rule(tmp_path):
+    # Now takes a session: a dossier may also be reachable through its owning organization, and
+    # membership is a database fact. These dossiers carry no organization, so the org arm is a
+    # no-op here and the original creator-only contract below is unchanged.
+    engine = create_engine(f"sqlite:///{tmp_path / 'mobile.sqlite3'}")
+    Base.metadata.create_all(engine)
+    with sessionmaker(engine)() as session:
+        owned = RegulatoryDossierORM(title="owned", created_by_user_id=7)
+        system_made = RegulatoryDossierORM(title="system", created_by_user_id=None)
+        assert _mobile_can_access_dossier(session, owned, MobileActor(user_id=7)) is True
+        assert _mobile_can_access_dossier(session, owned, MobileActor(user_id=8)) is False
+        assert _mobile_can_access_dossier(session, owned, MobileActor(system_api_key=True)) is True
+        # A NULL-owner (system-created) dossier is reachable only by the system key.
+        assert _mobile_can_access_dossier(session, system_made, MobileActor(user_id=7)) is False
+        assert (
+            _mobile_can_access_dossier(session, system_made, MobileActor(system_api_key=True))
+            is True
+        )
 
 
 # --------------------------------------------------------------------------- #

@@ -328,6 +328,18 @@ POLICY_SET: tuple[Policy, ...] = (
         condition=_owns_resource,
         description="User reads/writes only resources they own (_user_scope_for_context).",
     ),
+    # 4b. Team access for reaction campaigns, mirroring 3b for dossiers. A campaign is run by a
+    #     group — someone designs the plate, someone runs it, someone reads the results — so an
+    #     active member of the owning organization reaches it alongside the creator.
+    Policy(
+        id="permit-org-member-owned-rw",
+        effect=Effect.PERMIT,
+        principal_kinds=frozenset({PrincipalKind.USER}),
+        actions=frozenset({"owned:read", "owned:write"}),
+        resource_types=frozenset({"reaction_project"}),
+        condition=_shares_owner_org,
+        description="User reads/writes reaction projects owned by an organization they belong to.",
+    ),
     # 5. Any authenticated user (or admin; system is covered by #1) may read surveillance.
     Policy(
         id="permit-authenticated-surveillance-read",

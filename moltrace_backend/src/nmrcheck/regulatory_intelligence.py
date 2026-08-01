@@ -326,14 +326,7 @@ def list_dossiers(
     with session_scope(session_factory) as session:
         stmt = select(RegulatoryDossierORM)
         if owner_scope_id is not None:
-            org_ids = org_membership.active_org_ids_for_user(session, owner_scope_id)
-            owned = RegulatoryDossierORM.created_by_user_id == owner_scope_id
-            if org_ids:
-                stmt = stmt.where(
-                    or_(owned, RegulatoryDossierORM.organization_id.in_(org_ids))
-                )
-            else:
-                stmt = stmt.where(owned)
+            stmt = stmt.where(dossier_scope_predicate(session, owner_scope_id))
         rows = session.scalars(
             stmt.order_by(RegulatoryDossierORM.id.desc()).limit(limit)
         ).all()
@@ -347,6 +340,23 @@ def get_dossier(
     with session_scope(session_factory) as session:
         row = session.get(RegulatoryDossierORM, dossier_id)
         return _dossier_to_record(row) if row is not None else None
+
+
+def dossier_scope_predicate(session: Session, owner_scope_id: int) -> Any:
+    """The SQL predicate for dossiers a user-scoped caller may see.
+
+    The row-level counterpart of :func:`dossier_owned_by`, and it must stay in step with it: any
+    query that scopes dossiers (or joins to them to scope their children) uses this, so a caller
+    cannot be shown a row they then cannot open, or — the failure that actually bit — open a
+    dossier whose children are all invisible because a nearby query still filtered on the creator
+    alone. Only call this for a user-scoped caller; ``owner_scope_id is None`` (system/admin) means
+    no predicate at all.
+    """
+    org_ids = org_membership.active_org_ids_for_user(session, owner_scope_id)
+    owned = RegulatoryDossierORM.created_by_user_id == owner_scope_id
+    if not org_ids:
+        return owned
+    return or_(owned, RegulatoryDossierORM.organization_id.in_(org_ids))
 
 
 def dossier_owned_by(

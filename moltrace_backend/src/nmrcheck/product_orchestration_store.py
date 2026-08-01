@@ -10,6 +10,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
 
 from . import reaction_access
+from . import regulatory_intelligence
 from .database import session_scope
 from .models import (
     ComplianceDrivenOptimizationObjective,
@@ -384,7 +385,7 @@ def list_spectroscopy_to_regulatory_bridges(
             stmt = stmt.join(
                 RegulatoryDossierORM,
                 SpectroscopyToRegulatoryBridgeORM.dossier_id == RegulatoryDossierORM.id,
-            ).where(RegulatoryDossierORM.created_by_user_id == owner_scope_id)
+            ).where(regulatory_intelligence.dossier_scope_predicate(session, owner_scope_id))
         if dossier_id is not None:
             stmt = stmt.where(SpectroscopyToRegulatoryBridgeORM.dossier_id == dossier_id)
         return [_s2r_to_record(row) for row in session.scalars(stmt.limit(limit)).all()]
@@ -564,10 +565,10 @@ def list_regulatory_to_reaction_bridges(
         # user's own bridges. System/admin (owner_scope_id None) sees all.
         if owner_scope_id is not None:
             owned_dossiers = select(RegulatoryDossierORM.id).where(
-                RegulatoryDossierORM.created_by_user_id == owner_scope_id
+                regulatory_intelligence.dossier_scope_predicate(session, owner_scope_id)
             )
             owned_projects = select(ReactionProjectORM.id).where(
-                ReactionProjectORM.owner_id == owner_scope_id
+                reaction_access.project_scope_predicate(session, owner_scope_id)
             )
             stmt = stmt.where(
                 or_(
@@ -914,7 +915,7 @@ def create_cross_module_action_item(
         return _cross_action_to_record(row)
 
 
-def _cross_module_action_visible_to_owner(owner_scope_id: int):
+def _cross_module_action_visible_to_owner(session: Session, owner_scope_id: int):
     """SQL predicate: ``True`` for cross-module action items where the caller owns either the
     source or the target resource. Caller-supplied subqueries keep the join graph compact and
     avoid a Python post-filter that would silently drop owned rows behind another tenant's
@@ -922,7 +923,7 @@ def _cross_module_action_visible_to_owner(owner_scope_id: int):
     from sqlalchemy import and_, or_
 
     owned_reaction_projects = select(ReactionProjectORM.id).where(
-        ReactionProjectORM.owner_id == owner_scope_id
+        reaction_access.project_scope_predicate(session, owner_scope_id)
     )
     owned_reaction_experiments = (
         select(ReactionExperimentORM.id)
@@ -930,10 +931,10 @@ def _cross_module_action_visible_to_owner(owner_scope_id: int):
             ReactionProjectORM,
             ReactionProjectORM.id == ReactionExperimentORM.reaction_project_id,
         )
-        .where(ReactionProjectORM.owner_id == owner_scope_id)
+        .where(reaction_access.project_scope_predicate(session, owner_scope_id))
     )
     owned_dossiers = select(RegulatoryDossierORM.id).where(
-        RegulatoryDossierORM.created_by_user_id == owner_scope_id
+        regulatory_intelligence.dossier_scope_predicate(session, owner_scope_id)
     )
     owned_spectracheck_sessions = (
         select(SpectraCheckSessionORM.id)
@@ -981,7 +982,7 @@ def list_cross_module_action_items(
         if owner_scope_id is not None:
             # Owner-filter IN SQL BEFORE the .limit() — a post-.limit() Python filter would
             # silently drop owned rows behind another tenant's items on a busy table.
-            stmt = stmt.where(_cross_module_action_visible_to_owner(owner_scope_id))
+            stmt = stmt.where(_cross_module_action_visible_to_owner(session, owner_scope_id))
         return [_cross_action_to_record(row) for row in session.scalars(stmt.limit(limit)).all()]
 
 
