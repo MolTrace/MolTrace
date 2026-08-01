@@ -19202,7 +19202,7 @@ export interface components {
         /** ElectronicSignatureRecordCreate */
         ElectronicSignatureRecordCreate: {
             /** Signer Name */
-            signer_name?: string | null;
+            signer_name: string;
             /** Signer Email */
             signer_email?: string | null;
             /**
@@ -30545,6 +30545,8 @@ export interface components {
             }[] | {
                 [key: string]: unknown;
             };
+            /** Entries */
+            entries?: components["schemas"]["ReactionDesignSpaceEntry"][];
             /**
              * Created At
              * Format: date-time
@@ -30597,10 +30599,36 @@ export interface components {
             }[] | {
                 [key: string]: unknown;
             };
+            /** Entries */
+            entries?: components["schemas"]["ReactionDesignSpaceEntry"][];
             /** Metadata Json */
             metadata_json?: {
                 [key: string]: unknown;
             };
+        };
+        /**
+         * ReactionDesignSpaceEntry
+         * @description Per-variable exploration state chosen in the design-space editor.
+         *
+         *     ``free`` — vary the variable during optimization (the default).
+         *     ``fixed`` — hold the variable constant; the optimizer pins it at the
+         *     variable's default value (when the variable has one).
+         *     ``excluded`` — drop the variable from the search space entirely.
+         *
+         *     This is the lightweight, per-variable scoping the reaction design-space UI
+         *     manages. It is distinct from ``fixed_conditions_json`` (name → explicit
+         *     value) and ``excluded_conditions_json`` (whole-condition filters), which the
+         *     optimizer also honors; the two mechanisms layer additively.
+         */
+        ReactionDesignSpaceEntry: {
+            /** Reaction Variable Id */
+            reaction_variable_id: number;
+            /**
+             * Exploration State
+             * @default free
+             * @enum {string}
+             */
+            exploration_state: "free" | "fixed" | "excluded";
         };
         /** ReactionDesignSpaceUpdate */
         ReactionDesignSpaceUpdate: {
@@ -30630,6 +30658,8 @@ export interface components {
             }[] | {
                 [key: string]: unknown;
             } | null;
+            /** Entries */
+            entries?: components["schemas"]["ReactionDesignSpaceEntry"][] | null;
             /** Metadata Json */
             metadata_json?: {
                 [key: string]: unknown;
