@@ -1141,8 +1141,16 @@ def _create_signature_row(
         metadata["step_up_factor"] = step_up_factor
     if step_up_aal is not None:
         metadata["step_up_aal"] = step_up_aal
-    if signer_user_id is not None and effective_name != payload.signer_name:
-        # Record what the client declared vs the server-authoritative identity that was used.
+    if (
+        signer_user_id is not None
+        and payload.signer_name is not None
+        and effective_name != payload.signer_name
+    ):
+        # Record what the client declared vs the server-authoritative identity that was used. Guarded
+        # on ``payload.signer_name is not None`` so that a caller which legitimately omits the name
+        # (the SPA, post server-authoritative signing) does not write a misleading
+        # ``client_declared_signer_name: null`` into the audit trail — only an actual declared name
+        # that differs from the principal is worth recording.
         metadata["client_declared_signer_name"] = payload.signer_name
     row = ElectronicSignatureRecordORM(
         signer_name=effective_name,

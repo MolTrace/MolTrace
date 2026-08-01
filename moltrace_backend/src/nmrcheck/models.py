@@ -14094,7 +14094,16 @@ class TraceabilityMatrix(BaseModel):
 class ElectronicSignatureRecordCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    signer_name: str = Field(min_length=1, max_length=200)
+    # §11.100: signer identity is the authenticated server principal. The ``/esignatures/records``
+    # route derives and *overrides* the name from the session, so a normal user-session caller (e.g.
+    # the SPA) does not send this at all — hence optional, not required. It is retained (not removed)
+    # because two paths still legitimately supply it: the operator break-glass path (system api key,
+    # no user principal), where the client-declared name is the *only* identity and becomes the
+    # fallback; and inline callers (system-release approval, pilot signoff) that construct this model
+    # with a real name. When a user-session caller does send a name that differs from the principal it
+    # is preserved in ``metadata_json.client_declared_signer_name`` as an impersonation-audit trail. A
+    # value that *is* sent must still be non-empty (min_length=1); ``None`` means "not declared".
+    signer_name: str | None = Field(default=None, min_length=1, max_length=200)
     signer_email: str | None = Field(default=None, max_length=255)
     signature_meaning: SignatureMeaning
     target_type: str = Field(min_length=1, max_length=100)
