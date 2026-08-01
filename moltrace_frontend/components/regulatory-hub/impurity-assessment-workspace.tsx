@@ -25,6 +25,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { StructureFieldEditor } from "@/src/components/chemistry/StructureFieldEditor"
 import { Checkbox } from "@/components/ui/checkbox"
 import { InfoTooltip } from "@/components/ui/info-tooltip"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
@@ -516,16 +517,32 @@ export function ImpurityAssessmentWorkspace() {
                 <div className="flex flex-wrap items-end gap-2">
                   <div className="min-w-[220px] flex-1 space-y-1">
                     <Label className="text-xs text-muted-foreground">SMILES</Label>
-                    <Input
-                      value={row.smiles}
-                      onChange={(e) =>
-                        setStructural((rows) => rows.map((r) => (r._id === row._id ? { ...r, smiles: e.target.value } : r)))
-                      }
-                      placeholder="CN(C)N=O"
-                      disabled={submitting}
-                      autoComplete="off"
-                      className="font-mono"
-                    />
+                    <div className="flex items-center gap-2">
+                      <Input
+                        value={row.smiles}
+                        onChange={(e) =>
+                          setStructural((rows) => rows.map((r) => (r._id === row._id ? { ...r, smiles: e.target.value } : r)))
+                        }
+                        placeholder="CN(C)N=O"
+                        disabled={submitting}
+                        autoComplete="off"
+                        className="font-mono"
+                      />
+                      {/* SMILES fails silently: CN(C)N=O is NDMA, CN(C)NO is
+                          something else, both parse, and a text box shows no
+                          difference. This string drives a mutagenicity and a
+                          potency call, so it is worth drawing and seeing. */}
+                      <StructureFieldEditor
+                        value={row.smiles}
+                        disabled={submitting}
+                        label="impurity structure"
+                        onChange={(smiles) =>
+                          setStructural((rows) =>
+                            rows.map((r) => (r._id === row._id ? { ...r, smiles } : r)),
+                          )
+                        }
+                      />
+                    </div>
                   </div>
                   <div className="w-40 space-y-1">
                     <Label className="text-xs text-muted-foreground">Name (optional)</Label>

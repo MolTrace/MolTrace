@@ -1,6 +1,5 @@
 "use client"
 
-import dynamic from "next/dynamic"
 import Link from "next/link"
 import { useCallback, useRef, useState } from "react"
 import { AlertCard } from "@/components/dashboard/alert-card"
@@ -10,30 +9,11 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { apiFetch } from "@/lib/api/client"
 import { loadCompounds } from "@/lib/ui/entity-options"
+import { LazyStructureCanvas } from "@/src/components/chemistry/LazyStructureCanvas"
 import type {
   StructureEditorApi,
   StructureSnapshot,
 } from "@/src/components/chemistry/StructureEditor"
-
-/**
- * Client-only, lazily-loaded wrapper around the drawing canvas.
- *
- * `ssr: false` is required, not stylistic: Ketcher reads `window` while its
- * module is evaluated, so rendering it on the server throws. The dynamic import
- * also keeps its multi-megabyte bundle off every route that never draws — it is
- * fetched the first time a reader opens the editor, and not before.
- */
-const StructureEditorCanvas = dynamic(
-  () => import("@/src/components/chemistry/StructureEditor").then((m) => m.StructureEditorCanvas),
-  {
-    ssr: false,
-    loading: () => (
-      <div className="flex h-[520px] items-center justify-center rounded-lg border border-dashed bg-muted/30">
-        <p className="text-sm text-muted-foreground">Starting the drawing canvas…</p>
-      </div>
-    ),
-  },
-)
 
 /** Formats the engine reads. Extensions are a hint for the file picker only —
  *  the engine sniffs the actual content, which is why paste works too. */
@@ -253,7 +233,7 @@ export function StructureEditorPanel({ onCapture, contextLabel }: Props) {
       ) : null}
 
       {open ? (
-        <StructureEditorCanvas
+        <LazyStructureCanvas
           onCapture={(s) => {
             setSnapshot(s)
             setError("")
