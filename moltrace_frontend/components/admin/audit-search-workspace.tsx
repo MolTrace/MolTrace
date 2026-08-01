@@ -28,6 +28,7 @@ import {
   ScrollText,
   ServerOff,
 } from "lucide-react"
+import { RAW_DATA_DISCLOSURE } from "@/lib/ui/copy"
 
 const AUDIT_SEARCH_TOOLTIP =
   "Reconstructs who did what, when, and why across every logged action."
@@ -517,7 +518,7 @@ export function AuditSearchWorkspace() {
       </div>
 
       <div>
-        <h2 className="mb-3 text-sm font-medium text-muted-foreground">Raw data (for troubleshooting)</h2>
+        <h2 className="mb-3 text-sm font-medium text-muted-foreground">{RAW_DATA_DISCLOSURE}</h2>
         <Collapsible className="group rounded-md border">
           <CollapsibleTrigger className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm font-medium hover:bg-muted/50">
             Raw audit records (sensitive values redacted)

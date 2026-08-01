@@ -38,6 +38,7 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty"
 import { ArrowLeft, Download, Library, Loader2, Quote, Search, Upload } from "lucide-react"
+import { RAW_DATA_DISCLOSURE } from "@/lib/ui/copy"
 
 const SOURCE_TYPES = [
   "guidance",
@@ -622,7 +623,7 @@ export function RegulatorySourceLibraryWorkspace() {
                     {readConnectorImportWarnings().join("; ") || "—"}
                   </p>
                   <details className="sm:col-span-2 rounded-md border p-2">
-                    <summary className="cursor-pointer text-xs font-medium">Raw data (for troubleshooting)</summary>
+                    <summary className="cursor-pointer text-xs font-medium">{RAW_DATA_DISCLOSURE}</summary>
                     <pre className="mt-2 overflow-x-auto text-[10px]">{JSON.stringify(connectorImportResult, null, 2)}</pre>
                   </details>
                 </CardContent>

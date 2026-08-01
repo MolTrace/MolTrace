@@ -51,6 +51,7 @@ import {
   trackTenantAuditExportRequested,
   trackValidationProfileUpdated,
 } from "@/src/lib/analytics/analytics-client"
+import { RAW_DATA_DISCLOSURE } from "@/lib/ui/copy"
 
 type Row = Record<string, unknown>
 
@@ -2722,7 +2723,7 @@ function ProcurementPackagesPanel({
       </SectionCard>
 
       <DeveloperOnly>
-        <SectionCard title="Raw data (for troubleshooting)">
+        <SectionCard title={RAW_DATA_DISCLOSURE}>
           <details className="rounded-md border bg-muted/20 p-3">
             <summary className="cursor-pointer text-sm font-medium">Show raw package data</summary>
             <div className="mt-3">
@@ -2906,7 +2907,7 @@ function AuditExportPanel({ tenantId }: { tenantId: string }) {
       </SectionCard>
 
       <DeveloperOnly>
-        <SectionCard title="Raw data (for troubleshooting)">
+        <SectionCard title={RAW_DATA_DISCLOSURE}>
           <details className="rounded-md border bg-muted/20 p-3">
             <summary className="cursor-pointer text-sm font-medium">Show raw export data</summary>
             <div className="mt-3">
@@ -3260,7 +3261,7 @@ export function TenantDetailWorkspace() {
 
         <DeveloperOnly>
           <TabsContent value="developer_json">
-            <SectionCard title="Raw data (for troubleshooting)">
+            <SectionCard title={RAW_DATA_DISCLOSURE}>
               <JsonBlock value={developerBundle} />
             </SectionCard>
           </TabsContent>

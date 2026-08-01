@@ -29,6 +29,7 @@ import {
   PlayCircle,
   Workflow,
 } from "lucide-react"
+import { RAW_DATA_DISCLOSURE } from "@/lib/ui/copy"
 
 type Row = Record<string, unknown>
 
@@ -661,7 +662,7 @@ export function FileIngestionNormalizationWorkspace() {
           </div>
           <DeveloperOnly>
             <details className="rounded-md border p-3">
-              <summary className="cursor-pointer text-sm font-medium">Raw data (for troubleshooting)</summary>
+              <summary className="cursor-pointer text-sm font-medium">{RAW_DATA_DISCLOSURE}</summary>
               <pre className="mt-3 max-h-[24rem] overflow-auto text-[10px]">{JSON.stringify(developerJson, null, 2)}</pre>
             </details>
           </DeveloperOnly>

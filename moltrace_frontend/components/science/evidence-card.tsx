@@ -279,7 +279,7 @@ export function EvidenceCard({
         {status === "pending_review" ? (
           <Alert className="border-primary/30 bg-primary/5 py-2">
             <Clock className="h-4 w-4" aria-hidden />
-            <AlertTitle className="text-sm">Human review required.</AlertTitle>
+            <AlertTitle className="text-sm">Human review required</AlertTitle>
           </Alert>
         ) : null}
 
