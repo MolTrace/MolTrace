@@ -89,6 +89,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/system/capabilities": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * System Capabilities Route
+         * @description Which products this workspace includes.
+         *
+         *     The client reads this once to decide what to show, so an unavailable product never appears as
+         *     a broken link or an empty screen. The server remains the authority — this is what the
+         *     interface renders from, not what access is decided by.
+         */
+        get: operations["system_capabilities_route_system_capabilities_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/system/dependencies": {
         parameters: {
             query?: never;
@@ -26948,6 +26972,21 @@ export interface components {
                 [key: string]: unknown;
             } | null;
         };
+        /**
+         * ModuleCapability
+         * @description Whether one product is part of this workspace.
+         */
+        ModuleCapability: {
+            /**
+             * Module
+             * @enum {string}
+             */
+            module: "spectracheck" | "regulatory_hub" | "reaction_optimization";
+            /** Display Name */
+            display_name: string;
+            /** Included */
+            included: boolean;
+        };
         /** ModulePriorityMap */
         ModulePriorityMap: {
             /** Id */
@@ -28979,6 +29018,14 @@ export interface components {
              * @default false
              */
             development_mode: boolean;
+            /** Evidence Item Id */
+            evidence_item_id?: number | null;
+            /** Compound Id */
+            compound_id?: number | null;
+            /** Session Id */
+            session_id?: number | null;
+            /** Notes */
+            notes?: string | null;
             /** Metadata Json */
             metadata_json?: {
                 [key: string]: unknown;
@@ -33421,7 +33468,7 @@ export interface components {
              * Action Type
              * @enum {string}
              */
-            action_type: "impurity_reporting" | "impurity_identification" | "impurity_qualification" | "residual_solvent_review" | "nitrosamine_risk_review" | "qnmr_validation_gap" | "ai_governance_gap" | "jurisdictional_review" | "source_needed" | "human_review" | "other";
+            action_type: "impurity_reporting" | "impurity_identification" | "impurity_qualification" | "residual_solvent_review" | "elemental_impurity_review" | "nitrosamine_risk_review" | "qnmr_validation_gap" | "ai_governance_gap" | "jurisdictional_review" | "source_needed" | "human_review" | "other";
             /** Title */
             title: string;
             /** Description */
@@ -33483,7 +33530,7 @@ export interface components {
              * @default human_review
              * @enum {string}
              */
-            action_type: "impurity_reporting" | "impurity_identification" | "impurity_qualification" | "residual_solvent_review" | "nitrosamine_risk_review" | "qnmr_validation_gap" | "ai_governance_gap" | "jurisdictional_review" | "source_needed" | "human_review" | "other";
+            action_type: "impurity_reporting" | "impurity_identification" | "impurity_qualification" | "residual_solvent_review" | "elemental_impurity_review" | "nitrosamine_risk_review" | "qnmr_validation_gap" | "ai_governance_gap" | "jurisdictional_review" | "source_needed" | "human_review" | "other";
             /** Title */
             title: string;
             /** Description */
@@ -33514,7 +33561,7 @@ export interface components {
         /** RegulatoryActionItemUpdate */
         RegulatoryActionItemUpdate: {
             /** Action Type */
-            action_type?: ("impurity_reporting" | "impurity_identification" | "impurity_qualification" | "residual_solvent_review" | "nitrosamine_risk_review" | "qnmr_validation_gap" | "ai_governance_gap" | "jurisdictional_review" | "source_needed" | "human_review" | "other") | null;
+            action_type?: ("impurity_reporting" | "impurity_identification" | "impurity_qualification" | "residual_solvent_review" | "elemental_impurity_review" | "nitrosamine_risk_review" | "qnmr_validation_gap" | "ai_governance_gap" | "jurisdictional_review" | "source_needed" | "human_review" | "other") | null;
             /** Title */
             title?: string | null;
             /** Description */
@@ -38883,6 +38930,14 @@ export interface components {
                 [key: string]: unknown;
             };
         };
+        /**
+         * SystemCapabilities
+         * @description What this workspace includes, so the interface only offers what is actually available.
+         */
+        SystemCapabilities: {
+            /** Modules */
+            modules?: components["schemas"]["ModuleCapability"][];
+        };
         /** SystemHealthResponse */
         SystemHealthResponse: {
             /**
@@ -42071,6 +42126,39 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+        };
+    };
+    system_capabilities_route_system_capabilities_get: {
+        parameters: {
+            query?: {
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SystemCapabilities"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
