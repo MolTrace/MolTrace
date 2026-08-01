@@ -20,6 +20,8 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
+import { EntityPicker } from "@/components/ui/entity-picker"
+import { loadManagedFiles, loadConnectors, loadDossiers, loadExternalRecords } from "@/lib/ui/entity-options"
 import {
   Table,
   TableBody,
@@ -66,6 +68,13 @@ function asArray(data: unknown): unknown[] {
   return []
 }
 
+/** Coerce an EntityPicker value to a positive integer id, or null when unset/invalid. */
+function toId(value: number | string | null): number | null {
+  if (value == null) return null
+  const n = typeof value === "number" ? value : Number(value)
+  return Number.isInteger(n) && n >= 1 ? n : null
+}
+
 function parseJurisdictions(raw: unknown): JurisdictionRow[] {
   const rows = asArray(raw).filter(isRecord)
   const out: JurisdictionRow[] = []
@@ -107,13 +116,12 @@ export function RegulatorySourceLibraryWorkspace() {
   const [uploadBusy, setUploadBusy] = useState(false)
   const [uploadErr, setUploadErr] = useState("")
   const [uploadOk, setUploadOk] = useState("")
-  const [connectorImportConnector, setConnectorImportConnector] = useState("")
-  const [connectorImportExternalRecord, setConnectorImportExternalRecord] = useState("")
+  const [connectorImportFileId, setConnectorImportFileId] = useState<number | string | null>(null)
+  const [connectorImportConnectorId, setConnectorImportConnectorId] = useState<number | string | null>(null)
+  const [connectorImportDossierId, setConnectorImportDossierId] = useState<number | string | null>(null)
+  const [connectorImportExternalRecordId, setConnectorImportExternalRecordId] = useState<number | string | null>(null)
   const [connectorImportSourceType, setConnectorImportSourceType] = useState<string>("guidance")
   const [connectorImportJurisdiction, setConnectorImportJurisdiction] = useState("")
-  const [connectorImportDossier, setConnectorImportDossier] = useState("")
-  const [connectorImportFileId, setConnectorImportFileId] = useState("")
-  const [connectorImportExternalObjectId, setConnectorImportExternalObjectId] = useState("")
   const [connectorImportBusy, setConnectorImportBusy] = useState(false)
   const [connectorImportErr, setConnectorImportErr] = useState("")
   const [connectorImportResult, setConnectorImportResult] = useState<Record<string, unknown> | null>(null)
@@ -338,21 +346,27 @@ export function RegulatorySourceLibraryWorkspace() {
   }
 
   async function submitConnectorImport() {
+    const fileId = toId(connectorImportFileId)
+    if (fileId == null) {
+      setConnectorImportErr("Select a managed file to import.")
+      return
+    }
     setConnectorImportBusy(true)
     setConnectorImportErr("")
     try {
-      const body: Record<string, unknown> = {
-        connector: connectorImportConnector.trim(),
-        external_record: connectorImportExternalRecord.trim(),
-        source_type: connectorImportSourceType,
-        jurisdiction: connectorImportJurisdiction.trim(),
-      }
-      const dossier = connectorImportDossier.trim()
-      if (dossier) body.dossier = dossier
-      const fileId = connectorImportFileId.trim()
-      if (fileId) body.file_id = fileId
-      const externalObjectId = connectorImportExternalObjectId.trim()
-      if (externalObjectId) body.external_object_id = externalObjectId
+      // source_type / jurisdiction describe the citation, not the transport — carry them as
+      // citation metadata (a free-form dict the model accepts) rather than top-level keys.
+      const sourceCitation: Record<string, unknown> = {}
+      if (connectorImportSourceType) sourceCitation.source_type = connectorImportSourceType
+      if (connectorImportJurisdiction.trim()) sourceCitation.jurisdiction = connectorImportJurisdiction.trim()
+      const body: Record<string, unknown> = { file_id: fileId }
+      const connectorId = toId(connectorImportConnectorId)
+      if (connectorId != null) body.connector_id = connectorId
+      const dossierId = toId(connectorImportDossierId)
+      if (dossierId != null) body.dossier_id = dossierId
+      const externalRecordId = toId(connectorImportExternalRecordId)
+      if (externalRecordId != null) body.external_record_id = externalRecordId
+      if (Object.keys(sourceCitation).length > 0) body.source_citation_json = sourceCitation
       const data = await apiFetch<unknown>("/integrations/regulatory/import-source", {
         method: "POST",
         body,
@@ -522,21 +536,55 @@ export function RegulatorySourceLibraryWorkspace() {
           <div className="space-y-4">
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="connector-import-connector">Connector</Label>
-                <Input
-                  id="connector-import-connector"
-                  value={connectorImportConnector}
-                  onChange={(e) => setConnectorImportConnector(e.target.value)}
-                  autoComplete="off"
+                <Label htmlFor="connector-import-file-id">Managed file</Label>
+                <EntityPicker
+                  id="connector-import-file-id"
+                  ariaLabel="Managed file"
+                  value={connectorImportFileId}
+                  onChange={setConnectorImportFileId}
+                  load={loadManagedFiles}
+                  allowClear
+                  placeholder="Select a managed file"
+                  searchPlaceholder="Search files…"
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="connector-import-external-record">External record</Label>
-                <Input
+                <Label htmlFor="connector-import-connector">Connector (optional)</Label>
+                <EntityPicker
+                  id="connector-import-connector"
+                  ariaLabel="Connector"
+                  value={connectorImportConnectorId}
+                  onChange={setConnectorImportConnectorId}
+                  load={loadConnectors}
+                  allowClear
+                  placeholder="Select a connector"
+                  searchPlaceholder="Search connectors…"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="connector-import-dossier">Dossier (optional)</Label>
+                <EntityPicker
+                  id="connector-import-dossier"
+                  ariaLabel="Dossier"
+                  value={connectorImportDossierId}
+                  onChange={setConnectorImportDossierId}
+                  load={loadDossiers}
+                  allowClear
+                  placeholder="Select a dossier"
+                  searchPlaceholder="Search dossiers…"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="connector-import-external-record">External record (optional)</Label>
+                <EntityPicker
                   id="connector-import-external-record"
-                  value={connectorImportExternalRecord}
-                  onChange={(e) => setConnectorImportExternalRecord(e.target.value)}
-                  autoComplete="off"
+                  ariaLabel="External record"
+                  value={connectorImportExternalRecordId}
+                  onChange={setConnectorImportExternalRecordId}
+                  load={loadExternalRecords}
+                  allowClear
+                  placeholder="Select an external record"
+                  searchPlaceholder="Search records…"
                 />
               </div>
               <div className="space-y-2">
@@ -563,34 +611,11 @@ export function RegulatorySourceLibraryWorkspace() {
                   autoComplete="off"
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="connector-import-dossier">Dossier (optional)</Label>
-                <Input
-                  id="connector-import-dossier"
-                  value={connectorImportDossier}
-                  onChange={(e) => setConnectorImportDossier(e.target.value)}
-                  autoComplete="off"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="connector-import-file-id">File ID</Label>
-                <Input
-                  id="connector-import-file-id"
-                  value={connectorImportFileId}
-                  onChange={(e) => setConnectorImportFileId(e.target.value)}
-                  autoComplete="off"
-                />
-              </div>
-              <div className="space-y-2 md:col-span-2">
-                <Label htmlFor="connector-import-external-object-id">External object ID</Label>
-                <Input
-                  id="connector-import-external-object-id"
-                  value={connectorImportExternalObjectId}
-                  onChange={(e) => setConnectorImportExternalObjectId(e.target.value)}
-                  autoComplete="off"
-                />
-              </div>
             </div>
+            <p className="text-xs text-muted-foreground">
+              A managed file is required. Source type and jurisdiction are stored as citation metadata;
+              linking an external record also needs a dossier.
+            </p>
             {connectorImportErr ? <AlertCard variant="error" title="Import error" description={connectorImportErr} /> : null}
             <Button type="button" disabled={connectorImportBusy} onClick={() => void submitConnectorImport()}>
               {connectorImportBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
