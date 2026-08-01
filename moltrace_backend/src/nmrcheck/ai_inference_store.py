@@ -440,6 +440,7 @@ def create_prediction(
             warnings.extend([_NO_MODEL_WARNING, _DEV_WARNING])
 
         request_summary = _safe_request_summary(payload)
+        request_context = _request_context(payload)
         confidence = _extract_confidence(payload, selected_artifact_id)
         threshold = _confidence_threshold(config)
         ood_status = _extract_ood_status(payload, config)
@@ -481,6 +482,7 @@ def create_prediction(
                     "routing_decision_id": decision.id,
                     "experimental": payload.experimental,
                     "development_mode": payload.development_mode,
+                    **({"context": request_context} if request_context else {}),
                 }
             ),
         )
@@ -1259,6 +1261,25 @@ def _decide_route_row(
     return row
 
 
+def _request_context(payload: PredictionRequest) -> dict[str, Any]:
+    """Provenance context (evidence/compound/session/notes) attached to a request.
+
+    Only non-null values are returned so an empty request adds no noise. These
+    fields have no dedicated columns; they are persisted into the run summary and
+    metadata to retain requester intent for review.
+    """
+    context: dict[str, Any] = {}
+    if payload.evidence_item_id is not None:
+        context["evidence_item_id"] = payload.evidence_item_id
+    if payload.compound_id is not None:
+        context["compound_id"] = payload.compound_id
+    if payload.session_id is not None:
+        context["session_id"] = payload.session_id
+    if payload.notes:
+        context["notes"] = payload.notes
+    return context
+
+
 def _safe_request_summary(payload: PredictionRequest) -> dict[str, Any]:
     summary = {
         "service_key": payload.service_key,
@@ -1268,6 +1289,9 @@ def _safe_request_summary(payload: PredictionRequest) -> dict[str, Any]:
         "development_mode": payload.development_mode,
         "experimental": payload.experimental,
     }
+    context = _request_context(payload)
+    if context:
+        summary["context"] = context
     return _public_json(summary)
 
 

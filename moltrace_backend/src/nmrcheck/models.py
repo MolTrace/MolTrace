@@ -5575,6 +5575,14 @@ class PredictionRequest(BaseModel):
     requested_result_type: PredictionResultType | None = None
     experimental: bool = False
     development_mode: bool = False
+    # Optional context references linking a prediction to the evidence item,
+    # compound, or session it was run for, plus a free-text requester note.
+    # These are provenance, not model signals: they are persisted into the run
+    # metadata/summary (no dedicated columns) so intent is retained for review.
+    evidence_item_id: int | None = Field(default=None, ge=1)
+    compound_id: int | None = Field(default=None, ge=1)
+    session_id: int | None = Field(default=None, ge=1)
+    notes: str | None = Field(default=None, max_length=20_000)
     metadata_json: dict[str, Any] = Field(default_factory=dict)
 
 
