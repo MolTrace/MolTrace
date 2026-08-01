@@ -4993,6 +4993,51 @@ export interface paths {
         patch: operations["update_tenant_entitlement_route_tenant_entitlements__entitlement_id__patch"];
         trace?: never;
     };
+    "/tenants/{tenant_id}/effective-entitlements": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Effective Entitlements Route
+         * @description The effective per-module licensing for a tenant — each program's ``entitled`` flag, whether
+         *     it is an ``explicit`` decision or the default, and the standing ``default_policy`` (allow). Lets
+         *     the client distinguish an explicit denial from an unconfigured module. Membership is enforced by
+         *     ``_tenant_membership_gate``; the header/path self-consistency check stays for defense in depth.
+         */
+        get: operations["get_effective_entitlements_route_tenants__tenant_id__effective_entitlements_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tenants/{tenant_id}/organizations/{organization_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Link Organization To Tenant Route
+         * @description Bind an organization to this tenant — the operator action that makes the tenant resolvable
+         *     from its members' org membership (and thus its module entitlements enforceable). Super-admin
+         *     only; the caller never asserts their own tenant binding.
+         */
+        put: operations["link_organization_to_tenant_route_tenants__tenant_id__organizations__organization_id__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/feature-flags": {
         parameters: {
             query?: never;
@@ -19136,6 +19181,47 @@ export interface components {
             /** Reason */
             reason: string;
         };
+        /**
+         * EffectiveEntitlement
+         * @description The resolved licensing state of one module for a tenant.
+         *
+         *     ``entitled`` is what the gate acts on. ``explicit`` distinguishes a real decision (an
+         *     entitlement row exists for this program) from the default — so the client can tell
+         *     "denied" from "unconfigured", the distinction it cannot make from the raw rows alone.
+         */
+        EffectiveEntitlement: {
+            /**
+             * Program
+             * @enum {string}
+             */
+            program: "spectracheck" | "regulatory_hub" | "reaction_optimization";
+            /** Display Name */
+            display_name: string;
+            /** Entitled */
+            entitled: boolean;
+            /** Explicit */
+            explicit: boolean;
+        };
+        /**
+         * EffectiveEntitlementReadout
+         * @description Per-program effective entitlements for a tenant, plus the standing default policy.
+         *
+         *     ``default_policy`` states how an absent row is treated (currently always ``allow`` —
+         *     a program with no entitlement row stays open; only an explicit ``enabled=false`` denies).
+         *     Surfacing it means the client never has to assume the default.
+         */
+        EffectiveEntitlementReadout: {
+            /** Tenant Id */
+            tenant_id: number;
+            /**
+             * Default Policy
+             * @default allow
+             * @enum {string}
+             */
+            default_policy: "allow" | "deny";
+            /** Programs */
+            programs?: components["schemas"]["EffectiveEntitlement"][];
+        };
         /** ElectronicSignatureRecord */
         ElectronicSignatureRecord: {
             /** Id */
@@ -28108,6 +28194,8 @@ export interface components {
             id: number;
             /** Name */
             name: string;
+            /** Tenant Id */
+            tenant_id?: number | null;
             /**
              * Created At
              * Format: date-time
@@ -55122,6 +55210,78 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TenantEntitlement"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_effective_entitlements_route_tenants__tenant_id__effective_entitlements_get: {
+        parameters: {
+            query?: {
+                access_token?: string | null;
+            };
+            header?: {
+                "x-tenant-id"?: number | null;
+                "x-api-key"?: string | null;
+            };
+            path: {
+                tenant_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EffectiveEntitlementReadout"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    link_organization_to_tenant_route_tenants__tenant_id__organizations__organization_id__put: {
+        parameters: {
+            query?: {
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path: {
+                tenant_id: number;
+                organization_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrganizationRecord"];
                 };
             };
             /** @description Validation Error */

@@ -365,6 +365,7 @@ from .models import (
     ElementalImpurityAssessmentRequest,
     EmailActionRequest,
     EmailOutboxRecord,
+    EffectiveEntitlementReadout,
     EnvironmentCheckResponse,
     ErrorAnalysisSlice,
     ErrorAnalysisSliceCreate,
@@ -2044,6 +2045,9 @@ async def _baseline_access_gate(request: Request) -> None:
     )
     if context is None:
         raise HTTPException(status_code=401, detail=PUBLIC_AUTH_REQUIRED_DETAIL)
+    # Cache the resolved principal for the tenant-membership + module-entitlement gates that run
+    # after this one (same include_router list), so they don't re-hit the token store.
+    request.state.access_context = context
     _enforce_mfa_satisfied(request, context)
     # Authenticated route: rate-limit per principal (= per tenant today) + route (Prompt 16).
     rate_limit.enforce(request, context)
@@ -2064,6 +2068,147 @@ async def _abuse_rate_limit_gate(request: Request) -> None:
     except HTTPException:
         context = None
     rate_limit.enforce(request, context)
+
+
+# --------------------------------------------------------------------------------------------
+# Module-entitlement enforcement (handoff: "make module entitlements actually enforce").
+#
+# Two router-level gates, attached once at include_router, keyed on the ROUTE PATH TEMPLATE — so
+# every detail/child route is covered in one place, not per-decorator:
+#
+#   _tenant_membership_gate  — item 1: the tenant is resolved server-side from the caller's org
+#     membership, NOT from the self-asserted ``x-tenant-id`` header. A non-super-admin may reach a
+#     ``/tenants/{tenant_id}/…`` route only for a tenant they belong to (else 403).
+#   _module_entitlement_gate — item 3: a WRITE to a module-owned route is refused (403,
+#     ``module_not_entitled``) when the caller's tenant is explicitly denied that module. Reads are
+#     preserved (ALCOA+/Part 11 retention); allow-by-default, so an unbound/unconfigured tenant is
+#     never blocked.
+#
+# The path→program map below is the single source of truth for which routes belong to which
+# sellable module. Extend it (not the decorators) to bring more surface under enforcement.
+# --------------------------------------------------------------------------------------------
+# /regulatory/* routes that are actually spectral analysis, not Regentry (mis-filed under the
+# prefix) — excluded so they are not gated as the regulatory module.
+_NON_MODULE_REGULATORY_PREFIXES: tuple[str, ...] = ("/regulatory/impurities", "/regulatory/spc")
+
+
+def _module_program_for_path(path: str | None) -> str | None:
+    """Map a route path template to the sellable module (``SaaSProgram``) that owns it, or None
+    for shared/platform routes that no single module gates."""
+    if not path:
+        return None
+    # Repho / reaction optimization — every product route lives under a ``/reaction-*`` prefix.
+    if path.startswith("/reaction-"):
+        return "reaction_optimization"
+    # Regentry / regulatory hub — the dossier/action-item/rule-set/surveillance surface, minus the
+    # two spectral endpoints mis-filed under ``/regulatory/``.
+    if path.startswith("/regulatory/"):
+        if any(path.startswith(prefix) for prefix in _NON_MODULE_REGULATORY_PREFIXES):
+            return None
+        return "regulatory_hub"
+    if path.startswith("/ctd-module3-bundles"):
+        return "regulatory_hub"
+    # SpectraCheck — the session workspace plus the core NMR/MS analysis engine it owns.
+    if path.startswith("/spectracheck/") or path in {"/analyze"} or path.startswith("/analyze/"):
+        return "spectracheck"
+    if path.startswith("/spectrum/"):
+        return "spectracheck"
+    return None
+
+
+def _caller_authorized_tenant_ids(request: Request, context: AccessContext) -> set[int]:
+    email = context.user.email if context.user is not None else None
+    return tenant_store.list_member_tenant_ids(_state(request).session_factory, email)
+
+
+def _resolve_active_tenant_id(request: Request, context: AccessContext) -> int | None:
+    """The tenant whose entitlements apply to this request, or None when it can't be pinned.
+
+    Derived from membership. An ``x-tenant-id`` header is honored ONLY when it names one of the
+    caller's own tenants (so it can't be used to dodge a denial by asserting someone else's
+    entitled tenant); an unauthorized header is ignored. A single-tenant caller needs no header.
+    None (no tenant, or an ambiguous multi-tenant caller with no valid header) means allow-by-default.
+    """
+    authorized = _caller_authorized_tenant_ids(request, context)
+    if not authorized:
+        return None
+    header = request.headers.get("x-tenant-id")
+    if header is not None:
+        try:
+            requested = int(header)
+        except (TypeError, ValueError):
+            requested = None
+        if requested is not None and requested in authorized:
+            return requested
+    if len(authorized) == 1:
+        return next(iter(authorized))
+    return None
+
+
+async def _gate_context(request: Request) -> AccessContext | None:
+    """The principal cached by ``_baseline_access_gate``; resolve best-effort if absent (e.g. a
+    router that skips the baseline gate). A credential error is swallowed — the baseline gate /
+    route auth already validated it, so this only affects entitlement keying."""
+    context = getattr(request.state, "access_context", None)
+    if context is not None:
+        return context
+    try:
+        return await get_optional_access_context(
+            request,
+            request.headers.get("x-api-key"),
+            await oauth2_scheme(request),
+            request.query_params.get("access_token"),
+        )
+    except HTTPException:
+        return None
+
+
+async def _tenant_membership_gate(request: Request) -> None:
+    """Item 1: authorize the tenant on ``/tenants/{tenant_id}/…`` against the caller's memberships
+    instead of trusting the header. Super-admin/system unrestricted; non-members get 403."""
+    route = request.scope.get("route")
+    path = getattr(route, "path", None)
+    if not path or not path.startswith("/tenants/{tenant_id}"):
+        return
+    context = await _gate_context(request)
+    if context is None or _is_internal_super_admin(context):
+        return
+    raw = request.path_params.get("tenant_id")
+    try:
+        tenant_id = int(raw)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        # Non-numeric id: the route's own ``: int`` coercion will 422; nothing to authorize.
+        return
+    if tenant_id not in _caller_authorized_tenant_ids(request, context):
+        raise HTTPException(
+            status_code=403,
+            detail="Tenant-scoped access requires membership of the requested tenant.",
+        )
+
+
+async def _module_entitlement_gate(request: Request) -> None:
+    """Item 3: refuse a WRITE to a module the caller's tenant is explicitly denied. Reads pass
+    (retention); allow-by-default, so unbound/unconfigured tenants and operators are never blocked."""
+    route = request.scope.get("route")
+    program = _module_program_for_path(getattr(route, "path", None))
+    if program is None:
+        return
+    if request.method.upper() in {"GET", "HEAD", "OPTIONS"}:
+        return
+    context = await _gate_context(request)
+    if context is None or _is_internal_super_admin(context):
+        return
+    tenant_id = _resolve_active_tenant_id(request, context)
+    if tenant_id is None:
+        return
+    if not tenant_store.is_program_entitled(_state(request).session_factory, tenant_id, program):
+        # Machine-readable body AND a header, because the Next proxy sanitizes 401/403 bodies — the
+        # header lets the client read the signal even when the body is stripped (see FE handoff).
+        raise HTTPException(
+            status_code=403,
+            detail={"code": "module_not_entitled", "program": program},
+            headers={"X-Module-Not-Entitled": program},
+        )
 
 
 def gate(
@@ -2668,6 +2813,15 @@ def _safe_http_exception_detail(status_code: int, detail: Any) -> Any:
         # to enable, so that detail is preserved (still sanitized for safety).
         if isinstance(detail, str) and "feature flag" in detail.lower():
             return _sanitize_public_error_detail(detail)
+        # Module-entitlement denials (module_not_entitled) are the same deliberate exception:
+        # the program name is not a secret — the caller needs it to know which module to license —
+        # so the machine-readable code + program survive the sanitizer (the ``X-Module-Not-Entitled``
+        # response header carries the same signal for clients behind a body-stripping proxy).
+        if isinstance(detail, dict) and detail.get("code") == "module_not_entitled":
+            return {
+                "code": "module_not_entitled",
+                "program": _sanitize_public_error_detail(detail.get("program")),
+            }
         return PUBLIC_ACCESS_DENIED_DETAIL
     return _sanitize_public_error_detail(detail)
 
@@ -15700,8 +15854,14 @@ def list_tenants_route(
     limit: int = Query(default=200, ge=1, le=500),
     context: AccessContext = Depends(require_access_context),
 ) -> list[Tenant]:
+    # Operators (system key / admin) see every tenant. A regular user sees only the tenants they
+    # belong to (via org membership) — the honest replacement for the old blanket 403, and what
+    # lets the client render its licensing readout for the caller's own organization.
     if not _is_internal_super_admin(context):
-        raise HTTPException(status_code=403, detail="Internal super-admin access is required.")
+        return tenant_store.list_member_tenants(
+            _state(request).session_factory,
+            context.user.email if context.user is not None else None,
+        )
     return tenant_store.list_tenants(
         _state(request).session_factory,
         status_filter=status_filter,
@@ -16027,6 +16187,73 @@ def update_tenant_entitlement_route(
         entity_type="tenant_entitlement",
         entity_id=record.id,
         metadata={"tenant_id": record.tenant_id, "updated_fields": sorted(payload.model_fields_set)},
+    )
+    return record
+
+
+@router.get(
+    "/tenants/{tenant_id}/effective-entitlements",
+    response_model=EffectiveEntitlementReadout,
+    dependencies=[Depends(require_access_context)],
+)
+def get_effective_entitlements_route(
+    tenant_id: int,
+    request: Request,
+    x_tenant_id: int | None = Header(default=None, alias="x-tenant-id"),
+    context: AccessContext = Depends(require_access_context),
+) -> EffectiveEntitlementReadout:
+    """The effective per-module licensing for a tenant — each program's ``entitled`` flag, whether
+    it is an ``explicit`` decision or the default, and the standing ``default_policy`` (allow). Lets
+    the client distinguish an explicit denial from an unconfigured module. Membership is enforced by
+    ``_tenant_membership_gate``; the header/path self-consistency check stays for defense in depth."""
+    _require_tenant_scope_header(
+        context=context,
+        requested_tenant_id=x_tenant_id,
+        actual_tenant_id=tenant_id,
+    )
+    try:
+        return tenant_store.effective_entitlements(_state(request).session_factory, tenant_id)
+    except Exception as exc:
+        _raise_tenant_saas_http_error(exc)
+        raise
+
+
+@router.put(
+    "/tenants/{tenant_id}/organizations/{organization_id}",
+    response_model=OrganizationRecord,
+    dependencies=[Depends(require_access_context)],
+)
+def link_organization_to_tenant_route(
+    tenant_id: int,
+    organization_id: int,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> OrganizationRecord:
+    """Bind an organization to this tenant — the operator action that makes the tenant resolvable
+    from its members' org membership (and thus its module entitlements enforceable). Super-admin
+    only; the caller never asserts their own tenant binding."""
+    if not _is_internal_super_admin(context):
+        raise HTTPException(status_code=403, detail="Internal super-admin access is required.")
+    actor = _collaboration_actor(request, context)
+    try:
+        record = collab_store.link_organization_to_tenant(
+            _state(request).session_factory,
+            organization_id,
+            tenant_id,
+            actor=actor,
+        )
+    except collab_store.CollaborationError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    if record is None:
+        raise HTTPException(status_code=404, detail="Organization not found.")
+    _audit_from_context(
+        request,
+        context=context,
+        event_type="tenant.organization_link",
+        message="Organization bound to tenant.",
+        entity_type="organization",
+        entity_id=organization_id,
+        metadata={"tenant_id": tenant_id, "organization_id": organization_id},
     )
     return record
 
@@ -30012,7 +30239,16 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     # authenticated-or-public gate, so a new endpoint fails closed unless explicitly listed in
     # PUBLIC_ROUTE_PATHS. scim_router (SCIM-token auth) and nmr2d_router (per-route auth) keep
     # their own schemes.
-    app.include_router(router, dependencies=[Depends(_baseline_access_gate)])
+    # Order matters: _baseline_access_gate resolves + caches the principal (and 401s) first; the
+    # tenant-membership gate (item 1) and module-entitlement gate (item 3) then reuse it.
+    app.include_router(
+        router,
+        dependencies=[
+            Depends(_baseline_access_gate),
+            Depends(_tenant_membership_gate),
+            Depends(_module_entitlement_gate),
+        ],
+    )
     # scim_router / nmr2d_router keep their own auth schemes but still need abuse throttling
     # (Prompt 16) — they don't run _baseline_access_gate, so attach the rate-limit-only gate.
     app.include_router(scim_router, dependencies=[Depends(_abuse_rate_limit_gate)])

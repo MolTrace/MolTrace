@@ -14,6 +14,8 @@ from .models import (
     CustomerOnboardingProjectCreate,
     CustomerOnboardingProjectUpdate,
     CustomerSuccessHealthScore,
+    EffectiveEntitlement,
+    EffectiveEntitlementReadout,
     FeatureFlag,
     FeatureFlagCreate,
     FeatureFlagUpdate,
@@ -58,9 +60,11 @@ from .orm import (
     CustomerSuccessHealthScoreORM,
     FeatureFlagORM,
     ImplementationTaskORM,
+    OrganizationORM,
     PilotProgramORM,
     ProcurementEvidencePackageORM,
     SubscriptionPlanORM,
+    TeamMemberORM,
     TenantAuditExportORM,
     TenantDataBoundaryORM,
     TenantEntitlementORM,
@@ -608,6 +612,97 @@ def update_entitlement(
         row.updated_at = utcnow()
         session.flush()
         return _entitlement_to_record(row)
+
+
+# --------------------------------------------------------------------------------------------
+# Tenant resolution + module-entitlement enforcement (server-side; never client-asserted).
+#
+# A caller's tenant is derived from their organization membership: active ``team_members`` rows
+# (by email) → their organizations → each organization's bound ``tenant_id``. Entitlements are
+# ALLOW-BY-DEFAULT: a program with no entitlement row is granted; a program is denied only when
+# every row that exists for it has ``enabled=false`` (mirrors :func:`get_module_readiness`).
+# --------------------------------------------------------------------------------------------
+def _normalize_email(email: str | None) -> str:
+    return (email or "").strip().lower()
+
+
+def list_member_tenant_ids(session_factory: sessionmaker[Session], email: str | None) -> set[int]:
+    """The set of tenant ids the caller belongs to (active member of a tenant-bound org).
+
+    Empty when the email is blank, has no active memberships, or none of their orgs is bound to
+    a tenant. This is the server-side resolution that replaces trusting an ``x-tenant-id`` header.
+    """
+    normalized = _normalize_email(email)
+    if not normalized:
+        return set()
+    with session_scope(session_factory) as session:
+        stmt = (
+            select(OrganizationORM.tenant_id)
+            .join(TeamMemberORM, TeamMemberORM.organization_id == OrganizationORM.id)
+            .where(TeamMemberORM.user_email == normalized)
+            .where(TeamMemberORM.status == "active")
+            .where(OrganizationORM.tenant_id.is_not(None))
+        )
+        return {int(tenant_id) for tenant_id in session.scalars(stmt) if tenant_id is not None}
+
+
+def list_member_tenants(session_factory: sessionmaker[Session], email: str | None) -> list[Tenant]:
+    """The tenants the caller belongs to, as records (for a membership-scoped ``GET /tenants``)."""
+    tenant_ids = list_member_tenant_ids(session_factory, email)
+    if not tenant_ids:
+        return []
+    with session_scope(session_factory) as session:
+        stmt = (
+            select(TenantORM)
+            .where(TenantORM.id.in_(tenant_ids))
+            .order_by(TenantORM.created_at.desc())
+        )
+        return [_tenant_to_record(row) for row in session.scalars(stmt)]
+
+
+def is_program_entitled(session_factory: sessionmaker[Session], tenant_id: int, program: str) -> bool:
+    """Whether ``tenant_id`` is licensed for ``program``. Allow-by-default: True when no row
+    exists; once rows exist, True if ANY is enabled (matches ``get_module_readiness`` OR-semantics)."""
+    with session_scope(session_factory) as session:
+        entries = list(
+            session.scalars(
+                select(TenantEntitlementORM).where(
+                    TenantEntitlementORM.tenant_id == tenant_id,
+                    TenantEntitlementORM.program == program,
+                )
+            )
+        )
+        return True if not entries else any(entry.enabled for entry in entries)
+
+
+def effective_entitlements(
+    session_factory: sessionmaker[Session], tenant_id: int
+) -> EffectiveEntitlementReadout:
+    """Per-program effective entitlement for a tenant, with ``explicit`` flags + default policy —
+    so a client can tell an explicit denial from an unconfigured (defaulted-allow) program."""
+    with session_scope(session_factory) as session:
+        _require_tenant(session, tenant_id)
+        entries = list(
+            session.scalars(
+                select(TenantEntitlementORM).where(TenantEntitlementORM.tenant_id == tenant_id)
+            )
+        )
+        by_program: dict[str, list[TenantEntitlementORM]] = {}
+        for entry in entries:
+            by_program.setdefault(entry.program, []).append(entry)
+        programs = [
+            EffectiveEntitlement(
+                program=key,
+                display_name=display,
+                entitled=True if not rows else any(row.enabled for row in rows),
+                explicit=bool(rows),
+            )
+            for display, key in zip(DEFAULT_PRODUCT_ORDER, DEFAULT_PRODUCT_KEYS, strict=True)
+            for rows in (by_program.get(key, []),)
+        ]
+        return EffectiveEntitlementReadout(
+            tenant_id=tenant_id, default_policy="allow", programs=programs
+        )
 
 
 def create_feature_flag(session_factory: sessionmaker[Session], payload: FeatureFlagCreate) -> FeatureFlag:

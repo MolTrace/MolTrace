@@ -54,6 +54,7 @@ from .orm import (
     SpectraCheckReportRecordORM,
     SpectraCheckSessionORM,
     TeamMemberORM,
+    TenantORM,
     utcnow,
 )
 
@@ -1073,11 +1074,48 @@ def _organization_to_record(row: OrganizationORM) -> OrganizationRecord:
     return OrganizationRecord(
         id=row.id,
         name=row.name,
+        tenant_id=row.tenant_id,
         created_at=row.created_at,
         updated_at=row.updated_at,
         metadata_json=_json_dict(row.metadata_json),
         notes=["Organization records control collaboration scope and do not alter evidence data."],
     )
+
+
+def link_organization_to_tenant(
+    session_factory: sessionmaker[Session],
+    organization_id: int,
+    tenant_id: int | None,
+    *,
+    actor: CollaborationActor,
+) -> OrganizationRecord | None:
+    """Bind an organization to a SaaS tenant (or unbind with ``tenant_id=None``).
+
+    This edge is what lets the server resolve a caller's tenant from their org membership; it is
+    an operator action, never client-assertable — the route restricts it to a super-admin. Returns
+    ``None`` when the organization does not exist; raises ``CollaborationError`` when the target
+    tenant does not exist.
+    """
+    with session_scope(session_factory) as session:
+        row = session.get(OrganizationORM, organization_id)
+        if row is None:
+            return None
+        if tenant_id is not None and session.get(TenantORM, tenant_id) is None:
+            raise CollaborationError("Tenant not found.")
+        row.tenant_id = tenant_id
+        row.updated_at = utcnow()
+        _audit(
+            session,
+            event_type="collaboration.organization.tenant_link",
+            message="Organization tenant binding updated.",
+            actor=actor,
+            entity_type="organization",
+            entity_id=row.id,
+            metadata={"tenant_id": tenant_id},
+        )
+        session.flush()
+        session.refresh(row)
+        return _organization_to_record(row)
 
 
 def _team_member_to_record(row: TeamMemberORM) -> TeamMemberRecord:

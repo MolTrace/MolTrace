@@ -9084,6 +9084,8 @@ class OrganizationRecord(BaseModel):
 
     id: int
     name: str
+    # SaaS-tenant this org is bound to (NULL = unbound; no module entitlement resolves through it).
+    tenant_id: int | None = None
     created_at: datetime
     updated_at: datetime
     metadata_json: dict[str, Any] = Field(default_factory=dict)
@@ -14702,6 +14704,43 @@ class TenantEntitlement(BaseModel):
     created_at: datetime
     updated_at: datetime
     metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+# The three sellable modules the entitlement gate enforces on. Kept aligned with
+# ``tenant_saas_store.DEFAULT_PRODUCT_KEYS`` / ``DEFAULT_PRODUCT_ORDER``.
+ModuleProgram = Literal["spectracheck", "regulatory_hub", "reaction_optimization"]
+EntitlementDefaultPolicy = Literal["allow", "deny"]
+
+
+class EffectiveEntitlement(BaseModel):
+    """The resolved licensing state of one module for a tenant.
+
+    ``entitled`` is what the gate acts on. ``explicit`` distinguishes a real decision (an
+    entitlement row exists for this program) from the default — so the client can tell
+    "denied" from "unconfigured", the distinction it cannot make from the raw rows alone.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    program: ModuleProgram
+    display_name: str
+    entitled: bool
+    explicit: bool
+
+
+class EffectiveEntitlementReadout(BaseModel):
+    """Per-program effective entitlements for a tenant, plus the standing default policy.
+
+    ``default_policy`` states how an absent row is treated (currently always ``allow`` —
+    a program with no entitlement row stays open; only an explicit ``enabled=false`` denies).
+    Surfacing it means the client never has to assume the default.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    tenant_id: int
+    default_policy: EntitlementDefaultPolicy = "allow"
+    programs: list[EffectiveEntitlement] = Field(default_factory=list)
 
 
 class FeatureFlagCreate(BaseModel):
