@@ -253,20 +253,26 @@ export function AppSidebar({ collapsed, onToggle }: AppSidebarProps) {
                   cannot find. Hover and focus deepen it; they do not reveal it.
                   `motion-reduce` drops the tween but keeps every state change,
                   as globals.css carries no global reduced-motion rule. */}
+              {/* Carries the brand accent rather than border grey. A neutral chip
+                  reads as part of the divider it sits on — in dark mode especially,
+                  where a muted ring on a near-black sidebar all but disappears.
+                  Teal is the app's "you can act on this" colour, and on an icon
+                  the vivid token is the correct one (the ink variants exist for
+                  TEXT, which fails AA at these sizes). */}
               <span
                 className={cn(
-                  "flex h-6 w-6 items-center justify-center rounded-full border border-border/70 bg-background text-muted-foreground shadow-sm",
+                  "flex h-7 w-7 items-center justify-center rounded-full border-2 bg-background shadow-md",
                   "transition-all duration-200 motion-reduce:transition-none",
-                  "group-hover/edge:h-7 group-hover/edge:w-7 group-hover/edge:text-foreground group-hover/edge:shadow-md",
-                  "group-focus-visible/edge:h-7 group-focus-visible/edge:w-7 group-focus-visible/edge:text-foreground group-focus-visible/edge:shadow-md",
-                  "group-focus-visible/edge:ring-2 group-focus-visible/edge:ring-ring group-focus-visible/edge:ring-offset-1",
+                  "group-hover/edge:h-8 group-hover/edge:w-8 group-hover/edge:shadow-lg",
+                  "group-focus-visible/edge:h-8 group-focus-visible/edge:w-8",
+                  "group-focus-visible/edge:ring-2 group-focus-visible/edge:ring-ring group-focus-visible/edge:ring-offset-2",
                 )}
-                style={{ borderColor: "color-mix(in srgb, var(--mt-teal) 35%, var(--border))" }}
+                style={{ borderColor: "var(--mt-teal)" }}
               >
                 {collapsed ? (
-                  <ChevronRight className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                  <ChevronRight className="h-4 w-4 shrink-0" style={{ color: "var(--mt-teal)" }} aria-hidden />
                 ) : (
-                  <ChevronLeft className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                  <ChevronLeft className="h-4 w-4 shrink-0" style={{ color: "var(--mt-teal)" }} aria-hidden />
                 )}
               </span>
             </button>
