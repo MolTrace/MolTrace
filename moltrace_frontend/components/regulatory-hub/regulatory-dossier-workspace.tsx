@@ -63,6 +63,11 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Tabs, TabsContent } from "@/components/ui/tabs"
+import {
+  WorkspaceStageNav,
+  type WorkspaceStageGroup,
+} from "@/components/app/workspace-stage-nav"
+import { statusLabel } from "@/lib/ui/status"
 import { Textarea } from "@/components/ui/textarea"
 import { JsonObjectField } from "@/components/ui/json-object-field"
 import { ObjectArrayField } from "@/components/ui/object-array-field"
@@ -245,45 +250,156 @@ const JURISDICTION_PRESET_LABELS = [
 ] as const
 
 // ── Two-tier dossier section navigation ──────────────────────────────────
-// The dossier has 18 sections. They are organised into discoverable primary
-// groups; any group with more than one section exposes a persistent secondary
-// nav so every sibling is always visible. This replaces the prior pattern of
-// two hidden Select dropdowns (+ "Back to …" buttons) where sub-sections were
-// invisible until a dropdown was opened and couldn't be seen once you drilled in.
-type DossierNavGroup = { id: string; label: string; sections: string[] }
-
-const DOSSIER_NAV: DossierNavGroup[] = [
-  { id: "overview", label: "Overview", sections: ["overview"] },
-  { id: "requirements", label: "Requirements & Evidence", sections: ["requirements", "evidence", "compliance-rules"] },
-  { id: "impurity-safety", label: "Impurity & Safety", sections: ["impurity-register", "residual-solvents", "nitrosamine-watch"] },
-  { id: "quality", label: "Quality & Governance", sections: ["qnmr-method-validation", "process-capability", "ai-governance"] },
-  { id: "jurisdiction", label: "Jurisdiction", sections: ["jurisdictional-map", "change-impact"] },
-  { id: "review", label: "Review & Readiness", sections: ["action-items", "qa", "risk", "review", "readiness"] },
-  { id: "submission", label: "Submission", sections: ["submission-package"] },
-  { id: "developer", label: "Developer JSON", sections: ["json"] },
+// The dossier has 18 sections, grouped into the way a dossier is actually
+// worked: state it, evidence it, assess its impurity and quality risk, place it
+// in a jurisdiction, review it, submit it. The stage is the primary tab and its
+// sections are the secondary tabs — see components/app/workspace-stage-nav.tsx
+// for why the tiers are split rather than shown as one strip.
+const DOSSIER_NAV: WorkspaceStageGroup[] = [
+  {
+    id: "overview",
+    label: "Overview",
+    sections: [
+      {
+        value: "overview",
+        label: "Overview",
+        desc: "Dossier details, linked compound and batch, and the current status of this submission record.",
+      },
+    ],
+  },
+  {
+    id: "requirements",
+    label: "Requirements & Evidence",
+    sections: [
+      {
+        value: "requirements",
+        label: "Requirements",
+        desc: "The requirements this dossier must satisfy, and how far each one has got.",
+      },
+      {
+        value: "evidence",
+        label: "Evidence Links",
+        desc: "Analytical evidence attached to each requirement, with its source and reviewer state.",
+      },
+      {
+        value: "compliance-rules",
+        label: "Compliance Rules",
+        desc: "Outcomes computed from the active rule sets and their thresholds — workflow signals, not legal conclusions.",
+      },
+    ],
+  },
+  {
+    id: "impurity-safety",
+    label: "Impurity & Safety",
+    sections: [
+      {
+        value: "impurity-register",
+        label: "Impurity Register",
+        desc: "Identified and unidentified impurities for this dossier, with limits and qualification state.",
+      },
+      {
+        value: "residual-solvents",
+        label: "Residual Solvent",
+        desc: "Residual solvent findings measured against their class limits.",
+      },
+      {
+        value: "nitrosamine-watch",
+        label: "Nitrosamine Watch",
+        desc: "Nitrosamine risk items flagged for assessment, with their cumulative exposure picture.",
+      },
+    ],
+  },
+  {
+    id: "quality",
+    label: "Quality & Governance",
+    sections: [
+      {
+        value: "qnmr-method-validation",
+        label: "qNMR / Method Validation",
+        desc: "Quantitative NMR method validation evidence supporting the numbers used in this dossier.",
+      },
+      {
+        value: "process-capability",
+        label: "Process Capability",
+        desc: "Process capability of the measured batches against specification.",
+      },
+      {
+        value: "ai-governance",
+        label: "AI Governance",
+        desc: "Which AI-assisted decisions touched this dossier, and who reviewed them.",
+      },
+    ],
+  },
+  {
+    id: "jurisdiction",
+    label: "Jurisdiction",
+    sections: [
+      {
+        value: "jurisdictional-map",
+        label: "Jurisdictional Map",
+        desc: "Requirements, thresholds, source documents, and action items compared across selected jurisdictions.",
+      },
+      {
+        value: "change-impact",
+        label: "Change Impact",
+        desc: "External rule changes that touch this dossier, and what each one affects.",
+      },
+    ],
+  },
+  {
+    id: "review",
+    label: "Review & Readiness",
+    sections: [
+      {
+        value: "action-items",
+        label: "Action Items",
+        desc: "Open work on this dossier, by severity and owner.",
+      },
+      {
+        value: "qa",
+        label: "Cited Q&A",
+        desc: "Answers drawn from this dossier's own sources, each shown with the passage it came from.",
+      },
+      {
+        value: "risk",
+        label: "Risk Assessment",
+        desc: "Gaps and contradictions across requirements, evidence links, and cited sources — for internal readiness review.",
+      },
+      {
+        value: "review",
+        label: "Review",
+        desc: "Reviewer decisions and sign-off history for this dossier.",
+      },
+      {
+        value: "readiness",
+        label: "Readiness",
+        desc: "What still stands between this dossier and a submission-ready state.",
+      },
+    ],
+  },
+  {
+    id: "submission",
+    label: "Submission",
+    sections: [
+      {
+        value: "submission-package",
+        label: "Submission Package",
+        desc: "Assemble the dossier's evidence and documents into a reviewer-ready package.",
+      },
+    ],
+  },
+  {
+    id: "developer",
+    label: "Developer JSON",
+    sections: [
+      {
+        value: "json",
+        label: "Developer JSON",
+        desc: "Raw results for troubleshooting, validation, and data-shape inspection.",
+      },
+    ],
+  },
 ]
-
-const DOSSIER_SECTION_LABEL: Record<string, string> = {
-  overview: "Overview",
-  requirements: "Requirements",
-  evidence: "Evidence Links",
-  "compliance-rules": "Compliance Rules",
-  "impurity-register": "Impurity Register",
-  "residual-solvents": "Residual Solvent",
-  "nitrosamine-watch": "Nitrosamine Watch",
-  "qnmr-method-validation": "qNMR / Method Validation",
-  "process-capability": "Process Capability",
-  "ai-governance": "AI Governance",
-  "jurisdictional-map": "Jurisdictional Map",
-  "change-impact": "Change Impact",
-  "action-items": "Action Items",
-  qa: "Cited Q&A",
-  risk: "Risk Assessment",
-  review: "Review",
-  readiness: "Readiness",
-  "submission-package": "Submission Package",
-  json: "Developer JSON",
-}
 
 /** overall_risk → badge palette (high/critical red · medium amber · low green). */
 function riskBadgeClass(level: string): string {
@@ -804,10 +920,6 @@ export function RegulatoryDossierWorkspace() {
   const visibleDossierNav = useMemo(
     () => (developerModeEnabled ? DOSSIER_NAV : DOSSIER_NAV.filter((g) => g.id !== "developer")),
     [developerModeEnabled],
-  )
-  const visibleDossierSections = useMemo(
-    () => visibleDossierNav.flatMap((g) => g.sections),
-    [visibleDossierNav],
   )
 
   const [submissionPackageByDossier, setSubmissionPackageByDossier] = useState<Record<string, unknown> | null>(null)
@@ -2320,6 +2432,44 @@ export function RegulatoryDossierWorkspace() {
   const dossierRiskLevel = readRecordString(riskAssessment ?? {}, "overall_risk") ?? ""
   const dossierReadinessStatus = readRecordString(readinessReport ?? {}, "status") ?? ""
 
+  /** Attaches the live risk / readiness state to the two sections that carry it,
+   *  leaving every other section's label to speak for itself. */
+  const dossierNavWithBadges = useMemo<WorkspaceStageGroup[]>(
+    () =>
+      visibleDossierNav.map((group) => ({
+        ...group,
+        sections: group.sections.map((section) => {
+          if (section.value === "risk" && dossierRiskLevel) {
+            return {
+              ...section,
+              badge: (
+                <span
+                  className={cn(
+                    "rounded-full border px-1.5 text-[10px] font-bold uppercase",
+                    riskBadgeClass(dossierRiskLevel),
+                  )}
+                >
+                  {dossierRiskLevel}
+                </span>
+              ),
+            }
+          }
+          if (section.value === "readiness" && dossierReadinessStatus) {
+            return {
+              ...section,
+              badge: (
+                <span className="rounded-full border px-1.5 text-[10px] font-bold uppercase text-muted-foreground">
+                  {statusLabel(dossierReadinessStatus)}
+                </span>
+              ),
+            }
+          }
+          return section
+        }),
+      })),
+    [visibleDossierNav, dossierRiskLevel, dossierReadinessStatus],
+  )
+
   const dossierJurisdictionLine = useMemo(() => {
     if (!dossier) return "—"
     const jid = readRecordNumber(dossier, "jurisdiction_id")
@@ -2368,30 +2518,18 @@ export function RegulatoryDossierWorkspace() {
 
       <header className="space-y-1">
         <p
-          className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+          className="font-mono text-[11px] font-bold uppercase tracking-[0.2em]"
           style={{ color: "var(--mt-cyan-ink)" }}
         >
           MolTrace · Regulatory Dossier
         </p>
-        <h1 className="font-mono text-2xl font-bold tracking-tight">Regulatory Dossier</h1>
+        <h1 className="font-mono text-2xl font-bold tracking-tight sm:text-3xl">Regulatory Dossier</h1>
         {dossier ? (
           <p className="text-sm text-muted-foreground">
             {readRecordString(dossier, "title") ?? `Dossier ${dossierId}`}
           </p>
         ) : null}
       </header>
-
-      <AlertCard
-        variant="warning"
-        title="Important"
-        description="Regentry provides cited decision support and requires qualified human review. It is not legal advice or final regulatory approval."
-      />
-
-      <AlertCard
-        variant="info"
-        title="Draft regulatory intelligence"
-        description="Requires qualified human review. Not legal advice or final regulatory determination."
-      />
 
       {loadErr ? (
         <AlertCard variant="error" title="Load error" description={loadErr} />
@@ -2404,98 +2542,39 @@ export function RegulatoryDossierWorkspace() {
         </div>
       ) : dossier ? (
         <Tabs value={activeTab} onValueChange={setActiveTab} className="gap-4">
-          {/* Section nav — one grouped tablist (matches SpectraCheck): every
-              section is visible and one click away, organised into labelled
-              groups with dividers. Arrow / Home / End roam across all sections;
-              risk / readiness state surface as badges on their tabs. Drives the
-              same activeTab the 18 TabsContent panels read. */}
-          <div className="space-y-2">
-            <div className="min-w-0 overflow-x-auto pb-1 [-webkit-overflow-scrolling:touch]">
-              <div
-                role="tablist"
-                aria-label="Dossier sections"
-                className="inline-flex w-max items-center gap-1 rounded-lg border bg-muted/20 p-1"
-                onKeyDown={(e) => {
-                  const all = visibleDossierSections
-                  const idx = all.indexOf(activeTab)
-                  let next: number
-                  if (e.key === "ArrowRight" || e.key === "ArrowDown") next = (idx + 1) % all.length
-                  else if (e.key === "ArrowLeft" || e.key === "ArrowUp") next = (idx - 1 + all.length) % all.length
-                  else if (e.key === "Home") next = 0
-                  else if (e.key === "End") next = all.length - 1
-                  else return
-                  e.preventDefault()
-                  setActiveTab(all[next])
-                  e.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]')[next]?.focus()
-                }}
-              >
-                {visibleDossierNav.map((g, gi) => (
-                  <div key={g.id} className="inline-flex items-center gap-1">
-                    {gi > 0 ? <span aria-hidden className="mx-1 h-5 w-px shrink-0 bg-border" /> : null}
-                    {/* Single-tab groups skip the label: it would duplicate (or add
-                        nothing over) the tab itself — e.g. "OVERVIEW" next to the
-                        "Overview" tab — which is exactly the header/tab confusion
-                        this nav is trying to avoid. The divider still chunks them. */}
-                    {g.sections.length > 1 ? (
-                      <span
-                        aria-hidden
-                        className="shrink-0 px-1 font-mono text-[9px] font-bold uppercase tracking-[0.12em]"
-                        style={{ color: "var(--mt-cyan-ink)" }}
-                      >
-                        {g.label}
-                      </span>
-                    ) : null}
-                    {g.sections.map((s) => {
-                      const on = activeTab === s
-                      return (
-                        <button
-                          key={s}
-                          type="button"
-                          role="tab"
-                          aria-selected={on}
-                          tabIndex={on ? 0 : -1}
-                          onClick={() => setActiveTab(s)}
-                          className={cn(
-                            "inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-md px-2.5 py-1 text-xs transition-colors",
-                            on
-                              ? "bg-[color:var(--mt-cyan)] font-semibold text-[#04080F] shadow-sm"
-                              : "text-muted-foreground hover:bg-muted hover:text-foreground",
-                          )}
-                        >
-                          {DOSSIER_SECTION_LABEL[s] ?? s}
-                          {s === "risk" && dossierRiskLevel ? (
-                            <span
-                              className={cn(
-                                "rounded-full border px-1 text-[9px] font-bold uppercase",
-                                riskBadgeClass(dossierRiskLevel),
-                              )}
-                            >
-                              {dossierRiskLevel}
-                            </span>
-                          ) : null}
-                          {s === "readiness" && dossierReadinessStatus ? (
-                            <span className="rounded-full border px-1 text-[9px] font-bold uppercase text-muted-foreground">
-                              {dossierReadinessStatus.replace(/_/g, " ")}
-                            </span>
-                          ) : null}
-                        </button>
-                      )
-                    })}
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
+          {/* Risk and readiness keep their badges: unlike a count, those say
+              something the label cannot, and a reader scanning the Review stage
+              should see "high" without opening the section. */}
+          <WorkspaceStageNav
+            groups={dossierNavWithBadges}
+            activeValue={activeTab}
+            onSelect={setActiveTab}
+            label="Dossier"
+            accent="cyan"
+          />
+
+          {/* One notice, not two. This page previously carried "Important —
+              cited decision support, requires qualified human review, not legal
+              advice" immediately followed by "Draft regulatory intelligence —
+              requires qualified human review, not legal advice", which said the
+              same thing twice and cost two full blocks above the nav. It sits
+              below the nav for the same reason it does in SpectraCheck: the
+              sections are what a reader navigates by. */}
+          <AlertCard
+            variant="warning"
+            title="Decision support · qualified review required"
+            description="Regentry outputs are cited decision support and require qualified human review. They are not legal advice or a final regulatory determination."
+          />
 
           <TabsContent value="overview" className="min-w-0 max-w-full space-y-6">
             <div className="space-y-1">
               <p
-                className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+                className="font-mono text-[11px] font-bold uppercase tracking-[0.2em]"
                 style={{ color: "var(--mt-cyan-ink)" }}
               >
                 Dossier · Overview
               </p>
-              <h2 className="font-mono text-xl font-bold tracking-tight">Dossier metadata at a glance</h2>
+              <h2 className="font-mono text-2xl font-bold tracking-tight">Dossier metadata at a glance</h2>
               <p className="text-sm text-muted-foreground">
                 The source of truth for the rest of the workspace.
               </p>
@@ -2725,12 +2804,12 @@ export function RegulatoryDossierWorkspace() {
           <TabsContent value="requirements" className="min-w-0 max-w-full space-y-6">
             <div className="space-y-1">
               <p
-                className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+                className="font-mono text-[11px] font-bold uppercase tracking-[0.2em]"
                 style={{ color: "var(--mt-cyan-ink)" }}
               >
                 Dossier · Requirements
               </p>
-              <h2 className="font-mono text-xl font-bold tracking-tight">Requirements & evidence sections</h2>
+              <h2 className="font-mono text-2xl font-bold tracking-tight">Requirements & evidence sections</h2>
               <p className="text-sm text-muted-foreground">
                 Per-section coverage status and shortcuts to evidence, compliance rules, impurity register, solvents, nitrosamine watch, qNMR validation, and AI governance.
               </p>
@@ -2929,12 +3008,12 @@ export function RegulatoryDossierWorkspace() {
           <TabsContent value="evidence" className="min-w-0 max-w-full space-y-6">
             <div className="space-y-1">
               <p
-                className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+                className="font-mono text-[11px] font-bold uppercase tracking-[0.2em]"
                 style={{ color: "var(--mt-cyan-ink)" }}
               >
                 Dossier · Evidence Links
               </p>
-              <h2 className="font-mono text-xl font-bold tracking-tight">Linked evidence & artifacts</h2>
+              <h2 className="font-mono text-2xl font-bold tracking-tight">Linked evidence & artifacts</h2>
               <p className="text-sm text-muted-foreground">
                 SpectraCheck evidence items, dossier artifacts, and external citations attached to this dossier.
               </p>
@@ -3110,12 +3189,12 @@ export function RegulatoryDossierWorkspace() {
           <TabsContent value="compliance-rules" className="min-w-0 max-w-full space-y-6">
             <div className="space-y-1">
               <p
-                className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+                className="font-mono text-[11px] font-bold uppercase tracking-[0.2em]"
                 style={{ color: "var(--mt-cyan-ink)" }}
               >
                 Dossier · Compliance Rules
               </p>
-              <h2 className="font-mono text-xl font-bold tracking-tight">Active rule sets & coverage</h2>
+              <h2 className="font-mono text-2xl font-bold tracking-tight">Active rule sets & coverage</h2>
               <p className="text-sm text-muted-foreground">
                 Tenant rule sets evaluated against this dossier — open the rule-updates workspace to propose changes.
               </p>
@@ -3214,12 +3293,12 @@ export function RegulatoryDossierWorkspace() {
           <TabsContent value="impurity-register" className="min-w-0 max-w-full space-y-6">
             <div className="space-y-1">
               <p
-                className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+                className="font-mono text-[11px] font-bold uppercase tracking-[0.2em]"
                 style={{ color: "var(--mt-cyan-ink)" }}
               >
                 Dossier · Impurity Register
               </p>
-              <h2 className="font-mono text-xl font-bold tracking-tight">Specified & unspecified impurities</h2>
+              <h2 className="font-mono text-2xl font-bold tracking-tight">Specified & unspecified impurities</h2>
               <p className="text-sm text-muted-foreground">
                 ICH Q3A/Q3B-aligned register with thresholds, identification status, and qualified justifications.
               </p>
@@ -3483,12 +3562,12 @@ export function RegulatoryDossierWorkspace() {
           <TabsContent value="residual-solvents" className="min-w-0 max-w-full space-y-6">
             <div className="space-y-1">
               <p
-                className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+                className="font-mono text-[11px] font-bold uppercase tracking-[0.2em]"
                 style={{ color: "var(--mt-cyan-ink)" }}
               >
                 Dossier · Residual Solvents
               </p>
-              <h2 className="font-mono text-xl font-bold tracking-tight">ICH Q3C residual-solvent watch</h2>
+              <h2 className="font-mono text-2xl font-bold tracking-tight">ICH Q3C residual-solvent watch</h2>
               <p className="text-sm text-muted-foreground">
                 Class 1 / 2 / 3 solvent levels and PDE compliance against the active rule set.
               </p>
@@ -3767,12 +3846,12 @@ export function RegulatoryDossierWorkspace() {
           <TabsContent value="nitrosamine-watch" className="min-w-0 max-w-full space-y-6">
             <div className="space-y-1">
               <p
-                className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+                className="font-mono text-[11px] font-bold uppercase tracking-[0.2em]"
                 style={{ color: "var(--mt-cyan-ink)" }}
               >
                 Dossier · Nitrosamine Watch
               </p>
-              <h2 className="font-mono text-xl font-bold tracking-tight">Nitrosamine risk assessment</h2>
+              <h2 className="font-mono text-2xl font-bold tracking-tight">Nitrosamine risk assessment</h2>
               <p className="text-sm text-muted-foreground">
                 FDA / EMA nitrosamine risk-narrative coverage with cited evidence and reviewer signoff state.
               </p>
@@ -4144,12 +4223,12 @@ export function RegulatoryDossierWorkspace() {
           <TabsContent value="qnmr-method-validation" className="min-w-0 max-w-full space-y-6">
             <div className="space-y-1">
               <p
-                className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+                className="font-mono text-[11px] font-bold uppercase tracking-[0.2em]"
                 style={{ color: "var(--mt-cyan-ink)" }}
               >
                 Dossier · qNMR Validation
               </p>
-              <h2 className="font-mono text-xl font-bold tracking-tight">qNMR / method validation evidence</h2>
+              <h2 className="font-mono text-2xl font-bold tracking-tight">qNMR / method validation evidence</h2>
               <p className="text-sm text-muted-foreground">
                 Method validation parameters, qualified-reference traceability, and reviewer signoff for quantitative NMR.
               </p>
@@ -4562,12 +4641,12 @@ export function RegulatoryDossierWorkspace() {
           <TabsContent value="ai-governance" className="min-w-0 max-w-full space-y-6">
             <div className="space-y-1">
               <p
-                className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+                className="font-mono text-[11px] font-bold uppercase tracking-[0.2em]"
                 style={{ color: "var(--mt-cyan-ink)" }}
               >
                 Dossier · AI Governance
               </p>
-              <h2 className="font-mono text-xl font-bold tracking-tight">AI / model-governance trail</h2>
+              <h2 className="font-mono text-2xl font-bold tracking-tight">AI / model-governance trail</h2>
               <p className="text-sm text-muted-foreground">
                 Model versions, prompts, validation evidence, and human-review checkpoints for AI-assisted dossier content.
               </p>
@@ -4900,12 +4979,12 @@ export function RegulatoryDossierWorkspace() {
           <TabsContent value="process-capability" className="min-w-0 max-w-full space-y-6">
             <div className="space-y-1">
               <p
-                className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+                className="font-mono text-[11px] font-bold uppercase tracking-[0.2em]"
                 style={{ color: "var(--mt-cyan-ink)" }}
               >
                 Dossier · Process Capability
               </p>
-              <h2 className="font-mono text-xl font-bold tracking-tight">Process capability &amp; SPC trending</h2>
+              <h2 className="font-mono text-2xl font-bold tracking-tight">Process capability &amp; SPC trending</h2>
               <p className="text-sm text-muted-foreground">
                 Control-chart a measurement series for one parameter — capability indices (Cp/Cpk/Pp/Ppk/Cpm) and
                 Shewhart / CUSUM / EWMA signals catch drift before a specification breach. Caller-supplied data;
@@ -4918,12 +4997,12 @@ export function RegulatoryDossierWorkspace() {
           <TabsContent value="jurisdictional-map" className="min-w-0 max-w-full space-y-6">
             <div className="space-y-1">
               <p
-                className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+                className="font-mono text-[11px] font-bold uppercase tracking-[0.2em]"
                 style={{ color: "var(--mt-cyan-ink)" }}
               >
                 Dossier · Jurisdictional Map
               </p>
-              <h2 className="font-mono text-xl font-bold tracking-tight">Per-region requirement coverage</h2>
+              <h2 className="font-mono text-2xl font-bold tracking-tight">Per-region requirement coverage</h2>
               <p className="text-sm text-muted-foreground">
                 FDA / EMA / PMDA / multi-region requirement matrix with coverage status and missing-evidence callouts.
               </p>
@@ -5308,12 +5387,12 @@ export function RegulatoryDossierWorkspace() {
           <TabsContent value="change-impact" className="min-w-0 max-w-full space-y-6">
             <div className="space-y-1">
               <p
-                className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+                className="font-mono text-[11px] font-bold uppercase tracking-[0.2em]"
                 style={{ color: "var(--mt-cyan-ink)" }}
               >
                 Dossier · Change Impact
               </p>
-              <h2 className="font-mono text-xl font-bold tracking-tight">Detected regulatory changes affecting this dossier</h2>
+              <h2 className="font-mono text-2xl font-bold tracking-tight">Detected regulatory changes affecting this dossier</h2>
               <p className="text-sm text-muted-foreground">
                 Downstream impact of detected regulatory changes on this dossier's requirements, evidence links, rule sets, and action items.
               </p>
@@ -5495,12 +5574,12 @@ export function RegulatoryDossierWorkspace() {
           <TabsContent value="action-items" className="min-w-0 max-w-full space-y-6">
             <div className="space-y-1">
               <p
-                className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+                className="font-mono text-[11px] font-bold uppercase tracking-[0.2em]"
                 style={{ color: "var(--mt-cyan-ink)" }}
               >
                 Dossier · Action Items
               </p>
-              <h2 className="font-mono text-xl font-bold tracking-tight">Reviewer & operational workflow</h2>
+              <h2 className="font-mono text-2xl font-bold tracking-tight">Reviewer & operational workflow</h2>
               <p className="text-sm text-muted-foreground">
                 Cited Q&amp;A, risk hot-spots, review checkpoints, and submission-readiness — each routes to the global Action Queue when escalated.
               </p>
@@ -5525,12 +5604,12 @@ export function RegulatoryDossierWorkspace() {
           <TabsContent value="qa" className="min-w-0 max-w-full space-y-6">
             <div className="space-y-1">
               <p
-                className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+                className="font-mono text-[11px] font-bold uppercase tracking-[0.2em]"
                 style={{ color: "var(--mt-cyan-ink)" }}
               >
                 Dossier · Cited Q&amp;A
               </p>
-              <h2 className="font-mono text-xl font-bold tracking-tight">Reviewer Q&amp;A with citations</h2>
+              <h2 className="font-mono text-2xl font-bold tracking-tight">Reviewer Q&amp;A with citations</h2>
               <p className="text-sm text-muted-foreground">
                 Question / answer pairs that must cite source evidence. Required before promoting to in-review.
               </p>
@@ -5802,12 +5881,12 @@ export function RegulatoryDossierWorkspace() {
           <TabsContent value="risk" className="min-w-0 max-w-full space-y-6">
             <div className="space-y-1">
               <p
-                className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+                className="font-mono text-[11px] font-bold uppercase tracking-[0.2em]"
                 style={{ color: "var(--mt-cyan-ink)" }}
               >
                 Dossier · Risk Assessment
               </p>
-              <h2 className="font-mono text-xl font-bold tracking-tight">Risk hot-spots & mitigation status</h2>
+              <h2 className="font-mono text-2xl font-bold tracking-tight">Risk hot-spots & mitigation status</h2>
               <p className="text-sm text-muted-foreground">
                 Per-requirement risk hints and overall dossier risk level — feeds the High-risk dossier KPI on the landing page.
               </p>
@@ -5943,12 +6022,12 @@ export function RegulatoryDossierWorkspace() {
           <TabsContent value="review" className="min-w-0 max-w-full space-y-6">
             <div className="space-y-1">
               <p
-                className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+                className="font-mono text-[11px] font-bold uppercase tracking-[0.2em]"
                 style={{ color: "var(--mt-cyan-ink)" }}
               >
                 Dossier · Review
               </p>
-              <h2 className="font-mono text-xl font-bold tracking-tight">Reviewer decision &amp; attribution</h2>
+              <h2 className="font-mono text-2xl font-bold tracking-tight">Reviewer decision &amp; attribution</h2>
               <p className="text-sm text-muted-foreground">
                 Record an internal review decision with reviewer attribution. Not legal advice or external regulatory approval.
               </p>
@@ -6109,12 +6188,12 @@ export function RegulatoryDossierWorkspace() {
           <TabsContent value="readiness" className="min-w-0 max-w-full space-y-6">
             <div className="space-y-1">
               <p
-                className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+                className="font-mono text-[11px] font-bold uppercase tracking-[0.2em]"
                 style={{ color: "var(--mt-cyan-ink)" }}
               >
                 Dossier · Readiness Report
               </p>
-              <h2 className="font-mono text-xl font-bold tracking-tight">Submission readiness snapshot</h2>
+              <h2 className="font-mono text-2xl font-bold tracking-tight">Submission readiness snapshot</h2>
               <p className="text-sm text-muted-foreground">
                 Pre-submission checklist with per-section coverage and reviewer signoff state — share with the regulatory affairs team.
               </p>
@@ -6347,12 +6426,12 @@ export function RegulatoryDossierWorkspace() {
           <TabsContent value="submission-package" className="min-w-0 max-w-full space-y-6">
             <div className="space-y-1">
               <p
-                className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+                className="font-mono text-[11px] font-bold uppercase tracking-[0.2em]"
                 style={{ color: "var(--mt-cyan-ink)" }}
               >
                 Dossier · Submission Package
               </p>
-              <h2 className="font-mono text-xl font-bold tracking-tight">Assemble draft submission artefacts</h2>
+              <h2 className="font-mono text-2xl font-bold tracking-tight">Assemble draft submission artefacts</h2>
               <p className="text-sm text-muted-foreground">
                 Source-backed artefacts staged for review. Package status is system-driven — treat as ready only when the status field explicitly says so.
               </p>
@@ -6579,12 +6658,12 @@ export function RegulatoryDossierWorkspace() {
             <DeveloperOnly>
               <div className="space-y-1">
                 <p
-                  className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+                  className="font-mono text-[11px] font-bold uppercase tracking-[0.2em]"
                   style={{ color: "var(--mt-cyan-ink)" }}
                 >
                   Dossier · Developer JSON
                 </p>
-                <h2 className="font-mono text-xl font-bold tracking-tight">{RAW_DATA_DISCLOSURE}</h2>
+                <h2 className="font-mono text-2xl font-bold tracking-tight">{RAW_DATA_DISCLOSURE}</h2>
                 <p className="text-sm text-muted-foreground">
                   Aggregated dossier records loaded in this browser session — use to inspect exact values, warnings, and
                   audit fields.
