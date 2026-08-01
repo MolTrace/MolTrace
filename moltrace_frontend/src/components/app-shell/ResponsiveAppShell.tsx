@@ -13,6 +13,7 @@ import { MobileBottomNav } from "@/src/components/app-shell/MobileBottomNav"
 import { invalidateShellSnapshots } from "@/src/lib/shell/shell-snapshot-cache"
 import { TenantProvider } from "@/src/lib/tenant/tenant-context"
 import { StepUpProvider } from "@/components/auth/step-up-provider"
+import { ModuleRouteGuard } from "@/src/lib/modules/module-route-guard"
 
 /** Remembers the reader's panel/sidebar choices across the shell remount that
  *  every navigation causes. Guarded: storage access throws outright in Safari
@@ -131,7 +132,7 @@ export function ResponsiveAppShell({ children }: { children: React.ReactNode }) 
                   isMobile ? "pb-[calc(env(safe-area-inset-bottom)+5.5rem)] sm:pb-[calc(env(safe-area-inset-bottom)+6rem)]" : "pb-6",
                 )}
               >
-                {children}
+                <ModuleRouteGuard>{children}</ModuleRouteGuard>
               </main>
               {/* A real flex column, not a fixed overlay. As an overlay it had to
                   guess where the topbar ended (`top-14`), which the offline
