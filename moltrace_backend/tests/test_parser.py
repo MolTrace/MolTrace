@@ -1,3 +1,5 @@
+import pytest
+
 from nmrcheck.parser import parse_nmr_text, parse_reference_nmr_text
 
 TOBRAMYCIN_REFERENCE_TEXT = """'H NMR (500 MHz, D2O) 8 5.23 (d, J = 3.6 Hz, 1H), 5.08 (d, J = 3.9 Hz, 1H), 3.95 (ddd,
@@ -33,3 +35,17 @@ def test_parse_nmr_text_preserves_j_values_on_parsed_peaks() -> None:
     peaks = parse_nmr_text("1H NMR (500 MHz, CDCl3) δ 3.65 (q, J = 7.1 Hz, 2H), 1.26 (t, J = 7.1 Hz, 3H)")
 
     assert [peak.j_values_hz for peak in peaks] == [[7.1], [7.1]]
+
+
+# A single 1H signal may integrate far above the old 50 H ceiling. Three
+# triisopropylsilyl protecting groups put 63 equivalent protons under one
+# 1.0-1.1 ppm envelope, and silyl-protected sugars like this are ordinary work,
+# not an edge case. Measured over 400,000 1H records in NMRexp, the largest
+# single signal per spectrum runs p99 20 H, p99.99 64 H and reaches 156 H; the
+# 50 H bound sat at the 99.97th percentile and rejected real published spectra
+# outright. Each value below is taken from that measured distribution.
+@pytest.mark.parametrize("integration", [51.0, 63.0, 72.0, 156.0])
+def test_parse_nmr_text_accepts_real_large_integrations(integration: float) -> None:
+    peaks = parse_nmr_text(f"1H NMR (500 MHz, CDCl3) δ 1.08 (m, {integration:g}H)")
+
+    assert peaks[0].integration_h == integration

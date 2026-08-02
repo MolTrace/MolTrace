@@ -37,6 +37,7 @@ USAGE
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 import urllib.request
 from pathlib import Path
@@ -57,22 +58,62 @@ SUBSETS = [
 FULL = "NMRexp_10to24_1_1004.csv"  # ~2.1 GB
 
 
-def fetch(name: str) -> bool:
-    target = DEST / name
-    if target.exists() and target.stat().st_size > 0:
-        print(f"  {name}: already present ({target.stat().st_size/1e6:.1f} MB)")
-        return True
-    url = f"{BASE}/{name}?download=1"
-    print(f"  {name}: downloading ...", flush=True)
+def expected_sizes() -> dict[str, int]:
+    """Authoritative file sizes from the Zenodo record."""
     try:
-        with urllib.request.urlopen(url, timeout=120) as response, target.open("wb") as out:
+        with urllib.request.urlopen(
+            f"https://zenodo.org/api/records/{RECORD}", timeout=60
+        ) as response:
+            record = json.load(response)
+    except Exception:
+        return {}
+    sizes: dict[str, int] = {}
+    for entry in record.get("files", []):
+        key = entry.get("key") or entry.get("filename")
+        size = entry.get("size")
+        if key and isinstance(size, int):
+            sizes[key] = size
+    return sizes
+
+
+def fetch(name: str, sizes: dict[str, int]) -> bool:
+    """Download one file, resuming nothing but never trusting a partial result.
+
+    A 2 GB transfer can be interrupted, and an existence check alone cannot
+    tell a truncated file from a finished one - the first version of this
+    script reported success on a 51 MB fragment of a 2,143 MB corpus. The
+    download therefore goes to a ``.part`` file that is only renamed into place
+    once the whole body has arrived and the byte count matches what Zenodo
+    reports.
+    """
+    target = DEST / name
+    want = sizes.get(name)
+    if target.exists():
+        have = target.stat().st_size
+        if want is None or have == want:
+            print(f"  {name}: already present ({have/1e6:.1f} MB)")
+            return True
+        print(f"  {name}: incomplete ({have/1e6:.1f} of {want/1e6:.1f} MB), refetching")
+
+    part = target.with_suffix(target.suffix + ".part")
+    url = f"{BASE}/{name}?download=1"
+    print(f"  {name}: downloading{f' {want/1e6:.0f} MB' if want else ''} ...", flush=True)
+    written = 0
+    try:
+        with urllib.request.urlopen(url, timeout=180) as response, part.open("wb") as out:
             while chunk := response.read(1 << 20):
                 out.write(chunk)
+                written += len(chunk)
     except Exception as exc:  # noqa: BLE001 - report and continue with the rest
-        print(f"  {name}: FAILED {type(exc).__name__}: {exc}")
-        target.unlink(missing_ok=True)
+        print(f"  {name}: FAILED after {written/1e6:.1f} MB - {type(exc).__name__}: {exc}")
+        part.unlink(missing_ok=True)
         return False
-    print(f"  {name}: {target.stat().st_size/1e6:.1f} MB")
+    if want is not None and written != want:
+        print(f"  {name}: TRUNCATED {written/1e6:.1f} of {want/1e6:.1f} MB - not kept")
+        part.unlink(missing_ok=True)
+        return False
+    part.replace(target)
+    print(f"  {name}: {written/1e6:.1f} MB")
     return True
 
 
@@ -85,9 +126,12 @@ def main() -> int:
     print(f"NMRexp (CC BY 4.0, doi:10.5281/zenodo.{RECORD}) -> {DEST}")
     print("gitignored; attribute the source if results are published\n")
 
-    ok = sum(fetch(name) for name in SUBSETS)
+    sizes = expected_sizes()
+    if not sizes:
+        print("  (could not read Zenodo file sizes; completeness cannot be verified)\n")
+    ok = sum(fetch(name, sizes) for name in SUBSETS)
     if args.full:
-        ok += fetch(FULL)
+        ok += fetch(FULL, sizes)
     print(f"\nfetched {ok} file(s)")
     return 0
 

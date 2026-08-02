@@ -136,12 +136,33 @@ class RawArchiveExportManifest(BaseModel):
     warnings: list[str] = Field(default_factory=list)
 
 
+#: Largest integration accepted for a single NMR signal. See ``Peak`` below for
+#: the measured basis. Exported rather than inlined so that a reader who parses
+#: NMR text can check the value itself and reject it with a message naming the
+#: offending signal, instead of letting a bare model-validation error escape
+#: and surface to the chemist as a generic "service unavailable".
+MAX_SIGNAL_INTEGRATION_H = 1000.0
+
+
 class Peak(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     shift_ppm: float = Field(ge=-50.0, le=260.0)
     multiplicity: str = Field(min_length=1, max_length=20)
-    integration_h: float = Field(gt=0.0, le=50.0)
+    # Upper bound on ONE signal's integration, not on a molecule's proton count.
+    # This was 50 H, which is not a chemical limit — it sits at the 99.97th
+    # percentile of real published spectra and rejected genuine work. Measured
+    # over 400,000 1H records in NMRexp, the largest single signal per spectrum
+    # runs p50 4 H, p99 20 H, p99.99 64 H, max 156 H; 131 records exceed 50 H
+    # and none exceeds 200 H. The records it was throwing out are silyl- and
+    # benzyl-protected carbohydrates — three TIPS groups put 63 equivalent
+    # protons under one 1.0-1.1 ppm envelope — which is exactly the chemistry
+    # this product is for. Polymeric and PEGylated samples run higher still.
+    # 1000 keeps a sanity bound against a mis-parse that swallows a molecular
+    # weight or a J-value in Hz, while admitting any real molecule. The real
+    # check on integration is structural (the proton inventory compares
+    # observed against what the SMILES supports) and lives downstream.
+    integration_h: float = Field(gt=0.0, le=MAX_SIGNAL_INTEGRATION_H)
     j_values_hz: list[float] = Field(default_factory=list)
 
 
