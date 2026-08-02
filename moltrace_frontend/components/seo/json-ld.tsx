@@ -20,6 +20,12 @@ export function OrganizationJsonLd() {
         "@type": "Organization",
         "@id": `${SITE_URL}/#organization`,
         name: SITE_NAME,
+        // Declares the spellings the brand is written as, so a lowercase-t or
+        // spaced rendering resolves to this entity rather than to something
+        // else. Verified 2026-08-02: Google renders the brand as "Moltrace" and
+        // offers "Did you mean: moltres" on the brand query, so the collision is
+        // live rather than hypothetical.
+        alternateName: ["Moltrace", "Mol Trace", "MolTrace platform"],
         url: SITE_URL,
         logo: {
           "@type": "ImageObject",
