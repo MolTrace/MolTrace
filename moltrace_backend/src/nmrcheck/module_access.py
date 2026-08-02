@@ -203,6 +203,7 @@ PLATFORM_ROUTE_PREFIXES: tuple[str, ...] = (
     "/review-tasks",
     "/comments",
     "/approvals",
+    "/reviewers",
 )
 
 

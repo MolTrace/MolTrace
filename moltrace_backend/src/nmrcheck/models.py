@@ -9212,6 +9212,23 @@ class ProjectPermissionRecord(BaseModel):
     notes: list[str] = Field(default_factory=list)
 
 
+class SubjectReviewerCreate(BaseModel):
+    """Nominate someone to review a filing or a campaign.
+
+    A nomination records who is expected to look. It does not grant access — that comes from the
+    owning team — so nominating someone outside the team is allowed and simply does not let them
+    in.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    subject_type: SubjectType
+    subject_id: int = Field(ge=1)
+    reviewer_email: str = Field(min_length=3, max_length=255)
+    status: SessionReviewerStatus = "assigned"
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
 class SessionReviewerCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -9240,7 +9257,10 @@ class SessionReviewerRecord(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     id: int
-    session_id: int
+    session_id: int | None = None
+    subject_type: SubjectType | None = None
+    subject_id: int | None = None
+    module: ProductProgramKey | None = None
     reviewer_email: str
     assigned_by: str | None = None
     status: SessionReviewerStatus

@@ -178,6 +178,24 @@ def _ensure_sqlite_schema(engine: Engine) -> None:
                 connection.exec_driver_sql(
                     "ALTER TABLE regulatory_dossiers ADD COLUMN organization_id INTEGER"
                 )
+        if "session_reviewers" in tables:
+            # Subject-addressed reviewer nominations (migration 0038) on a pre-existing dev DB.
+            reviewer_existing = {
+                str(row[1])
+                for row in connection.exec_driver_sql(
+                    "PRAGMA table_info(session_reviewers)"
+                ).fetchall()
+            }
+            for column, ddl in {"subject_type": "VARCHAR(48)", "subject_id": "INTEGER"}.items():
+                if column not in reviewer_existing:
+                    connection.exec_driver_sql(
+                        f"ALTER TABLE session_reviewers ADD COLUMN {column} {ddl}"
+                    )
+            connection.exec_driver_sql(
+                "CREATE INDEX IF NOT EXISTS ix_session_reviewers_subject "
+                "ON session_reviewers (subject_type, subject_id)"
+            )
+            _sqlite_make_column_nullable(connection, "session_reviewers", "session_id")
         if "approval_records" in tables:
             # Subject-addressed approvals (migration 0037) on a pre-existing dev SQLite DB.
             approval_existing = {

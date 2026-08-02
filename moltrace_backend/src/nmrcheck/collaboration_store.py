@@ -30,6 +30,7 @@ from .models import (
     ReviewTaskCreate,
     SubjectApprovalCreate,
     SubjectCommentCreate,
+    SubjectReviewerCreate,
     SubjectReviewTaskCreate,
     ReviewTaskRecord,
     ReviewTaskUpdate,
@@ -1113,9 +1114,17 @@ def _project_permission_to_record(row: ProjectPermissionORM) -> ProjectPermissio
 
 
 def _session_reviewer_to_record(row: SessionReviewerORM) -> SessionReviewerRecord:
+    subject_type = row.subject_type
     return SessionReviewerRecord(
         id=row.id,
         session_id=row.session_id,
+        subject_type=subject_type,  # type: ignore[arg-type]
+        subject_id=row.subject_id,
+        module=(
+            collaboration_subjects.SUBJECT_MODULE.get(subject_type)  # type: ignore[arg-type]
+            if subject_type
+            else ("spectracheck" if row.session_id is not None else None)
+        ),
         reviewer_email=row.reviewer_email,
         assigned_by=row.assigned_by,
         status=row.status,  # type: ignore[arg-type]
@@ -1788,3 +1797,88 @@ def list_subject_approvals(
             .limit(limit)
         ).all()
         return [_approval_to_record(row) for row in rows]
+
+
+# --------------------------------------------------------------------------- #
+# Subject-addressed reviewer nominations (Regentry filings, Repho campaigns)
+# --------------------------------------------------------------------------- #
+def create_subject_reviewer(
+    session_factory: sessionmaker[Session],
+    payload: SubjectReviewerCreate,
+    *,
+    owner_scope_id: int | None,
+    assigned_by: str | None,
+) -> SessionReviewerRecord:
+    """Nominate someone to review a filing or a campaign.
+
+    The nomination is a record of expectation, not a grant: access to the subject still comes from
+    the owning team. Nominating someone outside the team therefore succeeds and simply does not let
+    them in — deliberately, because an assignment that silently widened access would be a second,
+    weaker way into a record.
+
+    Re-nominating the same person updates the existing row rather than stacking duplicates.
+    """
+    with session_scope(session_factory) as session:
+        _require_subject_access(session, payload.subject_type, payload.subject_id, owner_scope_id)
+        email = _normalize_email(payload.reviewer_email)
+        if email is None:
+            raise CollaborationError("reviewer_email is required.")
+        row = session.scalar(
+            select(SessionReviewerORM)
+            .where(SessionReviewerORM.subject_type == payload.subject_type)
+            .where(SessionReviewerORM.subject_id == payload.subject_id)
+            .where(SessionReviewerORM.reviewer_email == email)
+        )
+        if row is None:
+            row = SessionReviewerORM(
+                session_id=None,
+                subject_type=payload.subject_type,
+                subject_id=payload.subject_id,
+                reviewer_email=email,
+                assigned_by=_normalize_email(assigned_by),
+                status=payload.status,
+                metadata_json=_json_dump(payload.metadata_json),
+            )
+            session.add(row)
+        else:
+            row.status = payload.status
+            row.metadata_json = _json_dump(payload.metadata_json)
+            row.updated_at = utcnow()
+        session.flush()
+        _audit(
+            session,
+            event_type="collaboration.reviewer.assign",
+            message="Reviewer nominated.",
+            actor=CollaborationActor(
+                user_id=owner_scope_id, email=assigned_by, permissive=owner_scope_id is None
+            ),
+            entity_type="session_reviewer",
+            entity_id=row.id,
+            metadata={
+                "subject_type": payload.subject_type,
+                "subject_id": payload.subject_id,
+                "status": payload.status,
+            },
+        )
+        session.refresh(row)
+        return _session_reviewer_to_record(row)
+
+
+def list_subject_reviewers(
+    session_factory: sessionmaker[Session],
+    subject_type: str,
+    subject_id: int,
+    *,
+    owner_scope_id: int | None,
+    limit: int = 500,
+) -> list[SessionReviewerRecord]:
+    with session_scope(session_factory) as session:
+        _require_subject_access(session, subject_type, subject_id, owner_scope_id)
+        rows = session.scalars(
+            select(SessionReviewerORM)
+            .where(SessionReviewerORM.subject_type == subject_type)
+            .where(SessionReviewerORM.subject_id == subject_id)
+            .order_by(SessionReviewerORM.created_at.asc(), SessionReviewerORM.id.asc())
+            .limit(limit)
+        ).all()
+        return [_session_reviewer_to_record(row) for row in rows]

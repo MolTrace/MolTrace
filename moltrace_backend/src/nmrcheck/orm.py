@@ -1117,13 +1117,20 @@ class SessionReviewerORM(Base):
     __tablename__ = "session_reviewers"
     __table_args__ = (
         Index("ix_session_reviewers_session_status", "session_id", "status"),
+        Index("ix_session_reviewers_subject", "subject_type", "subject_id"),
         UniqueConstraint("session_id", "reviewer_email", name="uq_session_reviewers_session_email"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    session_id: Mapped[int] = mapped_column(
-        ForeignKey("spectracheck_sessions.id", ondelete="CASCADE"), index=True
+    # Fourth table on the subject pair. A reviewer nomination on a filing or a campaign is
+    # informational: it records who is expected to look, and does NOT grant access — access comes
+    # from the owning team. Making a nomination an access grant would be a second, weaker path
+    # into a record, which is the thing this carve-out has avoided throughout.
+    session_id: Mapped[int | None] = mapped_column(
+        ForeignKey("spectracheck_sessions.id", ondelete="CASCADE"), nullable=True, index=True
     )
+    subject_type: Mapped[str | None] = mapped_column(String(48), nullable=True)
+    subject_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     reviewer_email: Mapped[str] = mapped_column(String(255), index=True)
     assigned_by: Mapped[str | None] = mapped_column(String(255), nullable=True)
     status: Mapped[str] = mapped_column(String(32), default="assigned", index=True)

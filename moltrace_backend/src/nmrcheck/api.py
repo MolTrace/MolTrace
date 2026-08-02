@@ -769,6 +769,7 @@ from .models import (
     ReviewQueueItem,
     ReviewTaskCreate,
     SubjectApprovalCreate,
+    SubjectReviewerCreate,
     SubjectCommentCreate,
     SubjectReviewTaskCreate,
     ReviewTaskRecord,
@@ -24206,6 +24207,64 @@ def delete_session_comment_route(
     if record is None:
         raise HTTPException(status_code=404, detail="Comment not found.")
     return record
+
+
+@router.post(
+    "/reviewers",
+    response_model=SessionReviewerRecord,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_access_context)],
+)
+def create_subject_reviewer_route(
+    payload: SubjectReviewerCreate,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> SessionReviewerRecord:
+    """Nominate someone to review a filing or a campaign.
+
+    A nomination records who is expected to look; it does not grant access, which still comes from
+    the owning team. Nominating someone outside the team therefore succeeds and simply does not let
+    them in.
+    """
+    try:
+        return collab_store.create_subject_reviewer(
+            _state(request).session_factory,
+            payload,
+            owner_scope_id=_user_scope_for_context(context),
+            assigned_by=context.user.email if context.user else None,
+        )
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="Review subject not found.") from exc
+    except Exception as exc:
+        _raise_collaboration_http_error(exc)
+        raise
+
+
+@router.get(
+    "/reviewers",
+    response_model=list[SessionReviewerRecord],
+    dependencies=[Depends(require_access_context)],
+)
+def list_subject_reviewers_route(
+    request: Request,
+    subject_type: str = Query(...),
+    subject_id: int = Query(..., ge=1),
+    limit: int = Query(default=500, ge=1, le=1000),
+    context: AccessContext = Depends(require_access_context),
+) -> list[SessionReviewerRecord]:
+    try:
+        return collab_store.list_subject_reviewers(
+            _state(request).session_factory,
+            subject_type,
+            subject_id,
+            owner_scope_id=_user_scope_for_context(context),
+            limit=limit,
+        )
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="Review subject not found.") from exc
+    except Exception as exc:
+        _raise_collaboration_http_error(exc)
+        raise
 
 
 @router.post(
