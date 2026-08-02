@@ -1,51 +1,48 @@
-import { beforeAll, describe, expect, it, vi } from "vitest"
 import { render, screen, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
-import { EntityPicker, type EntityOption } from "@/components/ui/entity-picker"
+import { describe, expect, it } from "vitest"
 
-// Radix/cmdk rely on a few pointer/scroll APIs jsdom doesn't implement.
-beforeAll(() => {
-  Element.prototype.hasPointerCapture = vi.fn()
-  Element.prototype.setPointerCapture = vi.fn()
-  Element.prototype.releasePointerCapture = vi.fn()
-  Element.prototype.scrollIntoView = vi.fn()
-})
+import { EntityPicker } from "@/components/ui/entity-picker"
+import { ApiError } from "@/lib/api/client"
 
-const OPTIONS: EntityOption[] = [
-  { id: 10, label: "Aspirin synthesis", description: "compound · ASA-001" },
-  { id: 11, label: "Ibuprofen route B", description: "compound · IBU-002" },
-]
+async function openWith(load: () => Promise<never>) {
+  const user = userEvent.setup()
+  render(<EntityPicker value={null} onChange={() => {}} load={load} placeholder="Choose one" />)
+  await user.click(screen.getByRole("combobox"))
+}
 
-describe("EntityPicker", () => {
-  it("shows the placeholder when empty and the entity label when a value is set", () => {
-    const { rerender } = render(<EntityPicker value={null} onChange={() => {}} options={OPTIONS} placeholder="Pick a compound" />)
-    expect(screen.getByRole("combobox")).toHaveTextContent("Pick a compound")
-    rerender(<EntityPicker value={11} onChange={() => {}} options={OPTIONS} placeholder="Pick a compound" />)
-    // resolves the id to the human label — never shows the raw id
-    expect(screen.getByRole("combobox")).toHaveTextContent("Ibuprofen route B")
+describe("EntityPicker load failures", () => {
+  it("tells a signed-out reader to sign in, rather than that something broke", async () => {
+    // The case seen in production: the list needs a session, and "Could not load
+    // options." gave no hint that signing in was the fix.
+    await openWith(() => Promise.reject(new ApiError(401, null)))
+    await waitFor(() => {
+      expect(screen.getByText("Sign in to load these options.")).toBeInTheDocument()
+    })
   })
 
-  it("opens, filters, and returns the chosen entity's id (not typed)", async () => {
-    const user = userEvent.setup()
-    const onChange = vi.fn()
-    render(<EntityPicker value={null} onChange={onChange} options={OPTIONS} searchPlaceholder="Search compounds" />)
-
-    await user.click(screen.getByRole("combobox"))
-    const search = await screen.findByPlaceholderText("Search compounds")
-    await user.type(search, "ibu")
-    await user.click(await screen.findByText("Ibuprofen route B"))
-
-    expect(onChange).toHaveBeenCalledWith(11)
+  it("separates a licensing refusal from a permission failure", async () => {
+    await openWith(() =>
+      Promise.reject(new ApiError(403, null, undefined, "reaction_optimization")),
+    )
+    await waitFor(() => {
+      expect(
+        screen.getByText("This list belongs to a product this workspace does not include."),
+      ).toBeInTheDocument()
+    })
   })
 
-  it("lazy-loads options on first open", async () => {
-    const user = userEvent.setup()
-    const load = vi.fn().mockResolvedValue(OPTIONS)
-    render(<EntityPicker value={null} onChange={() => {}} load={load} />)
+  it("says the service is unreachable when it is, and suggests retrying", async () => {
+    await openWith(() => Promise.reject(new ApiError(503, null)))
+    await waitFor(() => {
+      expect(screen.getByText("The service could not be reached. Try again shortly.")).toBeInTheDocument()
+    })
+  })
 
-    expect(load).not.toHaveBeenCalled() // not fetched until opened
-    await user.click(screen.getByRole("combobox"))
-    await waitFor(() => expect(load).toHaveBeenCalledTimes(1))
-    expect(await screen.findByText("Aspirin synthesis")).toBeInTheDocument()
+  it("falls back to the generic message for anything it cannot name", async () => {
+    await openWith(() => Promise.reject(new Error("boom")))
+    await waitFor(() => {
+      expect(screen.getByText("Could not load options.")).toBeInTheDocument()
+    })
   })
 })

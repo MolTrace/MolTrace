@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { Check, ChevronsUpDown, Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { ApiError } from "@/lib/api/client"
 import { Button } from "@/components/ui/button"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import {
@@ -38,6 +39,20 @@ type EntityPickerProps = {
  * user know it. Pass `options` when the parent already has the list, or `load`
  * to lazily fetch on first open.
  */
+
+/** Turns a failed load into something a reader can act on. */
+function describeLoadFailure(err: unknown): string {
+  if (err instanceof ApiError) {
+    // A licensing refusal is not a permission failure — one is an upgrade path,
+    // the other is an access error, and they must not read the same.
+    if (err.moduleNotIncluded) return "This list belongs to a product this workspace does not include."
+    if (err.status === 401 || err.status === 403) return "Sign in to load these options."
+    if (err.status === 404) return "That list is not available here."
+    if (err.status >= 500) return "The service could not be reached. Try again shortly."
+  }
+  return "Could not load options."
+}
+
 export function EntityPicker({
   value,
   onChange,
@@ -55,7 +70,10 @@ export function EntityPicker({
   const [open, setOpen] = useState(false)
   const [loaded, setLoaded] = useState<EntityOption[] | null>(options ?? null)
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState(false)
+  // The REASON, not a boolean. "Could not load options." is the same sentence
+  // whether you are signed out, offline, or looking at a list this deployment
+  // does not serve — and only one of those is something you can act on.
+  const [error, setError] = useState("")
 
   useEffect(() => {
     if (options) setLoaded(options)
@@ -66,13 +84,13 @@ export function EntityPicker({
     if (!open || options || loaded != null || !load) return
     let cancelled = false
     setLoading(true)
-    setError(false)
+    setError("")
     void load()
       .then((opts) => {
         if (!cancelled) setLoaded(opts)
       })
-      .catch(() => {
-        if (!cancelled) setError(true)
+      .catch((err: unknown) => {
+        if (!cancelled) setError(describeLoadFailure(err))
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
@@ -116,7 +134,7 @@ export function EntityPicker({
                 <Loader2 className="h-3 w-3 animate-spin" aria-hidden /> Loading…
               </div>
             ) : error ? (
-              <div className="py-6 text-center text-xs text-destructive">Could not load options.</div>
+              <div className="px-3 py-6 text-center text-xs text-destructive">{error}</div>
             ) : (
               <>
                 <CommandEmpty>{emptyText}</CommandEmpty>
