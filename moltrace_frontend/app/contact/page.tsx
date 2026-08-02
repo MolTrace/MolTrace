@@ -2,7 +2,9 @@ import type { Metadata } from "next"
 import { ContactPage } from "@/components/marketing/contact-page"
 
 export const metadata: Metadata = {
-  title: "Contact · MolTrace",
+  // The root layout's title template appends " | MolTrace"; suffixing here too
+  // rendered the brand twice in the live SERP.
+  title: "Contact",
   description:
     "Get in touch with MolTrace — request a demo, open a support ticket, or reach our security, partnership, and press teams.",
   alternates: { canonical: "/contact" },

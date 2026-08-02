@@ -2,9 +2,12 @@ import type { Metadata } from "next"
 import { CroAnalyticalPage } from "@/components/marketing/cro-analytical-page"
 
 export const metadata: Metadata = {
-  title: "CRO / Analytical · MolTrace",
+  // The root layout's title template appends " | MolTrace"; suffixing here too
+  // rendered the brand twice in the live SERP.
+  title: "CRO & Analytical Labs — defensible throughput",
+  // Held under ~160 characters so Google shows the whole line.
   description:
-    "MolTrace for contract research and analytical labs — one reproducible pipeline that runs every sponsor's samples fast enough to hit the SLA, consistent enough to defend, and isolated enough to keep competing clients fully separate.",
+    "MolTrace for CROs and analytical labs: one reproducible pipeline — fast enough for the SLA, defensible under audit, with every sponsor's data kept separate.",
   alternates: { canonical: "/cro-analytical" },
   openGraph: {
     title: "CRO / Analytical · MolTrace",
