@@ -56,6 +56,7 @@ import {
 import { GsdMultipletPanel } from "@/components/spectracheck/gsd-multiplet-panel"
 import { GsdJCouplingPanel } from "@/components/spectracheck/gsd-jcoupling-panel"
 import { GsdIntegrationPanel } from "@/components/spectracheck/gsd-integration-panel"
+import { QnmrPurityPanel } from "@/components/spectracheck/qnmr-purity-panel"
 import { ShiftPredictionPanel } from "@/components/spectracheck/shift-prediction-panel"
 import { SpectrumRetrievePanel } from "@/components/spectracheck/spectrum-retrieve-panel"
 import { SpectrumReasonPanel } from "@/components/spectracheck/spectrum-reason-panel"
@@ -1653,6 +1654,13 @@ export function SpectraCheckProcessedSpectrumSection({
         fieldMhz={Number(spectrometerMhz.trim() || "500") || 500}
         testId="processed-integration-results-surface"
       />
+
+      {/* ── qNMR purity ──────────────────────────────────────────────────
+          Sits beside the region integrals because purity is what an analyst
+          computes *from* the integrals just reviewed. Takes its numbers by
+          hand, so it stays usable with integrals from any source and never
+          gates on the GSD chain — stateless compute, nothing persisted. */}
+      <QnmrPurityPanel testId="processed-qnmr-purity-surface" />
 
       {/* ── Candidate tool — per-atom shift prediction (v0.7.8) ──────────
           Structure-derived (not part of the observed-spectrum chain):
