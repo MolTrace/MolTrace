@@ -943,7 +943,10 @@ export function RegulatoryIntelligenceLanding() {
           >
             Regulatory · Dossier Index
           </p>
-          <h2 className="font-mono text-xl font-bold tracking-tight">All dossiers in this org</h2>
+          {/* Not "all dossiers in this org": a dossier belongs to its creator's team, and one
+              created without a team stays creator-only, so an organization-wide claim would
+              promise rows this list cannot return. */}
+          <h2 className="font-mono text-xl font-bold tracking-tight">Every dossier you can open</h2>
           <p className="text-sm text-muted-foreground">
             Per-dossier requirement coverage, missing evidence count, and risk hint — open any row to drill into the workspace.
           </p>

@@ -16,6 +16,26 @@ if (typeof Element !== "undefined" && typeof Element.prototype.scrollTo !== "fun
   Element.prototype.scrollTo = function scrollTo() {}
 }
 
+// Radix Select drives its trigger through the Pointer Events capture API and
+// scrolls the active item into view. jsdom implements neither, so opening a
+// <Select> under test throws before the listbox ever renders.
+if (typeof Element !== "undefined") {
+  if (typeof Element.prototype.hasPointerCapture !== "function") {
+    Element.prototype.hasPointerCapture = function hasPointerCapture() {
+      return false
+    }
+  }
+  if (typeof Element.prototype.setPointerCapture !== "function") {
+    Element.prototype.setPointerCapture = function setPointerCapture() {}
+  }
+  if (typeof Element.prototype.releasePointerCapture !== "function") {
+    Element.prototype.releasePointerCapture = function releasePointerCapture() {}
+  }
+  if (typeof Element.prototype.scrollIntoView !== "function") {
+    Element.prototype.scrollIntoView = function scrollIntoView() {}
+  }
+}
+
 // Several responsive client components read matchMedia in effects; jsdom
 // does not provide it by default.
 if (typeof window !== "undefined" && typeof window.matchMedia !== "function") {

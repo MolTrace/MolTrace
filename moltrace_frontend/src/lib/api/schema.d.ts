@@ -9513,6 +9513,49 @@ export interface paths {
         patch: operations["update_session_comment_route_spectracheck_sessions__session_id__comments__comment_id__patch"];
         trace?: never;
     };
+    "/review-tasks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Subject Review Tasks Route */
+        get: operations["list_subject_review_tasks_route_review_tasks_get"];
+        put?: never;
+        /**
+         * Create Subject Review Task Route
+         * @description Ask someone to review a filing or a campaign.
+         *
+         *     Access is the subject's own rule, so a task can only be raised against something the caller
+         *     can already open; anything else is the same 404 as a subject that does not exist. Spectroscopy
+         *     sessions keep their own review surface, which carries per-session reviewer roles this one does
+         *     not.
+         */
+        post: operations["create_subject_review_task_route_review_tasks_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/review-tasks/{task_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Subject Review Task Route */
+        patch: operations["update_subject_review_task_route_review_tasks__task_id__patch"];
+        trace?: never;
+    };
     "/spectracheck/sessions/{session_id}/review-tasks": {
         parameters: {
             query?: never;
@@ -29123,14 +29166,6 @@ export interface components {
             metadata_json?: {
                 [key: string]: unknown;
             };
-            /** Evidence Item Id */
-            evidence_item_id?: number | null;
-            /** Compound Id */
-            compound_id?: number | null;
-            /** Session Id */
-            session_id?: number | null;
-            /** Notes */
-            notes?: string | null;
         };
         /** PredictionResponse */
         PredictionResponse: {
@@ -35774,7 +35809,13 @@ export interface components {
             /** Id */
             id: number;
             /** Session Id */
-            session_id: number;
+            session_id?: number | null;
+            /** Subject Type */
+            subject_type?: ("spectracheck_session" | "regulatory_dossier" | "reaction_project") | null;
+            /** Subject Id */
+            subject_id?: number | null;
+            /** Module */
+            module?: ("spectracheck" | "regulatory_hub" | "reaction_optimization") | null;
             /** Title */
             title: string;
             /** Description */
@@ -39208,6 +39249,41 @@ export interface components {
              * @default
              */
             validator_version: string;
+        };
+        /**
+         * SubjectReviewTaskCreate
+         * @description Ask someone to review a filing or a campaign.
+         */
+        SubjectReviewTaskCreate: {
+            /**
+             * Subject Type
+             * @enum {string}
+             */
+            subject_type: "spectracheck_session" | "regulatory_dossier" | "reaction_project";
+            /** Subject Id */
+            subject_id: number;
+            /** Title */
+            title: string;
+            /** Description */
+            description?: string | null;
+            /** Assigned To */
+            assigned_to?: string | null;
+            /**
+             * Status
+             * @default open
+             * @enum {string}
+             */
+            status: "open" | "in_progress" | "resolved" | "dismissed";
+            /**
+             * Priority
+             * @default medium
+             * @enum {string}
+             */
+            priority: "low" | "medium" | "high" | "critical";
+            /** Metadata Json */
+            metadata_json?: {
+                [key: string]: unknown;
+            };
         };
         /** SubscriptionPlan */
         SubscriptionPlan: {
@@ -68709,6 +68785,118 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EvidenceCommentRecord"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_subject_review_tasks_route_review_tasks_get: {
+        parameters: {
+            query: {
+                subject_type: string;
+                subject_id: number;
+                limit?: number;
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewTaskRecord"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_subject_review_task_route_review_tasks_post: {
+        parameters: {
+            query?: {
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SubjectReviewTaskCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewTaskRecord"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_subject_review_task_route_review_tasks__task_id__patch: {
+        parameters: {
+            query?: {
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path: {
+                task_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReviewTaskUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewTaskRecord"];
                 };
             };
             /** @description Validation Error */
