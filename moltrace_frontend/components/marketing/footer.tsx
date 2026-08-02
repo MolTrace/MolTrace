@@ -357,8 +357,12 @@ export function Footer() {
               <span className={moltraceTraceClassName}>Trace</span>
             </span>
           </Link>
+          {/* Audience phrase must match SITE_DESCRIPTION word for word. This
+              line renders on all 13 marketing pages, so a narrower list here is
+              the most repeated audience signal on the site — it read "chemistry
+              and pharmaceutical R&D", dropping academic labs entirely. */}
           <p className="max-w-md text-sm text-muted-foreground">
-            AI-native scientific intelligence for chemistry and pharmaceutical R&D.
+            AI-native scientific intelligence for academic, chemical and pharmaceutical R&D.
           </p>
         </div>
 
