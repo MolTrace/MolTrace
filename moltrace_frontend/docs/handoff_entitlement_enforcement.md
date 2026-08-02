@@ -1,7 +1,36 @@
 # Handoff → backend: make module entitlements actually enforce
 
 **From:** frontend session, 2026-07-31
-**Status:** frontend is ready and waiting; nothing here is implemented server-side yet.
+**Status:** still open. Everything below is unimplemented on the per-tenant axis.
+
+> **Update 2026-08-02 — read this before acting on the checklist.**
+>
+> Module gating shipped, but on a *different axis* than this document describes.
+> `moltrace_backend/src/nmrcheck/module_access.py` gates on `MOLTRACE_ENABLED_MODULES`,
+> a deployment setting — one SKU per deployment — and the frontend reads it back
+> through `useIncludedModules` / `GET /system/capabilities`. That is real
+> enforcement, and it is what the nav and route guards now obey.
+>
+> It is **not** the per-tenant entitlement enforcement specified here. Nothing on
+> the entitlement axis changed: `programEnabled()` still returns `true` for an
+> absent record, `isProgramEnabled` / `isFeatureEnabled` still have zero call
+> sites, and item 1 — resolving the tenant server-side — is still the blocking
+> prerequisite. Per-tenant entitlements only become necessary for pooled
+> deployments; a dedicated deployment per customer is already the SKU boundary.
+>
+> The item-6 copy change was resolved by **deleting the readout rather than the
+> footnote**. The tenant dropdown, the dashboard deployment card and the mobile
+> tenant summary no longer render a per-module licensing badge at all, because
+> those badges displayed entitlement state that enforces nothing and so had to
+> disclaim themselves. `licensingConfigured` is gone from the tenant context, and
+> `TenantModuleAccess` lost its `enabled` flag — `moduleAccess` is now just the
+> three products in canonical order, which is all those surfaces ever needed.
+>
+> Do not reinstate a licensing badge when this work lands. Build it on
+> `useIncludedModules`, or on a real per-tenant check once item 1 exists.
+> `isProgramEnabled` / `isFeatureEnabled` remain on the context, still with zero
+> call sites, still permissive on an absent record — they are the hooks item 3
+> would make meaningful.
 
 ## The problem
 
@@ -116,11 +145,11 @@ tenants. The frontend work is then:
   should exist and do not)
 - handle the 403 with a real "not licensed for your organization" state instead
   of a generic error
-- delete the "does not restrict module access on this yet" footnote and restore
-  the "access" wording in `components/app/tenant-selector.tsx`,
-  `components/dashboard/dashboard-v0.tsx` and
-  `components/admin/mobile-tenant-summary-workspace.tsx`
-- drop `licensingConfigured` from the tenant context if item 4 makes it moot
+- ~~delete the "does not restrict module access on this yet" footnote and restore
+  the "access" wording~~ — **done differently; see the 2026-08-02 update above.**
+  The readout was removed instead, across all three surfaces.
+- ~~drop `licensingConfigured` from the tenant context if item 4 makes it moot~~ —
+  **done.** Removed along with `TenantModuleAccess.enabled`.
 
 ## Related
 

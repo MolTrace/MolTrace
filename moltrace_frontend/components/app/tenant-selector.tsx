@@ -1,7 +1,6 @@
 "use client"
 
-import { Building2, CheckCircle2, MinusCircle, RefreshCw } from "lucide-react"
-import { Badge } from "@/components/ui/badge"
+import { Building2, CheckCircle2, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -24,17 +23,9 @@ export function TenantSelector() {
     isAdmin,
     loading,
     error,
-    moduleAccess,
-    licensingConfigured,
     setCurrentTenantId,
     refreshTenantContext,
   } = useTenant()
-
-  // Only meaningful once this organization actually has entitlement records —
-  // with none, every module reads as permitted by default rather than by grant.
-  const unlicensedCount = licensingConfigured
-    ? moduleAccess.filter((module) => !module.enabled).length
-    : 0
 
   return (
     <DropdownMenu>
@@ -42,11 +33,6 @@ export function TenantSelector() {
         <Button variant="outline" size="sm" className="min-w-0 gap-2">
           <Building2 className="h-4 w-4 shrink-0" />
           <span className="max-w-36 truncate">{isMobile ? "Organization" : tenantDisplayName}</span>
-          {unlicensedCount > 0 ? (
-            <Badge variant="outline" className={isMobile ? "hidden" : "inline-flex h-5 px-1.5 text-[10px]"}>
-              {unlicensedCount} not licensed
-            </Badge>
-          ) : null}
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-80">
@@ -78,35 +64,12 @@ export function TenantSelector() {
           </>
         ) : null}
 
-        {/* Shown only when this organization has entitlement records. With none,
-            every module resolves to permitted because nothing is configured, and
-            a row of "licensed" badges would read as a grant that was never made.
-            The wording says licensing, not access, because the app does not yet
-            restrict anything on this basis. */}
-        {licensingConfigured ? (
-          <>
-            <DropdownMenuSeparator />
-            <DropdownMenuLabel className="text-xs text-muted-foreground">Module licensing</DropdownMenuLabel>
-            {moduleAccess.map((module, index) => (
-              <DropdownMenuItem key={module.key} disabled>
-                {module.enabled ? (
-                  <CheckCircle2 className="mr-2 h-4 w-4" />
-                ) : (
-                  <MinusCircle className="mr-2 h-4 w-4" />
-                )}
-                <span className="min-w-0 flex-1 truncate">
-                  {index + 1}. {module.label}
-                </span>
-                <Badge variant={module.enabled ? "secondary" : "outline"}>
-                  {module.enabled ? "licensed" : "not licensed"}
-                </Badge>
-              </DropdownMenuItem>
-            ))}
-            <p className="px-2 pb-1 pt-0.5 text-[11px] text-muted-foreground">
-              Licensing record only — MolTrace does not restrict module access on this yet.
-            </p>
-          </>
-        ) : null}
+        {/* The per-module licensing readout that used to sit here is gone. It rendered
+            tenant entitlement rows, which enforce nothing — so it needed a footnote
+            saying as much, and a badge row carrying a disclaimer is worse than no badge
+            row. What a workspace actually includes is deployment-scoped and answered by
+            `useIncludedModules` (GET /system/capabilities); that is the readout the nav
+            and route guards already obey. Do not reinstate this one on entitlements. */}
 
         <DropdownMenuSeparator />
         <DropdownMenuItem disabled={loading} onSelect={() => void refreshTenantContext()}>

@@ -387,7 +387,6 @@ export function DashboardV0() {
     tenantDisplayName,
     isAdmin,
     moduleAccess,
-    licensingConfigured,
   } = tenantContext
   const live = overview.metrics != null
   const metrics = overview.metrics
@@ -1462,19 +1461,15 @@ export function DashboardV0() {
                 <p className="font-medium">{deploymentSummary?.nextOnboardingTask ?? "—"}</p>
               </div>
             </div>
+            {/* Order only. The "licensed / not licensed" badge that used to sit on each
+                tile read tenant entitlement rows, which enforce nothing — see the note in
+                `components/app/tenant-selector.tsx`. */}
             <div className="grid gap-2 sm:grid-cols-3">
               {moduleAccess.map((module, index) => (
                 <div key={module.key} className="rounded-md border bg-muted/20 px-3 py-2">
-                  <div className="flex items-center justify-between gap-2">
-                    <span>
-                      {index + 1}. {module.label}
-                    </span>
-                    {licensingConfigured ? (
-                      <Badge variant={module.enabled ? "secondary" : "outline"}>
-                        {module.enabled ? "licensed" : "not licensed"}
-                      </Badge>
-                    ) : null}
-                  </div>
+                  <span>
+                    {index + 1}. {module.label}
+                  </span>
                 </div>
               ))}
             </div>

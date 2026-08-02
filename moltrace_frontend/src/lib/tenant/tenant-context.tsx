@@ -53,10 +53,13 @@ export type TenantFeatureFlagRecord = {
   status: string
 }
 
+/** The three products in canonical run order. Identity and order only — deliberately no
+ *  `enabled` flag. It used to carry one, derived from tenant entitlement rows, and every
+ *  surface that rendered it had to disclaim that it enforced nothing. What a workspace
+ *  actually includes is deployment-scoped: use `useIncludedModules`. */
 export type TenantModuleAccess = {
   key: "spectracheck" | "regulatory_hub" | "reaction_optimization"
   label: "SpectraCheck" | "Regentry" | "Repho"
-  enabled: boolean
 }
 
 type TenantContextValue = {
@@ -68,10 +71,6 @@ type TenantContextValue = {
   entitlements: TenantEntitlementRecord[]
   featureFlags: TenantFeatureFlagRecord[]
   moduleAccess: TenantModuleAccess[]
-  /** True when this organization actually has entitlement records. When false,
-   *  every module reads as permitted simply because nothing is configured — so
-   *  surfaces must not present that as a granted licence. */
-  licensingConfigured: boolean
   isAdmin: boolean
   loading: boolean
   error: string
@@ -94,16 +93,11 @@ const LOCAL_TENANT: TenantRecord = {
   status: FALLBACK_TENANT_STATUS,
 }
 
-const CORE_MODULES: Omit<TenantModuleAccess, "enabled">[] = [
+const CORE_MODULES: TenantModuleAccess[] = [
   { key: "spectracheck", label: "SpectraCheck" },
   { key: "regulatory_hub", label: "Regentry" },
   { key: "reaction_optimization", label: "Repho" },
 ]
-
-const LOCAL_MODULE_ACCESS: TenantModuleAccess[] = CORE_MODULES.map((module) => ({
-  ...module,
-  enabled: true,
-}))
 
 const LOCAL_TENANT_CONTEXT: TenantContextValue = {
   currentTenantId: LOCAL_TENANT.id,
@@ -113,8 +107,7 @@ const LOCAL_TENANT_CONTEXT: TenantContextValue = {
   tenants: [LOCAL_TENANT],
   entitlements: [],
   featureFlags: [],
-  moduleAccess: LOCAL_MODULE_ACCESS,
-  licensingConfigured: false,
+  moduleAccess: CORE_MODULES,
   isAdmin: false,
   loading: false,
   error: "",
@@ -413,15 +406,6 @@ export function TenantProvider({ children }: { children: ReactNode }) {
     [loadTenantDetail, tenants],
   )
 
-  const moduleAccess = useMemo<TenantModuleAccess[]>(
-    () =>
-      CORE_MODULES.map((module) => ({
-        ...module,
-        enabled: programEnabled(entitlements, module.key),
-      })),
-    [entitlements],
-  )
-
   const value = useMemo<TenantContextValue>(
     () => ({
       currentTenantId: tenant.id,
@@ -431,8 +415,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
       tenants,
       entitlements,
       featureFlags,
-      moduleAccess,
-      licensingConfigured: entitlements.length > 0,
+      moduleAccess: CORE_MODULES,
       isAdmin,
       loading,
       error,
@@ -446,7 +429,6 @@ export function TenantProvider({ children }: { children: ReactNode }) {
       tenants,
       entitlements,
       featureFlags,
-      moduleAccess,
       isAdmin,
       loading,
       error,
