@@ -607,6 +607,43 @@ def test_archiving_retains_the_record_and_requires_a_reason(
     assert with_archived.json()[0]["source_block"]
 
 
+def test_validation_is_reachable_on_a_deployment_that_only_licenses_regentry(
+    app, api_headers: dict[str, str]
+):
+    """Reading a drawn structure is a platform primitive, not a Repho feature.
+
+    Regentry needs it to show a chemist what RDKit read back from an impurity drawing before
+    that structure becomes an ICH M7 verdict. Filed under Repho, this route answered
+    403 module_not_licensed on a Regentry-only deployment and blocked that round-trip
+    outright — so the classification is pinned here rather than left to the route map alone.
+    """
+    previous = getattr(app.state, "enabled_modules", None)
+    app.state.enabled_modules = ("regulatory_hub",)
+    try:
+        client = TestClient(app)
+        res = client.post(
+            "/reactions/structures/validate",
+            headers=api_headers,
+            json={"block": _mol_block("Cc1ccc(N)cc1"), "format": "mol", "smiles": ""},
+        )
+        assert res.status_code == 200, res.text
+        assert res.json()["canonical_smiles"] == "Cc1ccc(N)cc1"
+
+        # The campaign surfaces stay licensed to Repho — this widens one primitive, not Repho.
+        gated = client.post(
+            "/reaction-projects",
+            headers=api_headers,
+            json={"name": "x", "objective": "maximize_yield", "status": "active"},
+        )
+        assert gated.status_code == 403
+        assert gated.json()["detail"] == "module_not_licensed"
+    finally:
+        if previous is None:
+            delattr(app.state, "enabled_modules")
+        else:
+            app.state.enabled_modules = previous
+
+
 def test_smarts_match_route_uses_the_shared_engine(
     client: TestClient, api_headers: dict[str, str]
 ):
