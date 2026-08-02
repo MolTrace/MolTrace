@@ -9513,6 +9513,99 @@ export interface paths {
         patch: operations["update_session_comment_route_spectracheck_sessions__session_id__comments__comment_id__patch"];
         trace?: never;
     };
+    "/reviewers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Subject Reviewers Route */
+        get: operations["list_subject_reviewers_route_reviewers_get"];
+        put?: never;
+        /**
+         * Create Subject Reviewer Route
+         * @description Nominate someone to review a filing or a campaign.
+         *
+         *     A nomination records who is expected to look; it does not grant access, which still comes from
+         *     the owning team. Nominating someone outside the team therefore succeeds and simply does not let
+         *     them in.
+         */
+        post: operations["create_subject_reviewer_route_reviewers_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/approvals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Subject Approvals Route */
+        get: operations["list_subject_approvals_route_approvals_get"];
+        put?: never;
+        /**
+         * Create Subject Approval Route
+         * @description Record a sign-off decision on a filing or a campaign.
+         *
+         *     This is the workflow record — who decided what, and why. It is not itself a signature: an
+         *     electronic signature is created separately and bound to a point-in-time report, which is what
+         *     keeps a signature tied to exactly what it attested to.
+         */
+        post: operations["create_subject_approval_route_approvals_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/comments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Subject Comments Route */
+        get: operations["list_subject_comments_route_comments_get"];
+        put?: never;
+        /**
+         * Create Subject Comment Route
+         * @description Leave a note on a filing or a campaign.
+         *
+         *     Access is the subject's own rule, so a comment can only be left on something the caller can
+         *     already open; anything else is the same 404 as a subject that does not exist. Spectroscopy
+         *     sessions keep their own comment surface, which can also anchor a note to a specific piece of
+         *     evidence.
+         */
+        post: operations["create_subject_comment_route_comments_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/comments/{comment_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Subject Comment Route */
+        patch: operations["update_subject_comment_route_comments__comment_id__patch"];
+        trace?: never;
+    };
     "/review-tasks": {
         parameters: {
             query?: never;
@@ -13049,7 +13142,13 @@ export interface components {
             /** Id */
             id: number;
             /** Session Id */
-            session_id: number;
+            session_id?: number | null;
+            /** Subject Type */
+            subject_type?: ("spectracheck_session" | "regulatory_dossier" | "reaction_project") | null;
+            /** Subject Id */
+            subject_id?: number | null;
+            /** Module */
+            module?: ("spectracheck" | "regulatory_hub" | "reaction_optimization") | null;
             /** Evidence Id */
             evidence_id?: number | null;
             /** Report Id */
@@ -13060,7 +13159,7 @@ export interface components {
              * Decision
              * @enum {string}
              */
-            decision: "approved_plausible" | "approved_confirmed" | "rejected" | "needs_changes" | "deferred";
+            decision: "approved_plausible" | "approved_confirmed" | "approved" | "rejected" | "needs_changes" | "deferred";
             /** Rationale */
             rationale: string;
             /**
@@ -19578,7 +19677,13 @@ export interface components {
             /** Id */
             id: number;
             /** Session Id */
-            session_id: number;
+            session_id?: number | null;
+            /** Subject Type */
+            subject_type?: ("spectracheck_session" | "regulatory_dossier" | "reaction_project") | null;
+            /** Subject Id */
+            subject_id?: number | null;
+            /** Module */
+            module?: ("spectracheck" | "regulatory_hub" | "reaction_optimization") | null;
             /** Evidence Id */
             evidence_id?: number | null;
             /** Artifact Id */
@@ -36898,7 +37003,13 @@ export interface components {
             /** Id */
             id: number;
             /** Session Id */
-            session_id: number;
+            session_id?: number | null;
+            /** Subject Type */
+            subject_type?: ("spectracheck_session" | "regulatory_dossier" | "reaction_project") | null;
+            /** Subject Id */
+            subject_id?: number | null;
+            /** Module */
+            module?: ("spectracheck" | "regulatory_hub" | "reaction_optimization") | null;
             /** Reviewer Email */
             reviewer_email: string;
             /** Assigned By */
@@ -39251,6 +39362,57 @@ export interface components {
             validator_version: string;
         };
         /**
+         * SubjectApprovalCreate
+         * @description Record a sign-off decision on a filing or a campaign.
+         */
+        SubjectApprovalCreate: {
+            /**
+             * Subject Type
+             * @enum {string}
+             */
+            subject_type: "spectracheck_session" | "regulatory_dossier" | "reaction_project";
+            /** Subject Id */
+            subject_id: number;
+            /**
+             * Decision
+             * @enum {string}
+             */
+            decision: "approved" | "rejected" | "needs_changes" | "deferred";
+            /** Rationale */
+            rationale: string;
+            /** Approver Email */
+            approver_email?: string | null;
+            /** Metadata Json */
+            metadata_json?: {
+                [key: string]: unknown;
+            };
+        };
+        /**
+         * SubjectCommentCreate
+         * @description Leave a note on a filing or a campaign.
+         */
+        SubjectCommentCreate: {
+            /**
+             * Subject Type
+             * @enum {string}
+             */
+            subject_type: "spectracheck_session" | "regulatory_dossier" | "reaction_project";
+            /** Subject Id */
+            subject_id: number;
+            /** Comment */
+            comment: string;
+            /**
+             * Comment Type
+             * @default note
+             * @enum {string}
+             */
+            comment_type: "note" | "question" | "concern" | "contradiction" | "approval_note";
+            /** Metadata Json */
+            metadata_json?: {
+                [key: string]: unknown;
+            };
+        };
+        /**
          * SubjectReviewTaskCreate
          * @description Ask someone to review a filing or a campaign.
          */
@@ -39280,6 +39442,35 @@ export interface components {
              * @enum {string}
              */
             priority: "low" | "medium" | "high" | "critical";
+            /** Metadata Json */
+            metadata_json?: {
+                [key: string]: unknown;
+            };
+        };
+        /**
+         * SubjectReviewerCreate
+         * @description Nominate someone to review a filing or a campaign.
+         *
+         *     A nomination records who is expected to look. It does not grant access — that comes from the
+         *     owning team — so nominating someone outside the team is allowed and simply does not let them
+         *     in.
+         */
+        SubjectReviewerCreate: {
+            /**
+             * Subject Type
+             * @enum {string}
+             */
+            subject_type: "spectracheck_session" | "regulatory_dossier" | "reaction_project";
+            /** Subject Id */
+            subject_id: number;
+            /** Reviewer Email */
+            reviewer_email: string;
+            /**
+             * Status
+             * @default assigned
+             * @enum {string}
+             */
+            status: "assigned" | "in_review" | "completed" | "removed";
             /** Metadata Json */
             metadata_json?: {
                 [key: string]: unknown;
@@ -68768,6 +68959,264 @@ export interface operations {
             };
             path: {
                 session_id: number;
+                comment_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EvidenceCommentUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EvidenceCommentRecord"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_subject_reviewers_route_reviewers_get: {
+        parameters: {
+            query: {
+                subject_type: string;
+                subject_id: number;
+                limit?: number;
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionReviewerRecord"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_subject_reviewer_route_reviewers_post: {
+        parameters: {
+            query?: {
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SubjectReviewerCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionReviewerRecord"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_subject_approvals_route_approvals_get: {
+        parameters: {
+            query: {
+                subject_type: string;
+                subject_id: number;
+                limit?: number;
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApprovalRecord"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_subject_approval_route_approvals_post: {
+        parameters: {
+            query?: {
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SubjectApprovalCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApprovalRecord"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_subject_comments_route_comments_get: {
+        parameters: {
+            query: {
+                subject_type: string;
+                subject_id: number;
+                limit?: number;
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EvidenceCommentRecord"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_subject_comment_route_comments_post: {
+        parameters: {
+            query?: {
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SubjectCommentCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EvidenceCommentRecord"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_subject_comment_route_comments__comment_id__patch: {
+        parameters: {
+            query?: {
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path: {
                 comment_id: number;
             };
             cookie?: never;

@@ -2,7 +2,7 @@ import { render, screen, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { ApiError } from "@/lib/api/client"
-import { SubjectReviewTasksPanel } from "@/components/collaboration/subject-review-tasks-panel"
+import { SubjectReviewTasksBody } from "@/components/collaboration/subject-review-tasks-panel"
 import {
   buildRaiseReviewTaskBody,
   describeSubjectReviewTaskError,
@@ -129,17 +129,25 @@ describe("subject-review-tasks lib", () => {
   })
 })
 
-describe("SubjectReviewTasksPanel", () => {
-  it("lists the queue for a filing and counts what is still open", async () => {
+describe("SubjectReviewTasksBody", () => {
+  it("lists the queue for a filing and reports what is still open", async () => {
     api.listSubjectReviewTasks.mockResolvedValue([
       task(),
       task({ id: 2, status: "resolved", title: "Attach the batch certificate" }),
     ])
-    render(<SubjectReviewTasksPanel subjectType="regulatory_dossier" subjectId={42} />)
+    const onCount = vi.fn()
+    render(
+      <SubjectReviewTasksBody
+        subjectType="regulatory_dossier"
+        subjectId={42}
+        onAttentionCountChange={onCount}
+      />,
+    )
 
     expect(await screen.findByText("Confirm the nitrosamine limit")).toBeInTheDocument()
     expect(screen.getByText("Attach the batch certificate")).toBeInTheDocument()
-    expect(screen.getByText("1 open")).toBeInTheDocument()
+    // The count is what the tab badge is drawn from — the closed task must not be in it.
+    await waitFor(() => expect(onCount).toHaveBeenCalledWith(1))
     expect(api.listSubjectReviewTasks).toHaveBeenCalledWith("regulatory_dossier", 42)
   })
 
@@ -147,7 +155,7 @@ describe("SubjectReviewTasksPanel", () => {
     api.listSubjectReviewTasks.mockResolvedValue([])
     api.raiseSubjectReviewTask.mockResolvedValue(task())
     const user = userEvent.setup()
-    render(<SubjectReviewTasksPanel subjectType="reaction_project" subjectId={7} />)
+    render(<SubjectReviewTasksBody subjectType="reaction_project" subjectId={7} />)
 
     await screen.findByText(/No one has been asked to review this campaign yet/i)
     await user.type(screen.getByLabelText(/What should they look at/i), "Check the solvent swap")
@@ -170,7 +178,7 @@ describe("SubjectReviewTasksPanel", () => {
   it("will not send a task with no title", async () => {
     api.listSubjectReviewTasks.mockResolvedValue([])
     const user = userEvent.setup()
-    render(<SubjectReviewTasksPanel subjectType="regulatory_dossier" subjectId={42} />)
+    render(<SubjectReviewTasksBody subjectType="regulatory_dossier" subjectId={42} />)
 
     await screen.findByText(/No one has been asked to review this filing yet/i)
     await user.click(screen.getByRole("button", { name: /Raise review task/i }))
@@ -183,7 +191,7 @@ describe("SubjectReviewTasksPanel", () => {
     api.listSubjectReviewTasks.mockResolvedValue([task()])
     api.updateSubjectReviewTask.mockResolvedValue(task({ status: "resolved" }))
     const user = userEvent.setup()
-    render(<SubjectReviewTasksPanel subjectType="regulatory_dossier" subjectId={42} />)
+    render(<SubjectReviewTasksBody subjectType="regulatory_dossier" subjectId={42} />)
 
     await screen.findByText("Confirm the nitrosamine limit")
     await user.click(screen.getByRole("combobox", { name: /Status of/i }))
@@ -195,7 +203,7 @@ describe("SubjectReviewTasksPanel", () => {
   // A filing belonging to another organization answers exactly as a deleted one does.
   it("renders an unreachable subject as not-found, with no permissions claim", async () => {
     api.listSubjectReviewTasks.mockRejectedValue(new ApiError(404, { detail: "Review subject not found." }))
-    render(<SubjectReviewTasksPanel subjectType="regulatory_dossier" subjectId={999} />)
+    render(<SubjectReviewTasksBody subjectType="regulatory_dossier" subjectId={999} />)
 
     expect(await screen.findByText(/This filing is not available/i)).toBeInTheDocument()
     expect(screen.queryByText(/permission/i)).not.toBeInTheDocument()
@@ -204,7 +212,7 @@ describe("SubjectReviewTasksPanel", () => {
   })
 
   it("waits instead of calling out while the route id is still resolving", () => {
-    render(<SubjectReviewTasksPanel subjectType="reaction_project" subjectId={null} />)
+    render(<SubjectReviewTasksBody subjectType="reaction_project" subjectId={null} />)
     expect(api.listSubjectReviewTasks).not.toHaveBeenCalled()
   })
 })

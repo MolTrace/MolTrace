@@ -18,7 +18,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { AlertCard } from "@/components/dashboard/alert-card"
 import { ModuleCard } from "@/components/dashboard/module-card"
-import { SubjectReviewTasksPanel } from "@/components/collaboration/subject-review-tasks-panel"
+import { SubjectCollaborationPanel } from "@/components/collaboration/subject-collaboration-panel"
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription } from "@/components/ui/empty"
 
 /** Shared style for inline, baseline-aligned link-buttons rendered inside prose
@@ -5193,13 +5193,14 @@ export function ReactionProjectDetail() {
           </ModuleCard>
           <ReactionStudioCompoundLinkSummary loading={loading} project={project} experiments={experimentsRec} />
           {/* A campaign belongs to its creator's team, so whoever can open it can raise a
-              task on it and work the same queue. One created without a team stays
-              creator-only, which is why neither the panel nor this mount assumes a team. */}
-          <SubjectReviewTasksPanel
+              task on it, leave a note, record a decision or nominate a reviewer. One created
+              without a team stays creator-only, which is why neither the panel nor this mount
+              assumes a team. */}
+          <SubjectCollaborationPanel
             subjectType="reaction_project"
             subjectId={Number.isFinite(reactionProjectId) ? reactionProjectId : null}
             accent="violet"
-            eyebrow="Overview · Review Tasks"
+            eyebrow="Overview · Collaboration"
           />
         </TabsContent>
 

@@ -40,7 +40,7 @@ import {
   DossierAIDecisionsPanel,
   type AIDecision,
 } from "@/components/regulatory-hub/dossier-ai-decisions-panel"
-import { SubjectReviewTasksPanel } from "@/components/collaboration/subject-review-tasks-panel"
+import { SubjectCollaborationPanel } from "@/components/collaboration/subject-collaboration-panel"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { InfoTooltip } from "@/components/ui/info-tooltip"
@@ -6186,13 +6186,14 @@ export function RegulatoryDossierWorkspace() {
             </ModuleCard>
 
             {/* The decision above is one reviewer signing off. This is the work that gets a
-                dossier to that point: whoever can open this filing can raise a task on it and
-                work the same queue. */}
-            <SubjectReviewTasksPanel
+                dossier to that point: whoever can open this filing can raise a task on it,
+                leave a note, record a decision or nominate a reviewer, and everyone sees the
+                same four. */}
+            <SubjectCollaborationPanel
               subjectType="regulatory_dossier"
               subjectId={Number.isFinite(dossierId) ? dossierId : null}
               accent="cyan"
-              eyebrow="Dossier · Review Tasks"
+              eyebrow="Dossier · Collaboration"
             />
           </TabsContent>
 
