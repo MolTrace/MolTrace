@@ -3064,6 +3064,8 @@ def process_bruker_1d_zip(
             priority_regions=diagnostic_regions_for(
                 compound_class, _normalize_nucleus_label(nucleus) or "1H"
             ),
+            solvent=solvent,
+            nucleus=nucleus,
         )
         peaks, peak_meta = _estimates_to_peaks(estimates, target_total_h=target_total_h)
 

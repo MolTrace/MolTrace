@@ -28,7 +28,7 @@ from .models import (
 from .compound_class_priors import diagnostic_regions_for
 from .gsd import deconvolve_region, multiplicity_from_lines
 from .impurities import match_h1_impurity_shifts, partner_shifts_for_compound
-from .solvents import solvent_exchanges_labile_protons
+from .solvents import get_solvent_profile, solvent_exchanges_labile_protons
 from .nmr_tables import solvent_windows
 from .parser import ReferencePeakAssignment, normalize_multiplicity, normalize_nmr_text, parse_j_values_hz, parse_reference_nmr_text
 
@@ -797,12 +797,26 @@ def _ppm_step(x_vals: list[float]) -> float:
 
 
 def _normalize_solvent_key(solvent: str | None) -> str | None:
+    """Canonical solvent key for the mask-window table.
+
+    Matching only the table's own spellings meant every alias silently
+    disabled solvent masking. Bruker writes ``SOLVENT= <MeOD>``, not
+    ``CD3OD``, so masking was off for whole instruments' output while the
+    impurity library - which goes through ``solvents.get_solvent_profile`` -
+    resolved the same name correctly. The two now agree: aliases are
+    canonicalised through the shared solvent registry first.
+    """
     if not solvent:
         return None
     s = solvent.strip()
     for key in _SOLVENT_MASK_WINDOWS:
         if key.lower() == s.lower():
             return key
+    profile = get_solvent_profile(s)
+    if profile is not None:
+        for key in _SOLVENT_MASK_WINDOWS:
+            if key.lower() == profile.canonical_name.lower():
+                return key
     return s
 
 
@@ -1515,13 +1529,24 @@ def _infer_peak_estimates(
     )
 
 
-def _provisional_integrations(estimates: list[_PeakEstimate]) -> list[float]:
+def _provisional_integrations(
+    estimates: list[_PeakEstimate],
+    *,
+    reference_areas: list[float] | None = None,
+) -> list[float]:
+    """Relative integrations, scaled so the smallest credible peak is ~1 H.
+
+    ``reference_areas`` chooses which peaks set the scale. It must exclude
+    residual solvent and water: those routinely carry most of the signal, and
+    letting them anchor the scale drives every analyte resonance toward the
+    0.2 floor.
+    """
     if not estimates:
         return []
-    nonzero_areas = [peak.area for peak in estimates if peak.area > 0]
-    if not nonzero_areas:
+    basis = [a for a in (reference_areas or [peak.area for peak in estimates]) if a > 0]
+    if not basis:
         return []
-    reference = max(min(nonzero_areas), max(nonzero_areas) * 0.08)
+    reference = max(min(basis), max(basis) * 0.08)
     return [max(0.2, peak.area / reference) for peak in estimates]
 
 
@@ -1962,7 +1987,46 @@ def _build_spectrum_comparison(
     )
 
 
-def _estimates_to_peaks(estimates: list[_PeakEstimate], *, target_total_h: float | None = None) -> tuple[list[Peak], dict[str, Any]]:
+def _analyte_reference_areas(
+    estimates: list[_PeakEstimate],
+    *,
+    solvent: str | None,
+    nucleus: str = "1H",
+) -> list[float]:
+    """Areas of the estimates that are plausibly ANALYTE, for scale setting.
+
+    Residual solvent and water routinely dominate a spectrum - in a crude
+    sample the CD3OD residual (3.31 ppm) and its water (4.87 ppm) measured
+    53% and 37% of the total, i.e. 90% between them. Letting them set the
+    reference compresses every real resonance to under 2% of the total, and
+    the noise filter then discards the entire analyte: 42 of 45 peaks were
+    dropped on a real sample, leaving 3.
+
+    They are excluded here for the purpose of choosing the scale only. The
+    peaks themselves are still returned and still classified; the categoriser
+    labels them ``solvent`` and the proton inventory already omits that class
+    from the analyte buckets.
+    """
+    windows = _solvent_mask_windows(solvent, nucleus=nucleus) if solvent else []
+    if not windows:
+        return [float(e.area) for e in estimates if e.area > 0]
+    kept = [
+        float(e.area)
+        for e in estimates
+        if e.area > 0 and not any(_in_window(e.shift_ppm, lo, hi) for lo, hi, _ in windows)
+    ]
+    # Never return an empty basis: a spectrum that is nothing but solvent
+    # should fall back to the old behaviour rather than divide by nothing.
+    return kept or [float(e.area) for e in estimates if e.area > 0]
+
+
+def _estimates_to_peaks(
+    estimates: list[_PeakEstimate],
+    *,
+    target_total_h: float | None = None,
+    solvent: str | None = None,
+    nucleus: str = "1H",
+) -> tuple[list[Peak], dict[str, Any]]:
     if not estimates:
         return ([], {"raw_estimated_total_h": 0.0, "integration_normalized_to_target": False})
     # Pre-filter estimates whose chemical shift falls outside the strict Peak
@@ -1991,7 +2055,16 @@ def _estimates_to_peaks(estimates: list[_PeakEstimate], *, target_total_h: float
                 "out_of_range_dropped_shifts": [round(s, 3) for s in out_of_range_shifts],
             },
         )
-    raw_integrations = _provisional_integrations(in_range_estimates)
+    # Set the scale from analyte peaks only. Residual solvent and water are
+    # excluded from the REFERENCE (they are still kept as peaks and still
+    # classified) so that a dominant solvent line cannot push every real
+    # resonance below the noise cutoff.
+    reference_areas = _analyte_reference_areas(
+        in_range_estimates, solvent=solvent, nucleus=nucleus
+    )
+    raw_integrations = _provisional_integrations(
+        in_range_estimates, reference_areas=reference_areas
+    )
     if not raw_integrations:
         return ([], {"raw_estimated_total_h": 0.0, "integration_normalized_to_target": False})
 
@@ -2017,7 +2090,12 @@ def _estimates_to_peaks(estimates: list[_PeakEstimate], *, target_total_h: float
         # resonance rather than a noise spike, which also retires the
         # max*0.08 guard that otherwise pins the tallest peak at ~12.5 H
         # regardless of how many protons the molecule contains.
-        raw_integrations = _provisional_integrations(in_range_estimates)
+        raw_integrations = _provisional_integrations(
+            in_range_estimates,
+            reference_areas=_analyte_reference_areas(
+                in_range_estimates, solvent=solvent, nucleus=nucleus
+            ),
+        )
 
     integrations = _round_half_integrations(raw_integrations, minimum=0.5)
     normalized_to_target = False
@@ -2296,6 +2374,8 @@ def _structure_guided_peak_estimates(
     frequency_mhz: float | None,
     fixed_sensitivity: float | None = None,
     priority_regions: tuple[tuple[float, float], ...] = (),
+    solvent: str | None = None,
+    nucleus: str = "1H",
 ) -> tuple[list[_PeakEstimate], SpectrumComparisonReport | None, float]:
     """Detect peaks with a structure / reference-guided sensitivity sweep.
 
@@ -2338,7 +2418,9 @@ def _structure_guided_peak_estimates(
             frequency_mhz=frequency_mhz,
             priority_regions=priority_regions,
         )
-        candidate_peaks, _ = _estimates_to_peaks(estimates, target_total_h=target_total_h)
+        candidate_peaks, _ = _estimates_to_peaks(
+            estimates, target_total_h=target_total_h, solvent=solvent, nucleus=nucleus
+        )
         observed_total = round(sum(peak.integration_h for peak in candidate_peaks), 4)
         candidate_target_total = (
             target_total_h
@@ -2699,8 +2781,12 @@ def parse_processed_spectrum(
             frequency_mhz=frequency_mhz,
             fixed_sensitivity=float(peak_sensitivity) if peak_sensitivity is not None else None,
             priority_regions=diagnostic_regions_for(compound_class, "1H"),
+            solvent=solvent,
+            nucleus="1H",
         )
-        inferred_peaks, peak_meta = _estimates_to_peaks(best_estimates, target_total_h=target_total_h)
+        inferred_peaks, peak_meta = _estimates_to_peaks(
+            best_estimates, target_total_h=target_total_h, solvent=solvent, nucleus="1H"
+        )
         comparison = best_comparison or _build_spectrum_comparison(
             reference_assignments=reference_assignments,
             extracted_peaks=inferred_peaks,
