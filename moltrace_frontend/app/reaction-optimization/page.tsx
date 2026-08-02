@@ -3,8 +3,9 @@ import { ReactionOptimizationPage } from "@/components/marketing/reaction-optimi
 
 export const metadata: Metadata = {
   title: "Repho — Bayesian reaction optimization",
+  // Held under ~160 characters so Google shows the whole line.
   description:
-    "Repho runs the Bayesian acquisition over a live Gaussian-process surrogate — proposing the next experiment under hard constraints from your spectroscopy evidence and regulatory framework.",
+    "Repho proposes your next experiment: Bayesian acquisition over a live Gaussian-process surrogate, under hard constraints drawn from your own evidence.",
   alternates: { canonical: "/reaction-optimization" },
   openGraph: {
     title: "Reaction Optimization · MolTrace",

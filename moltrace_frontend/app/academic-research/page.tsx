@@ -2,9 +2,12 @@ import type { Metadata } from "next"
 import { AcademicResearchPage } from "@/components/marketing/academic-research-page"
 
 export const metadata: Metadata = {
-  title: "Academic Research · MolTrace",
+  // The root layout's title template appends " | MolTrace"; suffixing here too
+  // rendered the brand twice in the live SERP.
+  title: "Academic Research — reproducible NMR & MS",
+  // Held under ~160 characters so Google shows the whole line.
   description:
-    "MolTrace for academic research — transparent, reproducible spectroscopy for university and institute labs. Confirm structures, elucidate unknowns, run a core facility, and generate publication-ready supporting information with the reasoning kept visible.",
+    "MolTrace for academic research: reproducible spectroscopy for university and core-facility labs — elucidate unknowns, generate publication-ready SI.",
   alternates: { canonical: "/academic-research" },
   openGraph: {
     title: "Academic Research · MolTrace",

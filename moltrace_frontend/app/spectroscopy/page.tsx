@@ -3,8 +3,9 @@ import { SpectroscopyPage } from "@/components/marketing/spectroscopy-page"
 
 export const metadata: Metadata = {
   title: "SpectraCheck — NMR & MS structure elucidation",
+  // Held under ~160 characters so Google shows the whole line.
   description:
-    "SpectraCheck is the spectroscopy intelligence engine inside MolTrace — NMR, LC-MS, HRMS, MS/MS as one evidence stack, audit-grade from raw FID to regulatory-ready report.",
+    "SpectraCheck is the spectroscopy engine inside MolTrace — NMR, LC-MS, HRMS and MS/MS as one evidence stack, from raw FID to regulatory-ready report.",
   alternates: { canonical: "/spectroscopy" },
   openGraph: {
     title: "Spectroscopy · MolTrace",

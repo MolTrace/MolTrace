@@ -2,9 +2,13 @@ import type { Metadata } from "next"
 import { RegulatoryAffairsPage } from "@/components/marketing/regulatory-affairs-page"
 
 export const metadata: Metadata = {
-  title: "Regulatory Affairs · MolTrace",
+  // The root layout's title template appends " | MolTrace"; suffixing here too
+  // rendered the brand twice in the live SERP.
+  title: "Regulatory Affairs — CTD-ready dossiers",
+  // Held under ~160 characters so Google shows the whole line. Part 11 stays
+  // framed as "designed to support" - it is not a held certification.
   description:
-    "MolTrace for regulatory affairs teams — submissions that assemble themselves from the evidence. CTD-ready impurity and structure dossiers, ICH-aware classification, AI/ML model documentation, and ALCOA+ / 21 CFR Part 11 audit trails that survive a query with the clock running.",
+    "MolTrace for regulatory affairs: CTD-ready impurity and structure dossiers, ICH-aware classification, and audit trails designed to support 21 CFR Part 11.",
   alternates: { canonical: "/regulatory-affairs" },
   openGraph: {
     title: "Regulatory Affairs · MolTrace",

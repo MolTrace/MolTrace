@@ -2,7 +2,9 @@ import type { Metadata } from "next"
 import { CareersPage } from "@/components/marketing/careers-page"
 
 export const metadata: Metadata = {
-  title: "Careers · MolTrace",
+  // The root layout's title template appends " | MolTrace"; suffixing here too
+  // rendered the brand twice in the live SERP.
+  title: "Careers",
   description:
     "We hire the way we ship — deliberately, with clear gates. Real Phase work, transparent hiring rubric, four-stage interview, geo-parity compensation.",
   alternates: { canonical: "/careers" },
