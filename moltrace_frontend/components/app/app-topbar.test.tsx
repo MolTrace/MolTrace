@@ -17,8 +17,13 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: routerPushMock, replace: vi.fn() }),
 }))
 
+// Hoisted so a test can switch the topbar between its desktop and mobile
+// branches. It was pinned to `false`, which meant the mobile AI Queue control —
+// a different element with a different label and its own unread dot — had never
+// been rendered by any test.
+const shell = vi.hoisted(() => ({ isMobile: false }))
 vi.mock("@/hooks/use-mobile", () => ({
-  useIsMobile: () => false,
+  useIsMobile: () => shell.isMobile,
 }))
 
 vi.mock("@/components/theme-toggle", () => ({
@@ -135,5 +140,51 @@ describe("AppTopbar sign out", () => {
     render(<TopbarHarness />)
     expect(screen.getByTestId("raw-file")).toHaveTextContent("empty")
     expect(screen.getByTestId("processed-file")).toHaveTextContent("empty")
+  })
+})
+
+describe("AppTopbar AI Queue control", () => {
+  beforeEach(() => {
+    shell.isMobile = false
+    routerPushMock.mockClear()
+    window.localStorage.clear()
+  })
+
+  it("labels the desktop control and reports whether the queue is showing", () => {
+    render(<AppTopbar onToggleEvidenceQueue={() => {}} evidenceQueueOpen />)
+
+    const control = screen.getByRole("button", { name: /Toggle AI Evidence Queue/i })
+    expect(control).toHaveAttribute("aria-expanded", "true")
+    // The desktop control carries the count as visible text.
+    expect(control).toHaveTextContent("AI Queue")
+  })
+
+  it("renders the mobile control, which is a different element entirely", async () => {
+    shell.isMobile = true
+    const onToggle = vi.fn()
+    const user = userEvent.setup()
+
+    render(<AppTopbar onToggleEvidenceQueue={onToggle} evidenceQueueOpen={false} />)
+
+    const control = screen.getByRole("button", { name: /Toggle AI Evidence Queue/i })
+    expect(control).toHaveAttribute("aria-expanded", "false")
+    // No room for a visible count on an icon button — the mobile branch must not
+    // render the desktop badge, which is what made this worth covering.
+    expect(control).not.toHaveTextContent("AI Queue")
+
+    await user.click(control)
+    expect(onToggle).toHaveBeenCalledTimes(1)
+  })
+
+  it("puts the waiting count in the mobile control's accessible name, not on screen", () => {
+    shell.isMobile = true
+    // The count comes from overview metrics when the queue fetch yields nothing.
+    render(<AppTopbar onToggleEvidenceQueue={() => {}} />)
+
+    // With an empty queue there is nothing waiting, so the label stays plain and
+    // no unread dot is drawn.
+    const control = screen.getByRole("button", { name: "Toggle AI Evidence Queue" })
+    expect(control).toBeInTheDocument()
+    expect(control.querySelector("span[aria-hidden]")).toBeNull()
   })
 })
