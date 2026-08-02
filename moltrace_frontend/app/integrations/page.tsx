@@ -2,7 +2,7 @@ import type { Metadata } from "next"
 import { IntegrationsPage } from "@/components/marketing/integrations-page"
 
 export const metadata: Metadata = {
-  title: "Integrations · MolTrace",
+  title: "Integrations",
   description:
     "Your existing stack — spoken natively, end to end. Instruments, LIMS, ELN, identity providers, pharmacopoeia feeds. One audit ledger across every connector.",
   alternates: { canonical: "/integrations" },

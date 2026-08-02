@@ -417,7 +417,16 @@ export function RegulatoryHubPage() {
                   Compliance as a{" "}
                   <span style={{ color: "var(--mt-teal-ink)" }}>side effect</span> — not a sprint.
                 </h1>
-                <p className="mt-6 max-w-2xl text-lg leading-relaxed text-muted-foreground sm:text-xl">
+                {/* Plain definitional lede. The H1 is a slogan, which reads well
+                    but answers no question — this sentence pairs the product name
+                    with a category a buyer (or an answer engine) already
+                    recognises, in the first line of body copy. */}
+                <p className="mt-6 max-w-2xl text-lg leading-relaxed text-foreground/85 sm:text-xl">
+                  <strong className="font-semibold">Regentry</strong> is MolTrace&apos;s
+                  regulatory-intelligence module for ICH impurity assessment and CTD dossier
+                  drafting.
+                </p>
+                <p className="mt-4 max-w-2xl text-lg leading-relaxed text-muted-foreground sm:text-xl">
                   Spectroscopy evidence flows into ICH-classified action items, dossier-section
                   drafts, and ALCOA+ ledger entries — automatically. The regulatory work is the
                   output of the science, not a separate document written in parallel.

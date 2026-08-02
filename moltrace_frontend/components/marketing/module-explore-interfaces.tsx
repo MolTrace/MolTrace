@@ -1372,7 +1372,7 @@ export function ReactionExploreInterface({ onClose }: { onClose: () => void }) {
             <li className="flex items-start gap-2.5 text-sm leading-snug text-foreground/90">
               <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-violet-500 dark:text-violet-400" strokeWidth={2.5} />
               <span>
-                Multi-objective acquisition optimises yield, selectivity, AND impurity profile
+                Multi-objective acquisition optimizes yield, selectivity, AND impurity profile
                 jointly, so yield gains aren't pursued at the expense of a regulatory flag.
               </span>
             </li>

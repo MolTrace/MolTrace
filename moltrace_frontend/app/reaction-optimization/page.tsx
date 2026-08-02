@@ -2,7 +2,7 @@ import type { Metadata } from "next"
 import { ReactionOptimizationPage } from "@/components/marketing/reaction-optimization-page"
 
 export const metadata: Metadata = {
-  title: "Reaction Optimization · MolTrace",
+  title: "Repho — Bayesian reaction optimization",
   description:
     "Repho runs the Bayesian acquisition over a live Gaussian-process surrogate — proposing the next experiment under hard constraints from your spectroscopy evidence and regulatory framework.",
   alternates: { canonical: "/reaction-optimization" },
