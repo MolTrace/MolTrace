@@ -129,7 +129,12 @@ export function ReactionSchemeList({
                 <p className="truncate text-sm font-medium">
                   {scheme.name?.trim() || "Untitled scheme"}
                   {archived ? (
-                    <span className="ml-2 font-normal text-xs text-muted-foreground">archived</span>
+                    <>
+                      {/* The space is load-bearing: a margin separates these visually but not in
+                          the text layer, so without it the name and the label run together for a
+                          screen reader and for anyone copying the row. */}{" "}
+                      <span className="ml-1 font-normal text-xs text-muted-foreground">archived</span>
+                    </>
                   ) : null}
                 </p>
                 <p className="text-xs text-muted-foreground">

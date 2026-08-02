@@ -66,6 +66,11 @@ describe("ReactionSchemeList", () => {
     render(<ReactionSchemeList reactionProjectId={12} />)
     await waitFor(() => expect(screen.getByText("Old route")).toBeInTheDocument())
     expect(screen.getByText(/superseded by the revised route/)).toBeInTheDocument()
+    // A CSS margin separates the name from the "archived" label visually but not in the text
+    // layer — caught live as "Old routearchived", which is what a screen reader would announce.
+    const row = screen.getByTestId("reaction-scheme-8")
+    expect(row.textContent).not.toContain("Old routearchived")
+    expect(row.textContent).toContain("Old route archived")
     // Already archived: no second archive control.
     expect(screen.queryByRole("button", { name: /^Archive$/ })).toBeNull()
   })
