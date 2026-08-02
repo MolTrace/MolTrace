@@ -631,6 +631,22 @@ def _param_array_element(params: dict[str, Any], name: str, index: int) -> float
     return None
 
 
+def _varian_pulse_angle_deg(params: dict[str, Any]) -> float | None:
+    """Flip angle from a Varian/Agilent procpar, in degrees.
+
+    Varian states the read pulse width ``pw`` and the calibrated 90-degree
+    width ``pw90`` (both microseconds), so the angle is 90*pw/pw90. Returns
+    None when either is missing or implausible, leaving the caller to infer
+    the angle from the pulse-program name instead.
+    """
+    pw = _param_float(params, "pw")
+    pw90 = _param_float(params, "pw90")
+    if pw is None or pw90 is None or pw90 <= 0 or pw <= 0:
+        return None
+    angle = 90.0 * (pw / pw90)
+    return angle if 1.0 <= angle <= 180.0 else None
+
+
 def _unwrap_param_value(value: Any) -> Any:
     if isinstance(value, dict):
         if "values" in value:
@@ -3285,25 +3301,40 @@ def process_bruker_1d_zip(
                 # with a 1 s relaxation delay does not relax slowly-relaxing
                 # protons, and a presaturation sequence attenuates everything
                 # near the irradiated solvent line.
+                # Vendor-agnostic. Bruker keeps the relaxation delay in the D
+                # array and requires deriving the acquisition time from TD/SW;
+                # Varian/Agilent procpar names everything differently (d1, at,
+                # np, sw, nt, seqfil) and states the acquisition time outright.
+                # Reading only the Bruker names left every Varian dataset
+                # reporting level "unknown" with no verdict at all.
                 "acquisition_quality": assess_1h_acquisition(
                     # D[1] is the relaxation delay; D[0] is a settling delay.
+                    # ``_param`` is case-insensitive, so "D1" also resolves
+                    # Varian's own ``d1``.
                     relaxation_delay_s=(
                         _param_array_element(params, "D", 1)
                         if _param_array_element(params, "D", 1) is not None
                         else _param_float(params, "D1", "RD")
                     ),
-                    td=_param_float(params, "TD"),
-                    sw_hz=_param_float(params, "SW_h", "SWH"),
+                    td=_param_float(params, "TD", "np"),
+                    sw_hz=_param_float(params, "SW_h", "SWH", "sw"),
+                    measured_acquisition_time_s=_param_float(params, "at"),
                     scans=(
                         int(scan_count)
-                        if (scan_count := _param_float(params, "NS")) is not None
+                        if (scan_count := _param_float(params, "NS", "nt")) is not None
                         else None
                     ),
                     pulse_program=(
                         str(pulse_program)
-                        if (pulse_program := _param(params, "PULPROG")) is not None
+                        if (pulse_program := _param(params, "PULPROG", "seqfil"))
+                        is not None
                         else None
                     ),
+                    # Varian encodes the flip angle as the read pulse width
+                    # relative to a 90-degree pulse, rather than in the sequence
+                    # name. s2pul carries no angle in its name, so without this
+                    # it would fall back to the conservative 90 degrees.
+                    pulse_angle_deg=_varian_pulse_angle_deg(params),
                 ).to_payload()
                 if nucleus == "1H"
                 else None,

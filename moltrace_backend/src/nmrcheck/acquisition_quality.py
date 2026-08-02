@@ -159,9 +159,14 @@ def assess_1h_acquisition(
     scans: int | None = None,
     pulse_program: str | None = None,
     pulse_angle_deg: float | None = None,
+    measured_acquisition_time_s: float | None = None,
 ) -> AcquisitionQuality:
     """Classify how far the acquisition supports quantitative integration."""
-    aq = acquisition_time_s(td=td, sw_hz=sw_hz)
+    # Varian/Agilent procpar states the acquisition time outright as ``at``;
+    # Bruker requires deriving it from TD and SW. Prefer the stated value.
+    aq = measured_acquisition_time_s
+    if aq is None or aq <= 0:
+        aq = acquisition_time_s(td=td, sw_hz=sw_hz)
     recycle = (
         relaxation_delay_s + aq
         if relaxation_delay_s is not None and aq is not None
