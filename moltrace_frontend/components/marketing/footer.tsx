@@ -290,7 +290,13 @@ type SocialLink = {
  * Never put "#" back in this list.
  */
 export const socialLinks: SocialLink[] = [
-  { label: "LinkedIn",  href: "https://www.linkedin.com/company/moltrace/", Glyph: LinkedInGlyph },
+  // `?viewAsMember=true` forces LinkedIn's public member view. Without it,
+  // anyone who administers the page is redirected to the admin dashboard
+  // instead of the company page. Harmless for everyone else — non-admins see
+  // the member view either way — so this is correct for all visitors.
+  // NOTE: the Organization `sameAs` in components/seo/json-ld.tsx deliberately
+  // keeps the CLEAN canonical URL (no query string) — see the note there.
+  { label: "LinkedIn",  href: "https://www.linkedin.com/company/moltrace/?viewAsMember=true", Glyph: LinkedInGlyph },
   { label: "Facebook",  href: null, Glyph: FacebookGlyph  },
   { label: "Instagram", href: null, Glyph: InstagramGlyph },
   { label: "X",         href: "https://x.com/moltrace_co", Glyph: XGlyph },

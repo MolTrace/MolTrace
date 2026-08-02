@@ -28,11 +28,17 @@ export function OrganizationJsonLd() {
           height: 512,
         },
         description: SITE_DESCRIPTION,
-        // Keep in sync with the claimed entries in `socialLinks`
+        // Mirrors the claimed entries in `socialLinks`
         // (components/marketing/footer.tsx). `sameAs` is what ties this domain,
         // the repo, and the social profiles into a single brand entity — which
         // matters here because the bare term "MolTrace" collides with unrelated
         // content in search results.
+        //
+        // These MUST be the clean canonical profile URLs — no query strings.
+        // The footer's LinkedIn href carries `?viewAsMember=true` (a UI fix so
+        // page admins aren't bounced to the admin dashboard); that parameter
+        // must NOT leak in here, because an entity URL that doesn't match the
+        // profile's own canonical is a weaker match for the knowledge graph.
         sameAs: [
           "https://github.com/MolTrace/MolTrace",
           "https://www.linkedin.com/company/moltrace/",
