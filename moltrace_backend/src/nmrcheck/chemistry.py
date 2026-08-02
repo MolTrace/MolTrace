@@ -181,10 +181,20 @@ def count_aromatic_atoms(mol: Chem.Mol) -> int:
 
 
 def count_aromatic_protons(mol: Chem.Mol) -> int:
+    """Protons on aromatic CARBON.
+
+    Counting every aromatic ATOM also counts the N-H of pyrrole-type rings -
+    indole, pyrrole, imidazole, carbazole - which ``count_labile_hydrogens``
+    counts as well. The proton was therefore in two buckets at once and the
+    expected classes summed to one more than the non-labile total for every
+    N-H heteroaromatic. An aromatic proton in the NMR sense is a C-H in the
+    ring-current-deshielded band; an aromatic N-H is exchangeable and belongs
+    to the labile count alone.
+    """
     return sum(
         atom.GetTotalNumHs(includeNeighbors=False)
         for atom in mol.GetAtoms()
-        if atom.GetIsAromatic()
+        if atom.GetIsAromatic() and atom.GetAtomicNum() == 6
     )
 
 
