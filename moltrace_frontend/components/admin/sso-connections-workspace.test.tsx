@@ -45,7 +45,11 @@ function lastCall(predicate: (path: string, init: { method?: string; body?: Reco
 }
 
 describe("SSOConnectionsWorkspace", () => {
-  beforeEach(() => mockApiFetch.mockReset())
+  // Braces matter: an expression-bodied arrow returns the mock, and vitest calls a value
+  // returned from beforeEach as the test's teardown — re-invoking the mock after the test.
+  beforeEach(() => {
+    mockApiFetch.mockReset()
+  })
 
   it("lists connections and never surfaces a client secret value", async () => {
     withList([CONN])
