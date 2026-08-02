@@ -19202,7 +19202,7 @@ export interface components {
         /** ElectronicSignatureRecordCreate */
         ElectronicSignatureRecordCreate: {
             /** Signer Name */
-            signer_name: string;
+            signer_name?: string | null;
             /** Signer Email */
             signer_email?: string | null;
             /**
