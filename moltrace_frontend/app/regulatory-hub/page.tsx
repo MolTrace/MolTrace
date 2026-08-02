@@ -2,7 +2,7 @@ import type { Metadata } from "next"
 import { RegulatoryHubPage } from "@/components/marketing/regulatory-hub-page"
 
 export const metadata: Metadata = {
-  title: "Regentry · MolTrace",
+  title: "Regentry — ICH impurity assessment & regulatory dossiers",
   description:
     "Spectroscopy evidence flows into ICH-classified action items, dossier-section drafts, and ALCOA+ ledger entries — automatically. Compliance as a side effect, not a sprint.",
   alternates: { canonical: "/regulatory-hub" },

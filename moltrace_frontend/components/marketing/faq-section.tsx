@@ -12,6 +12,10 @@ import type { FaqItem } from "@/components/seo/structured-data"
  * Pair with <ModuleJsonLd faqs=...> or <FaqJsonLd> so the same Q&A is both
  * visible and machine-readable.
  */
+/** How many entries render expanded. Enough to make the section read as answered
+ *  content on arrival, few enough that the list stays scannable. */
+const OPEN_BY_DEFAULT = 3
+
 export function FaqSection({
   items,
   title = "Frequently asked questions",
@@ -34,9 +38,17 @@ export function FaqSection({
         <h2 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">{title}</h2>
         <div className="mt-8 divide-y rounded-2xl border bg-card">
           {items.map((item, i) => (
-            <details key={i} className="group px-5 py-4 sm:px-6">
-              <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-left text-base font-semibold tracking-tight text-foreground marker:hidden [&::-webkit-details-marker]:hidden">
-                {item.q}
+            // The first few open by default: a collapsed <details> still ships its
+            // answer in the server HTML, but an open one is unambiguously visible
+            // content rather than something a reader (or an extractor) must act to
+            // reveal. The questions are the only question-shaped strings on the
+            // site, so they are wrapped in <h3> to enter the document outline —
+            // <summary> alone carries no heading semantics.
+            <details key={i} open={i < OPEN_BY_DEFAULT} className="group px-5 py-4 sm:px-6">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-left marker:hidden [&::-webkit-details-marker]:hidden">
+                <h3 className="text-base font-semibold tracking-tight text-foreground">
+                  {item.q}
+                </h3>
                 <ChevronDown
                   className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180"
                   aria-hidden

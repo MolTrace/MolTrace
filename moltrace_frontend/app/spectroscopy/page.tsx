@@ -2,7 +2,7 @@ import type { Metadata } from "next"
 import { SpectroscopyPage } from "@/components/marketing/spectroscopy-page"
 
 export const metadata: Metadata = {
-  title: "Spectroscopy · MolTrace",
+  title: "SpectraCheck — NMR & MS structure elucidation",
   description:
     "SpectraCheck is the spectroscopy intelligence engine inside MolTrace — NMR, LC-MS, HRMS, MS/MS as one evidence stack, audit-grade from raw FID to regulatory-ready report.",
   alternates: { canonical: "/spectroscopy" },

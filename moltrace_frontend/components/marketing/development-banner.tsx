@@ -18,8 +18,13 @@ import { useEffect, useState } from "react"
  * looping, or caret. SSR and the first client render both start empty, so there
  * is no hydration mismatch and no flash of full text.
  */
+// Deliberately avoids the copula form "MolTrace is <weakness>". This banner is
+// the FIRST body text on the page, so a sentence matching that pattern becomes
+// the strongest lexical answer to "What is MolTrace?" for an extractor — ahead
+// of the real definition thousands of characters below. Same honesty, phrased
+// so it can never be mistaken for the product definition.
 const KEY = "Actively in development"
-const REST = " — MolTrace is a live work-in-progress; features, data & pages may change."
+const REST = " — features, data & pages may change."
 const FULL = KEY + REST
 
 const TYPE_MS = 30 // per-character typing speed
@@ -81,7 +86,7 @@ export function DevelopmentBanner() {
   return (
     <div
       role="status"
-      aria-label="MolTrace is actively in development — a live work-in-progress; features, data, and pages may change."
+      aria-label="Actively in development — features, data, and pages may change."
       className="dev-banner relative isolate w-full overflow-hidden border-b border-[color:var(--mt-cyan)]/15 bg-[#04070E]"
     >
       {/* slow diagonal light sheen drifting across the strip */}

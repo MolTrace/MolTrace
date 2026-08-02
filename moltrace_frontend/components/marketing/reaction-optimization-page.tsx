@@ -83,7 +83,7 @@ const PIPELINE: Stage[] = [
     stage: "04",
     title: "Run",
     detail:
-      "Execute the proposed batch in the lab (manual) or on an autonomous platform (closed-loop). Recipe + parameters pinned by recipe-hash; cross-modal evidence pulled in automatically when the batch finishes.",
+      "A chemist approves the proposed batch and runs it in the lab. Recipe + parameters pinned by recipe-hash; cross-modal evidence pulled in automatically when the batch finishes. Repho executes nothing itself.",
     artifact: "run_id · recipe_hash · operator · timestamp",
   },
   {
@@ -137,7 +137,7 @@ const METHODS: Method[] = [
       "Yield × purity × cost × impurity-load trade-off",
       "Deterministic Pareto front + hypervolume indicator (pure NumPy)",
       "Batch recommendations — propose N reactions at once",
-      "Pareto-set visualisation with non-dominated frontier",
+      "Pareto-set visualization with non-dominated frontier",
       "Diversity penalty against redundant proposals",
     ],
   },
@@ -148,21 +148,25 @@ const METHODS: Method[] = [
     bullets: [
       "Variance-weighted sampling for under-explored regions",
       "Curiosity-driven probes inside safety guardrails",
-      "Useful for discovery campaigns, not optimisation",
+      "Useful for discovery campaigns, not optimization",
       "Integrates with literature priors + predicted-shift models",
       "Stops automatically when surrogate variance plateaus",
     ],
   },
   {
-    acronym: "CL",
-    full: "Closed-Loop Autonomous",
-    scope: "Robot-driven · continuous campaign",
+    // Describes the HALF-closed loop that actually ships. Autonomous execution is
+    // deliberately unwired: `execution_surface_wired` is False and the only SDL
+    // route is a read-only status readout — there is no arm, run-step, or abort
+    // endpoint, and a registered-routes test pins that absence.
+    acronym: "HCL",
+    full: "Half-Closed Loop",
+    scope: "Human-gated · propose, approve, run",
     bullets: [
-      "Direct integration with autonomous synthesis platforms",
-      "Spectroscopy auto-acquired between rounds",
-      "Supports continuous unattended campaigns with audit attribution",
-      "Safety abort triggers wired to live sensor streams",
-      "Reviewer signs off pivots, not individual rounds",
+      "Repho proposes the next batch; a chemist approves before anything runs",
+      "Spectroscopy evidence flows back in automatically once a batch is measured",
+      "Every proposal and decision is attributed in the audit ledger",
+      "Reviewer signs each campaign decision, not just pivots",
+      "Autonomous execution is not wired — no arm, run-step, or abort surface exists",
     ],
   },
 ]
@@ -186,9 +190,9 @@ const USE_CASES: UseCase[] = [
   },
   {
     icon: TrendingUp,
-    name: "Yield + selectivity optimisation",
+    name: "Yield + selectivity optimization",
     blurb:
-      "Continuous-variable optimisation over temperature, equivalents, residence time. Multi-objective when selectivity matters as much as yield.",
+      "Continuous-variable optimization over temperature, equivalents, residence time. Multi-objective when selectivity matters as much as yield.",
     inputs: "Continuous bounds · objective weights",
     outputs: "Pareto frontier · best-by-objective conditions",
   },
@@ -196,7 +200,7 @@ const USE_CASES: UseCase[] = [
     icon: AlertTriangle,
     name: "Impurity suppression",
     blurb:
-      "Regulatory-Hub impurity limits become hard constraints. Optimiser proposes only conditions predicted to clear ICH Q3A/Q3B thresholds.",
+      "Regulatory-Hub impurity limits become hard constraints. Optimizer proposes only conditions predicted to clear ICH Q3A/Q3B thresholds.",
     inputs: "Impurity limits from regulatory · prior runs",
     outputs: "Compliant conditions · constraint-aware ranking",
   },
@@ -212,7 +216,7 @@ const USE_CASES: UseCase[] = [
     icon: Thermometer,
     name: "Conditions for scale-up",
     blurb:
-      "Optimises for robustness at scale: temperature insensitivity, mixing-time tolerance, work-up reproducibility. Variance-weighted objective.",
+      "Optimizes for robustness at scale: temperature insensitivity, mixing-time tolerance, work-up reproducibility. Variance-weighted objective.",
     inputs: "Lab-scale data · scale-up risk profile",
     outputs: "Robust conditions · sensitivity heatmap",
   },
@@ -220,7 +224,7 @@ const USE_CASES: UseCase[] = [
     icon: Repeat,
     name: "Method-development DOE",
     blurb:
-      "HPLC method dev, work-up optimisation, crystallisation polymorph search. Same engine, different objectives — purity + recovery + crystal habit.",
+      "HPLC method dev, work-up optimization, crystallisation polymorph search. Same engine, different objectives — purity + recovery + crystal habit.",
     inputs: "Design variables · purity targets",
     outputs: "Method parameters designed to support Q2(R2) validation",
   },
@@ -310,7 +314,7 @@ const COMPARISON: Comparison[] = [
   {
     dimension: "Constraint handling",
     trialAndError: "Hope the operator remembers the impurity limit · catch in QC later",
-    reactioniq: "Hard constraint at proposal time · violated points masked before the optimiser ever sees them",
+    reactioniq: "Hard constraint at proposal time · violated points masked before the optimizer ever sees them",
   },
   {
     dimension: "Batch parallelism",
@@ -373,7 +377,7 @@ const TRUST: TrustPillar[] = [
   {
     icon: ShieldCheck,
     title: "Constraint-aware by design",
-    body: "Regulatory limits, safety thresholds, and cost ceilings enter the optimiser as hard constraints — not soft hints. Proposals are masked against known limits before they reach you.",
+    body: "Regulatory limits, safety thresholds, and cost ceilings enter the optimizer as hard constraints — not soft hints. Proposals are masked against known limits before they reach you.",
   },
   {
     icon: BadgeCheck,
@@ -433,11 +437,22 @@ export function ReactionOptimizationPage() {
                   The next experiment, chosen by{" "}
                   <span style={{ color: "var(--mt-teal-ink)" }}>the surrogate</span> — not by intuition.
                 </h1>
-                <p className="mt-6 max-w-2xl text-lg leading-relaxed text-muted-foreground sm:text-xl">
-                  Repho runs the closed-loop optimisation engine inside MolTrace. Bayesian
-                  acquisition over a live Gaussian-process surrogate proposes the conditions most
-                  worth trying next — under hard constraints from your spectroscopy evidence and
-                  regulatory framework.
+                {/* Plain definitional lede — the H1 is a slogan and answers no
+                    question. Pairs the product name with a recognised category in
+                    the first line of body copy. */}
+                <p className="mt-6 max-w-2xl text-lg leading-relaxed text-foreground/85 sm:text-xl">
+                  <strong className="font-semibold">Repho</strong> is MolTrace&apos;s
+                  reaction-optimization module — it uses Bayesian optimization to recommend the
+                  next experiment to run.
+                </p>
+                <p className="mt-4 max-w-2xl text-lg leading-relaxed text-muted-foreground sm:text-xl">
+                  {/* "half-closed", not "closed-loop": the loop is human-gated and
+                      the SDL execution surface is deliberately unwired, so Repho
+                      proposes and a chemist decides. */}
+                  Bayesian acquisition over a live Gaussian-process surrogate proposes the
+                  conditions most worth trying next — under hard constraints from your
+                  spectroscopy evidence and regulatory framework. The loop is half-closed by
+                  design: Repho proposes, a chemist approves, and nothing executes on its own.
                 </p>
                 <div className="mt-10 flex flex-wrap items-center gap-4">
                   <Button asChild size="lg" className="gap-2">
@@ -580,7 +595,7 @@ export function ReactionOptimizationPage() {
                 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
                 style={{ color: "var(--mt-teal-ink)" }}
               >
-                The optimisation loop
+                The optimization loop
               </p>
               <h2 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">
                 Seven stages, looping until the surrogate converges.
@@ -662,7 +677,7 @@ export function ReactionOptimizationPage() {
                 Methods we ship
               </p>
               <h2 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">
-                Four optimisation regimes. One typed API.
+                Four optimization regimes. One typed API.
               </h2>
               <p className="mt-4 text-base text-muted-foreground">
                 Switch regimes by argument — the design-space + objective + constraint contract
@@ -1016,7 +1031,7 @@ export function ReactionOptimizationPage() {
                   <div>
                     <p className="text-sm font-semibold">← Regentry</p>
                     <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                      Translates compliance thresholds into hard constraints the optimiser respects
+                      Translates compliance thresholds into hard constraints the optimizer respects
                       at proposal time.
                     </p>
                   </div>

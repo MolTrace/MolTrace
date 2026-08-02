@@ -2,7 +2,7 @@ import type { Metadata } from "next"
 import { BlogPage } from "@/components/marketing/blog-page"
 
 export const metadata: Metadata = {
-  title: "Field notes · MolTrace",
+  title: "Field notes",
   description:
     "Methodology essays, architecture decisions, and validation deep-dives from the MolTrace team. The work, written down as we ship it.",
   alternates: { canonical: "/blog" },
