@@ -27,6 +27,18 @@ vi.mock("@/lib/api/client", () => ({
   },
 }))
 
+/**
+ * The MS-evidence nav is two-tier (WorkspaceStageNav): the section buttons for a
+ * group are only rendered while that group is selected. Reaching an LC-MS
+ * section therefore means picking the group first — same as a reader does.
+ */
+async function openMsSection(user: ReturnType<typeof userEvent.setup>, name: string) {
+  if (name.startsWith("LC-MS")) {
+    await user.click(await screen.findByRole("tab", { name: "LC-MS pipeline" }))
+  }
+  await user.click(await screen.findByRole("tab", { name }))
+}
+
 describe("SpectraCheckMsEvidence HRMS & formula", () => {
   beforeEach(() => {
     apiFetchMock.mockReset()
@@ -41,7 +53,7 @@ describe("SpectraCheckMsEvidence HRMS & formula", () => {
   it("renders Formula search beta card", async () => {
     const user = userEvent.setup()
     renderSpectraCheckMsEvidence(<SpectraCheckMsEvidence sampleId="S1" candidatesText="A | CCO" />)
-    await user.click(screen.getByRole("tab", { name: "Formula search" }))
+    await openMsSection(user, "Formula search")
     expect(await screen.findByText("Formula search beta")).toBeInTheDocument()
     expect(screen.getByRole("button", { name: "Search formulas" })).toBeInTheDocument()
   })
@@ -75,7 +87,7 @@ describe("SpectraCheckMsEvidence HRMS & formula", () => {
     })
     const user = userEvent.setup()
     renderSpectraCheckMsEvidence(<SpectraCheckMsEvidence sampleId="S1" candidatesText="A | CCO" />)
-    await user.click(screen.getByRole("tab", { name: "Formula search" }))
+    await openMsSection(user, "Formula search")
     await user.click(await screen.findByRole("button", { name: "Search formulas" }))
     await waitFor(() => expect(apiFetchMock).toHaveBeenCalled())
     expect(apiFetchMock).toHaveBeenCalledWith("/ms/hrms/formulas/search", {
@@ -116,7 +128,7 @@ describe("SpectraCheckMsEvidence HRMS & formula", () => {
   it("renders Adduct + isotope pattern inference card and infer button", async () => {
     const user = userEvent.setup()
     renderSpectraCheckMsEvidence(<SpectraCheckMsEvidence sampleId="S1" candidatesText="A | CCO" />)
-    await user.click(screen.getByRole("tab", { name: "Adduct + isotope" }))
+    await openMsSection(user, "Adduct + isotope")
     expect(await screen.findByText("Adduct + isotope pattern inference")).toBeInTheDocument()
     expect(screen.getByRole("button", { name: "Infer adducts + isotopes" })).toBeInTheDocument()
   })
@@ -176,7 +188,7 @@ describe("SpectraCheckMsEvidence HRMS & formula", () => {
     })
     const user = userEvent.setup()
     renderSpectraCheckMsEvidence(<SpectraCheckMsEvidence sampleId="S1" candidatesText="A | CCO" />)
-    await user.click(screen.getByRole("tab", { name: "Adduct + isotope" }))
+    await openMsSection(user, "Adduct + isotope")
     await user.click(await screen.findByRole("button", { name: "Infer adducts + isotopes" }))
     await waitFor(() => expect(apiFetchMock).toHaveBeenCalled())
     const [path, init] = apiFetchMock.mock.calls[0]
@@ -190,7 +202,7 @@ describe("SpectraCheckMsEvidence HRMS & formula", () => {
   it("renders Processed MS/MS annotation card and Annotate MS/MS button", async () => {
     const user = userEvent.setup()
     renderSpectraCheckMsEvidence(<SpectraCheckMsEvidence sampleId="S1" candidatesText="Ethanol | CCO" />)
-    await user.click(screen.getByRole("tab", { name: "Processed MS/MS" }))
+    await openMsSection(user, "Processed MS/MS")
     expect(await screen.findByText("Processed MS/MS annotation")).toBeInTheDocument()
     expect(screen.getByRole("button", { name: "Annotate MS/MS" })).toBeInTheDocument()
   })
@@ -198,7 +210,7 @@ describe("SpectraCheckMsEvidence HRMS & formula", () => {
   it("renders fragmentation-tree card and Build fragmentation tree button", async () => {
     const user = userEvent.setup()
     renderSpectraCheckMsEvidence(<SpectraCheckMsEvidence sampleId="S1" candidatesText="A | CCO" />)
-    await user.click(screen.getByRole("tab", { name: "Fragmentation tree" }))
+    await openMsSection(user, "Fragmentation tree")
     expect(await screen.findByText("MS/MS fragmentation-tree reasoning")).toBeInTheDocument()
     expect(screen.getByRole("button", { name: "Build fragmentation tree" })).toBeInTheDocument()
   })
@@ -261,7 +273,7 @@ describe("SpectraCheckMsEvidence HRMS & formula", () => {
     })
     const user = userEvent.setup()
     renderSpectraCheckMsEvidence(<SpectraCheckMsEvidence sampleId="S1" candidatesText="Ethanol | CCO" />)
-    await user.click(screen.getByRole("tab", { name: "Processed MS/MS" }))
+    await openMsSection(user, "Processed MS/MS")
     await user.click(await screen.findByRole("button", { name: "Annotate MS/MS" }))
     await waitFor(() => expect(apiFetchMock).toHaveBeenCalled())
     expect(await screen.findByText("Neutral-loss hits")).toBeInTheDocument()
@@ -319,7 +331,7 @@ describe("SpectraCheckMsEvidence HRMS & formula", () => {
     })
     const user = userEvent.setup()
     renderSpectraCheckMsEvidence(<SpectraCheckMsEvidence sampleId="S1" candidatesText="A | CCO" />)
-    await user.click(screen.getByRole("tab", { name: "Fragmentation tree" }))
+    await openMsSection(user, "Fragmentation tree")
     await user.click(await screen.findByRole("button", { name: "Build fragmentation tree" }))
     await waitFor(() => expect(apiFetchMock).toHaveBeenCalled())
     expect(await screen.findByText("Edge table")).toBeInTheDocument()
@@ -331,7 +343,7 @@ describe("SpectraCheckMsEvidence HRMS & formula", () => {
   it("renders LC-MS import bridge card", async () => {
     const user = userEvent.setup()
     renderSpectraCheckMsEvidence(<SpectraCheckMsEvidence sampleId="S1" candidatesText="A | CCO" />)
-    await user.click(screen.getByRole("tab", { name: "LC-MS import" }))
+    await openMsSection(user, "LC-MS import")
     expect(await screen.findByText(/Raw LC-MS\/MS mzML \+ processed peak import bridge/)).toBeInTheDocument()
     expect(screen.getByRole("button", { name: "Import LC-MS/MS" })).toBeInTheDocument()
   })
@@ -339,7 +351,7 @@ describe("SpectraCheckMsEvidence HRMS & formula", () => {
   it("renders LC-MS feature detection card", async () => {
     const user = userEvent.setup()
     renderSpectraCheckMsEvidence(<SpectraCheckMsEvidence sampleId="S1" candidatesText="A | CCO" />)
-    await user.click(screen.getByRole("tab", { name: "LC-MS features" }))
+    await openMsSection(user, "LC-MS features")
     expect(await screen.findByText(/LC-MS feature detection \+ EIC\/XIC \+ peak purity/)).toBeInTheDocument()
     expect(screen.getByRole("button", { name: "Detect features + XICs" })).toBeInTheDocument()
   })
@@ -347,13 +359,13 @@ describe("SpectraCheckMsEvidence HRMS & formula", () => {
   it("exposes file upload inputs on LC-MS tabs", async () => {
     const user = userEvent.setup()
     const { container } = renderSpectraCheckMsEvidence(<SpectraCheckMsEvidence sampleId="S1" candidatesText="A | CCO" />)
-    await user.click(screen.getByRole("tab", { name: "LC-MS import" }))
+    await openMsSection(user, "LC-MS import")
     const importInputs = container.querySelectorAll('input[type="file"]')
     expect(importInputs.length).toBeGreaterThanOrEqual(1)
     expect((importInputs[0] as HTMLInputElement).accept).toContain(".raw")
     expect((importInputs[0] as HTMLInputElement).accept).toContain(".mgf")
     expect((importInputs[0] as HTMLInputElement).accept).toContain(".wiff")
-    await user.click(screen.getByRole("tab", { name: "LC-MS features" }))
+    await openMsSection(user, "LC-MS features")
     expect(container.querySelectorAll('input[type="file"]').length).toBeGreaterThanOrEqual(1)
   })
 
@@ -412,7 +424,7 @@ describe("SpectraCheckMsEvidence HRMS & formula", () => {
     })
     const user = userEvent.setup()
     const { container } = renderSpectraCheckMsEvidence(<SpectraCheckMsEvidence sampleId="S1" candidatesText="A | CCO" />)
-    await user.click(screen.getByRole("tab", { name: "LC-MS features" }))
+    await openMsSection(user, "LC-MS features")
     const files = container.querySelectorAll('input[type="file"]')
     const featureFileInput = files[files.length - 1]
     expect(featureFileInput).toBeTruthy()
@@ -426,16 +438,16 @@ describe("SpectraCheckMsEvidence HRMS & formula", () => {
   it("renders advanced LC-MS grouping, consensus, dereplication, and bridge tabs", async () => {
     const user = userEvent.setup()
     renderSpectraCheckMsEvidence(<SpectraCheckMsEvidence sampleId="S1" candidatesText="A | CCO" />)
-    await user.click(screen.getByRole("tab", { name: "LC-MS grouping" }))
+    await openMsSection(user, "LC-MS grouping")
     expect(await screen.findByText(/Feature grouping \+ blank subtraction \+ RT alignment/)).toBeInTheDocument()
     expect(screen.getByRole("button", { name: "Group features" })).toBeInTheDocument()
-    await user.click(screen.getByRole("tab", { name: "LC-MS consensus" }))
+    await openMsSection(user, "LC-MS consensus")
     expect(await screen.findByText(/LC-MS isotope\/adduct consensus \+ feature-family confidence/)).toBeInTheDocument()
     expect(screen.getByRole("button", { name: "Score feature-family consensus" })).toBeInTheDocument()
-    await user.click(screen.getByRole("tab", { name: "LC-MS dereplication" }))
+    await openMsSection(user, "LC-MS dereplication")
     expect(await screen.findByText(/LC-MS\/MS library dereplication \+ candidate seed retrieval/)).toBeInTheDocument()
     expect(screen.getByRole("button", { name: "Run dereplication" })).toBeInTheDocument()
-    await user.click(screen.getByRole("tab", { name: "LC-MS bridge" }))
+    await openMsSection(user, "LC-MS bridge")
     expect(await screen.findByText(/LC-MS consensus → unified confidence bridge/)).toBeInTheDocument()
     expect(screen.getByRole("button", { name: "Bridge LC-MS evidence to candidate confidence" })).toBeInTheDocument()
   })
@@ -477,7 +489,7 @@ describe("SpectraCheckMsEvidence HRMS & formula", () => {
     })
     const user = userEvent.setup()
     renderSpectraCheckMsEvidence(<SpectraCheckMsEvidence sampleId="S1" candidatesText="A | CCO" />)
-    await user.click(screen.getByRole("tab", { name: "LC-MS consensus" }))
+    await openMsSection(user, "LC-MS consensus")
     await user.type(await screen.findByPlaceholderText(/Paste the grouped feature-table text from grouping/), "group_id\nx\n")
     await user.click(screen.getByRole("button", { name: "Score feature-family consensus" }))
     await waitFor(() => expect(apiFetchMock).toHaveBeenCalled())
@@ -489,7 +501,7 @@ describe("SpectraCheckMsEvidence HRMS & formula", () => {
     apiFetchMock.mockRejectedValueOnce(new ApiError(404, { detail: "Not Found" }))
     const user = userEvent.setup()
     renderSpectraCheckMsEvidence(<SpectraCheckMsEvidence sampleId="S1" candidatesText="A | CCO" />)
-    await user.click(screen.getByRole("tab", { name: "LC-MS grouping" }))
+    await openMsSection(user, "LC-MS grouping")
     await user.type(await screen.findByPlaceholderText(/Feature or peak list text/), "mz,rt\n100,1")
     await user.click(screen.getByRole("button", { name: "Group features" }))
     expect(await screen.findByText("This capability is not available on this MolTrace instance yet.")).toBeInTheDocument()

@@ -22,10 +22,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Tabs, TabsContent } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Textarea } from "@/components/ui/textarea"
 import { InfoTooltip } from "@/components/ui/info-tooltip"
+import {
+  WorkspaceStageNav,
+  type WorkspaceStageGroup,
+} from "@/components/app/workspace-stage-nav"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { formatApiError } from "@/components/spectracheck/spectracheck-helpers"
 import { cn } from "@/lib/utils"
@@ -82,35 +86,44 @@ const ADDUCT_INFERENCE_ION_MODE_OPTIONS: { value: string; label: string }[] = [
 const LC_MS_UPLOAD_ACCEPT = SPECTRACHECK_MS_SPECTRUM_ACCEPT
 
 /** Matches SpectraCheck `tabTriggerClass`: outer `TabsTrigger` owns active teal-coded highlight; tooltip wraps label span only. */
+/**
+ * The 11 MS-evidence sections, in the two tiers a reader actually thinks in:
+ * direct MS evidence, then the optional LC-MS pipeline. `desc` carries what used
+ * to be each tab's hover tooltip, so the explanation is readable without
+ * covering the strip the reader is trying to click through.
+ */
+const MS_EVIDENCE_NAV: WorkspaceStageGroup[] = [
+  {
+    id: "ms-direct",
+    label: "HRMS & MS/MS",
+    sections: [
+      { value: "hrms-exact", label: "HRMS exact mass", desc: "Match candidates to an observed m/z and adduct by exact mass." },
+      { value: "formula-search", label: "Formula search", desc: "Enumerate plausible formulas from accurate mass, adduct and ppm bounds." },
+      { value: "adduct", label: "Adduct + isotope", desc: "Infer adducts, charge and isotope clusters from processed MS1 peak lists." },
+      { value: "msms", label: "Processed MS/MS", desc: "Annotate centroid MS/MS spectra against candidates and neutral losses." },
+      { value: "frag-tree", label: "Fragmentation tree", desc: "Hypothesized fragmentation pathways and diagnostic neutral losses." },
+    ],
+  },
+  {
+    id: "ms-lcms",
+    label: "LC-MS pipeline",
+    sections: [
+      { value: "lcms-import", label: "LC-MS import", desc: "Import mzML/mzXML or tables; extract MS1/MS2 peaks and traceability hashes." },
+      { value: "lcms-features", label: "LC-MS features", desc: "Chromatographic features, XIC/EIC, purity and linked MS/MS context." },
+      { value: "lcms-adv-group", label: "LC-MS grouping", desc: "Align retention times, subtract blank/QC signal and group ions across runs." },
+      { value: "lcms-adv-consensus", label: "LC-MS consensus", desc: "Feature-family scoring: isotope, adduct, in-source loss and linkage consistency." },
+      { value: "lcms-adv-derep", label: "LC-MS dereplication", desc: "Rank library candidates against LC-MS consensus evidence. Decision-support." },
+      { value: "lcms-adv-bridge", label: "LC-MS bridge", desc: "Map theoretical candidate m/z to promoted LC-MS feature-family anchors." },
+    ],
+  },
+]
+
 const MS_EVIDENCE_TABS_TRIGGER_CLASS = cn(
   "shrink-0 whitespace-normal text-left text-xs sm:text-sm sm:text-center sm:whitespace-nowrap",
   "font-mono",
   "data-[state=active]:[background-color:var(--mt-teal)] data-[state=active]:[color:#04080F] data-[state=active]:font-bold data-[state=active]:shadow-sm",
   "data-[state=inactive]:text-muted-foreground",
 )
-
-function MsEvidenceTabWithTooltip({
-  value,
-  tooltip,
-  children,
-}: {
-  value: string
-  tooltip: string
-  children: ReactNode
-}) {
-  return (
-    <TabsTrigger className={MS_EVIDENCE_TABS_TRIGGER_CLASS} value={value}>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <span className="inline-flex w-full min-w-0 items-center justify-center gap-1 text-center">{children}</span>
-        </TooltipTrigger>
-        <TooltipContent side="bottom" className="max-w-[260px] text-xs">
-          {tooltip}
-        </TooltipContent>
-      </Tooltip>
-    </TabsTrigger>
-  )
-}
 
 /** Inline label + InfoTooltip; keeps visible label text unchanged. */
 function FieldLabelTip({ label, tip }: { label: string; tip: string }) {
@@ -1818,6 +1831,8 @@ export function SpectraCheckMsEvidence({
   lcmsReportReady = false,
   onLcmsHashForReport,
 }: Props) {
+  // The stage nav is a controlled selector, so the active section lives here.
+  const [activeMsTab, setActiveMsTab] = useState("hrms-exact")
   const compoundClassParam = compoundClassForRequest(compoundClass)
 
   function appendCompoundClass(fd: FormData) {
@@ -2599,15 +2614,7 @@ export function SpectraCheckMsEvidence({
       <ModuleCard
         accent="teal"
         eyebrow="MS · Interpretation"
-        title={
-          <span className="inline-flex items-center gap-2">
-            MS evidence interpretation
-            <InfoTooltip
-              label="MS evidence"
-              content="Mass spectrometry evidence modules; all outputs are decision-support and need expert review."
-            />
-          </span>
-        }
+        title="MS evidence interpretation"
         description={
           <>
             Outputs are decision-support only. Labels describe how experimental inputs relate to each row—they may{" "}
@@ -2618,89 +2625,26 @@ export function SpectraCheckMsEvidence({
         }
       />
 
-      <Tabs defaultValue="hrms-exact" className="w-full min-w-0">
-        <div className="min-w-0 overflow-x-auto pb-2 [-webkit-overflow-scrolling:touch]">
-          <TabsList className="inline-flex h-auto min-h-9 w-max min-w-0 max-w-full flex-nowrap justify-start gap-1 sm:flex-wrap">
-            <MsEvidenceTabWithTooltip
-              value="hrms-exact"
-              tooltip="Exact-mass (HRMS) match of candidates to an observed m/z and adduct."
-            >
-              HRMS exact mass
-            </MsEvidenceTabWithTooltip>
-            <MsEvidenceTabWithTooltip
-              value="formula-search"
-              tooltip="Enumerate plausible formulas from accurate mass, adduct, and ppm bounds."
-            >
-              Formula search
-            </MsEvidenceTabWithTooltip>
-            <MsEvidenceTabWithTooltip
-              value="adduct"
-              tooltip="Infer adducts, charge, and isotope clusters from processed MS1 peak lists."
-            >
-              Adduct + isotope
-            </MsEvidenceTabWithTooltip>
-            <MsEvidenceTabWithTooltip
-              value="msms"
-              tooltip="Annotate centroid MS/MS spectra vs. candidates and neutral losses."
-            >
-              Processed MS/MS
-            </MsEvidenceTabWithTooltip>
-            <MsEvidenceTabWithTooltip
-              value="frag-tree"
-              tooltip="Hypothesized fragmentation pathways and diagnostic neutral losses."
-            >
-              Fragmentation tree
-            </MsEvidenceTabWithTooltip>
-            <MsEvidenceTabWithTooltip
-              value="lcms-import"
-              tooltip="Import mzML/mzXML or tables; extract MS1/MS2 peaks and traceability hashes."
-            >
-              LC-MS import
-            </MsEvidenceTabWithTooltip>
-            <MsEvidenceTabWithTooltip
-              value="lcms-features"
-              tooltip="Chromatographic features, XIC/EIC, purity, and linked MS/MS context."
-            >
-              LC-MS features
-            </MsEvidenceTabWithTooltip>
-            <MsEvidenceTabWithTooltip
-              value="lcms-adv-group"
-              tooltip="Align retention times, subtract blank/QC signal, and group ions across runs."
-            >
-              LC-MS grouping
-            </MsEvidenceTabWithTooltip>
-            <MsEvidenceTabWithTooltip
-              value="lcms-adv-consensus"
-              tooltip="Feature-family scoring: isotope, adduct, in-source loss, and linkage consistency."
-            >
-              LC-MS consensus
-            </MsEvidenceTabWithTooltip>
-            <MsEvidenceTabWithTooltip
-              value="lcms-adv-derep"
-              tooltip="Rank library candidates vs. LC-MS consensus evidence (decision-support)."
-            >
-              LC-MS dereplication
-            </MsEvidenceTabWithTooltip>
-            <MsEvidenceTabWithTooltip
-              value="lcms-adv-bridge"
-              tooltip="Map theoretical candidate m/z to promoted LC-MS feature-family anchors."
-            >
-              LC-MS bridge
-            </MsEvidenceTabWithTooltip>
-          </TabsList>
-        </div>
+      <Tabs defaultValue="hrms-exact" value={activeMsTab} onValueChange={setActiveMsTab} className="w-full min-w-0">
+        {/* The same two-tier stage nav the SpectraCheck parent and the reaction
+            workspace use. Each section's explanation is now VISIBLE `desc` text
+            instead of a tooltip on the tab, which opened every time the reader
+            crossed the strip on the way to another tab. */}
+        <WorkspaceStageNav
+          groups={MS_EVIDENCE_NAV}
+          activeValue={activeMsTab}
+          onSelect={setActiveMsTab}
+          label="MS evidence"
+          accent="teal"
+        />
 
         <TabsContent value="hrms-exact" className="mt-4 space-y-12">
           <div className="space-y-1">
             <p className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]" style={{ color: "var(--mt-teal-ink)" }}>
               MS · HRMS Exact Mass
             </p>
-            <h3 className="inline-flex items-center gap-2 font-mono text-xl font-bold tracking-tight">
+            <h3 className="font-mono text-xl font-bold tracking-tight">
               HRMS exact-mass candidate match
-              <InfoTooltip
-                label="About HRMS candidate match"
-                content="Use high-resolution MS to constrain candidates by exact mass, adduct, ppm error, isotope hints, and DBE/IHD."
-              />
             </h3>
             <p className="text-sm text-muted-foreground">
               Constrain candidates by exact mass, adduct, ppm error, isotope pattern, and DBE/IHD.
@@ -2870,12 +2814,8 @@ export function SpectraCheckMsEvidence({
             <p className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]" style={{ color: "var(--mt-teal-ink)" }}>
               MS · Formula Search
             </p>
-            <h3 className="inline-flex items-center gap-2 font-mono text-xl font-bold tracking-tight">
+            <h3 className="font-mono text-xl font-bold tracking-tight">
               <span>Formula search beta</span>
-              <InfoTooltip
-                label="About formula search"
-                content="Search bounded CHNOPSClBr formulas from exact mass. Use this as formula triage, not final identification."
-              />
             </h3>
             <p className="text-sm text-muted-foreground">
               Enumerate plausible CHNOPSClBr formulas from observed exact mass — formula triage, not final ID.
@@ -3019,12 +2959,8 @@ export function SpectraCheckMsEvidence({
             <p className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]" style={{ color: "var(--mt-teal-ink)" }}>
               MS · Adduct + Isotope
             </p>
-            <h3 className="inline-flex items-center gap-2 font-mono text-xl font-bold tracking-tight">
+            <h3 className="font-mono text-xl font-bold tracking-tight">
               Adduct + isotope pattern inference
-              <InfoTooltip
-                label="About adduct + isotope inference"
-                content="Infer likely adducts, charge state, isotope clusters, carbon-count hints, halogen patterns, and formula candidates from processed MS1/HRMS peaks."
-              />
             </h3>
             <p className="text-sm text-muted-foreground">
               Infer adduct form, charge state, isotope cluster, and halogen signature from MS1 or HRMS peak data.
@@ -3241,12 +3177,8 @@ export function SpectraCheckMsEvidence({
             <p className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]" style={{ color: "var(--mt-teal-ink)" }}>
               MS · Processed MS/MS
             </p>
-            <h3 className="inline-flex items-center gap-2 font-mono text-xl font-bold tracking-tight">
+            <h3 className="font-mono text-xl font-bold tracking-tight">
               Processed MS/MS annotation
-              <InfoTooltip
-                label="About processed MS/MS annotation"
-                content="Annotate processed centroid MS/MS peaks using precursor m/z, adduct, candidate structures, fragment matches, and diagnostic neutral losses."
-              />
             </h3>
             <p className="text-sm text-muted-foreground">
               Annotate centroid MS/MS fragments with candidate-specific matches, neutral losses, and diagnostic ion series.
@@ -3445,12 +3377,8 @@ export function SpectraCheckMsEvidence({
             <p className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]" style={{ color: "var(--mt-teal-ink)" }}>
               MS · Fragmentation Tree
             </p>
-            <h3 className="inline-flex items-center gap-2 font-mono text-xl font-bold tracking-tight">
+            <h3 className="font-mono text-xl font-bold tracking-tight">
               MS/MS fragmentation-tree reasoning
-              <InfoTooltip
-                label="About fragmentation-tree reasoning"
-                content="Build precursor-to-fragment and fragment-to-subfragment relationships using diagnostic neutral losses and candidate-specific plausibility."
-              />
             </h3>
             <p className="text-sm text-muted-foreground">
               Build a precursor-to-fragment tree using diagnostic neutral losses and candidate-specific bond-cleavage plausibility.
@@ -3623,12 +3551,8 @@ export function SpectraCheckMsEvidence({
             <p className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]" style={{ color: "var(--mt-teal-ink)" }}>
               LC-MS · Import Bridge
             </p>
-            <h3 className="inline-flex items-center gap-2 font-mono text-xl font-bold tracking-tight">
+            <h3 className="font-mono text-xl font-bold tracking-tight">
               Raw LC-MS/MS mzML + processed peak import bridge
-              <InfoTooltip
-                label="About LC-MS import bridge"
-                content="Import mzML/mzXML or processed LC-MS/MS peak tables, compute source hashes, summarize scans, and extract MS1/MS2 peak lists for downstream analysis."
-              />
             </h3>
             <p className="text-sm text-muted-foreground">
               Import mzML/mzXML or a processed peak table — the app parses scans, computes hashes, and extracts MS1/MS2 peak lists.
@@ -3833,12 +3757,8 @@ export function SpectraCheckMsEvidence({
             <p className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]" style={{ color: "var(--mt-teal-ink)" }}>
               LC-MS · Features
             </p>
-            <h3 className="inline-flex items-center gap-2 font-mono text-xl font-bold tracking-tight">
+            <h3 className="font-mono text-xl font-bold tracking-tight">
               LC-MS feature detection + EIC/XIC + peak purity
-              <InfoTooltip
-                label="About LC-MS feature detection"
-                content="Detect chromatographic features, extract EIC/XIC traces, estimate peak purity, and link nearby MS/MS scans."
-              />
             </h3>
             <p className="text-sm text-muted-foreground">
               Detect chromatographic features, extract EIC/XIC traces, estimate co-elution purity, and link proximal MS/MS scans.
@@ -4047,12 +3967,8 @@ export function SpectraCheckMsEvidence({
             <p className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]" style={{ color: "var(--mt-teal-ink)" }}>
               LC-MS · Grouping
             </p>
-            <h3 className="inline-flex items-center gap-2 font-mono text-xl font-bold tracking-tight">
+            <h3 className="font-mono text-xl font-bold tracking-tight">
               Feature grouping + blank subtraction + RT alignment
-              <InfoTooltip
-                label="About LC-MS grouping"
-                content="Group sample, blank, QC, and reference LC-MS features; align retention time; subtract blank/background signals; and flag sample-enriched features."
-              />
             </h3>
             <p className="text-sm text-muted-foreground">
               Group features across sample / blank / QC / reference runs, align RT, subtract background, and flag sample-enriched peaks.
@@ -4233,12 +4149,8 @@ export function SpectraCheckMsEvidence({
             <p className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]" style={{ color: "var(--mt-teal-ink)" }}>
               LC-MS · Consensus
             </p>
-            <h3 className="inline-flex items-center gap-2 font-mono text-xl font-bold tracking-tight">
+            <h3 className="font-mono text-xl font-bold tracking-tight">
               LC-MS isotope/adduct consensus + feature-family confidence
-              <InfoTooltip
-                label="About feature-family consensus"
-                content="Score feature families using blank subtraction, peak purity, isotope envelope, adduct consistency, in-source loss, and MS/MS linkage."
-              />
             </h3>
             <p className="text-sm text-muted-foreground">
               Score feature families using blank subtraction, isotope envelope, adduct consistency, in-source loss, and MS/MS linkage.
@@ -4424,12 +4336,8 @@ export function SpectraCheckMsEvidence({
             <p className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]" style={{ color: "var(--mt-teal-ink)" }}>
               LC-MS · Dereplication
             </p>
-            <h3 className="inline-flex items-center gap-2 font-mono text-xl font-bold tracking-tight">
+            <h3 className="font-mono text-xl font-bold tracking-tight">
               LC-MS/MS library dereplication + candidate seed retrieval
-              <InfoTooltip
-                label="About LC-MS dereplication"
-                content="Rank supplied local or curated library candidates against precursor m/z, MS/MS similarity, optional RT/CCS, feature-family consensus, and library provenance."
-              />
             </h3>
             <p className="text-sm text-muted-foreground">
               Rank candidates against the spectral library using precursor m/z, MS/MS dot-product, optional RT/CCS, and feature-family provenance.
@@ -4643,12 +4551,8 @@ export function SpectraCheckMsEvidence({
             <p className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]" style={{ color: "var(--mt-teal-ink)" }}>
               LC-MS · Confidence Bridge
             </p>
-            <h3 className="inline-flex items-center gap-2 font-mono text-xl font-bold tracking-tight">
+            <h3 className="font-mono text-xl font-bold tracking-tight">
               LC-MS consensus → unified confidence bridge
-              <InfoTooltip
-                label="About LC-MS consensus bridge"
-                content="Connect promoted LC-MS feature families to candidate confidence when theoretical adduct m/z matches a non-conflicting feature-family anchor."
-              />
             </h3>
             <p className="text-sm text-muted-foreground">
               Link promoted LC-MS feature families to candidate confidence when theoretical adduct masses match a consensus anchor.
