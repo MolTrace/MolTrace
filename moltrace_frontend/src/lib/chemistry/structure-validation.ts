@@ -11,6 +11,8 @@ export type StructureIssue = components["schemas"]["StructureIssue"]
 export type StructureValidateResponse = components["schemas"]["StructureValidateResponse"]
 export type StructureComponentCounts = components["schemas"]["StructureComponentCounts"]
 export type ReactionStructureScheme = components["schemas"]["ReactionStructureScheme"]
+export type StructureSmartsMatchResponse = components["schemas"]["StructureSmartsMatchResponse"]
+export type StructureSmartsMatchResult = components["schemas"]["StructureSmartsMatchResult"]
 export type StructureFormat = StructureValidateResponse["format"]
 
 /** The exact snapshot fields the request accepts. Every model here is extra="forbid". */
@@ -105,6 +107,97 @@ export async function archiveReactionScheme(
 /** A scheme is archived when the server stamped a deletion time on it. */
 export function schemeIsArchived(scheme: ReactionStructureScheme): boolean {
   return typeof scheme.deleted_at === "string" && scheme.deleted_at.trim().length > 0
+}
+
+/**
+ * Match a query pattern against structures the reader supplies.
+ *
+ * Deliberately NOT a search over the registry: the only structures looked at are the ones passed
+ * in. Reading it as "nothing in my compounds contains this" would be a false negative over a
+ * corpus that was never consulted.
+ *
+ * A pattern the engine cannot compile is a 400 whose message is already written for a chemist.
+ */
+export async function matchSmarts(
+  smarts: string,
+  targets: readonly string[],
+): Promise<StructureSmartsMatchResponse> {
+  return apiFetch<StructureSmartsMatchResponse>("/reactions/structures/smarts-match", {
+    method: "POST",
+    // smarts / targets and NOTHING else: this model is extra="forbid" like the rest.
+    body: { smarts: smarts.trim(), targets: [...targets] },
+  })
+}
+
+export type SmartsMatchRow = {
+  smiles: string
+  /**
+   * Whether the target could be read at all. A target that did not parse is NOT a miss — it is an
+   * unanswered question, and the two must never be shown the same way. A reaction SMILES lands
+   * here: this engine matches molecules, not reactions.
+   */
+  parsed: boolean
+  matched: boolean
+  matchCount: number
+  atomIndices: number[]
+}
+
+export type SmartsMatchOutcome = {
+  smarts: string
+  rows: SmartsMatchRow[]
+  matchedCount: number
+  unreadableCount: number
+}
+
+/**
+ * Read the match response defensively, on the same rule as `readVerdict`: a missing or malformed
+ * field must never resolve to the reassuring answer. `parsed` and `matched` count only when they
+ * are literally true, so anything unreadable degrades to "could not be read" rather than "no
+ * match".
+ */
+export function readSmartsMatch(response: unknown): SmartsMatchOutcome | null {
+  if (!response || typeof response !== "object" || Array.isArray(response)) return null
+  const r = response as Partial<StructureSmartsMatchResponse>
+  const rows = (Array.isArray(r.results) ? r.results : [])
+    .filter((v): v is StructureSmartsMatchResult => !!v && typeof v === "object" && !Array.isArray(v))
+    .map((row) => {
+      const parsed = row.parsed === true
+      return {
+        smiles: typeof row.smiles === "string" ? row.smiles : "",
+        parsed,
+        // A match on a target that did not parse is not a claim this page will make.
+        matched: parsed && row.matched === true,
+        matchCount:
+          typeof row.match_count === "number" && Number.isFinite(row.match_count)
+            ? row.match_count
+            : 0,
+        atomIndices: Array.isArray(row.atom_indices)
+          ? row.atom_indices.filter((n): n is number => typeof n === "number" && Number.isFinite(n))
+          : [],
+      }
+    })
+  return {
+    smarts: typeof r.smarts === "string" ? r.smarts : "",
+    rows,
+    // Counted from the rows rather than trusted from the envelope, so the headline can never
+    // disagree with the list under it.
+    matchedCount: rows.filter((row) => row.matched).length,
+    unreadableCount: rows.filter((row) => !row.parsed).length,
+  }
+}
+
+/**
+ * One target structure per line.
+ *
+ * Split only on line breaks. A SMILES may legitimately contain a "." (component separator) and a
+ * ">>" (reaction arrow), so splitting on those here would be the frontend deciding where one
+ * structure ends — a chemistry judgement that belongs to the engine, not to this text box.
+ */
+export function parseTargetList(text: string): string[] {
+  return text
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0)
 }
 
 export type IssueSeverity = "error" | "warning"
