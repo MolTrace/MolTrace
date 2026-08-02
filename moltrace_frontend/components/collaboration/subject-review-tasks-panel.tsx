@@ -1,22 +1,23 @@
 "use client"
 
 // Ask a colleague to review this filing or this campaign, and work the queue that
-// comes back. One panel serves both — the only difference is which subject it is
+// comes back. One surface serves both — the only difference is which subject it is
 // pointed at — because the queue behind it is one endpoint addressed by subject.
+//
+// Rendered as a tab of `subject-collaboration-panel.tsx`, alongside notes, sign-off
+// decisions and reviewer nominations.
 //
 // Spectroscopy sessions are NOT served here; they keep the richer session-scoped
 // review workspace with per-session reviewer roles. `SubjectType` excludes them.
 //
 // The not-found state is load-bearing: a filing that belongs to another organization
-// answers the same way one that never existed does, so the panel says "no longer
-// available", never "you do not have permission". See the module comment on
-// lib/collaboration/subject-review-tasks.ts.
+// answers the same way one that never existed does, so this says "no longer available",
+// never "you do not have permission". See the module comment on
+// lib/collaboration/subject-collaboration.ts.
 
 import { useCallback, useEffect, useState } from "react"
-import { ClipboardCheck, Loader2 } from "lucide-react"
-import { ModuleCard, type ModuleCardAccent } from "@/components/dashboard/module-card"
+import { Loader2 } from "lucide-react"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -26,6 +27,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Textarea } from "@/components/ui/textarea"
 import { statusLabel } from "@/lib/ui/status"
 import { formatStableUtcDateTime } from "@/lib/utils"
+import type { SubjectSurfaceBodyProps } from "@/lib/collaboration/subject-collaboration"
 import {
   REVIEW_TASK_PRIORITIES,
   REVIEW_TASK_STATUSES,
@@ -41,23 +43,13 @@ import {
   type ReviewTaskRecord,
   type ReviewTaskStatus,
   type SubjectReviewTaskError,
-  type SubjectType,
 } from "@/lib/collaboration/subject-review-tasks"
 
-export type SubjectReviewTasksPanelProps = {
-  subjectType: SubjectType
-  /** Null while the route param is still resolving, or when it is not a number. */
-  subjectId: number | null
-  accent?: ModuleCardAccent
-  eyebrow?: string
-}
-
-export function SubjectReviewTasksPanel({
+export function SubjectReviewTasksBody({
   subjectType,
   subjectId,
-  accent = "teal",
-  eyebrow = "Review tasks",
-}: SubjectReviewTasksPanelProps) {
+  onAttentionCountChange,
+}: SubjectSurfaceBodyProps) {
   const kind = subjectKindLabel(subjectType)
 
   const [tasks, setTasks] = useState<ReviewTaskRecord[]>([])
@@ -137,187 +129,176 @@ export function SubjectReviewTasksPanel({
 
   const openCount = openReviewTaskCount(tasks)
 
-  // Deliberately not "anyone on your team": a filing or campaign created without a team
-  // stays creator-only, so a team is not something this copy can assume exists. Both
-  // states are in the wild.
-  const panelDescription =
-    `Raise a review task against this ${kind} and track it to a decision. ` +
-    `Everyone who can open this ${kind} sees the same queue.`
+  useEffect(() => {
+    onAttentionCountChange?.(openCount)
+  }, [openCount, onAttentionCountChange])
 
   return (
-    <ModuleCard
-      accent={accent}
-      eyebrow={eyebrow}
-      icon={ClipboardCheck}
-      title="Ask someone to review this"
-      description={panelDescription}
-      badge={
-        openCount > 0 ? (
-          <Badge variant="secondary">
-            {openCount} open
-          </Badge>
-        ) : null
-      }
-    >
-      <div className="space-y-5">
-        {subjectId == null ? (
-          <p className="text-sm text-muted-foreground">Loading…</p>
-        ) : loadError ? (
-          <Alert variant={loadError.kind === "not_found" ? "default" : "destructive"}>
-            <AlertTitle>
-              {loadError.kind === "not_found"
-                ? `This ${kind} is not available`
-                : "Review tasks could not be loaded"}
-            </AlertTitle>
-            <AlertDescription className="text-sm leading-relaxed">{loadError.message}</AlertDescription>
-          </Alert>
-        ) : (
-          <>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2 sm:col-span-2">
-                <Label htmlFor="srt-title" className="text-sm">
-                  What should they look at? <span className="text-destructive">*</span>
-                </Label>
-                <Input
-                  id="srt-title"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  placeholder="Confirm the nitrosamine limit"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="srt-assignee" className="text-sm">
-                  Assign to (optional)
-                </Label>
-                <Input
-                  id="srt-assignee"
-                  type="email"
-                  value={assignedTo}
-                  onChange={(e) => setAssignedTo(e.target.value)}
-                  placeholder="reviewer@example.com"
-                  autoComplete="email"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="srt-priority" className="text-sm">
-                  Priority
-                </Label>
-                {/* ``value`` stays the stored token; only the label is humanized. */}
-                <Select value={priority} onValueChange={(v) => setPriority(v as ReviewTaskPriority)}>
-                  <SelectTrigger id="srt-priority" className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {REVIEW_TASK_PRIORITIES.map((p) => (
-                      <SelectItem key={p} value={p}>
-                        {statusLabel(p)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2 sm:col-span-2">
-                <Label htmlFor="srt-description" className="text-sm">
-                  Detail (optional)
-                </Label>
-                <Textarea
-                  id="srt-description"
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  rows={3}
-                  placeholder="Anything the reviewer needs to know before they start."
-                />
-              </div>
+    <div className="space-y-5">
+      {/* Deliberately not "anyone on your team": a filing or campaign created without a
+          team stays creator-only, so a team is not something this copy can assume exists.
+          Both states are in the wild. */}
+      <p className="text-sm leading-relaxed text-muted-foreground">
+        Raise a review task against this {kind} and track it to a decision. Everyone who can open
+        this {kind} sees the same queue.
+      </p>
+      {subjectId == null ? (
+        <p className="text-sm text-muted-foreground">Loading…</p>
+      ) : loadError ? (
+        <Alert variant={loadError.kind === "not_found" ? "default" : "destructive"}>
+          <AlertTitle>
+            {loadError.kind === "not_found"
+              ? `This ${kind} is not available`
+              : "Review tasks could not be loaded"}
+          </AlertTitle>
+          <AlertDescription className="text-sm leading-relaxed">{loadError.message}</AlertDescription>
+        </Alert>
+      ) : (
+        <>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2 sm:col-span-2">
+              <Label htmlFor="srt-title" className="text-sm">
+                What should they look at? <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                id="srt-title"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="Confirm the nitrosamine limit"
+              />
             </div>
+            <div className="space-y-2">
+              <Label htmlFor="srt-assignee" className="text-sm">
+                Assign to (optional)
+              </Label>
+              <Input
+                id="srt-assignee"
+                type="email"
+                value={assignedTo}
+                onChange={(e) => setAssignedTo(e.target.value)}
+                placeholder="reviewer@example.com"
+                autoComplete="email"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="srt-priority" className="text-sm">
+                Priority
+              </Label>
+              {/* ``value`` stays the stored token; only the label is humanized. */}
+              <Select value={priority} onValueChange={(v) => setPriority(v as ReviewTaskPriority)}>
+                <SelectTrigger id="srt-priority" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {REVIEW_TASK_PRIORITIES.map((p) => (
+                    <SelectItem key={p} value={p}>
+                      {statusLabel(p)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2 sm:col-span-2">
+              <Label htmlFor="srt-description" className="text-sm">
+                Detail (optional)
+              </Label>
+              <Textarea
+                id="srt-description"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                rows={3}
+                placeholder="Anything the reviewer needs to know before they start."
+              />
+            </div>
+          </div>
 
-            {raiseError ? (
-              <Alert variant="destructive">
-                <AlertDescription className="text-sm">{raiseError}</AlertDescription>
-              </Alert>
-            ) : null}
+          {raiseError ? (
+            <Alert variant="destructive">
+              <AlertDescription className="text-sm">{raiseError}</AlertDescription>
+            </Alert>
+          ) : null}
 
-            <Button type="button" variant="outline" size="sm" disabled={raising} onClick={() => void raise()}>
-              {raising ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-              Raise review task
-            </Button>
+          <Button type="button" variant="outline" size="sm" disabled={raising} onClick={() => void raise()}>
+            {raising ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+            Raise review task
+          </Button>
 
-            {saveError ? (
-              <Alert variant="destructive">
-                <AlertDescription className="text-sm">{saveError}</AlertDescription>
-              </Alert>
-            ) : null}
+          {saveError ? (
+            <Alert variant="destructive">
+              <AlertDescription className="text-sm">{saveError}</AlertDescription>
+            </Alert>
+          ) : null}
 
-            {loading ? (
-              <p className="text-sm text-muted-foreground">Loading review tasks…</p>
-            ) : tasks.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                No one has been asked to review this {kind} yet.
-              </p>
-            ) : (
-              <div className="table-scroll">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Task</TableHead>
-                      <TableHead>Priority</TableHead>
-                      <TableHead>Assigned to</TableHead>
-                      <TableHead>Last updated</TableHead>
-                      <TableHead>Status</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {tasks.map((task) => {
-                      const taskId = Number(task.id)
-                      return (
-                        <TableRow key={taskId} className={isReviewTaskClosed(task) ? "opacity-60" : undefined}>
-                          <TableCell className="max-w-[22rem]">
-                            <p className="text-sm font-medium">{task.title}</p>
-                            {task.description ? (
-                              <p className="mt-1 whitespace-pre-wrap text-xs text-muted-foreground">
-                                {task.description}
-                              </p>
-                            ) : null}
-                          </TableCell>
-                          <TableCell>
-                            <StatusBadge status={task.priority} />
-                          </TableCell>
-                          <TableCell className="text-sm text-muted-foreground">
-                            {task.assigned_to || "Anyone on the team"}
-                          </TableCell>
-                          <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
-                            {formatStableUtcDateTime(task.updated_at)}
-                          </TableCell>
-                          <TableCell>
-                            <Select
-                              value={String(task.status)}
-                              disabled={savingTaskId === taskId}
-                              onValueChange={(v) => void setStatus(taskId, v as ReviewTaskStatus)}
+          {loading ? (
+            <p className="text-sm text-muted-foreground">Loading review tasks…</p>
+          ) : tasks.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              No one has been asked to review this {kind} yet.
+            </p>
+          ) : (
+            <div className="table-scroll">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Task</TableHead>
+                    <TableHead>Priority</TableHead>
+                    <TableHead>Assigned to</TableHead>
+                    <TableHead>Last updated</TableHead>
+                    <TableHead>Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {tasks.map((task) => {
+                    const taskId = Number(task.id)
+                    return (
+                      <TableRow key={taskId} className={isReviewTaskClosed(task) ? "opacity-60" : undefined}>
+                        <TableCell className="max-w-[22rem]">
+                          <p className="text-sm font-medium">{task.title}</p>
+                          {task.description ? (
+                            <p className="mt-1 whitespace-pre-wrap text-xs text-muted-foreground">
+                              {task.description}
+                            </p>
+                          ) : null}
+                        </TableCell>
+                        <TableCell>
+                          <StatusBadge status={task.priority} />
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {task.assigned_to || "Anyone on the team"}
+                        </TableCell>
+                        <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
+                          {formatStableUtcDateTime(task.updated_at)}
+                        </TableCell>
+                        <TableCell>
+                          <Select
+                            value={String(task.status)}
+                            disabled={savingTaskId === taskId}
+                            onValueChange={(v) => void setStatus(taskId, v as ReviewTaskStatus)}
+                          >
+                            <SelectTrigger
+                              className="w-[9.5rem]"
+                              aria-label={`Status of “${task.title}”`}
                             >
-                              <SelectTrigger
-                                className="w-[9.5rem]"
-                                aria-label={`Status of “${task.title}”`}
-                              >
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {REVIEW_TASK_STATUSES.map((s) => (
-                                  <SelectItem key={s} value={s}>
-                                    {statusLabel(s)}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </TableCell>
-                        </TableRow>
-                      )
-                    })}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
-          </>
-        )}
-      </div>
-    </ModuleCard>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {REVIEW_TASK_STATUSES.map((s) => (
+                                <SelectItem key={s} value={s}>
+                                  {statusLabel(s)}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </>
+      )}
+    </div>
   )
 }
