@@ -22,6 +22,7 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Footer } from "@/components/marketing/footer"
+import { AudienceLinks, AUDIENCES } from "@/components/marketing/audience-links"
 import { Header } from "@/components/marketing/header"
 import { FaqSection } from "@/components/marketing/faq-section"
 import { ModuleJsonLd } from "@/components/seo/structured-data"
@@ -1049,6 +1050,10 @@ export function RegulatoryHubPage() {
             </div>
           </div>
         </section>
+        <AudienceLinks
+          moduleName="Regentry"
+          audiences={[AUDIENCES.regulatory, AUDIENCES.pharma, AUDIENCES.cro]}
+        />
         <FaqSection items={REGULATORY_SEO.faqs} title="Frequently asked questions about Regentry" />
       </main>
       <ModuleJsonLd
