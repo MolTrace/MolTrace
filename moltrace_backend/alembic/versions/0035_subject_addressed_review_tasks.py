@@ -47,8 +47,10 @@ def upgrade() -> None:
         op.add_column(_TABLE, sa.Column("subject_id", sa.Integer(), nullable=True))
     if not _has_index(bind, _INDEX):
         op.create_index(_INDEX, _TABLE, ["subject_type", "subject_id"])
-    # SQLite cannot alter a column's nullability in place; dev SQLite databases are built by
-    # create_all from the ORM, which already has it nullable.
+    # SQLite cannot alter a column's nullability in place. A dev database built fresh by
+    # create_all already has it nullable, and one created before this migration is rebuilt on
+    # start-up by database._sqlite_make_column_nullable — skipping it here is not enough on its
+    # own, because that database keeps the constraint and rejects every subject-addressed task.
     if bind.dialect.name != "sqlite":
         op.alter_column(_TABLE, "session_id", existing_type=sa.Integer(), nullable=True)
 
