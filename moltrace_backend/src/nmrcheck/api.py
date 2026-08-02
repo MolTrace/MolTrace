@@ -768,6 +768,7 @@ from .models import (
     ReviewDecisionRecord,
     ReviewQueueItem,
     ReviewTaskCreate,
+    SubjectCommentCreate,
     SubjectReviewTaskCreate,
     ReviewTaskRecord,
     ReviewTaskUpdate,
@@ -24198,6 +24199,93 @@ def delete_session_comment_route(
             comment_id,
             actor=_collaboration_actor(request, context),
         )
+    except Exception as exc:
+        _raise_collaboration_http_error(exc)
+        raise
+    if record is None:
+        raise HTTPException(status_code=404, detail="Comment not found.")
+    return record
+
+
+@router.post(
+    "/comments",
+    response_model=EvidenceCommentRecord,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_access_context)],
+)
+def create_subject_comment_route(
+    payload: SubjectCommentCreate,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> EvidenceCommentRecord:
+    """Leave a note on a filing or a campaign.
+
+    Access is the subject's own rule, so a comment can only be left on something the caller can
+    already open; anything else is the same 404 as a subject that does not exist. Spectroscopy
+    sessions keep their own comment surface, which can also anchor a note to a specific piece of
+    evidence.
+    """
+    try:
+        return collab_store.create_subject_comment(
+            _state(request).session_factory,
+            payload,
+            owner_scope_id=_user_scope_for_context(context),
+            author_email=context.user.email if context.user else None,
+        )
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="Comment subject not found.") from exc
+    except Exception as exc:
+        _raise_collaboration_http_error(exc)
+        raise
+
+
+@router.get(
+    "/comments",
+    response_model=list[EvidenceCommentRecord],
+    dependencies=[Depends(require_access_context)],
+)
+def list_subject_comments_route(
+    request: Request,
+    subject_type: str = Query(...),
+    subject_id: int = Query(..., ge=1),
+    limit: int = Query(default=500, ge=1, le=1000),
+    context: AccessContext = Depends(require_access_context),
+) -> list[EvidenceCommentRecord]:
+    try:
+        return collab_store.list_subject_comments(
+            _state(request).session_factory,
+            subject_type,
+            subject_id,
+            owner_scope_id=_user_scope_for_context(context),
+            limit=limit,
+        )
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="Comment subject not found.") from exc
+    except Exception as exc:
+        _raise_collaboration_http_error(exc)
+        raise
+
+
+@router.patch(
+    "/comments/{comment_id}",
+    response_model=EvidenceCommentRecord,
+    dependencies=[Depends(require_access_context)],
+)
+def update_subject_comment_route(
+    comment_id: int,
+    payload: EvidenceCommentUpdate,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> EvidenceCommentRecord:
+    try:
+        record = collab_store.update_subject_comment(
+            _state(request).session_factory,
+            comment_id,
+            payload,
+            owner_scope_id=_user_scope_for_context(context),
+        )
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="Comment not found.") from exc
     except Exception as exc:
         _raise_collaboration_http_error(exc)
         raise

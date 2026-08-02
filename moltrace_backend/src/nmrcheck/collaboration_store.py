@@ -28,6 +28,7 @@ from .models import (
     ReportLockRequest,
     ReportReleaseRequest,
     ReviewTaskCreate,
+    SubjectCommentCreate,
     SubjectReviewTaskCreate,
     ReviewTaskRecord,
     ReviewTaskUpdate,
@@ -1125,9 +1126,17 @@ def _session_reviewer_to_record(row: SessionReviewerORM) -> SessionReviewerRecor
 
 
 def _comment_to_record(row: EvidenceCommentORM) -> EvidenceCommentRecord:
+    subject_type = row.subject_type
     return EvidenceCommentRecord(
         id=row.id,
         session_id=row.session_id,
+        subject_type=subject_type,  # type: ignore[arg-type]
+        subject_id=row.subject_id,
+        module=(
+            collaboration_subjects.SUBJECT_MODULE.get(subject_type)  # type: ignore[arg-type]
+            if subject_type
+            else ("spectracheck" if row.session_id is not None else None)
+        ),
         evidence_id=row.evidence_id,
         artifact_id=row.artifact_id,
         author_email=row.author_email,
@@ -1600,3 +1609,103 @@ def _require_subject_access(
         session, subject_type, subject_id, owner_scope_id=owner_scope_id
     ):
         raise KeyError(f"{subject_type} {subject_id} not found.")
+
+
+# --------------------------------------------------------------------------- #
+# Subject-addressed comments (Regentry filings, Repho campaigns)
+# --------------------------------------------------------------------------- #
+def create_subject_comment(
+    session_factory: sessionmaker[Session],
+    payload: SubjectCommentCreate,
+    *,
+    owner_scope_id: int | None,
+    author_email: str | None,
+) -> EvidenceCommentRecord:
+    """Leave a note on a filing or a campaign.
+
+    Same rule as a subject review task: access is the subject's own, so a comment can only be left
+    on something the caller can already open, and an unreachable subject is the same 404 as a
+    missing one.
+    """
+    with session_scope(session_factory) as session:
+        _require_subject_access(session, payload.subject_type, payload.subject_id, owner_scope_id)
+        row = EvidenceCommentORM(
+            session_id=None,
+            subject_type=payload.subject_type,
+            subject_id=payload.subject_id,
+            author_email=_normalize_email(author_email),
+            comment=payload.comment,
+            comment_type=payload.comment_type,
+            metadata_json=_json_dump(payload.metadata_json),
+        )
+        session.add(row)
+        session.flush()
+        _audit(
+            session,
+            event_type="collaboration.comment.create",
+            message="Comment added.",
+            actor=CollaborationActor(
+                user_id=owner_scope_id, email=author_email, permissive=owner_scope_id is None
+            ),
+            entity_type="evidence_comment",
+            entity_id=row.id,
+            metadata={
+                "subject_type": payload.subject_type,
+                "subject_id": payload.subject_id,
+                "comment_type": payload.comment_type,
+            },
+        )
+        session.refresh(row)
+        return _comment_to_record(row)
+
+
+def list_subject_comments(
+    session_factory: sessionmaker[Session],
+    subject_type: str,
+    subject_id: int,
+    *,
+    owner_scope_id: int | None,
+    limit: int = 500,
+) -> list[EvidenceCommentRecord]:
+    with session_scope(session_factory) as session:
+        _require_subject_access(session, subject_type, subject_id, owner_scope_id)
+        rows = session.scalars(
+            select(EvidenceCommentORM)
+            .where(EvidenceCommentORM.subject_type == subject_type)
+            .where(EvidenceCommentORM.subject_id == subject_id)
+            .order_by(EvidenceCommentORM.created_at.asc(), EvidenceCommentORM.id.asc())
+            .limit(limit)
+        ).all()
+        return [_comment_to_record(row) for row in rows]
+
+
+def update_subject_comment(
+    session_factory: sessionmaker[Session],
+    comment_id: int,
+    payload: EvidenceCommentUpdate,
+    *,
+    owner_scope_id: int | None,
+) -> EvidenceCommentRecord | None:
+    with session_scope(session_factory) as session:
+        row = session.get(EvidenceCommentORM, comment_id)
+        if row is None or row.subject_type is None or row.subject_id is None:
+            return None
+        _require_subject_access(session, row.subject_type, row.subject_id, owner_scope_id)
+        for field in ("comment", "comment_type", "resolved"):
+            value = getattr(payload, field, None)
+            if value is not None or field in payload.model_fields_set:
+                setattr(row, field, value)
+        if payload.metadata_json is not None:
+            row.metadata_json = _json_dump(payload.metadata_json)
+        row.updated_at = utcnow()
+        _audit(
+            session,
+            event_type="collaboration.comment.update",
+            message="Comment updated.",
+            actor=CollaborationActor(user_id=owner_scope_id, permissive=owner_scope_id is None),
+            entity_type="evidence_comment",
+            entity_id=row.id,
+            metadata={"updated_fields": sorted(payload.model_fields_set)},
+        )
+        session.flush()
+        return _comment_to_record(row)

@@ -9237,6 +9237,18 @@ class SessionReviewerRecord(BaseModel):
     notes: list[str] = Field(default_factory=list)
 
 
+class SubjectCommentCreate(BaseModel):
+    """Leave a note on a filing or a campaign."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    subject_type: SubjectType
+    subject_id: int = Field(ge=1)
+    comment: str = Field(min_length=1, max_length=20_000)
+    comment_type: EvidenceCommentType = "note"
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
 class EvidenceCommentCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -9277,7 +9289,12 @@ class EvidenceCommentRecord(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     id: int
-    session_id: int
+    # Exactly one addressing mode is populated: ``session_id`` for a spectroscopy session, or the
+    # subject pair for a filing or a campaign.
+    session_id: int | None = None
+    subject_type: SubjectType | None = None
+    subject_id: int | None = None
+    module: ProductProgramKey | None = None
     evidence_id: int | None = None
     artifact_id: int | None = None
     author_email: str | None = None

@@ -200,3 +200,95 @@ def test_an_unknown_subject_type_is_rejected(client, api_headers):
     with client:
         res = _task(client, api_headers, "compound_batch", 1)
         assert res.status_code == 422, res.text
+
+
+# --------------------------------------------------------------------------- #
+# Comments — the same registry, the same rules
+# --------------------------------------------------------------------------- #
+def _comment(client, headers, subject_type: str, subject_id: int, text: str = "Looks fine to me"):
+    return client.post(
+        "/comments",
+        headers=headers,
+        json={"subject_type": subject_type, "subject_id": subject_id, "comment": text},
+    )
+
+
+def test_a_filing_can_carry_a_comment(client, api_headers):
+    with client:
+        dossier = _dossier(client, api_headers)
+        created = _comment(client, api_headers, "regulatory_dossier", dossier["id"])
+        assert created.status_code == 201, created.text
+        body = created.json()
+        assert body["subject_type"] == "regulatory_dossier"
+        assert body["session_id"] is None
+        assert body["module"] == "regulatory_hub"
+
+        listed = client.get(
+            f"/comments?subject_type=regulatory_dossier&subject_id={dossier['id']}",
+            headers=api_headers,
+        )
+        assert listed.status_code == 200, listed.text
+        assert [row["id"] for row in listed.json()] == [body["id"]]
+
+
+def test_a_campaign_can_carry_a_comment(client, api_headers):
+    with client:
+        campaign = _campaign(client, api_headers)
+        created = _comment(client, api_headers, "reaction_project", campaign["id"])
+        assert created.status_code == 201, created.text
+        assert created.json()["module"] == "reaction_optimization"
+
+
+def test_a_teammate_can_read_and_resolve_a_comment(client, app):
+    lead_email, mate_email = _emails()
+    with client:
+        lead = _sign_up(client, lead_email)
+        mate = _sign_up(client, mate_email)
+        _org_with_members(app, "Regulatory Affairs", [(lead_email, "active"), (mate_email, "active")])
+        dossier = _dossier(client, lead)
+        created = _comment(client, lead, "regulatory_dossier", dossier["id"])
+        assert created.status_code == 201, created.text
+
+        listed = client.get(
+            f"/comments?subject_type=regulatory_dossier&subject_id={dossier['id']}", headers=mate
+        )
+        assert listed.status_code == 200, listed.text
+        assert [row["id"] for row in listed.json()] == [created.json()["id"]]
+
+        resolved = client.patch(
+            f"/comments/{created.json()['id']}", headers=mate, json={"resolved": True}
+        )
+        assert resolved.status_code == 200, resolved.text
+        assert resolved.json()["resolved"] is True
+
+
+def test_an_outsider_cannot_comment_read_or_resolve(client, app):
+    lead_email, outsider_email = _emails()
+    with client:
+        lead = _sign_up(client, lead_email)
+        outsider = _sign_up(client, outsider_email)
+        _org_with_members(app, "Regulatory Affairs", [(lead_email, "active")])
+        _org_with_members(app, "Another Company", [(outsider_email, "active")])
+        dossier = _dossier(client, lead)
+        comment = _comment(client, lead, "regulatory_dossier", dossier["id"]).json()
+
+        assert _comment(client, outsider, "regulatory_dossier", dossier["id"]).status_code == 404
+        assert (
+            client.get(
+                f"/comments?subject_type=regulatory_dossier&subject_id={dossier['id']}",
+                headers=outsider,
+            ).status_code
+            == 404
+        )
+        assert (
+            client.patch(
+                f"/comments/{comment['id']}", headers=outsider, json={"resolved": True}
+            ).status_code
+            == 404
+        )
+
+
+def test_spectroscopy_sessions_keep_their_own_comment_surface(client, api_headers):
+    """The session surface can anchor a note to a specific piece of evidence; this one cannot."""
+    with client:
+        assert _comment(client, api_headers, "spectracheck_session", 1).status_code == 403
