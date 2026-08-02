@@ -10,6 +10,7 @@ from typing import Any, Literal
 from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
+from . import collaboration_subjects
 from .database import session_scope
 from .models import (
     ApprovalRecord,
@@ -27,6 +28,7 @@ from .models import (
     ReportLockRequest,
     ReportReleaseRequest,
     ReviewTaskCreate,
+    SubjectReviewTaskCreate,
     ReviewTaskRecord,
     ReviewTaskUpdate,
     SecureShareLinkCreate,
@@ -1140,9 +1142,19 @@ def _comment_to_record(row: EvidenceCommentORM) -> EvidenceCommentRecord:
 
 
 def _review_task_to_record(row: ReviewTaskORM) -> ReviewTaskRecord:
+    subject_type = row.subject_type
     return ReviewTaskRecord(
         id=row.id,
         session_id=row.session_id,
+        subject_type=subject_type,  # type: ignore[arg-type]
+        subject_id=row.subject_id,
+        # Naming the product on the record saves every caller from re-deriving it, and a mixed
+        # queue is unreadable without it.
+        module=(
+            collaboration_subjects.SUBJECT_MODULE.get(subject_type)  # type: ignore[arg-type]
+            if subject_type
+            else ("spectracheck" if row.session_id is not None else None)
+        ),
         title=row.title,
         description=row.description,
         assigned_to=row.assigned_to,
@@ -1472,3 +1484,119 @@ def _is_expired(expires_at: datetime | None) -> bool:
     if value.tzinfo is None:
         value = value.replace(tzinfo=UTC)
     return value <= datetime.now(UTC)
+
+
+# --------------------------------------------------------------------------- #
+# Subject-addressed review tasks (Regentry filings, Repho campaigns)
+# --------------------------------------------------------------------------- #
+def create_subject_review_task(
+    session_factory: sessionmaker[Session],
+    payload: SubjectReviewTaskCreate,
+    *,
+    owner_scope_id: int | None,
+) -> ReviewTaskRecord:
+    """Raise a review task against a filing or a campaign.
+
+    Access is the subject's own rule (see :mod:`nmrcheck.collaboration_subjects`), so a task can
+    only ever be raised against something the caller can already open. A subject they cannot
+    reach and one that does not exist both raise ``KeyError``, which the route maps to the same
+    non-leaking 404.
+    """
+    with session_scope(session_factory) as session:
+        _require_subject_access(session, payload.subject_type, payload.subject_id, owner_scope_id)
+        row = ReviewTaskORM(
+            session_id=None,
+            subject_type=payload.subject_type,
+            subject_id=payload.subject_id,
+            title=payload.title,
+            description=payload.description,
+            assigned_to=payload.assigned_to,
+            status=payload.status,
+            priority=payload.priority,
+            metadata_json=_json_dump(payload.metadata_json),
+        )
+        session.add(row)
+        session.flush()
+        _audit(
+            session,
+            event_type="collaboration.review_task.create",
+            message="Review task created.",
+            actor=CollaborationActor(user_id=owner_scope_id, permissive=owner_scope_id is None),
+            entity_type="review_task",
+            entity_id=row.id,
+            metadata={
+                "subject_type": payload.subject_type,
+                "subject_id": payload.subject_id,
+                "status": payload.status,
+                "priority": payload.priority,
+            },
+        )
+        session.refresh(row)
+        return _review_task_to_record(row)
+
+
+def list_subject_review_tasks(
+    session_factory: sessionmaker[Session],
+    subject_type: str,
+    subject_id: int,
+    *,
+    owner_scope_id: int | None,
+    limit: int = 500,
+) -> list[ReviewTaskRecord]:
+    with session_scope(session_factory) as session:
+        _require_subject_access(session, subject_type, subject_id, owner_scope_id)
+        rows = session.scalars(
+            select(ReviewTaskORM)
+            .where(ReviewTaskORM.subject_type == subject_type)
+            .where(ReviewTaskORM.subject_id == subject_id)
+            .order_by(ReviewTaskORM.created_at.asc(), ReviewTaskORM.id.asc())
+            .limit(limit)
+        ).all()
+        return [_review_task_to_record(row) for row in rows]
+
+
+def update_subject_review_task(
+    session_factory: sessionmaker[Session],
+    task_id: int,
+    payload: ReviewTaskUpdate,
+    *,
+    owner_scope_id: int | None,
+) -> ReviewTaskRecord | None:
+    with session_scope(session_factory) as session:
+        row = session.get(ReviewTaskORM, task_id)
+        if row is None or row.subject_type is None or row.subject_id is None:
+            return None
+        _require_subject_access(session, row.subject_type, row.subject_id, owner_scope_id)
+        for field in ("title", "description", "assigned_to", "status", "priority"):
+            value = getattr(payload, field)
+            if value is not None or field in payload.model_fields_set:
+                setattr(row, field, value)
+        if payload.metadata_json is not None:
+            row.metadata_json = _json_dump(payload.metadata_json)
+        row.updated_at = utcnow()
+        _audit(
+            session,
+            event_type="collaboration.review_task.update",
+            message="Review task updated.",
+            actor=CollaborationActor(user_id=owner_scope_id, permissive=owner_scope_id is None),
+            entity_type="review_task",
+            entity_id=row.id,
+            metadata={"updated_fields": sorted(payload.model_fields_set), "status": row.status},
+        )
+        session.flush()
+        return _review_task_to_record(row)
+
+
+def _require_subject_access(
+    session: Session, subject_type: str, subject_id: int, owner_scope_id: int | None
+) -> None:
+    if not collaboration_subjects.is_generic_subject(subject_type):
+        # SpectraCheck sessions keep their richer role-based review surface; accepting them here
+        # would be a second, weaker path to the same records.
+        raise CollaborationPermissionError(
+            "Use the session review surface for spectroscopy sessions."
+        )
+    if not collaboration_subjects.can_access_subject(
+        session, subject_type, subject_id, owner_scope_id=owner_scope_id
+    ):
+        raise KeyError(f"{subject_type} {subject_id} not found.")

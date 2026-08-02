@@ -177,6 +177,17 @@ def _ensure_sqlite_schema(engine: Engine) -> None:
                 connection.exec_driver_sql(
                     "ALTER TABLE regulatory_dossiers ADD COLUMN organization_id INTEGER"
                 )
+        if "review_tasks" in tables:
+            # Subject-addressed review tasks (migration 0035) on a pre-existing dev SQLite DB.
+            task_existing = {
+                str(row[1])
+                for row in connection.exec_driver_sql("PRAGMA table_info(review_tasks)").fetchall()
+            }
+            for column, ddl in {"subject_type": "VARCHAR(48)", "subject_id": "INTEGER"}.items():
+                if column not in task_existing:
+                    connection.exec_driver_sql(
+                        f"ALTER TABLE review_tasks ADD COLUMN {column} {ddl}"
+                    )
         if "reaction_projects" in tables:
             # Team ownership (migration 0034), the counterpart of the dossier column above.
             project_existing = {
