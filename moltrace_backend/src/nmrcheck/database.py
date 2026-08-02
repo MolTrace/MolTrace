@@ -3,13 +3,14 @@ from __future__ import annotations
 import csv
 import io
 import json
+import re
 from collections.abc import Iterable
 from contextlib import contextmanager
 from datetime import UTC, datetime
 from typing import Any, Iterator
 
 from sqlalchemy import create_engine, delete, func, select, update
-from sqlalchemy.engine import Engine
+from sqlalchemy.engine import Connection, Engine
 from sqlalchemy.orm import Session, sessionmaker
 
 from .models import (
@@ -177,6 +178,26 @@ def _ensure_sqlite_schema(engine: Engine) -> None:
                 connection.exec_driver_sql(
                     "ALTER TABLE regulatory_dossiers ADD COLUMN organization_id INTEGER"
                 )
+        if "evidence_comments" in tables:
+            # Subject-addressed comments (migration 0036) on a pre-existing dev SQLite DB.
+            comment_existing = {
+                str(row[1])
+                for row in connection.exec_driver_sql(
+                    "PRAGMA table_info(evidence_comments)"
+                ).fetchall()
+            }
+            for column, ddl in {"subject_type": "VARCHAR(48)", "subject_id": "INTEGER"}.items():
+                if column not in comment_existing:
+                    connection.exec_driver_sql(
+                        f"ALTER TABLE evidence_comments ADD COLUMN {column} {ddl}"
+                    )
+            connection.exec_driver_sql(
+                "CREATE INDEX IF NOT EXISTS ix_evidence_comments_subject "
+                "ON evidence_comments (subject_type, subject_id)"
+            )
+            # The other half of 0036: a subject-addressed comment has no session, so the column
+            # that used to be required has to actually become optional.
+            _sqlite_make_column_nullable(connection, "evidence_comments", "session_id")
         if "review_tasks" in tables:
             # Subject-addressed review tasks (migration 0035) on a pre-existing dev SQLite DB.
             task_existing = {
@@ -188,6 +209,13 @@ def _ensure_sqlite_schema(engine: Engine) -> None:
                     connection.exec_driver_sql(
                         f"ALTER TABLE review_tasks ADD COLUMN {column} {ddl}"
                     )
+            connection.exec_driver_sql(
+                "CREATE INDEX IF NOT EXISTS ix_review_tasks_subject "
+                "ON review_tasks (subject_type, subject_id)"
+            )
+            # The other half of 0035: a task raised against a filing or a campaign has no session,
+            # so the column that used to be required has to actually become optional.
+            _sqlite_make_column_nullable(connection, "review_tasks", "session_id")
         if "reaction_projects" in tables:
             # Team ownership (migration 0034), the counterpart of the dossier column above.
             project_existing = {
@@ -342,6 +370,83 @@ def _ensure_sqlite_schema(engine: Engine) -> None:
                     connection.exec_driver_sql(
                         f"ALTER TABLE prediction_service_configs ADD COLUMN {column} {ddl}"
                     )
+
+
+def _sqlite_make_column_nullable(connection: Connection, table: str, column: str) -> None:
+    """Drop a NOT NULL constraint SQLite cannot drop in place, by rebuilding the table.
+
+    Migrations 0035/0036 relax ``session_id`` so a review task or a comment can be addressed to a
+    filing or a campaign instead of a spectroscopy session, but they skip that step on SQLite:
+    ``ALTER TABLE`` there cannot drop a constraint, and a dev database built fresh by
+    ``create_all`` already has the column nullable. A dev database created *before* those
+    migrations keeps the constraint, so a subject-addressed insert — which carries no session —
+    fails with an IntegrityError the API can only report as an unavailable service.
+
+    This is SQLite's documented table rebuild. The replacement table is derived from the live
+    ``CREATE TABLE`` text rather than restated here, so every column, default and foreign key
+    carries over exactly and cannot drift from the ORM, and the indexes are replayed from their
+    own stored DDL. Existing rows are preserved. Nothing in the schema references either table, so
+    dropping it cascades nowhere; the whole rebuild runs inside the caller's transaction, and
+    SQLite makes DDL transactional, so a failure leaves the original table intact.
+
+    A no-op once the column is nullable, which is every database built from the current ORM.
+    """
+    info = connection.exec_driver_sql(f"PRAGMA table_info({table})").fetchall()
+    if not any(str(row[1]) == column and int(row[3]) for row in info):
+        return
+
+    create_sql = str(
+        connection.exec_driver_sql(
+            "SELECT sql FROM sqlite_master WHERE type='table' AND name=?", (table,)
+        ).fetchone()[0]
+    )
+    # Match the column's own definition — ``name TYPE NOT NULL`` opening a line — and keep
+    # everything but the constraint. The foreign-key clause naming the same column cannot match:
+    # there the name is followed by ``)``, not by a type.
+    relaxed, replacements = re.subn(
+        rf"([(,]\s*\"?{re.escape(column)}\"?\s+\w+(?:\([^)]*\))?\s+)NOT\s+NULL",
+        r"\1",
+        create_sql,
+        count=1,
+        flags=re.IGNORECASE,
+    )
+    if not replacements:
+        raise RuntimeError(
+            f"Cannot relax {table}.{column} to nullable: its definition was not found in the "
+            f"stored schema. Rebuild the development database from the current models."
+        )
+
+    rebuild = f"{table}__rebuild"
+    new_sql, renames = re.subn(
+        rf"^CREATE\s+TABLE\s+\"?{re.escape(table)}\"?\s*\(",
+        f'CREATE TABLE "{rebuild}" (',
+        relaxed,
+        count=1,
+        flags=re.IGNORECASE,
+    )
+    if not renames:
+        raise RuntimeError(f"Cannot rebuild {table}: unrecognized CREATE TABLE statement.")
+
+    # Indexes are dropped with the table, so keep their DDL to replay. A NULL ``sql`` marks an
+    # index SQLite creates for a UNIQUE or PRIMARY KEY constraint; the new table declares those
+    # constraints itself, so replaying them would be a duplicate.
+    index_sql = [
+        str(row[0])
+        for row in connection.exec_driver_sql(
+            "SELECT sql FROM sqlite_master WHERE type='index' AND tbl_name=? AND sql IS NOT NULL",
+            (table,),
+        ).fetchall()
+    ]
+    columns = ", ".join(f'"{row[1]}"' for row in info)
+
+    connection.exec_driver_sql(new_sql)
+    connection.exec_driver_sql(
+        f'INSERT INTO "{rebuild}" ({columns}) SELECT {columns} FROM "{table}"'
+    )
+    connection.exec_driver_sql(f'DROP TABLE "{table}"')
+    connection.exec_driver_sql(f'ALTER TABLE "{rebuild}" RENAME TO "{table}"')
+    for statement in index_sql:
+        connection.exec_driver_sql(statement)
 
 
 @contextmanager
