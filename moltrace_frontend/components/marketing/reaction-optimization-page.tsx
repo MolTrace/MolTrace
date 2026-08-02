@@ -23,6 +23,7 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Footer } from "@/components/marketing/footer"
+import { AudienceLinks, AUDIENCES } from "@/components/marketing/audience-links"
 import { Header } from "@/components/marketing/header"
 import { FaqSection } from "@/components/marketing/faq-section"
 import { ModuleJsonLd } from "@/components/seo/structured-data"
@@ -1133,6 +1134,10 @@ export function ReactionOptimizationPage() {
             </div>
           </div>
         </section>
+        <AudienceLinks
+          moduleName="Repho"
+          audiences={[AUDIENCES.pharma, AUDIENCES.academic]}
+        />
         <FaqSection items={REACTION_SEO.faqs} title="Frequently asked questions about Repho" />
       </main>
       <ModuleJsonLd

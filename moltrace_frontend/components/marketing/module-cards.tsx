@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { ArrowRight, Check } from "lucide-react"
 import dynamic from "next/dynamic"
+import Link from "next/link"
 
 // The three "Explore Module" overlays live in a separate chunk and are pulled in
 // only when a user opens one — keeping ~half of this module's original code (the
@@ -27,6 +28,8 @@ const modules = [
   {
     tag: "Module 01",
     title: "Spectroscopy Intelligence",
+    overviewHref: "/spectroscopy",
+    overviewLabel: "How SpectraCheck works",
     desc: "Interpret raw FID files, elucidate molecular structures from 1H/13C/2D NMR, and annotate unknown compounds from LC-MS/MS. AI-assisted, human-verified.",
     badge: "Start Here",
     color: {
@@ -49,6 +52,8 @@ const modules = [
   {
     tag: "Module 02",
     title: "Regulatory Intelligence Hub",
+    overviewHref: "/regulatory-hub",
+    overviewLabel: "How Regentry works",
     desc: "Dossier assembly designed to support ICH requirements, impurity threshold monitoring, nitrosamine CPCA assessment, and jurisdiction-specific requirement tracking.",
     badge: null,
     color: {
@@ -71,6 +76,8 @@ const modules = [
   {
     tag: "Module 03",
     title: "Reaction Optimization",
+    overviewHref: "/reaction-optimization",
+    overviewLabel: "How Repho works",
     desc: "Bayesian multi-objective optimization of reaction conditions with uncertainty quantification, regulatory impurity constraints, and human-in-the-loop validation.",
     badge: null,
     color: {
@@ -117,6 +124,30 @@ export function ModuleCards() {
             Each module is purpose-built for scientific rigour, with transparent AI reasoning
             and mandatory human oversight at every decision point.
           </p>
+
+          {/* Followable links to each module's overview page.
+              These sit in the always-rendered header rather than inside a
+              module panel, because the panel below is a TAB: only the active
+              module renders, so a link in there would reach neither a reader
+              on another tab nor a crawler, which never clicks.
+              Before this, the homepage published no in-body link to any
+              marketing page at all. The tabs and "Explore Module" are buttons
+              — correctly so, since they switch and toggle rather than navigate
+              — and the launch links inside the overlay point at the app, which
+              robots.txt disallows. The three highest-value pages on the site
+              were reachable only through the header dropdown. */}
+          <div className="mt-6 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm">
+            {modules.map((mod) => (
+              <Link
+                key={mod.overviewHref}
+                href={mod.overviewHref}
+                className="inline-flex items-center gap-1.5 font-medium text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline"
+              >
+                {mod.overviewLabel}
+                <ArrowRight className="h-3 w-3" aria-hidden />
+              </Link>
+            ))}
+          </div>
         </div>
 
         {/* Tab selectors */}

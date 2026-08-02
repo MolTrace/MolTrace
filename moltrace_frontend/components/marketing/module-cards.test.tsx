@@ -54,6 +54,23 @@ describe("ModuleCards", () => {
     expect(screen.queryByRole("link", { name: /Open SpectraCheck/i })).not.toBeInTheDocument()
   })
 
+  // The homepage published no in-body link to any marketing page: the tabs and
+  // "Explore Module" are buttons (correctly — they switch and toggle rather
+  // than navigate) and the overlay's launch links point at the app, which
+  // robots.txt disallows. These three overview links are the crawl path to the
+  // module pages, so they must render WITHOUT any interaction and for all three
+  // modules at once — a link inside the active tab panel would reach neither a
+  // reader on another tab nor a crawler.
+  it.each([
+    ["How SpectraCheck works", "/spectroscopy"],
+    ["How Regentry works", "/regulatory-hub"],
+    ["How Repho works", "/reaction-optimization"],
+  ])("links to %s with no interaction", (label, href) => {
+    render(<ModuleCards />)
+
+    expect(screen.getByRole("link", { name: new RegExp(label, "i") })).toHaveAttribute("href", href)
+  })
+
   it.each([
     ["MODULE 01", "Open SpectraCheck", "/spectracheck"],
     ["MODULE 02", "Open Regentry", "/regulatory"],
