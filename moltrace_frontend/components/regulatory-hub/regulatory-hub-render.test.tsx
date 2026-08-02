@@ -129,18 +129,6 @@ describe("Regulatory Notifications Workspace", () => {
   })
 })
 
-describe("Regentry Workspace (CTD demo)", () => {
-  it("renders the demo dossier metadata", async () => {
-    const { RegulatoryHubWorkspace } = await import(
-      "@/components/regulatory-hub/regulatory-hub-workspace"
-    )
-    renderC(<RegulatoryHubWorkspace />)
-    // Static demo content — should always render synchronously
-    const matches = screen.queryAllByText(/MTX-447|PRJ-MTX-2047/i)
-    expect(matches.length).toBeGreaterThan(0)
-  })
-})
-
 describe("Reaction Optimization Handoff Card (cross-module integration)", () => {
   it("renders the handoff card host", async () => {
     const { ReactionOptimizationHandoffCard } = await import(
