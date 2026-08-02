@@ -28,7 +28,11 @@ const ISSUED = {
 const methodOf = (i?: unknown) => (i as { method?: string } | undefined)?.method ?? "GET"
 
 describe("ScimProvisioningSection", () => {
-  beforeEach(() => mockApiFetch.mockReset())
+  // Braces matter: an expression-bodied arrow returns the mock, and vitest calls a value
+  // returned from beforeEach as the test's teardown — re-invoking the mock after the test.
+  beforeEach(() => {
+    mockApiFetch.mockReset()
+  })
 
   it("gates the section when the connection is disabled (no fetch)", () => {
     render(<ScimProvisioningSection connectionId={5} enabled={false} />)

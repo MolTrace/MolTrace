@@ -74,7 +74,11 @@ function result(overrides: Partial<SPCResult> = {}): SPCResult {
 }
 
 describe("SPCProcessCapabilityPanel", () => {
-  beforeEach(() => mockApiFetch.mockReset())
+  // Braces matter: an expression-bodied arrow returns the mock, and vitest calls a value
+  // returned from beforeEach as the test's teardown — re-invoking the mock after the test.
+  beforeEach(() => {
+    mockApiFetch.mockReset()
+  })
 
   it("renders the input form and no result before analysis", () => {
     render(<SPCProcessCapabilityPanel />)

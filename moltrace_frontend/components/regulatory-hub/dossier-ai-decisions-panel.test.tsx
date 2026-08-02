@@ -48,7 +48,11 @@ function decision(overrides: Partial<AIDecision>): AIDecision {
 }
 
 describe("DossierAIDecisionsPanel", () => {
-  beforeEach(() => mockApiFetch.mockReset())
+  // Braces matter: an expression-bodied arrow returns the mock, and vitest calls a value
+  // returned from beforeEach as the test's teardown — re-invoking the mock after the test.
+  beforeEach(() => {
+    mockApiFetch.mockReset()
+  })
 
   it("shows the empty state when there are no decisions", () => {
     render(<DossierAIDecisionsPanel decisions={[]} dossierId={4} onReviewed={vi.fn()} />)
