@@ -1,39 +1,16 @@
 import * as React from 'react'
+import { applyShellMode, computeShellMode } from '@/src/lib/shell/shell-mode'
 
 const MOBILE_BREAKPOINT = 768
-const MOBILE_USER_AGENT =
-  /Android|webOS|iPhone|iPad|iPod|BlackBerry|BB10|IEMobile|Opera Mini|Mobile|Tablet/i
-const DESKTOP_PLATFORM = /Mac|Win|Linux x86|Linux i686|Linux armv|CrOS|X11/i
 
-function mediaMatches(query: string) {
-  return typeof window.matchMedia === 'function' && window.matchMedia(query).matches
-}
-
-function isDesktopPlatform() {
-  const nav = window.navigator
-  const userAgentData = nav as Navigator & { userAgentData?: { platform?: string; mobile?: boolean } }
-  const platform = userAgentData.userAgentData?.platform || nav.platform || ''
-  const ua = nav.userAgent || ''
-
-  if (userAgentData.userAgentData?.mobile === true) return false
-  if (/Mac/i.test(platform) && nav.maxTouchPoints > 1 && /Mobile|Safari/i.test(ua)) return false
-  return DESKTOP_PLATFORM.test(platform) && !MOBILE_USER_AGENT.test(ua)
-}
-
+/**
+ * The shell decision itself lives in src/lib/shell/shell-mode.ts, because a
+ * blocking <head> script has to make the SAME call before React exists — see
+ * that file. Duplicating the predicate here is how the two would drift.
+ */
 function isMobileViewport() {
   if (typeof window === 'undefined') return false
-  if (isDesktopPlatform()) return false
-
-  const isNarrow = window.innerWidth < MOBILE_BREAKPOINT
-  const hasCoarsePointer =
-    mediaMatches('(pointer: coarse)') || window.navigator.maxTouchPoints > 0
-  const hasNoHover = mediaMatches('(hover: none)')
-  const hasModernPointerSignals =
-    typeof window.matchMedia === 'function' &&
-    (mediaMatches('(pointer: coarse)') || mediaMatches('(pointer: fine)') || mediaMatches('(hover: none)') || mediaMatches('(hover: hover)'))
-  const looksMobileByAgent = MOBILE_USER_AGENT.test(window.navigator.userAgent || '')
-
-  return isNarrow && (hasModernPointerSignals ? hasCoarsePointer && hasNoHover : looksMobileByAgent)
+  return computeShellMode(window) === 'mobile'
 }
 
 export function useIsMobile() {
@@ -48,7 +25,13 @@ export function useIsMobile() {
             window.matchMedia('(hover: none)'),
           ]
         : []
-    const onChange = () => setIsMobile(isMobileViewport())
+    const onChange = () => {
+      const mobile = isMobileViewport()
+      setIsMobile(mobile)
+      // The pre-paint script set this; keep it true as the viewport changes so
+      // the CSS half of the decision never lags the React half.
+      applyShellMode(mobile ? 'mobile' : 'desktop')
+    }
 
     // Older Safari (≤13) ships MediaQueryList without add/removeEventListener —
     // only the deprecated addListener pair. Guard so the hook degrades to the

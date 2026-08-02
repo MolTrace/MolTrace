@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next'
 import { Analytics } from '@vercel/analytics/next'
 import { SITE_URL, SITE_NAME, SITE_TAGLINE, SITE_DESCRIPTION } from '@/lib/seo/site'
+import { SHELL_MODE_INLINE_SCRIPT } from '@/src/lib/shell/shell-mode'
 import { OrganizationJsonLd } from '@/components/seo/json-ld'
 import { ThemeProvider } from '@/components/theme-provider'
 import { DeveloperModeProvider } from '@/components/developer-mode-provider'
@@ -109,6 +110,12 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning className="bg-background">
       <head>
+        {/* Blocking, and deliberately so: it decides desktop vs mobile shell and
+            stamps it on <html> BEFORE anything paints. React cannot make this
+            call until hydration and starts by assuming desktop, so on a phone
+            the full sidebar painted and was then torn away. Same technique the
+            ecosystem uses for theme flashes, and the same reason. */}
+        <script dangerouslySetInnerHTML={{ __html: SHELL_MODE_INLINE_SCRIPT }} />
         <DevToolsBridge />
       </head>
       <body suppressHydrationWarning className="font-sans antialiased">

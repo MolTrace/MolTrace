@@ -204,6 +204,10 @@ export function AppSidebar({ collapsed, onToggle }: AppSidebarProps) {
   return (
     <TooltipProvider delayDuration={0}>
       <aside
+        // Hidden before paint on a phone by the [data-shell] rule in
+        // globals.css. React removes it a moment later; this is only about the
+        // frame before React can.
+        data-shell-desktop-only=""
         className={cn(
           // Solid bg-sidebar (no alpha) + no backdrop-blur — a blurred sidebar
           // promotes itself to a persistent GPU layer and can cull/repaint the
