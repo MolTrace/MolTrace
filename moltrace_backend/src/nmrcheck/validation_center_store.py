@@ -60,6 +60,8 @@ from .orm import (
     FunctionalSpecificationORM,
     InspectionReadinessPackageORM,
     RecordRetentionPolicyORM,
+    RegulatoryReadinessReportORM,
+    SpectraCheckReportRecordORM,
     SystemReleaseRecordORM,
     TraceabilityMatrixORM,
     UserRequirementSpecificationORM,
@@ -1167,7 +1169,17 @@ def _create_signature_row(
 # Target types for which a deterministic server-side content snapshot exists. Signing one of these
 # against a missing record is an error (see ``create_record_signature``); any other target type is
 # stored unbound (honest) — the digest simply omits a content binding.
-_BINDABLE_TARGET_TYPES = frozenset({"controlled_record", "system_release"})
+_BINDABLE_TARGET_TYPES = frozenset(
+    {
+        "controlled_record",
+        "system_release",
+        # The point-in-time artifacts each product actually asks a human to sign. You do not sign
+        # a living dossier or session — they keep changing — you sign the report generated from
+        # one at a moment in time, which is what a regulated process signs in practice.
+        "spectracheck_report",
+        "regulatory_readiness_report",
+    }
+)
 
 
 def _controlled_record_snapshot(row: ControlledRecordORM) -> dict[str, Any]:
@@ -1202,6 +1214,48 @@ def _system_release_snapshot(row: SystemReleaseRecordORM) -> dict[str, Any]:
     }
 
 
+def _spectracheck_report_snapshot(row: SpectraCheckReportRecordORM) -> dict[str, Any]:
+    """Deterministic §11.70 content snapshot for an analytical evidence report.
+
+    Anchored on ``report_sha256``, the server's own digest of the report body — a caller-supplied
+    hash is refused at write time, so the digest is trustworthy enough to bind a signature to.
+    The provenance ids are included because a signature attests not just to a result but to how it
+    was produced. ``status`` is excluded: a signed report still moves draft -> released through its
+    normal lifecycle, and that must not retroactively invalidate the signature.
+    """
+    return {
+        "spectracheck_report_id": row.id,
+        "session_id": row.session_id,
+        "report_title": row.report_title,
+        "report_sha256": row.report_sha256,
+        "method_id": row.method_id,
+        "model_version_id": row.model_version_id,
+        "scoring_profile_id": row.scoring_profile_id,
+        "threshold_profile_id": row.threshold_profile_id,
+    }
+
+
+def _regulatory_readiness_report_snapshot(row: RegulatoryReadinessReportORM) -> dict[str, Any]:
+    """Deterministic §11.70 content snapshot for a regulatory readiness report.
+
+    Covers the substance the signer is attesting to — the summary, the requirements and evidence
+    considered, the gaps and risks found, and the citations relied on. ``status`` and
+    ``review_status_json`` are excluded: they move *as part of* the review the signature belongs
+    to, exactly as ``approval_status`` is excluded from a system release.
+    """
+    return {
+        "regulatory_readiness_report_id": row.id,
+        "dossier_id": row.dossier_id,
+        "summary": _json_dict(row.summary_json),
+        "requirements": _json_list(row.requirements_json),
+        "evidence": _json_list(row.evidence_json),
+        "gaps": _json_list(row.gaps_json),
+        "risks": _json_dict(row.risks_json),
+        "citation_ids": _json_list(row.citation_ids_json),
+        "human_review_required": bool(row.human_review_required),
+    }
+
+
 def _resolve_record_content_hash(
     session: Session, target_type: str, target_id: int
 ) -> str | None:
@@ -1221,6 +1275,16 @@ def _resolve_record_content_hash(
         if row is None:
             return None
         return esign.compute_record_content_hash(_system_release_snapshot(row))
+    if target_type == "spectracheck_report":
+        report = session.get(SpectraCheckReportRecordORM, target_id)
+        if report is None:
+            return None
+        return esign.compute_record_content_hash(_spectracheck_report_snapshot(report))
+    if target_type == "regulatory_readiness_report":
+        readiness = session.get(RegulatoryReadinessReportORM, target_id)
+        if readiness is None:
+            return None
+        return esign.compute_record_content_hash(_regulatory_readiness_report_snapshot(readiness))
     return None
 
 
