@@ -9291,6 +9291,24 @@ class EvidenceCommentRecord(BaseModel):
     notes: list[str] = Field(default_factory=list)
 
 
+SubjectType = Literal["spectracheck_session", "regulatory_dossier", "reaction_project"]
+
+
+class SubjectReviewTaskCreate(BaseModel):
+    """Ask someone to review a filing or a campaign."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    subject_type: SubjectType
+    subject_id: int = Field(ge=1)
+    title: str = Field(min_length=1, max_length=300)
+    description: str | None = Field(default=None, max_length=20_000)
+    assigned_to: str | None = Field(default=None, max_length=255)
+    status: ReviewTaskStatus = "open"
+    priority: ReviewTaskPriority = "medium"
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
 class ReviewTaskCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -9333,7 +9351,12 @@ class ReviewTaskRecord(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     id: int
-    session_id: int
+    # Exactly one addressing mode is populated: ``session_id`` for the SpectraCheck-session tasks
+    # this surface began as, or the subject pair for a filing or a campaign.
+    session_id: int | None = None
+    subject_type: SubjectType | None = None
+    subject_id: int | None = None
+    module: ProductProgramKey | None = None
     title: str
     description: str | None = None
     assigned_to: str | None = None

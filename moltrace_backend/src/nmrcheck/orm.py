@@ -1170,12 +1170,20 @@ class ReviewTaskORM(Base):
     __table_args__ = (
         Index("ix_review_tasks_session_status", "session_id", "status"),
         Index("ix_review_tasks_assignee_status", "assigned_to", "status"),
+        Index("ix_review_tasks_subject", "subject_type", "subject_id"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    session_id: Mapped[int] = mapped_column(
-        ForeignKey("spectracheck_sessions.id", ondelete="CASCADE"), index=True
+    # A review task used to be a SpectraCheck-session task by construction, so Regentry and Repho
+    # had no way to say "someone look at this". The subject pair is the general address — the same
+    # polymorphic shape the compliance floor already uses (electronic_signature_records's
+    # target_type/target_id) — and ``session_id`` stays for the SpectraCheck rows that predate it.
+    # Exactly one addressing mode is set; ``collaboration_subjects`` resolves and authorizes it.
+    session_id: Mapped[int | None] = mapped_column(
+        ForeignKey("spectracheck_sessions.id", ondelete="CASCADE"), nullable=True, index=True
     )
+    subject_type: Mapped[str | None] = mapped_column(String(48), nullable=True)
+    subject_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     title: Mapped[str] = mapped_column(String(300))
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     assigned_to: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)

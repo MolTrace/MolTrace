@@ -768,6 +768,7 @@ from .models import (
     ReviewDecisionRecord,
     ReviewQueueItem,
     ReviewTaskCreate,
+    SubjectReviewTaskCreate,
     ReviewTaskRecord,
     ReviewTaskUpdate,
     RoiSnapshot,
@@ -24202,6 +24203,92 @@ def delete_session_comment_route(
         raise
     if record is None:
         raise HTTPException(status_code=404, detail="Comment not found.")
+    return record
+
+
+@router.post(
+    "/review-tasks",
+    response_model=ReviewTaskRecord,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_access_context)],
+)
+def create_subject_review_task_route(
+    payload: SubjectReviewTaskCreate,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> ReviewTaskRecord:
+    """Ask someone to review a filing or a campaign.
+
+    Access is the subject's own rule, so a task can only be raised against something the caller
+    can already open; anything else is the same 404 as a subject that does not exist. Spectroscopy
+    sessions keep their own review surface, which carries per-session reviewer roles this one does
+    not.
+    """
+    try:
+        return collab_store.create_subject_review_task(
+            _state(request).session_factory,
+            payload,
+            owner_scope_id=_user_scope_for_context(context),
+        )
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="Review subject not found.") from exc
+    except Exception as exc:
+        _raise_collaboration_http_error(exc)
+        raise
+
+
+@router.get(
+    "/review-tasks",
+    response_model=list[ReviewTaskRecord],
+    dependencies=[Depends(require_access_context)],
+)
+def list_subject_review_tasks_route(
+    request: Request,
+    subject_type: str = Query(...),
+    subject_id: int = Query(..., ge=1),
+    limit: int = Query(default=500, ge=1, le=1000),
+    context: AccessContext = Depends(require_access_context),
+) -> list[ReviewTaskRecord]:
+    try:
+        return collab_store.list_subject_review_tasks(
+            _state(request).session_factory,
+            subject_type,
+            subject_id,
+            owner_scope_id=_user_scope_for_context(context),
+            limit=limit,
+        )
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="Review subject not found.") from exc
+    except Exception as exc:
+        _raise_collaboration_http_error(exc)
+        raise
+
+
+@router.patch(
+    "/review-tasks/{task_id}",
+    response_model=ReviewTaskRecord,
+    dependencies=[Depends(require_access_context)],
+)
+def update_subject_review_task_route(
+    task_id: int,
+    payload: ReviewTaskUpdate,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> ReviewTaskRecord:
+    try:
+        record = collab_store.update_subject_review_task(
+            _state(request).session_factory,
+            task_id,
+            payload,
+            owner_scope_id=_user_scope_for_context(context),
+        )
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="Review task not found.") from exc
+    except Exception as exc:
+        _raise_collaboration_http_error(exc)
+        raise
+    if record is None:
+        raise HTTPException(status_code=404, detail="Review task not found.")
     return record
 
 
