@@ -5916,6 +5916,74 @@ class PredictionAuditEntry(BaseModel):
     active_learning_candidates: list[ActiveLearningCandidate] = Field(default_factory=list)
 
 
+class QnmrPurityResult(BaseModel):
+    """A qNMR purity determination with the whole computation attached.
+
+    ``intermediates`` carries every ratio that built ``purity_percent``, so the number can be
+    re-derived from the record alone — which is what makes a purity value defensible to a reviewer
+    rather than something to take on trust.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    purity_percent: float
+    uncertainty_percent: float
+    relative_uncertainty: float
+    method: str
+    inputs: dict[str, Any] = Field(default_factory=dict)
+    intermediates: dict[str, Any] = Field(default_factory=dict)
+    warnings: list[str] = Field(default_factory=list)
+    notes: list[str] = Field(default_factory=list)
+
+
+class QnmrInternalStandardRequest(BaseModel):
+    """Purity against a weighed internal standard (the routine qNMR determination)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    analyte_integral: float = Field(gt=0)
+    standard_integral: float = Field(gt=0)
+    analyte_protons: int = Field(gt=0)
+    standard_protons: int = Field(gt=0)
+    analyte_molar_mass: float = Field(gt=0, description="g/mol")
+    standard_molar_mass: float = Field(gt=0, description="g/mol")
+    analyte_mass_mg: float = Field(gt=0)
+    standard_mass_mg: float = Field(gt=0)
+    standard_purity_percent: float = Field(default=100.0, gt=0, le=100)
+    # Measurement uncertainties, defaulted to the engine's conservative values. Supplying your own
+    # is what turns the reported uncertainty from an estimate into your laboratory's estimate.
+    integral_rel_u: float | None = Field(default=None, ge=0)
+    mass_rel_u: float | None = Field(default=None, ge=0)
+    standard_purity_rel_u: float | None = Field(default=None, ge=0)
+    molar_mass_rel_u: float | None = Field(default=None, ge=0)
+
+
+class QnmrPulconRequest(BaseModel):
+    """Purity against an external reference (PULCON), for when the standard cannot be co-dissolved."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    analyte_integral: float = Field(gt=0)
+    analyte_protons: int = Field(gt=0)
+    analyte_nominal_concentration: float = Field(gt=0)
+    reference_integral: float = Field(gt=0)
+    reference_protons: int = Field(gt=0)
+    reference_concentration: float = Field(gt=0)
+    reference_purity_percent: float = Field(default=100.0, gt=0, le=100)
+    analyte_pulse_width_us: float = Field(default=1.0, gt=0)
+    reference_pulse_width_us: float = Field(default=1.0, gt=0)
+    analyte_temperature_k: float = Field(default=298.15, gt=0)
+    reference_temperature_k: float = Field(default=298.15, gt=0)
+    analyte_receiver_gain: float = Field(default=1.0, gt=0)
+    reference_receiver_gain: float = Field(default=1.0, gt=0)
+    analyte_scans: int = Field(default=1, gt=0)
+    reference_scans: int = Field(default=1, gt=0)
+    integral_rel_u: float | None = Field(default=None, ge=0)
+    pulse_width_rel_u: float | None = Field(default=None, ge=0)
+    concentration_rel_u: float | None = Field(default=None, ge=0)
+    reference_purity_rel_u: float | None = Field(default=None, ge=0)
+
+
 ProductProgramKey = Literal["spectracheck", "regulatory_hub", "reaction_optimization"]
 
 

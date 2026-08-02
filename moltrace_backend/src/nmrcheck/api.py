@@ -604,6 +604,9 @@ from .models import (
     ProtonEvidenceReport,
     QNMRComplianceProfile,
     QNMRComplianceProfileCreate,
+    QnmrInternalStandardRequest,
+    QnmrPulconRequest,
+    QnmrPurityResult,
     QualityAssessment,
     QualityAssessmentRequest,
     QualityFinding,
@@ -8149,6 +8152,95 @@ async def spectrum_analyze_integration(
             "peak_count": int(len(payload.peaks)),
         },
     )
+
+
+_QNMR_NOTES = [
+    "Purity is computed from the integrals you supply; it is only as good as the integration "
+    "and the weighing behind them.",
+    "The reported uncertainty is a combined standard uncertainty (k = 1) propagated from the "
+    "supplied relative uncertainties. Supply your own to make it your laboratory's estimate.",
+    "Decision support for human review — not a certificate of analysis.",
+]
+
+
+def _qnmr_result(result: Any) -> QnmrPurityResult:
+    return QnmrPurityResult(
+        purity_percent=result.purity_percent,
+        uncertainty_percent=result.uncertainty_percent,
+        relative_uncertainty=result.relative_uncertainty,
+        method=result.method,
+        inputs=result.inputs,
+        intermediates=result.intermediates,
+        warnings=list(result.warnings),
+        notes=_QNMR_NOTES,
+    )
+
+
+@router.post(
+    "/spectrum/qnmr/purity",
+    response_model=QnmrPurityResult,
+    dependencies=[Depends(require_access_context)],
+)
+def spectrum_qnmr_internal_standard_route(
+    payload: QnmrInternalStandardRequest,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> QnmrPurityResult:
+    """Mass-fraction purity against a weighed internal standard.
+
+    Stateless: everything needed is in the request, and every intermediate ratio comes back so the
+    result can be re-derived from the record alone.
+    """
+    from moltrace.spectroscopy.qnmr.purity import calculate_purity_internal_standard
+
+    supplied = payload.model_dump(exclude_none=True)
+    try:
+        result = calculate_purity_internal_standard(**supplied)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    _audit_from_context(
+        request,
+        context=context,
+        event_type="spectrum.qnmr.purity",
+        message="qNMR purity determined against an internal standard.",
+        entity_type="qnmr_purity",
+        metadata={"method": result.method, "purity_percent": result.purity_percent},
+    )
+    return _qnmr_result(result)
+
+
+@router.post(
+    "/spectrum/qnmr/purity/pulcon",
+    response_model=QnmrPurityResult,
+    dependencies=[Depends(require_access_context)],
+)
+def spectrum_qnmr_pulcon_route(
+    payload: QnmrPulconRequest,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> QnmrPurityResult:
+    """Mass-fraction purity against an external reference (PULCON).
+
+    For when the standard cannot be co-dissolved with the analyte. Same contract as the
+    internal-standard route; the acquisition terms (pulse width, gain, scans, temperature) are what
+    let the reference transfer.
+    """
+    from moltrace.spectroscopy.qnmr.purity import calculate_purity_pulcon
+
+    supplied = payload.model_dump(exclude_none=True)
+    try:
+        result = calculate_purity_pulcon(**supplied)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    _audit_from_context(
+        request,
+        context=context,
+        event_type="spectrum.qnmr.purity",
+        message="qNMR purity determined against an external reference (PULCON).",
+        entity_type="qnmr_purity",
+        metadata={"method": result.method, "purity_percent": result.purity_percent},
+    )
+    return _qnmr_result(result)
 
 
 @router.post(
