@@ -212,20 +212,18 @@ function MobileMetric({
   )
 }
 
-function ProgramOrderCard({
-  moduleAccess,
-  licensingConfigured,
-}: {
-  moduleAccess: TenantModuleAccess[]
-  licensingConfigured: boolean
-}) {
+// Order only. The per-module "Licensed / Not licensed" badge that used to sit on each row
+// read tenant entitlement rows, which enforce nothing — see the note in
+// `components/app/tenant-selector.tsx`. What a workspace includes is answered by
+// `useIncludedModules`, not here.
+function ProgramOrderCard({ moduleAccess }: { moduleAccess: TenantModuleAccess[] }) {
   return (
     <ModuleCard
       accent="slate"
       eyebrow="Programs"
       title="Program Order"
       icon={ListOrdered}
-      description="The order modules run in. Every module stays visible regardless of licensing."
+      description="The order modules run in."
     >
       <div className="space-y-2">
         {moduleAccess.map((module, index) => (
@@ -234,11 +232,6 @@ function ProgramOrderCard({
               <p className="text-xs font-medium text-muted-foreground">Program {index + 1}</p>
               <p className="break-words text-sm font-semibold">{module.label}</p>
             </div>
-            {licensingConfigured ? (
-              <Badge variant={module.enabled ? "secondary" : "outline"} className="shrink-0">
-                {module.enabled ? "Licensed" : "Not licensed"}
-              </Badge>
-            ) : null}
           </div>
         ))}
       </div>
@@ -252,7 +245,6 @@ export function MobileTenantSummaryWorkspace() {
     tenantDisplayName,
     tenantStatus,
     moduleAccess,
-    licensingConfigured,
     isAdmin,
     loading: tenantLoading,
   } = useTenant()
@@ -445,7 +437,7 @@ export function MobileTenantSummaryWorkspace() {
         </div>
       </ModuleCard>
 
-      <ProgramOrderCard moduleAccess={moduleAccess} licensingConfigured={licensingConfigured} />
+      <ProgramOrderCard moduleAccess={moduleAccess} />
 
       <div id="onboarding" className="scroll-mt-24">
         <ModuleCard
