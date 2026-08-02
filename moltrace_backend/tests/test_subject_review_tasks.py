@@ -386,3 +386,79 @@ def test_an_outsider_cannot_record_or_read_an_approval(client, app):
 def test_spectroscopy_sessions_keep_their_own_approval_surface(client, api_headers):
     with client:
         assert _approve(client, api_headers, "spectracheck_session", 1).status_code == 403
+
+
+# --------------------------------------------------------------------------- #
+# Reviewer nominations — a record of expectation, NOT an access grant
+# --------------------------------------------------------------------------- #
+def _nominate(client, headers, subject_type: str, subject_id: int, email: str):
+    return client.post(
+        "/reviewers",
+        headers=headers,
+        json={"subject_type": subject_type, "subject_id": subject_id, "reviewer_email": email},
+    )
+
+
+def test_a_filing_can_carry_a_reviewer_nomination(client, api_headers):
+    with client:
+        dossier = _dossier(client, api_headers)
+        created = _nominate(client, api_headers, "regulatory_dossier", dossier["id"], "tox@example.com")
+        assert created.status_code == 201, created.text
+        assert created.json()["reviewer_email"] == "tox@example.com"
+        assert created.json()["session_id"] is None
+        assert created.json()["module"] == "regulatory_hub"
+
+        listed = client.get(
+            f"/reviewers?subject_type=regulatory_dossier&subject_id={dossier['id']}",
+            headers=api_headers,
+        )
+        assert listed.status_code == 200, listed.text
+        assert [row["id"] for row in listed.json()] == [created.json()["id"]]
+
+
+def test_nominating_the_same_person_twice_updates_rather_than_duplicates(client, api_headers):
+    with client:
+        dossier = _dossier(client, api_headers)
+        first = _nominate(client, api_headers, "regulatory_dossier", dossier["id"], "tox@example.com")
+        second = _nominate(client, api_headers, "regulatory_dossier", dossier["id"], "tox@example.com")
+        assert first.status_code == 201 and second.status_code == 201
+        assert first.json()["id"] == second.json()["id"]
+
+
+def test_a_nomination_does_not_grant_access(client, app):
+    """The load-bearing property. If nominating someone let them in, an assignment would be a
+    second, weaker way into a record — exactly what this carve-out has avoided throughout."""
+    lead_email, outsider_email = _emails()
+    with client:
+        lead = _sign_up(client, lead_email)
+        outsider = _sign_up(client, outsider_email)
+        _org_with_members(app, "Regulatory Affairs", [(lead_email, "active")])
+        _org_with_members(app, "Another Company", [(outsider_email, "active")])
+        dossier = _dossier(client, lead)
+
+        # Nominating someone outside the team succeeds — it is a record of expectation.
+        nominated = _nominate(client, lead, "regulatory_dossier", dossier["id"], outsider_email)
+        assert nominated.status_code == 201, nominated.text
+
+        # And it changes nothing about what they can reach.
+        assert client.get(f"/regulatory/dossiers/{dossier['id']}", headers=outsider).status_code == 404
+        assert (
+            client.get(
+                f"/reviewers?subject_type=regulatory_dossier&subject_id={dossier['id']}",
+                headers=outsider,
+            ).status_code
+            == 404
+        )
+
+
+def test_a_campaign_can_carry_a_reviewer_nomination(client, api_headers):
+    with client:
+        campaign = _campaign(client, api_headers)
+        created = _nominate(client, api_headers, "reaction_project", campaign["id"], "chem@example.com")
+        assert created.status_code == 201, created.text
+        assert created.json()["module"] == "reaction_optimization"
+
+
+def test_spectroscopy_sessions_keep_their_own_reviewer_surface(client, api_headers):
+    with client:
+        assert _nominate(client, api_headers, "spectracheck_session", 1, "a@example.com").status_code == 403
