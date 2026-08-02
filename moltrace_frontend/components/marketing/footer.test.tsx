@@ -147,7 +147,9 @@ describe("Marketing Footer", () => {
     const socialNav = screen.getByTestId("footer-social-nav")
     const links = within(socialNav).getAllByRole("link")
     const labels = links.map((l) => l.getAttribute("aria-label"))
-    expect(labels).toEqual(["GitHub"])
+    // Registry order, filtered to claimed profiles. Crunchbase joins this list
+    // once its profile exists; the rest stay hidden rather than dead-linked.
+    expect(labels).toEqual(["LinkedIn", "X", "GitHub"])
   })
 
   it("keeps LinkedIn, X and Crunchbase artwork ready so publishing is a URL-only edit", () => {

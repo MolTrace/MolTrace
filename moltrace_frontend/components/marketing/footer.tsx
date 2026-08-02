@@ -290,10 +290,10 @@ type SocialLink = {
  * Never put "#" back in this list.
  */
 export const socialLinks: SocialLink[] = [
-  { label: "LinkedIn",  href: null, Glyph: LinkedInGlyph  },
+  { label: "LinkedIn",  href: "https://www.linkedin.com/company/moltrace/", Glyph: LinkedInGlyph },
   { label: "Facebook",  href: null, Glyph: FacebookGlyph  },
   { label: "Instagram", href: null, Glyph: InstagramGlyph },
-  { label: "X",         href: null, Glyph: XGlyph         },
+  { label: "X",         href: "https://x.com/moltrace_co", Glyph: XGlyph },
   { label: "Crunchbase", href: null, Glyph: CrunchbaseGlyph },
   { label: "YouTube",   href: null, Glyph: YouTubeGlyph   },
   { label: "GitHub",    href: "https://github.com/MolTrace/MolTrace", Glyph: GitHubGlyph },
