@@ -15,6 +15,7 @@ import type {
   StructureSnapshot,
 } from "@/src/components/chemistry/StructureEditor"
 import { Input } from "@/components/ui/input"
+import { SubstructureQueryPanel } from "@/src/components/chemistry/SubstructureQueryPanel"
 import {
   attachReactionScheme,
   issueAtomIndices,
@@ -34,7 +35,13 @@ const IMPORT_PLACEHOLDER = `Paste a molfile, reaction (RXN), SMILES, or CXSMILES
 For example:  CC(=O)Cl.OCC>>CC(=O)OCC`
 
 /** One warning or error. `message` is already chemist-facing — rendered verbatim, never rewritten. */
-function IssueLine({ issue }: { issue: StructureIssue }) {
+function IssueLine({
+  issue,
+  format,
+}: {
+  issue: StructureIssue
+  format: StructureSnapshot["format"]
+}) {
   const indices = issueAtomIndices(issue)
   return (
     <li className={isHeadlineWarning(issue) ? "font-medium text-foreground" : undefined}>
@@ -42,7 +49,11 @@ function IssueLine({ issue }: { issue: StructureIssue }) {
       {indices.length > 0 ? (
         <span className="text-muted-foreground">
           {" "}
-          (atom{indices.length > 1 ? "s" : ""} {indices.join(", ")})
+          (atom{indices.length > 1 ? "s" : ""} {indices.join(", ")}
+          {/* For a reaction these count from the start of the component the message names ("In
+              reactant 2, …"), NOT from the start of the scheme. Printed bare, "atom 4" reads as
+              the scheme's fifth atom and sends a chemist to the wrong place in their own drawing. */}
+          {format === "rxn" ? " of that component" : ""})
         </span>
       ) : null}
     </li>
@@ -92,14 +103,14 @@ function StructureVerdictReadout({
       {verdict.errors.length > 0 ? (
         <ul className="list-inside list-disc space-y-1 text-xs">
           {verdict.errors.map((issue, i) => (
-            <IssueLine key={`${issue.code}-${i}`} issue={issue} />
+            <IssueLine key={`${issue.code}-${i}`} issue={issue} format={format} />
           ))}
         </ul>
       ) : null}
       {verdict.warnings.length > 0 ? (
         <ul className="list-inside list-disc space-y-1 text-xs text-muted-foreground">
           {verdict.warnings.map((issue, i) => (
-            <IssueLine key={`${issue.code}-${i}`} issue={issue} />
+            <IssueLine key={`${issue.code}-${i}`} issue={issue} format={format} />
           ))}
         </ul>
       ) : null}
@@ -156,6 +167,7 @@ export function StructureEditorPanel({
   const [notice, setNotice] = useState("")
   const [importText, setImportText] = useState("")
   const [showImport, setShowImport] = useState(false)
+  const [showQuery, setShowQuery] = useState(false)
 
   // Attaching a capture to a compound in the registry — the one link into the
   // system that exists today. Reaction schemes have no home yet; see below.
@@ -406,6 +418,12 @@ export function StructureEditorPanel({
         <Button type="button" variant="outline" onClick={() => setShowImport((v) => !v)}>
           {showImport ? "Hide import" : "Import a scheme"}
         </Button>
+        {/* The third thing a chemist does with a drawing, after storing it and importing one:
+            ask where else that motif turns up. Folded in beside the other two rather than given
+            a surface of its own. */}
+        <Button type="button" variant="outline" onClick={() => setShowQuery((v) => !v)}>
+          {showQuery ? "Hide motif search" : "Search for a motif"}
+        </Button>
       </div>
 
       {showImport ? (
@@ -450,6 +468,13 @@ export function StructureEditorPanel({
             hint — the contents decide.
           </p>
         </div>
+      ) : null}
+
+      {showQuery ? (
+        <SubstructureQueryPanel
+          // Only offered once the engine is up; before that there is no drawing to take.
+          getQueryFromCanvas={open ? () => apiRef.current?.getSmarts() ?? Promise.resolve("") : undefined}
+        />
       ) : null}
 
       {open ? (

@@ -41,6 +41,14 @@ export type StructureSnapshot = {
 export type StructureEditorApi = {
   /** Accepts molfile, RXN, SMILES, or CXSMILES — the engine sniffs the format. */
   load: (text: string) => Promise<void>
+  /**
+   * The drawing expressed as a query pattern.
+   *
+   * Separate from the SMILES on a capture, and not interchangeable with it: a query is made of
+   * exactly the things — query atoms, R-groups, bond types — that make `getSmiles()` fail, which
+   * is why a captured snapshot's `smiles` is empty for precisely the drawings this is for.
+   */
+  getSmarts: () => Promise<string>
 }
 
 type Props = {
@@ -71,6 +79,10 @@ export function StructureEditorCanvas({ onCapture, onError, onReady }: Props) {
           // vs RXN vs SMILES vs CXSMILES itself, so the panel never has to guess
           // from a file extension — which lies often enough to matter.
           await ketcher.setMolecule(text)
+        },
+        getSmarts: async () => {
+          if (typeof ketcher.getSmarts !== "function") return ""
+          return (await ketcher.getSmarts()) ?? ""
         },
       })
     },

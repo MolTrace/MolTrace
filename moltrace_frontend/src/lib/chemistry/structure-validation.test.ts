@@ -3,7 +3,10 @@ import {
   attachReactionScheme,
   isHeadlineWarning,
   issueAtomIndices,
+  matchSmarts,
   orderIssues,
+  parseTargetList,
+  readSmartsMatch,
   readVerdict,
   validateStructure,
 } from "@/src/lib/chemistry/structure-validation"
@@ -145,5 +148,86 @@ describe("issueAtomIndices", () => {
   it("returns an empty list when there are no indices", () => {
     expect(issueAtomIndices(issue("c"))).toEqual([])
     expect(issueAtomIndices({ code: "c", message: "m", atom_indices: ["x"] } as never)).toEqual([])
+  })
+})
+
+describe("matchSmarts", () => {
+  beforeEach(() => {
+    apiFetch.mockReset()
+    apiFetch.mockResolvedValue({ smarts: "c1ccccc1", results: [] })
+  })
+
+  it("sends smarts/targets and NOTHING else — this model is extra=forbid too", async () => {
+    await matchSmarts("  c1ccccc1  ", ["CCO"])
+    const [path, init] = apiFetch.mock.calls[0]!
+    expect(path).toBe("/reactions/structures/smarts-match")
+    expect(init.method).toBe("POST")
+    expect(Object.keys(init.body as object).sort()).toEqual(["smarts", "targets"])
+    expect((init.body as { smarts: string }).smarts).toBe("c1ccccc1")
+  })
+})
+
+describe("parseTargetList", () => {
+  it("splits on line breaks only — a '.' and a '>>' are inside a SMILES, not between two", () => {
+    // Splitting on those would be the frontend deciding where one structure ends, which is a
+    // chemistry judgement it is not entitled to make.
+    expect(parseTargetList("CC(=O)Cl.OCC>>CC(=O)OCC\nCCO")).toEqual([
+      "CC(=O)Cl.OCC>>CC(=O)OCC",
+      "CCO",
+    ])
+  })
+
+  it("drops blank lines and surrounding whitespace", () => {
+    expect(parseTargetList("  CCO  \n\n\t\nCCC\n")).toEqual(["CCO", "CCC"])
+    expect(parseTargetList("   ")).toEqual([])
+  })
+})
+
+describe("readSmartsMatch", () => {
+  const row = (over: Record<string, unknown> = {}) => ({
+    smiles: "CCO",
+    parsed: true,
+    matched: false,
+    match_count: 0,
+    atom_indices: [],
+    ...over,
+  })
+
+  it("counts an unreadable target as unreadable, never as a miss", () => {
+    // The distinction the whole panel exists for: a target that did not parse was not searched,
+    // so reporting it as "does not contain it" would be a false negative a chemist would act on.
+    const out = readSmartsMatch({
+      smarts: "c1ccccc1",
+      results: [row({ smiles: "aspirin", matched: true, match_count: 1 }), row({ parsed: false })],
+    })!
+    expect(out.matchedCount).toBe(1)
+    expect(out.unreadableCount).toBe(1)
+    expect(out.rows[1]!.matched).toBe(false)
+    expect(out.rows[1]!.parsed).toBe(false)
+  })
+
+  it("will not call a target matched when the engine could not read it", () => {
+    // A contradictory row — matched:true on something that never parsed — resolves to the
+    // careful answer, not the flattering one.
+    const out = readSmartsMatch({ results: [row({ parsed: false, matched: true, match_count: 3 })] })!
+    expect(out.rows[0]!.matched).toBe(false)
+    expect(out.matchedCount).toBe(0)
+  })
+
+  it("counts from the rows, so the headline cannot disagree with the list under it", () => {
+    const out = readSmartsMatch({
+      matched_count: 99,
+      unreadable_count: 99,
+      results: [row({ matched: true }), row()],
+    })!
+    expect(out.matchedCount).toBe(1)
+    expect(out.unreadableCount).toBe(0)
+  })
+
+  it("survives a malformed body rather than inventing a verdict", () => {
+    expect(readSmartsMatch(null)).toBeNull()
+    expect(readSmartsMatch([])).toBeNull()
+    expect(readSmartsMatch({})!.rows).toEqual([])
+    expect(readSmartsMatch({ results: "nope" })!.rows).toEqual([])
   })
 })

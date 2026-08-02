@@ -121,6 +121,40 @@ describe("StructureEditorPanel verdict", () => {
     expect(screen.getByText(/2 reactants, 0 agents, 1 product\b/)).toBeInTheDocument()
   })
 
+  it("does not print a reaction's atom numbers as if they counted from the start of the scheme", async () => {
+    // They count from the start of the component the message names ("In reactant 2, …"). Printed
+    // bare, "atom 4" reads as the scheme's fifth atom and sends a chemist to the wrong place in
+    // their own drawing.
+    await captureWith(
+      {
+        ...OK_CLEAN,
+        format: "rxn",
+        inchikey: null,
+        warnings: [
+          {
+            code: "hydrogen_count_changed",
+            message: "In reactant 2, the hydrogen count changed.",
+            atom_indices: [4],
+          },
+        ],
+      },
+      "rxn",
+    )
+    await waitFor(() => expect(screen.getByText(/something to look at/i)).toBeInTheDocument())
+    expect(screen.getByRole("listitem").textContent).toContain("atom 4 of that component")
+  })
+
+  it("leaves a single structure's atom numbers unqualified, because there is only one component", async () => {
+    await captureWith({
+      ...OK_CLEAN,
+      warnings: [{ code: "charge_changed", message: "A charge was adjusted.", atom_indices: [4] }],
+    })
+    await waitFor(() => expect(screen.getByText(/something to look at/i)).toBeInTheDocument())
+    const text = screen.getByRole("listitem").textContent ?? ""
+    expect(text).toContain("(atom 4)")
+    expect(text).not.toContain("of that component")
+  })
+
   it("offers a reaction scheme its project home, not the compound registry", async () => {
     await captureWith({ ...OK_CLEAN, format: "rxn", inchikey: null }, "rxn")
     await waitFor(() => expect(screen.getByText(/Attach as a scheme on a reaction project/i)).toBeInTheDocument())
