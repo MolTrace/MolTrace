@@ -126,6 +126,25 @@ Two codes are worth surfacing prominently, because they are the reason this serv
   not own returns `404 {"detail": "Not found."}`, identical to a missing project. Do not
   special-case it as an auth error.
 - **Body cap** is 1,000,000 characters on `block`; over that is a 422 with a plain message.
+- **`/reactions/structures/*` is licensed as a platform route, not as Repho.** Any module may
+  call it — including a Regentry-only deployment, which needs it for the impurity round-trip
+  before an ICH M7 verdict. Filed under Repho it returned `403 module_not_licensed` there.
+  `…/schemes` is the opposite: it stays Repho-licensed, because a scheme belongs to a campaign.
+  The `/reactions/` spelling is a misnomer kept for compatibility now that the panel calls it;
+  see §8 if it is ever renamed.
+
+## 8. If the validate path is ever renamed
+
+`/reactions/structures/*` reads as a Repho route but is a shared chemistry primitive. Renaming
+it to `/structures/*` needs backend and frontend to land together, because the panel already
+calls the current path in three places:
+
+- `src/lib/chemistry/structure-validation.ts` (the `apiFetch` call)
+- `src/lib/chemistry/structure-validation.test.ts` and
+  `src/components/chemistry/StructureEditorPanel.test.tsx` (both assert the path literal)
+- plus `npm run generate:openapi` to refresh `schema.d.ts`
+
+Not worth doing on its own; worth folding into the next change that touches this file.
 
 ## 6. Verify
 

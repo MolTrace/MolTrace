@@ -87,9 +87,8 @@ MODULE_ROUTE_PREFIXES: tuple[tuple[str, ModuleKey], ...] = (
     ("/regulatory", "regulatory_hub"),
     ("/ctd-module3-bundles", "regulatory_hub"),
     # ---- Repho: campaigns, optimization, execution, advisory -------------------------------
-    # Note the two spellings: the campaign surfaces are ``/reaction-*`` (hyphen), while the
-    # structure/scheme capture service is nested under ``/reactions/`` (plural). Both are Repho.
-    ("/reactions", "reaction_optimization"),
+    # Only the hyphenated ``/reaction-*`` campaign surfaces are Repho. The plural
+    # ``/reactions/structures`` validator is deliberately NOT here — see the platform list.
     ("/reaction-projects", "reaction_optimization"),
     ("/reaction-variables", "reaction_optimization"),
     ("/reaction-experiments", "reaction_optimization"),
@@ -109,6 +108,14 @@ MODULE_ROUTE_PREFIXES: tuple[tuple[str, ModuleKey], ...] = (
 )
 
 PLATFORM_ROUTE_PREFIXES: tuple[str, ...] = (
+    # Reading a drawn structure with RDKit is a shared chemistry primitive, not a Repho
+    # feature: Regentry needs it to show a chemist what was read back from an impurity
+    # drawing before that structure becomes an ICH M7 verdict, and the compound registry's
+    # own structure surface is already platform for the same reason. Filed under Repho it
+    # returned 403 module_not_licensed on a Regentry-only deployment, which blocked the
+    # round-trip confirmation outright. The path keeps its ``/reactions/`` spelling because
+    # the frontend already calls it; the name is the misleading part, not the placement.
+    "/reactions/structures",
     # service surface
     "/",
     "/health",
