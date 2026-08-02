@@ -64,6 +64,49 @@ export async function attachReactionScheme(
   )
 }
 
+/**
+ * The schemes already attached to a project.
+ *
+ * Archived ones are retained and excluded by default; `includeArchived` asks for them back. That
+ * is the same retained-and-reversible shape the rest of the controlled records use — an archive
+ * here is a soft delete with a reason, not an erasure.
+ */
+export async function listReactionSchemes(
+  reactionProjectId: number,
+  includeArchived = false,
+): Promise<ReactionStructureScheme[]> {
+  const raw = await apiFetch<unknown>(
+    `/reaction-projects/${encodeURIComponent(String(reactionProjectId))}/schemes?include_deleted=${includeArchived ? "true" : "false"}`,
+    { method: "GET" },
+  )
+  return Array.isArray(raw) ? (raw.filter(isSchemeRow) as ReactionStructureScheme[]) : []
+}
+
+function isSchemeRow(v: unknown): boolean {
+  if (!v || typeof v !== "object" || Array.isArray(v)) return false
+  return typeof (v as Record<string, unknown>).id === "number"
+}
+
+/**
+ * Archive a scheme. The reason is required — a blank one is a 422 — because the record has to say
+ * why it stopped being current, not merely that it did.
+ */
+export async function archiveReactionScheme(
+  reactionProjectId: number,
+  schemeId: number,
+  reasonForChange: string,
+): Promise<ReactionStructureScheme> {
+  return apiFetch<ReactionStructureScheme>(
+    `/reaction-projects/${encodeURIComponent(String(reactionProjectId))}/schemes/${encodeURIComponent(String(schemeId))}/archive`,
+    { method: "POST", body: { reason_for_change: reasonForChange.trim() } },
+  )
+}
+
+/** A scheme is archived when the server stamped a deletion time on it. */
+export function schemeIsArchived(scheme: ReactionStructureScheme): boolean {
+  return typeof scheme.deleted_at === "string" && scheme.deleted_at.trim().length > 0
+}
+
 export type IssueSeverity = "error" | "warning"
 
 /**
