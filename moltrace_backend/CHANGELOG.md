@@ -113,9 +113,9 @@ reconciliation — and the honest admission of where it currently lands.
   retention windows, source, and the automated-decision position), `erasure_plan` (Art. 17
   per-store disposition), and `response_deadline` (Art. 12(3) — one month, with the
   two-month extension only if notified **with reasons inside month one**).
-- **`DATA_MAP`** — the machine-readable personal-data classification map (14 store groups,
-  unit-tested) with four honest dispositions: **erase** · **pseudonymise + restrict** ·
-  **retain (legal obligation, Art. 17(3))** · **immutable ledger**.
+- **`DATA_MAP`** — the machine-readable personal-data classification map (15 store groups,
+  unit-tested) with four honest dispositions: **erase** (5) · **pseudonymise + restrict** (4) ·
+  **retain (legal obligation, Art. 17(3))** (4) · **immutable ledger** (2).
 - **The honesty invariant, enforced in tests:** pseudonymisation is **never** reported as
   erasure. Under Recital 26 a tokenised/hashed record is still personal data, so it is
   reported as *retained and restricted* — as is the existing ALCOA+ soft-delete. A legal
