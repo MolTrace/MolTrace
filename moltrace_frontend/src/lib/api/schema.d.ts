@@ -2866,6 +2866,53 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/spectrum/qnmr/purity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Spectrum Qnmr Internal Standard Route
+         * @description Mass-fraction purity against a weighed internal standard.
+         *
+         *     Stateless: everything needed is in the request, and every intermediate ratio comes back so the
+         *     result can be re-derived from the record alone.
+         */
+        post: operations["spectrum_qnmr_internal_standard_route_spectrum_qnmr_purity_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/spectrum/qnmr/purity/pulcon": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Spectrum Qnmr Pulcon Route
+         * @description Mass-fraction purity against an external reference (PULCON).
+         *
+         *     For when the standard cannot be co-dissolved with the analyte. Same contract as the
+         *     internal-standard route; the acquisition terms (pulse width, gain, scans, temperature) are what
+         *     let the reference transfer.
+         */
+        post: operations["spectrum_qnmr_pulcon_route_spectrum_qnmr_purity_pulcon_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/spectrum/predict/shifts": {
         parameters: {
             query?: never;
@@ -29985,6 +30032,148 @@ export interface components {
                 [key: string]: unknown;
             };
         };
+        /**
+         * QnmrInternalStandardRequest
+         * @description Purity against a weighed internal standard (the routine qNMR determination).
+         */
+        QnmrInternalStandardRequest: {
+            /** Analyte Integral */
+            analyte_integral: number;
+            /** Standard Integral */
+            standard_integral: number;
+            /** Analyte Protons */
+            analyte_protons: number;
+            /** Standard Protons */
+            standard_protons: number;
+            /**
+             * Analyte Molar Mass
+             * @description g/mol
+             */
+            analyte_molar_mass: number;
+            /**
+             * Standard Molar Mass
+             * @description g/mol
+             */
+            standard_molar_mass: number;
+            /** Analyte Mass Mg */
+            analyte_mass_mg: number;
+            /** Standard Mass Mg */
+            standard_mass_mg: number;
+            /**
+             * Standard Purity Percent
+             * @default 100
+             */
+            standard_purity_percent: number;
+            /** Integral Rel U */
+            integral_rel_u?: number | null;
+            /** Mass Rel U */
+            mass_rel_u?: number | null;
+            /** Standard Purity Rel U */
+            standard_purity_rel_u?: number | null;
+            /** Molar Mass Rel U */
+            molar_mass_rel_u?: number | null;
+        };
+        /**
+         * QnmrPulconRequest
+         * @description Purity against an external reference (PULCON), for when the standard cannot be co-dissolved.
+         */
+        QnmrPulconRequest: {
+            /** Analyte Integral */
+            analyte_integral: number;
+            /** Analyte Protons */
+            analyte_protons: number;
+            /** Analyte Nominal Concentration */
+            analyte_nominal_concentration: number;
+            /** Reference Integral */
+            reference_integral: number;
+            /** Reference Protons */
+            reference_protons: number;
+            /** Reference Concentration */
+            reference_concentration: number;
+            /**
+             * Reference Purity Percent
+             * @default 100
+             */
+            reference_purity_percent: number;
+            /**
+             * Analyte Pulse Width Us
+             * @default 1
+             */
+            analyte_pulse_width_us: number;
+            /**
+             * Reference Pulse Width Us
+             * @default 1
+             */
+            reference_pulse_width_us: number;
+            /**
+             * Analyte Temperature K
+             * @default 298.15
+             */
+            analyte_temperature_k: number;
+            /**
+             * Reference Temperature K
+             * @default 298.15
+             */
+            reference_temperature_k: number;
+            /**
+             * Analyte Receiver Gain
+             * @default 1
+             */
+            analyte_receiver_gain: number;
+            /**
+             * Reference Receiver Gain
+             * @default 1
+             */
+            reference_receiver_gain: number;
+            /**
+             * Analyte Scans
+             * @default 1
+             */
+            analyte_scans: number;
+            /**
+             * Reference Scans
+             * @default 1
+             */
+            reference_scans: number;
+            /** Integral Rel U */
+            integral_rel_u?: number | null;
+            /** Pulse Width Rel U */
+            pulse_width_rel_u?: number | null;
+            /** Concentration Rel U */
+            concentration_rel_u?: number | null;
+            /** Reference Purity Rel U */
+            reference_purity_rel_u?: number | null;
+        };
+        /**
+         * QnmrPurityResult
+         * @description A qNMR purity determination with the whole computation attached.
+         *
+         *     ``intermediates`` carries every ratio that built ``purity_percent``, so the number can be
+         *     re-derived from the record alone — which is what makes a purity value defensible to a reviewer
+         *     rather than something to take on trust.
+         */
+        QnmrPurityResult: {
+            /** Purity Percent */
+            purity_percent: number;
+            /** Uncertainty Percent */
+            uncertainty_percent: number;
+            /** Relative Uncertainty */
+            relative_uncertainty: number;
+            /** Method */
+            method: string;
+            /** Inputs */
+            inputs?: {
+                [key: string]: unknown;
+            };
+            /** Intermediates */
+            intermediates?: {
+                [key: string]: unknown;
+            };
+            /** Warnings */
+            warnings?: string[];
+            /** Notes */
+            notes?: string[];
+        };
         /** QualityAssessment */
         QualityAssessment: {
             /** Id */
@@ -49853,6 +50042,80 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SpectrumIntegrationAnalyzeResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    spectrum_qnmr_internal_standard_route_spectrum_qnmr_purity_post: {
+        parameters: {
+            query?: {
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QnmrInternalStandardRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QnmrPurityResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    spectrum_qnmr_pulcon_route_spectrum_qnmr_purity_pulcon_post: {
+        parameters: {
+            query?: {
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QnmrPulconRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QnmrPurityResult"];
                 };
             };
             /** @description Validation Error */
