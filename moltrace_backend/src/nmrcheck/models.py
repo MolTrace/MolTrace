@@ -9079,6 +9079,20 @@ ApprovalDecision = Literal[
     "needs_changes",
     "deferred",
 ]
+#: Sign-off words for a filing or a campaign. The session vocabulary above is
+#: structure-elucidation language — "approved plausible" says something precise about a proposed
+#: structure and nothing at all about a regulatory filing — so the general surface gets general
+#: words rather than borrowing terms that would read as nonsense to a regulatory reviewer.
+SubjectApprovalDecision = Literal["approved", "rejected", "needs_changes", "deferred"]
+#: What may be *stored*: either vocabulary, because both surfaces share one table.
+AnyApprovalDecision = Literal[
+    "approved_plausible",
+    "approved_confirmed",
+    "approved",
+    "rejected",
+    "needs_changes",
+    "deferred",
+]
 ReportLockStatus = Literal["unlocked", "locked", "released"]
 SecureSharePermission = Literal["view", "comment", "review"]
 
@@ -9386,6 +9400,19 @@ class ReviewTaskRecord(BaseModel):
     notes: list[str] = Field(default_factory=list)
 
 
+class SubjectApprovalCreate(BaseModel):
+    """Record a sign-off decision on a filing or a campaign."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    subject_type: SubjectType
+    subject_id: int = Field(ge=1)
+    decision: SubjectApprovalDecision
+    rationale: str = Field(min_length=1, max_length=20_000)
+    approver_email: str | None = Field(default=None, max_length=255)
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
 class ApprovalRecordCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -9409,11 +9436,14 @@ class ApprovalRecord(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     id: int
-    session_id: int
+    session_id: int | None = None
+    subject_type: SubjectType | None = None
+    subject_id: int | None = None
+    module: ProductProgramKey | None = None
     evidence_id: int | None = None
     report_id: int | None = None
     approver_email: str | None = None
-    decision: ApprovalDecision
+    decision: AnyApprovalDecision
     rationale: str
     created_at: datetime
     metadata_json: dict[str, Any] = Field(default_factory=dict)

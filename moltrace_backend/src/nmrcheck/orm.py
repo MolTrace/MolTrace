@@ -1208,12 +1208,19 @@ class ApprovalRecordORM(Base):
     __table_args__ = (
         Index("ix_approval_records_session_created", "session_id", "created_at"),
         Index("ix_approval_records_report_decision", "report_id", "decision"),
+        Index("ix_approval_records_subject", "subject_type", "subject_id"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    session_id: Mapped[int] = mapped_column(
-        ForeignKey("spectracheck_sessions.id", ondelete="CASCADE"), index=True
+    # Third table on the subject pair, after review tasks and comments. An approval was a
+    # SpectraCheck-session approval by construction, so a regulatory or process-chemistry team had
+    # no general sign-off record — and nowhere to hang the §11.70 signature that makes one mean
+    # something. ``session_id`` stays for the rows that predate this.
+    session_id: Mapped[int | None] = mapped_column(
+        ForeignKey("spectracheck_sessions.id", ondelete="CASCADE"), nullable=True, index=True
     )
+    subject_type: Mapped[str | None] = mapped_column(String(48), nullable=True)
+    subject_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     evidence_id: Mapped[int | None] = mapped_column(
         ForeignKey("spectracheck_evidence_records.id", ondelete="SET NULL"),
         nullable=True,

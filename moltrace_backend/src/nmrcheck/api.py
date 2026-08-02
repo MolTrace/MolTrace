@@ -768,6 +768,7 @@ from .models import (
     ReviewDecisionRecord,
     ReviewQueueItem,
     ReviewTaskCreate,
+    SubjectApprovalCreate,
     SubjectCommentCreate,
     SubjectReviewTaskCreate,
     ReviewTaskRecord,
@@ -24205,6 +24206,64 @@ def delete_session_comment_route(
     if record is None:
         raise HTTPException(status_code=404, detail="Comment not found.")
     return record
+
+
+@router.post(
+    "/approvals",
+    response_model=ApprovalRecord,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_access_context)],
+)
+def create_subject_approval_route(
+    payload: SubjectApprovalCreate,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> ApprovalRecord:
+    """Record a sign-off decision on a filing or a campaign.
+
+    This is the workflow record — who decided what, and why. It is not itself a signature: an
+    electronic signature is created separately and bound to a point-in-time report, which is what
+    keeps a signature tied to exactly what it attested to.
+    """
+    try:
+        return collab_store.create_subject_approval(
+            _state(request).session_factory,
+            payload,
+            owner_scope_id=_user_scope_for_context(context),
+            approver_email=context.user.email if context.user else None,
+        )
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="Approval subject not found.") from exc
+    except Exception as exc:
+        _raise_collaboration_http_error(exc)
+        raise
+
+
+@router.get(
+    "/approvals",
+    response_model=list[ApprovalRecord],
+    dependencies=[Depends(require_access_context)],
+)
+def list_subject_approvals_route(
+    request: Request,
+    subject_type: str = Query(...),
+    subject_id: int = Query(..., ge=1),
+    limit: int = Query(default=500, ge=1, le=1000),
+    context: AccessContext = Depends(require_access_context),
+) -> list[ApprovalRecord]:
+    try:
+        return collab_store.list_subject_approvals(
+            _state(request).session_factory,
+            subject_type,
+            subject_id,
+            owner_scope_id=_user_scope_for_context(context),
+            limit=limit,
+        )
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="Approval subject not found.") from exc
+    except Exception as exc:
+        _raise_collaboration_http_error(exc)
+        raise
 
 
 @router.post(

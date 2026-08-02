@@ -178,6 +178,26 @@ def _ensure_sqlite_schema(engine: Engine) -> None:
                 connection.exec_driver_sql(
                     "ALTER TABLE regulatory_dossiers ADD COLUMN organization_id INTEGER"
                 )
+        if "approval_records" in tables:
+            # Subject-addressed approvals (migration 0037) on a pre-existing dev SQLite DB.
+            approval_existing = {
+                str(row[1])
+                for row in connection.exec_driver_sql(
+                    "PRAGMA table_info(approval_records)"
+                ).fetchall()
+            }
+            for column, ddl in {"subject_type": "VARCHAR(48)", "subject_id": "INTEGER"}.items():
+                if column not in approval_existing:
+                    connection.exec_driver_sql(
+                        f"ALTER TABLE approval_records ADD COLUMN {column} {ddl}"
+                    )
+            connection.exec_driver_sql(
+                "CREATE INDEX IF NOT EXISTS ix_approval_records_subject "
+                "ON approval_records (subject_type, subject_id)"
+            )
+            # The other half of 0037, same as 0035/0036: a subject-addressed approval has no
+            # session, so the column that used to be required has to actually become optional.
+            _sqlite_make_column_nullable(connection, "approval_records", "session_id")
         if "evidence_comments" in tables:
             # Subject-addressed comments (migration 0036) on a pre-existing dev SQLite DB.
             comment_existing = {
