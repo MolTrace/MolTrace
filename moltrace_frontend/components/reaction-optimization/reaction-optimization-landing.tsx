@@ -429,7 +429,7 @@ export function ReactionOptimizationLanding() {
               <AlertCard
                 variant="success"
                 title="Project created"
-                description="Refreshed your project list."
+                description="Refreshed the project list."
               />
             ) : null}
             <div className="grid gap-4 md:grid-cols-2">
@@ -512,7 +512,10 @@ export function ReactionOptimizationLanding() {
           >
             Reaction · Project Index
           </p>
-          <h2 className="font-mono text-xl font-bold tracking-tight">All reaction projects in this org</h2>
+          {/* Not "all reaction projects in this org": a campaign belongs to its creator's team,
+              and one created without a team stays creator-only, so an organization-wide claim
+              would promise rows this list cannot return. */}
+          <h2 className="font-mono text-xl font-bold tracking-tight">Every reaction project you can open</h2>
           <p className="text-sm text-muted-foreground">
             Status, linked experiments, and pending recommendations — open any row.
           </p>
