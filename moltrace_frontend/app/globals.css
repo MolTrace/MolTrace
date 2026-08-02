@@ -373,3 +373,17 @@
     color: var(--mt-cyan);
   }
 }
+
+/* ── Shell mode, decided before paint ──────────────────────────────────────
+   A blocking script in <head> stamps [data-shell] on <html> (see
+   src/lib/shell/shell-mode.ts). React makes the same call, but not until
+   hydration — and it starts by assuming desktop, so on a phone the desktop
+   sidebar painted for a frame and was then removed. This hides it immediately
+   instead, and React's own gating still does the real work a moment later.
+
+   No rule for the reverse case: the mobile bar is ABSENT at first paint rather
+   than wrong, and an element that has not been rendered cannot be revealed by
+   CSS. Appearing late is a smaller sin than appearing and vanishing. */
+[data-shell="mobile"] [data-shell-desktop-only] {
+  display: none;
+}
