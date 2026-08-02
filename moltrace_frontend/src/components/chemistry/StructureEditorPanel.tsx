@@ -140,9 +140,16 @@ type Props = {
   /** The project a scheme attaches to when the panel already sits inside one. Where it is
    *  absent — the studio, which has no ambient project — the reader picks one instead. */
   reactionProjectId?: number | null
+  /** Fired after a scheme is stored, so a list alongside can refresh itself. */
+  onSchemeAttached?: () => void
 }
 
-export function StructureEditorPanel({ onCapture, contextLabel, reactionProjectId }: Props) {
+export function StructureEditorPanel({
+  onCapture,
+  contextLabel,
+  reactionProjectId,
+  onSchemeAttached,
+}: Props) {
   const [open, setOpen] = useState(false)
   const [snapshot, setSnapshot] = useState<StructureSnapshot | null>(null)
   const [error, setError] = useState("")
@@ -283,6 +290,7 @@ export function StructureEditorPanel({ onCapture, contextLabel, reactionProjectI
         schemeName,
       )
       setAttachedScheme({ id: created.id, name: created.name?.trim() || "Untitled scheme" })
+      onSchemeAttached?.()
     } catch (err) {
       // A drawing RDKit cannot read is refused with 400 rather than stored, and that message is
       // already written for a chemist — render it as-is instead of replacing it with our own.
@@ -294,7 +302,7 @@ export function StructureEditorPanel({ onCapture, contextLabel, reactionProjectI
     } finally {
       setSchemeBusy(false)
     }
-  }, [snapshot, schemeProjectId, schemeName])
+  }, [snapshot, schemeProjectId, schemeName, onSchemeAttached])
 
   const attachToCompound = useCallback(async () => {
     if (!snapshot || attachCompoundId == null) return

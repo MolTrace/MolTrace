@@ -42,6 +42,7 @@ import {
 } from "@/components/ui/select"
 import { Tabs, TabsContent } from "@/components/ui/tabs"
 import { StructureEditorPanel } from "@/src/components/chemistry/StructureEditorPanel"
+import { ReactionSchemeList } from "@/src/components/chemistry/ReactionSchemeList"
 import {
   WorkspaceStageNav,
   type WorkspaceStageGroup,
@@ -1810,6 +1811,8 @@ export function ReactionProjectDetail() {
       : Array.isArray(raw) && raw[0]
         ? Number.parseInt(raw[0], 10)
         : NaN
+  /** Bumped after a scheme attaches, so the list beside the canvas refreshes itself. */
+  const [schemeRefreshToken, setSchemeRefreshToken] = useState(0)
   /** Latest project id, for dropping stale async responses after a client-side project switch. */
   const reactionProjectIdRef = useRef(reactionProjectId)
   reactionProjectIdRef.current = reactionProjectId
@@ -6336,7 +6339,16 @@ export function ReactionProjectDetail() {
             <StructureEditorPanel
               contextLabel={`Project ${reactionProjectId}`}
               reactionProjectId={Number.isFinite(reactionProjectId) ? reactionProjectId : null}
+              onSchemeAttached={() => setSchemeRefreshToken((n) => n + 1)}
             />
+            {/* Without this the attach was write-only: a scheme went in and could never be seen
+                again, which makes it hard to trust and impossible to correct. */}
+            {Number.isFinite(reactionProjectId) ? (
+              <ReactionSchemeList
+                reactionProjectId={reactionProjectId}
+                refreshToken={schemeRefreshToken}
+              />
+            ) : null}
           </section>
         </TabsContent>
 
