@@ -292,3 +292,97 @@ def test_spectroscopy_sessions_keep_their_own_comment_surface(client, api_header
     """The session surface can anchor a note to a specific piece of evidence; this one cannot."""
     with client:
         assert _comment(client, api_headers, "spectracheck_session", 1).status_code == 403
+
+
+# --------------------------------------------------------------------------- #
+# Approvals — the sign-off record, distinct from the signature
+# --------------------------------------------------------------------------- #
+def _approve(client, headers, subject_type: str, subject_id: int, decision: str = "approved"):
+    return client.post(
+        "/approvals",
+        headers=headers,
+        json={
+            "subject_type": subject_type,
+            "subject_id": subject_id,
+            "decision": decision,
+            "rationale": "Reviewed against the current guidance.",
+        },
+    )
+
+
+def test_a_filing_can_carry_an_approval(client, api_headers):
+    with client:
+        dossier = _dossier(client, api_headers)
+        created = _approve(client, api_headers, "regulatory_dossier", dossier["id"])
+        assert created.status_code == 201, created.text
+        body = created.json()
+        assert body["decision"] == "approved"
+        assert body["session_id"] is None
+        assert body["module"] == "regulatory_hub"
+
+        listed = client.get(
+            f"/approvals?subject_type=regulatory_dossier&subject_id={dossier['id']}",
+            headers=api_headers,
+        )
+        assert listed.status_code == 200, listed.text
+        assert [row["id"] for row in listed.json()] == [body["id"]]
+
+
+def test_a_campaign_can_carry_an_approval(client, api_headers):
+    with client:
+        campaign = _campaign(client, api_headers)
+        created = _approve(client, api_headers, "reaction_project", campaign["id"])
+        assert created.status_code == 201, created.text
+        assert created.json()["module"] == "reaction_optimization"
+
+
+def test_a_rejection_is_recorded_with_its_rationale(client, api_headers):
+    """A sign-off record has to be able to say no, with a reason — that is the point of it."""
+    with client:
+        dossier = _dossier(client, api_headers)
+        created = _approve(client, api_headers, "regulatory_dossier", dossier["id"], "rejected")
+        assert created.status_code == 201, created.text
+        assert created.json()["decision"] == "rejected"
+        assert created.json()["rationale"]
+
+
+def test_a_teammate_can_record_and_read_an_approval(client, app):
+    lead_email, mate_email = _emails()
+    with client:
+        lead = _sign_up(client, lead_email)
+        mate = _sign_up(client, mate_email)
+        _org_with_members(app, "Regulatory Affairs", [(lead_email, "active"), (mate_email, "active")])
+        dossier = _dossier(client, lead)
+
+        created = _approve(client, mate, "regulatory_dossier", dossier["id"])
+        assert created.status_code == 201, created.text
+
+        listed = client.get(
+            f"/approvals?subject_type=regulatory_dossier&subject_id={dossier['id']}", headers=lead
+        )
+        assert listed.status_code == 200, listed.text
+        assert [row["id"] for row in listed.json()] == [created.json()["id"]]
+
+
+def test_an_outsider_cannot_record_or_read_an_approval(client, app):
+    lead_email, outsider_email = _emails()
+    with client:
+        lead = _sign_up(client, lead_email)
+        outsider = _sign_up(client, outsider_email)
+        _org_with_members(app, "Regulatory Affairs", [(lead_email, "active")])
+        _org_with_members(app, "Another Company", [(outsider_email, "active")])
+        dossier = _dossier(client, lead)
+
+        assert _approve(client, outsider, "regulatory_dossier", dossier["id"]).status_code == 404
+        assert (
+            client.get(
+                f"/approvals?subject_type=regulatory_dossier&subject_id={dossier['id']}",
+                headers=outsider,
+            ).status_code
+            == 404
+        )
+
+
+def test_spectroscopy_sessions_keep_their_own_approval_surface(client, api_headers):
+    with client:
+        assert _approve(client, api_headers, "spectracheck_session", 1).status_code == 403

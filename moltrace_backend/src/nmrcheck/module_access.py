@@ -202,6 +202,7 @@ PLATFORM_ROUTE_PREFIXES: tuple[str, ...] = (
     # than needing a gate of its own.
     "/review-tasks",
     "/comments",
+    "/approvals",
 )
 
 

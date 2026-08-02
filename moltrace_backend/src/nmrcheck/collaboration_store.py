@@ -28,6 +28,7 @@ from .models import (
     ReportLockRequest,
     ReportReleaseRequest,
     ReviewTaskCreate,
+    SubjectApprovalCreate,
     SubjectCommentCreate,
     SubjectReviewTaskCreate,
     ReviewTaskRecord,
@@ -1177,9 +1178,17 @@ def _review_task_to_record(row: ReviewTaskORM) -> ReviewTaskRecord:
 
 
 def _approval_to_record(row: ApprovalRecordORM) -> ApprovalRecord:
+    subject_type = row.subject_type
     return ApprovalRecord(
         id=row.id,
         session_id=row.session_id,
+        subject_type=subject_type,  # type: ignore[arg-type]
+        subject_id=row.subject_id,
+        module=(
+            collaboration_subjects.SUBJECT_MODULE.get(subject_type)  # type: ignore[arg-type]
+            if subject_type
+            else ("spectracheck" if row.session_id is not None else None)
+        ),
         evidence_id=row.evidence_id,
         report_id=row.report_id,
         approver_email=row.approver_email,
@@ -1709,3 +1718,73 @@ def update_subject_comment(
         )
         session.flush()
         return _comment_to_record(row)
+
+
+# --------------------------------------------------------------------------- #
+# Subject-addressed approvals (Regentry filings, Repho campaigns)
+# --------------------------------------------------------------------------- #
+def create_subject_approval(
+    session_factory: sessionmaker[Session],
+    payload: SubjectApprovalCreate,
+    *,
+    owner_scope_id: int | None,
+    approver_email: str | None,
+) -> ApprovalRecord:
+    """Record a sign-off decision on a filing or a campaign.
+
+    This is the *workflow* record — who decided what, and why. It is deliberately not itself a
+    signature: an electronic signature is created through the e-signature surface and bound to a
+    point-in-time artifact, which is what §11.70 asks for. Approving a living record and signing a
+    generated report are different acts, and conflating them would let a signature drift away from
+    what it attested to.
+    """
+    with session_scope(session_factory) as session:
+        _require_subject_access(session, payload.subject_type, payload.subject_id, owner_scope_id)
+        row = ApprovalRecordORM(
+            session_id=None,
+            subject_type=payload.subject_type,
+            subject_id=payload.subject_id,
+            approver_email=_normalize_email(payload.approver_email or approver_email),
+            decision=payload.decision,
+            rationale=payload.rationale,
+            metadata_json=_json_dump(payload.metadata_json),
+        )
+        session.add(row)
+        session.flush()
+        _audit(
+            session,
+            event_type="collaboration.approval.create",
+            message="Approval decision recorded.",
+            actor=CollaborationActor(
+                user_id=owner_scope_id, email=approver_email, permissive=owner_scope_id is None
+            ),
+            entity_type="approval_record",
+            entity_id=row.id,
+            metadata={
+                "subject_type": payload.subject_type,
+                "subject_id": payload.subject_id,
+                "decision": payload.decision,
+            },
+        )
+        session.refresh(row)
+        return _approval_to_record(row)
+
+
+def list_subject_approvals(
+    session_factory: sessionmaker[Session],
+    subject_type: str,
+    subject_id: int,
+    *,
+    owner_scope_id: int | None,
+    limit: int = 500,
+) -> list[ApprovalRecord]:
+    with session_scope(session_factory) as session:
+        _require_subject_access(session, subject_type, subject_id, owner_scope_id)
+        rows = session.scalars(
+            select(ApprovalRecordORM)
+            .where(ApprovalRecordORM.subject_type == subject_type)
+            .where(ApprovalRecordORM.subject_id == subject_id)
+            .order_by(ApprovalRecordORM.created_at.asc(), ApprovalRecordORM.id.asc())
+            .limit(limit)
+        ).all()
+        return [_approval_to_record(row) for row in rows]
