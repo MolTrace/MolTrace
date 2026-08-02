@@ -29,7 +29,17 @@ export type ModuleSeo = {
 export const HOME_FAQS: FaqItem[] = [
   {
     q: "What is MolTrace?",
-    a: "MolTrace is an AI-native scientific intelligence platform for chemical and pharmaceutical R&D that links raw analytical data to decisions on one audit-ready evidence trail. It presents three modules — SpectraCheck, Regentry, and Repho — so any number in a report traces back to the spectrum, recipe, citation, and reviewer behind it.",
+    // Audience phrase must match SITE_DESCRIPTION word for word. This answer is
+    // emitted as FAQPage JSON-LD, which is the surface AI Overviews quote most
+    // readily — a narrower audience here than on the homepage is what lets the
+    // summary report the product as being for pharma alone.
+    //
+    // The three modules are also named in the SAME sentence as the audience,
+    // because a summariser that compresses this answer drops trailing clauses
+    // first: a live AI Overview for "moltrace platform" (2026-08-02) rendered
+    // "spectroscopy and reaction optimization" and lost regulatory work
+    // entirely, which is the whole of Regentry.
+    a: "MolTrace is an AI-native scientific intelligence platform for academic, chemical and pharmaceutical R&D, spanning spectroscopy, regulatory and reaction work in three modules — SpectraCheck, Regentry and Repho. It links raw analytical data to decisions on one audit-ready evidence trail, so any number in a report traces back to the spectrum, recipe, citation and reviewer behind it.",
   },
   {
     q: "What modules does MolTrace include?",
