@@ -1140,12 +1140,19 @@ class EvidenceCommentORM(Base):
         Index("ix_evidence_comments_session_created", "session_id", "created_at"),
         Index("ix_evidence_comments_evidence_created", "evidence_id", "created_at"),
         Index("ix_evidence_comments_artifact_created", "artifact_id", "created_at"),
+        Index("ix_evidence_comments_subject", "subject_type", "subject_id"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    session_id: Mapped[int] = mapped_column(
-        ForeignKey("spectracheck_sessions.id", ondelete="CASCADE"), index=True
+    # As with review tasks: a comment was a SpectraCheck-session comment by construction, so a
+    # regulatory or process-chemistry team had nowhere to discuss a record. The subject pair is
+    # the general address; ``session_id`` stays for the rows that predate it. Exactly one
+    # addressing mode is set, resolved and authorized by ``collaboration_subjects``.
+    session_id: Mapped[int | None] = mapped_column(
+        ForeignKey("spectracheck_sessions.id", ondelete="CASCADE"), nullable=True, index=True
     )
+    subject_type: Mapped[str | None] = mapped_column(String(48), nullable=True)
+    subject_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     evidence_id: Mapped[int | None] = mapped_column(
         ForeignKey("spectracheck_evidence_records.id", ondelete="SET NULL"),
         nullable=True,

@@ -196,11 +196,12 @@ PLATFORM_ROUTE_PREFIXES: tuple[str, ...] = (
     "/cross-module",
     "/product",
     "/mobile",
-    # Subject-addressed review tasks reach whichever products a deployment serves, and their
-    # authorization is the subject's own rule — so on a single-product deployment there is simply
-    # nothing of the other products to address, and the surface degrades to empty rather than
-    # needing a gate of its own.
+    # Subject-addressed review tasks and comments reach whichever products a deployment serves,
+    # and their authorization is the subject's own rule — so on a single-product deployment there
+    # is simply nothing of the other products to address, and the surface degrades to empty rather
+    # than needing a gate of its own.
     "/review-tasks",
+    "/comments",
 )
 
 
