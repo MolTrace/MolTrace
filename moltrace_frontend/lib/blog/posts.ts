@@ -49,19 +49,25 @@ export type BlogPost = {
   metaDescription?: string
   /** Byline for the article + JSON-LD author. */
   author?: string
-  /** Hero artwork, without extension, under `/public/blog/`.
+  /** Hero artwork shown on the post and the featured card. Path under
+   *  `/public/blog/`, WITH its extension — an .svg diagram or a raster
+   *  photograph are both fine, so the field does not assume a format. */
+  heroImage?: string
+  /** Raster twin for `og:image` and the Article JSON-LD image, 1200x630.
    *
-   *  Two files are expected per slug and each is used where it belongs:
-   *    `<name>.svg` — on-page hero. Stays crisp at any size and costs ~15 KB.
-   *    `<name>.png` — og:image. Social platforms and Slack do NOT render SVG
-   *                   previews, so a raster twin is required, at 1200x630.
-   *  Regenerate the PNG from the SVG after any edit:
+   *  Needed only when `heroImage` is an SVG: no major social platform or Slack
+   *  renders an SVG link preview, and Google's structured-data guidance wants a
+   *  raster, so pointing og:image at a .svg yields a link with no card at all.
+   *  When `heroImage` is already a raster it serves as its own twin and this
+   *  can be omitted — see `socialImageFor`.
+   *
+   *  Regenerate an SVG's twin after any edit to the source:
    *    node -e "const s=require('sharp'),f=require('fs');
    *      s(f.readFileSync('public/blog/<name>.svg'),{density:200})
    *       .resize(1200,630,{fit:'fill'}).png({palette:true,quality:90,effort:10})
    *       .toFile('public/blog/<name>.png')"
    */
-  heroImage?: string
+  heroSocialImage?: string
   /** Describes the artwork for screen readers. Required whenever heroImage is
    *  set — the artwork carries the post's argument, not just decoration. */
   heroImageAlt?: string
@@ -86,9 +92,12 @@ export const POSTS: BlogPost[] = [
     metaDescription:
       "Why MolTrace counts chemical environments, not peaks: reconciling expert NMR references with detector multiplet-line output for the GSD gate.",
     author: "MolTrace research team",
-    heroImage: "/blog/chemical-environments-not-peaks",
+    // A raster hero is its own social image, so no heroSocialImage twin is
+    // needed here. JPEG, not PNG: the same photograph encodes to 71 KB as JPEG
+    // and 1,379 KB as PNG, and this page is one we want crawled quickly.
+    heroImage: "/blog/chemical-environments-not-peaks-lab.jpg",
     heroImageAlt:
-      "A schematic proton NMR trace in which clusters of detector lines — a singlet, doublet, triplet, quartet, AB system and multiplet — are bracketed and collapsed into six chemical-environment markers. A magnifier over the quartet shows its four resolved lines resolving to one environment.",
+      "A darkened NMR facility. A superconducting magnet vents cryogenic vapour inside a yellow-and-black floor marking, beside a rack of spectrometer electronics. A proton NMR spectrum is projected into the air above the bench in glowing teal, its peak clusters gathered by brackets into single points, with a magnifier hovering over one cluster. At the right, a gloved hand holds a sample tube.",
     body: [
       {
         "type": "h2",
@@ -277,4 +286,19 @@ export function getLivePosts(): BlogPost[] {
 
 export function getPostBySlug(slug: string): BlogPost | undefined {
   return POSTS.find((p) => p.slug === slug)
+}
+
+const RASTER_IMAGE = /\.(png|jpe?g|webp)$/i
+
+/** The image to hand social scrapers and Article JSON-LD, or undefined.
+ *
+ *  A raster hero is its own social image; an SVG hero needs the explicit
+ *  `heroSocialImage` twin, because no major platform renders an SVG preview.
+ *  Returning undefined lets the caller fall back to the site-wide card rather
+ *  than advertising an image that would fail to render.
+ */
+export function socialImageFor(post: BlogPost): string | undefined {
+  if (post.heroSocialImage) return post.heroSocialImage
+  if (post.heroImage && RASTER_IMAGE.test(post.heroImage)) return post.heroImage
+  return undefined
 }
