@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Footer } from "@/components/marketing/footer"
 import { Header } from "@/components/marketing/header"
 import { SITE_URL, SITE_NAME } from "@/lib/seo/site"
-import { getLivePosts, getPostBySlug, type PostBlock } from "@/lib/blog/posts"
+import { getLivePosts, getPostBySlug, socialImageFor, type PostBlock } from "@/lib/blog/posts"
 
 // Only live posts (status: "live" + a body) are emitted as routes; any other
 // slug 404s. This is what keeps unwritten "forthcoming" posts from ever
@@ -28,12 +28,11 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   if (!post || post.status !== "live") return {}
   const description = post.metaDescription ?? post.dek
   const url = `${SITE_URL}/blog/${post.slug}`
-  // The PNG twin, never the SVG: no major social platform renders an SVG
-  // preview, so pointing og:image at the .svg would silently produce a
-  // link with no card at all. Absolute URL because scrapers do not resolve
-  // relative ones. Posts without artwork fall through to the site-wide
-  // opengraph-image card, which is the existing behaviour.
-  const heroPng = post.heroImage ? `${SITE_URL}${post.heroImage}.png` : undefined
+  // Absolute URL because scrapers do not resolve relative ones. Posts with no
+  // usable raster fall through to the site-wide opengraph-image card, which is
+  // the existing behaviour.
+  const social = socialImageFor(post)
+  const heroPng = social ? `${SITE_URL}${social}` : undefined
   const images = heroPng
     ? [{ url: heroPng, width: 1200, height: 630, alt: post.heroImageAlt ?? post.title }]
     : undefined
@@ -159,10 +158,12 @@ export default async function BlogPostPage({ params }: Params) {
       },
     },
     mainEntityOfPage: { "@type": "WebPage", "@id": url },
-    // The post's own artwork when it has some, so a rich result shows the
-    // essay rather than the generic site card. PNG, not SVG: Google's
-    // structured-data image guidance requires a raster format.
-    image: post.heroImage ? `${SITE_URL}${post.heroImage}.png` : `${SITE_URL}/opengraph-image`,
+    // The post's own artwork when it has a usable raster, so a rich result
+    // shows the essay rather than the generic site card. socialImageFor keeps
+    // SVGs out of here — Google's structured-data guidance wants a raster.
+    image: socialImageFor(post)
+      ? `${SITE_URL}${socialImageFor(post)}`
+      : `${SITE_URL}/opengraph-image`,
     url,
     articleSection: post.topicLabel,
     inLanguage: "en-US",
@@ -218,7 +219,7 @@ export default async function BlogPostPage({ params }: Params) {
           {post.heroImage ? (
             <figure className="mt-10">
               <img
-                src={`${post.heroImage}.svg`}
+                src={post.heroImage}
                 alt={post.heroImageAlt ?? ""}
                 width={1200}
                 height={630}

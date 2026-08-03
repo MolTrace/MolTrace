@@ -163,7 +163,7 @@ export function BlogPage() {
                 // Letting it keep its own aspect ratio shows the whole thing.
                 <aside className="relative self-start overflow-hidden rounded-2xl border bg-muted/30">
                   <img
-                    src={`${featured.heroImage}.svg`}
+                    src={featured.heroImage}
                     alt={featured.heroImageAlt ?? ""}
                     width={1200}
                     height={630}
