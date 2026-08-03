@@ -12,7 +12,7 @@ describe("home page", () => {
     render(<HomePage />)
     expect(
       screen.getByRole("heading", {
-        name: /Unified Intelligence Platform for Chemical and Pharmaceutical R&D/i,
+        name: /Analytical evidence you can trace under audit/i,
       }),
     ).toBeInTheDocument()
     expect(screen.getAllByText("Request Demo")[0]).toBeInTheDocument()
