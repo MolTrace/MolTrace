@@ -24,10 +24,17 @@ broad.
 from __future__ import annotations
 
 import math
+from dataclasses import dataclass
 
 import pytest
 
-from nmrcheck.spectrum import _infer_peak_estimates
+from nmrcheck.spectrum import (
+    _estimates_to_peaks,
+    _infer_peak_estimates,
+    _PeakEstimate,
+    _provisional_integrations,
+    _round_half_integrations,
+)
 
 # Realistic 1H digitisation: 0-10 ppm over 32768 points ~ 3277 points/ppm.
 _PPM_LO, _PPM_HI, _N_POINTS = 0.0, 10.0, 32768
@@ -272,3 +279,128 @@ def test_truncation_loss_is_reported_not_silent() -> None:
         "proton counts depend on linewidth rather than on how many protons "
         "are present."
     )
+
+
+# ---------------------------------------------------------------------------
+# Integration SCALE.
+#
+# The tests above check that fitted areas are recovered from a lineshape. These
+# check what the pipeline then does with those areas, which is a separate thing
+# and was separately wrong.
+#
+# `_provisional_integrations` used to set its reference to
+# ``max(min(basis), max(basis) * 0.08)``. The floor took over whenever a
+# spectrum's dynamic range exceeded 12.5 — i.e. for any molecule with a large
+# multiplet — and pinned the largest peak at exactly 1/0.08 = 12.5 H, which
+# ``_round_half_integrations`` then clipped to 12.0. Measured on a real 500 MHz
+# spectrum of a protected sugar: a multiplet of ~37 protons reported 12.0 H,
+# and the reported largest/smallest ratio was 24.0 against a true fitted-area
+# ratio of 41.6 — a 42% error in a quantity that is supposed to be a proton
+# count.
+#
+# The invariant asserted here is scale-free on purpose. An absolute proton
+# count cannot be recovered from one spectrum without an anchor (a structure or
+# an internal standard), so these do not assert absolute values. What must hold
+# regardless of the anchor is that RATIOS between reported integrations equal
+# ratios between fitted areas.
+# ---------------------------------------------------------------------------
+
+@dataclass
+class _Area:
+    """Minimal stand-in for _PeakEstimate: only `area` is read by the scaler."""
+
+    area: float
+    shift_ppm: float = 5.0
+
+
+def _reported(areas: list[float]) -> list[float]:
+    ests = [_Area(a) for a in areas]
+    return _round_half_integrations(_provisional_integrations(ests), minimum=0.5)
+
+
+@pytest.mark.parametrize("largest", [5, 10, 13, 20, 37, 63, 120])
+def test_large_multiplets_are_not_all_reported_as_the_same_value(largest: int) -> None:
+    """A 13, 37 and 120 proton multiplet must not all report 12.00 H.
+
+    Under the old 8% reference floor they did: every one of them came back as
+    exactly 12.00, because the value was a constant of the algorithm rather
+    than a measurement of the spectrum.
+    """
+    reported = _reported([1.0, 2.0, float(largest)])
+
+    assert reported[-1] == pytest.approx(largest, rel=0.05), (
+        f"a {largest} H multiplet reported {reported[-1]} H"
+    )
+
+
+def test_distinct_small_signals_do_not_collapse_onto_one_value() -> None:
+    """1 H, 2 H and 3 H must stay distinguishable next to a large envelope.
+
+    The old reference floor scaled by the LARGEST peak, so in a molecule with a
+    63 H envelope (three TIPS groups) a 1 H, a 2 H and a 3 H signal all landed
+    on 0.5 H — three different proton counts rendered as one number.
+    """
+    reported = _reported([1.0, 2.0, 3.0, 63.0])
+
+    assert len(set(reported[:3])) == 3, f"1/2/3 H collapsed onto {reported[:3]}"
+    assert reported[0] < reported[1] < reported[2]
+
+
+@pytest.mark.parametrize("dynamic_range", [3.0, 12.0, 12.6, 41.6, 100.0])
+def test_reported_ratios_track_fitted_area_ratios(dynamic_range: float) -> None:
+    """The scale-free invariant: reported ratio == area ratio.
+
+    12.6 and above are the cases the old floor broke; 41.6 is the ratio
+    measured on the real protected-sugar spectrum, where the old pipeline
+    reported 24.0.
+    """
+    areas = [1.0, dynamic_range / 2.0, dynamic_range]
+    reported = _reported(areas)
+
+    assert reported[-1] / reported[0] == pytest.approx(dynamic_range, rel=0.08)
+
+
+def test_reference_is_not_pinned_to_a_fraction_of_the_largest_peak() -> None:
+    """Doubling only the largest peak must not rescale the others.
+
+    Under the 8% floor the reference was derived from the maximum, so growing
+    the largest peak shrank every other reported integration — a change in one
+    resonance silently rewrote the rest of the spectrum.
+    """
+    base = _reported([1.0, 2.0, 4.0, 30.0])
+    grown = _reported([1.0, 2.0, 4.0, 60.0])
+
+    assert base[:3] == grown[:3], (
+        f"growing the largest peak rewrote the others: {base[:3]} -> {grown[:3]}"
+    )
+
+
+def test_a_lone_proton_beside_a_large_envelope_is_not_discarded_as_noise() -> None:
+    """A 1 H signal in a molecule with a 63 H envelope must survive.
+
+    The noise test used to be written on the provisional integrations
+    (``value >= 0.25``), which under the old reference floor worked out to
+    "area is at least 2% of the largest peak". That threshold is defined by the
+    biggest multiplet, so the larger the molecule the more real protons it
+    deleted: beside three TIPS groups a lone proton is 1.6% of the maximum and
+    was thrown away as noise. The criterion is now on area alone, sited inside
+    a measured gap between the noise and signal populations.
+    """
+    def est(shift: float, area: float) -> _PeakEstimate:
+        return _PeakEstimate(
+            shift_ppm=shift, area=area, intensity=area, multiplicity="s",
+            width_ppm=0.01, component_count=1, j_values_hz=(),
+        )
+
+    estimates = [
+        est(7.30, 63.0),   # the TIPS envelope
+        est(5.20, 1.0),    # a lone proton: 1.6% of the largest area
+        est(4.10, 2.0),
+        est(3.90, 0.05),   # genuine noise: 0.08% of the largest area
+    ]
+    peaks, meta = _estimates_to_peaks(estimates, solvent="CDCl3", nucleus="1H")
+
+    shifts = [p.shift_ppm for p in peaks]
+    assert 5.20 in shifts, f"the lone proton was dropped as noise; kept {shifts}"
+    assert 3.90 not in shifts, f"noise was kept as a peak; kept {shifts}"
+    assert meta["noise_peaks_dropped"] == 1

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from nmrcheck.acquisition_quality import (
     LEVEL_NOT,
     LEVEL_QUANTITATIVE,
@@ -41,9 +43,15 @@ class TestQuantitativeGating:
         single most common experiment in existence. The old flat threshold
         applied the 5xT1 rule that is calibrated for a 90 degree pulse and
         condemned it outright. At 30 degrees the steady state is far less
-        T1-sensitive: the same 5 s recycle leaves ~8% differential saturation
-        rather than ~58%, which is a real limitation but not grounds to refuse
-        the integrals. Verified against the user's own 500 MHz zg30 data.
+        T1-sensitive: the same 5 s recycle leaves ~15% differential saturation
+        rather than ~112%, which is a real limitation but not grounds to refuse
+        the integrals.
+
+        The figure was ~8% when this test was written, under a T1 range that
+        assumed every proton relaxes within 5 s. Integrating a real matched
+        pair (30 s vs 5 s recycle, same sample) measured 14.1%, so the range
+        was widened and the number here corrected. The VERDICT is unchanged,
+        which is the point of the test.
         """
         result = assess_1h_acquisition(
             relaxation_delay_s=1.0, td=65536, sw_hz=8000.0, scans=16, pulse_program="zg30"
@@ -60,9 +68,31 @@ class TestQuantitativeGating:
         assert result.parameters["pulse_angle_deg"] == 90.0
         assert result.parameters["differential_saturation_ratio"] > 1.4
 
-    def test_intermediate_recycle_is_semi_quantitative(self) -> None:
+    def test_intermediate_recycle_at_90_degrees_is_not_quantitative(self) -> None:
+        """DELIBERATE RE-BASELINE (was LEVEL_SEMI).
+
+        A 90 degree pulse at d1 = 8 s (≈12 s recycle) was called
+        semi-quantitative when the model assumed protons relax within 5 s. With
+        a realistic 8 s ceiling it leaves ~28% differential saturation, and the
+        classic rule agrees: a 90 degree pulse needs ~5·T1, which is 40 s for
+        an 8 s proton, not 12.
+
+        This is the one classification the wider T1 range genuinely moves, and
+        it moves in the direction the chemistry supports. A 30 degree pulse at
+        the same recycle stays semi-quantitative — that case is covered by
+        test_routine_zg30_is_semi_quantitative_not_condemned — so the change
+        does not condemn ordinary routine work.
+        """
         result = assess_1h_acquisition(
             relaxation_delay_s=8.0, td=65536, sw_hz=8000.0, scans=16, pulse_program="zg"
+        )
+        assert result.level == LEVEL_NOT
+        assert result.parameters["pulse_angle_deg"] == 90.0
+
+    def test_intermediate_recycle_at_30_degrees_stays_semi_quantitative(self) -> None:
+        """The counterpart: the same recycle with a small flip angle is usable."""
+        result = assess_1h_acquisition(
+            relaxation_delay_s=8.0, td=65536, sw_hz=8000.0, scans=16, pulse_program="zg30"
         )
         assert result.level == LEVEL_SEMI
 
@@ -144,4 +174,65 @@ class TestFlipAngleModel:
             "a 30 degree pulse must be less T1-sensitive than a 90 at the same "
             f"recycle; got {narrow:.3f} vs {wide:.3f}"
         )
-        assert wide > 1.4 and narrow < 1.15
+        # RE-BASELINED with the T1 range (0.5-5 s -> 0.5-8 s): narrow moved
+        # 1.078 -> 1.154. The claim under test is the GAP between the two flip
+        # angles, which is unchanged and large (2.15 vs 1.15); only the
+        # absolute bound needed moving. 1.154 is also the value that now
+        # brackets the 1.141 measured on a real 5 s / 30 degree acquisition.
+        assert wide > 1.4 and narrow < 1.20
+
+
+class TestAgainstMeasuredSpectra:
+    """Pinned to a real matched pair, not to the model's own arithmetic.
+
+    naw-1-244-54pt: one sample, one probe, two acquisitions differing only in
+    relaxation delay — 22.005 s + 7.995 s AQ = 30.00 s recycle, and 1.000 s +
+    3.998 s AQ = 5.00 s — both zg30 on a 500 MHz instrument. Integrating
+    identical ppm windows in the two processed spectra, the per-window ratio
+    between them spread by a factor of 1.141. That is a MEASUREMENT of
+    differential saturation at a 5 s recycle, and the model has to be
+    consistent with it.
+    """
+
+    def test_the_fully_relaxed_acquisition_is_called_quantitative(self) -> None:
+        from nmrcheck.acquisition_quality import assess_1h_acquisition
+
+        result = assess_1h_acquisition(
+            relaxation_delay_s=22.00461, td=131072,
+            sw_hz=16.3881000708626 * 500.16300096, scans=16, pulse_program="zg30",
+        )
+        assert result.level == LEVEL_QUANTITATIVE
+        assert result.parameters["recycle_time_s"] == pytest.approx(30.0, abs=0.01)
+
+    def test_the_routine_acquisition_is_flagged_but_not_condemned(self) -> None:
+        from nmrcheck.acquisition_quality import assess_1h_acquisition
+
+        result = assess_1h_acquisition(
+            relaxation_delay_s=1.0, td=65536,
+            sw_hz=16.3881000708626 * 500.16300096, scans=16, pulse_program="zg30",
+        )
+        assert result.level == LEVEL_SEMI
+        assert result.parameters["recycle_time_s"] == pytest.approx(5.0, abs=0.01)
+
+    def test_the_predicted_bias_brackets_what_was_measured(self) -> None:
+        """The estimate must not fall SHORT of the observed spread.
+
+        It read 1.078 against an observed 1.141 before the T1 range was
+        widened, i.e. it told the chemist the integrals were better than they
+        were. Being conservative in the other direction is acceptable; being
+        optimistic is not.
+        """
+        from nmrcheck.acquisition_quality import differential_saturation_ratio
+
+        MEASURED = 1.141
+        predicted = differential_saturation_ratio(recycle_s=5.0, angle_deg=30.0)
+
+        assert predicted >= MEASURED, (
+            f"model predicts {predicted:.4f} but {MEASURED} was measured on a real "
+            "matched pair; an optimistic estimate understates the error a chemist "
+            "will actually see"
+        )
+        assert predicted <= MEASURED * 1.25, (
+            f"model predicts {predicted:.4f}, far above the measured {MEASURED}; "
+            "an over-pessimistic estimate condemns usable spectra"
+        )

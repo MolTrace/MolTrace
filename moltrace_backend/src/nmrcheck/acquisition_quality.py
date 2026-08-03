@@ -47,13 +47,43 @@ from typing import Any
 # pulse — the standard routine experiment, zg30 — reaches the same fidelity far
 # sooner, and judging it by the 90 degree rule condemns almost every real
 # spectrum ever recorded.
+#
+# The slow end was 5.0 s, and one measurement showed that was optimistic. A
+# matched pair on the same sample and probe — 30.00 s and 5.00 s recycle, both
+# zg30 — was integrated over identical ppm windows: the per-window ratio
+# between the two spectra spread by a factor of 1.141, against 1.078 predicted.
+# Widening the slow end to 8 s predicts 1.154, so the estimate now brackets the
+# one real measurement instead of falling short of it, and 8 s remains a
+# defensible ceiling for small-molecule 1H (isolated aromatic CH, protons with
+# no near neighbour to relax against).
+#
+# The fast end does not matter at these recycle times — by 5 s a 0.5 s spin is
+# fully relaxed, and 0.5, 0.4 and 0.3 give the same ratio to four decimals — so
+# it is left alone rather than tuned for the appearance of precision.
+#
+# This is an estimate from an ASSUMED T1 range, not a measurement of any
+# particular sample; the wording of the reasons below says so.
 T1_FAST_S = 0.5
-T1_SLOW_S = 5.0
+T1_SLOW_S = 8.0
 
 # Tolerated ratio S(fast)/S(slow). 2% is a genuinely quantitative integral;
-# beyond 10% the integrals reflect relaxation as much as proton count.
+# beyond 20% the integrals reflect relaxation as much as proton count.
+#
+# The semi boundary was 1.10, calibrated against the old 0.5-5 s T1 range.
+# Widening that range to 0.5-8 s raises every ratio, so leaving the boundary
+# alone would have silently reclassified the single most common experiment in
+# existence — d1 = 1 s at 30 degrees — from semi-quantitative to condemned, on
+# no new evidence about that experiment's usefulness. It is moved so the
+# boundary keeps its MEANING rather than its number: ~15% differential
+# saturation still lets a chemist tell 1 H from 2 H, which is what
+# semi-quantitative is for, even though it is far from qNMR grade.
+#
+# The quantitative boundary deliberately does NOT move. 2% is what makes an
+# integral readable as a proton count, and the effect of the more realistic T1
+# ceiling is to demand a longer recycle before granting that label — which is
+# the correct direction, because the old range was optimistic.
 QUANTITATIVE_BIAS_RATIO = 1.02
-SEMI_QUANTITATIVE_BIAS_RATIO = 1.10
+SEMI_QUANTITATIVE_BIAS_RATIO = 1.20
 
 # Flip angle inferred from the pulse-program name when it is not supplied.
 # Bruker names the angle in the sequence: zg30 is 30 degrees, zg is a 90.
@@ -248,7 +278,9 @@ def assess_1h_acquisition(
             0,
             summary
             + f"about {bias_pct:.0f}% differential saturation: slowly relaxing "
-            "protons integrate low by roughly that much.",
+            "protons integrate low by roughly that much. That figure is an "
+            "estimate from an assumed relaxation range, not a measurement of "
+            "this sample, so treat it as a guide rather than a limit.",
         )
         return AcquisitionQuality(LEVEL_SEMI, reasons, parameters)
 

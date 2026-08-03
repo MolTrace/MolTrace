@@ -17,6 +17,7 @@ from .baseline import (
 )
 from .display_view import weak_peak_magnifier_view
 from .models import (
+    MAX_SIGNAL_INTEGRATION_H,
     Peak,
     SpectrumComparisonReport,
     SpectrumExtraPeak,
@@ -1546,11 +1547,32 @@ def _provisional_integrations(
     basis = [a for a in (reference_areas or [peak.area for peak in estimates]) if a > 0]
     if not basis:
         return []
-    reference = max(min(basis), max(basis) * 0.08)
+    # The smallest surviving analyte peak sets the scale, full stop.
+    #
+    # This used to be ``max(min(basis), max(basis) * 0.08)``. That floor made
+    # the LARGEST peak set the reference whenever the spectrum's dynamic range
+    # exceeded 12.5, which pinned the largest peak at exactly 1/0.08 = 12.5 H
+    # for every such molecule — a constant of the algorithm rather than a
+    # measurement. Verified on a real 500 MHz spectrum: a multiplet whose
+    # fitted area corresponds to ~37 protons reported 12.5 H, and 1 H, 2 H and
+    # 3 H signals all collapsed onto 0.5 H because the inflated reference
+    # crushed them together. Synthetically, 13 H, 20 H, 37 H, 60 H and 120 H
+    # multiplets ALL reported 12.00 H.
+    #
+    # The floor was there to stop a noise spike from setting the reference.
+    # Noise is now removed on its own explicit criterion before this runs (see
+    # the caller), so the smallest remaining peak is a real resonance and can
+    # be trusted to anchor the scale.
+    reference = min(basis)
     return [max(0.2, peak.area / reference) for peak in estimates]
 
 
-def _round_half_integrations(values: list[float], *, minimum: float = 0.5, maximum: float = 12.0) -> list[float]:
+def _round_half_integrations(
+    values: list[float],
+    *,
+    minimum: float = 0.5,
+    maximum: float = MAX_SIGNAL_INTEGRATION_H,
+) -> list[float]:
     rounded: list[float] = []
     for value in values:
         clipped = min(maximum, max(minimum, value))
@@ -1626,6 +1648,11 @@ def _data_derived_integration_scale(
 # not trusted. 0.12 H of drift on a typical peak is tolerable; beyond that the
 # spectrum is not telling us a consistent proton quantum.
 _DATA_SCALE_RESIDUAL_LIMIT = 0.12
+
+#: A peak-picking maximum is noise unless its fitted area reaches this fraction
+#: of the largest area in the spectrum. Sited inside a measured 4.9x gap
+#: between the noise and signal populations — see ``_estimates_to_peaks``.
+_NOISE_AREA_FRACTION_OF_MAX = 0.0075
 
 
 def _normalize_integrations_to_target(values: list[float], target_total_h: float) -> list[float] | None:
@@ -2059,6 +2086,38 @@ def _estimates_to_peaks(
     # excluded from the REFERENCE (they are still kept as peaks and still
     # classified) so that a dominant solvent line cannot push every real
     # resonance below the noise cutoff.
+    # Drop noise-level maxima BEFORE anything sets the integration scale.
+    #
+    # This test used to be expressed on the provisional integrations
+    # (``value >= 0.25``), which coupled it to the scale it was supposed to
+    # protect: with the old 8% reference floor it worked out to "area is at
+    # least 2% of the largest peak". That is a threshold defined by the biggest
+    # multiplet, so the bigger the molecule the more real protons it deleted —
+    # in a compound whose largest envelope is 63 H (three TIPS groups) a
+    # genuine 1 H signal is 1.6% of the maximum and was discarded as noise.
+    #
+    # The criterion is now stated once, on area alone, and the number comes
+    # from the data. On a real 500 MHz spectrum the 38 candidate maxima split
+    # cleanly in two, with a 4.9x gap: noise ran from 0.008% to 0.49% of the
+    # largest area, and the smallest true resonance sat at 2.41%. 0.75% falls
+    # inside that gap with margin on both sides, and — unlike 2% — still admits
+    # a lone proton in a molecule whose largest multiplet approaches 130 H.
+    areas_all = [max(0.0, float(est.area)) for est in in_range_estimates]
+    largest_area = max(areas_all, default=0.0)
+    if largest_area > 0:
+        survivors = [
+            index
+            for index, area in enumerate(areas_all)
+            if area / largest_area >= _NOISE_AREA_FRACTION_OF_MAX
+        ]
+    else:
+        survivors = list(range(len(in_range_estimates)))
+    dropped_noise_count = len(in_range_estimates) - len(survivors)
+    if survivors and dropped_noise_count:
+        in_range_estimates = [in_range_estimates[index] for index in survivors]
+
+    # Scale only AFTER the noise is gone, so the smallest surviving peak that
+    # anchors the scale is a real resonance.
     reference_areas = _analyte_reference_areas(
         in_range_estimates, solvent=solvent, nucleus=nucleus
     )
@@ -2067,35 +2126,6 @@ def _estimates_to_peaks(
     )
     if not raw_integrations:
         return ([], {"raw_estimated_total_h": 0.0, "integration_normalized_to_target": False})
-
-    # Drop noise-level maxima rather than promoting them to the 0.5 H floor.
-    # Measured on real archival 1H FIDs: a 10-proton compound produced 34 peaks
-    # of which 25 sat EXACTLY on the floor, contributing 12.5 H of pure
-    # quantiser output — the reported total was 76 H. The distribution is
-    # cleanly bimodal (real peaks >= 3% of the total, floor peaks at 0.66%), so
-    # the quantiser itself is the discriminator: anything that would round to
-    # zero protons is not a proton.
-    #
-    # Removing them also unblocks scaling. _normalize_integrations_to_target
-    # bails when the peak count exceeds twice the target proton count, so a
-    # noise tail of 25 spurious maxima was forcing every real spectrum onto the
-    # provisional scale.
-    survivors = [
-        index for index, value in enumerate(raw_integrations) if value >= 0.25
-    ]
-    dropped_noise_count = len(raw_integrations) - len(survivors)
-    if survivors and dropped_noise_count:
-        in_range_estimates = [in_range_estimates[index] for index in survivors]
-        # Rescale on the survivors: the reference peak is now the smallest REAL
-        # resonance rather than a noise spike, which also retires the
-        # max*0.08 guard that otherwise pins the tallest peak at ~12.5 H
-        # regardless of how many protons the molecule contains.
-        raw_integrations = _provisional_integrations(
-            in_range_estimates,
-            reference_areas=_analyte_reference_areas(
-                in_range_estimates, solvent=solvent, nucleus=nucleus
-            ),
-        )
 
     integrations = _round_half_integrations(raw_integrations, minimum=0.5)
     normalized_to_target = False
