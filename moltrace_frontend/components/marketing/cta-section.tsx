@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button"
-import { ArrowRight, Play } from "lucide-react"
+import { ArrowRight, Eye } from "lucide-react"
 import Link from "next/link"
 
 export function CTASection() {
@@ -33,9 +33,9 @@ export function CTASection() {
                 className="min-w-[180px] gap-2 border-background/30 text-background hover:bg-background/10"
                 asChild
               >
-                <Link href="/dashboard">
-                  <Play className="h-4 w-4" />
-                  View Platform
+                <Link href="#solutions">
+                  <Eye className="h-4 w-4" />
+                  See the evidence trail
                 </Link>
               </Button>
             </div>
