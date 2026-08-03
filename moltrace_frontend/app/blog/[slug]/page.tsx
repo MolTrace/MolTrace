@@ -28,6 +28,15 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   if (!post || post.status !== "live") return {}
   const description = post.metaDescription ?? post.dek
   const url = `${SITE_URL}/blog/${post.slug}`
+  // The PNG twin, never the SVG: no major social platform renders an SVG
+  // preview, so pointing og:image at the .svg would silently produce a
+  // link with no card at all. Absolute URL because scrapers do not resolve
+  // relative ones. Posts without artwork fall through to the site-wide
+  // opengraph-image card, which is the existing behaviour.
+  const heroPng = post.heroImage ? `${SITE_URL}${post.heroImage}.png` : undefined
+  const images = heroPng
+    ? [{ url: heroPng, width: 1200, height: 630, alt: post.heroImageAlt ?? post.title }]
+    : undefined
   return {
     title: `${post.title} · Field notes`,
     description,
@@ -41,11 +50,13 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
       modifiedTime: post.date,
       authors: [post.author ?? DEFAULT_AUTHOR],
       section: post.topicLabel,
+      ...(images ? { images } : {}),
     },
     twitter: {
       card: "summary_large_image",
       title: post.title,
       description,
+      ...(heroPng ? { images: [heroPng] } : {}),
     },
   }
 }
@@ -148,7 +159,10 @@ export default async function BlogPostPage({ params }: Params) {
       },
     },
     mainEntityOfPage: { "@type": "WebPage", "@id": url },
-    image: `${SITE_URL}/opengraph-image`,
+    // The post's own artwork when it has some, so a rich result shows the
+    // essay rather than the generic site card. PNG, not SVG: Google's
+    // structured-data image guidance requires a raster format.
+    image: post.heroImage ? `${SITE_URL}${post.heroImage}.png` : `${SITE_URL}/opengraph-image`,
     url,
     articleSection: post.topicLabel,
     inLanguage: "en-US",
@@ -196,6 +210,23 @@ export default async function BlogPostPage({ params }: Params) {
             <span aria-hidden>·</span>
             <span>{author}</span>
           </div>
+
+          {/* Hero artwork. The SVG rather than the PNG twin — it stays crisp on
+              any display and costs a fraction as much; the PNG exists only for
+              social scrapers, which cannot read SVG. Width/height reserve the
+              space so the essay text below does not shift as it loads. */}
+          {post.heroImage ? (
+            <figure className="mt-10">
+              <img
+                src={`${post.heroImage}.svg`}
+                alt={post.heroImageAlt ?? ""}
+                width={1200}
+                height={630}
+                className="w-full rounded-2xl border"
+                decoding="async"
+              />
+            </figure>
+          ) : null}
 
           <div className="mt-2">
             {post.body.map((block, i) => (

@@ -49,6 +49,22 @@ export type BlogPost = {
   metaDescription?: string
   /** Byline for the article + JSON-LD author. */
   author?: string
+  /** Hero artwork, without extension, under `/public/blog/`.
+   *
+   *  Two files are expected per slug and each is used where it belongs:
+   *    `<name>.svg` — on-page hero. Stays crisp at any size and costs ~15 KB.
+   *    `<name>.png` — og:image. Social platforms and Slack do NOT render SVG
+   *                   previews, so a raster twin is required, at 1200x630.
+   *  Regenerate the PNG from the SVG after any edit:
+   *    node -e "const s=require('sharp'),f=require('fs');
+   *      s(f.readFileSync('public/blog/<name>.svg'),{density:200})
+   *       .resize(1200,630,{fit:'fill'}).png({palette:true,quality:90,effort:10})
+   *       .toFile('public/blog/<name>.png')"
+   */
+  heroImage?: string
+  /** Describes the artwork for screen readers. Required whenever heroImage is
+   *  set — the artwork carries the post's argument, not just decoration. */
+  heroImageAlt?: string
   /** Full article body. Present only for `status: "live"` posts. */
   body?: PostBlock[]
 }
@@ -70,6 +86,9 @@ export const POSTS: BlogPost[] = [
     metaDescription:
       "Why MolTrace counts chemical environments, not peaks: reconciling expert NMR references with detector multiplet-line output for the GSD gate.",
     author: "MolTrace research team",
+    heroImage: "/blog/chemical-environments-not-peaks",
+    heroImageAlt:
+      "A schematic proton NMR trace in which clusters of detector lines — a singlet, doublet, triplet, quartet, AB system and multiplet — are bracketed and collapsed into six chemical-environment markers. A magnifier over the quartet shows its four resolved lines resolving to one environment.",
     body: [
       {
         "type": "h2",
