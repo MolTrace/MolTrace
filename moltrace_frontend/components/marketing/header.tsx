@@ -392,29 +392,6 @@ export function Header() {
             </Sheet>
           </div>
         </div>
-
-        {/* Mobile-only top-level nav row. The desktop dropdowns don't translate
-            to touch, so on small screens the four primary links render as a
-            compact horizontal strip under the logo row; the hamburger sheet
-            still carries the full dropdown tree. */}
-        <nav
-          aria-label="Mobile primary navigation"
-          className="flex items-center gap-1 overflow-x-auto px-3 py-1.5 [scrollbar-width:none] md:hidden [&::-webkit-scrollbar]:hidden"
-        >
-          {navItems.map((item) => {
-            const isExternal = /^https?:\/\//i.test(item.href)
-            return (
-              <Link
-                key={item.label}
-                href={item.href}
-                className="whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground active:text-foreground"
-                {...(isExternal ? { target: "_blank", rel: "noopener noreferrer" } : null)}
-              >
-                {item.label}
-              </Link>
-            )
-          })}
-        </nav>
       </div>
     </header>
   )
