@@ -3,7 +3,6 @@ import { FaqSection } from "@/components/marketing/faq-section"
 import { FaqJsonLd } from "@/components/seo/structured-data"
 import { HOME_FAQS } from "@/lib/seo/modules"
 import { DashboardPreview } from "@/components/marketing/dashboard-preview"
-import { DevelopmentBanner } from "@/components/marketing/development-banner"
 import { EnterpriseSection } from "@/components/marketing/enterprise-section"
 import { EvidenceSection } from "@/components/marketing/evidence-section"
 import { Footer } from "@/components/marketing/footer"
@@ -16,7 +15,6 @@ import { WorkflowStrip } from "@/components/marketing/workflow-strip"
 export function MarketingPage() {
   return (
     <div className="min-h-screen bg-background">
-      <DevelopmentBanner />
       <Header />
       <main>
         <Hero />
