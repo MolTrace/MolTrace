@@ -149,9 +149,30 @@ export function BlogPage() {
                 ) : null}
               </div>
 
-              {/* Visual flank — scientific-grid plate with the essay's key
-                  metric called out, so the featured card has its own
-                  visual anchor even before a hero image exists. */}
+              {/* Visual flank — the essay's own hero artwork once it has one,
+                  falling back to the scientific-grid metric plate for essays
+                  that don't. The SVG is used here rather than the PNG twin:
+                  it stays crisp at any width and costs a fraction as much.
+                  Width/height are set so the space is reserved before the
+                  image loads and the card doesn't shift under it. */}
+              {featured.heroImage ? (
+                // self-start, and no object-cover: the grid stretches this column
+                // to the height of the essay text beside it, so a 1200x630 hero
+                // forced to fill it was cropped to a near-square centre slice —
+                // losing the headline and the figures the artwork exists to show.
+                // Letting it keep its own aspect ratio shows the whole thing.
+                <aside className="relative self-start overflow-hidden rounded-2xl border bg-muted/30">
+                  <img
+                    src={`${featured.heroImage}.svg`}
+                    alt={featured.heroImageAlt ?? ""}
+                    width={1200}
+                    height={630}
+                    className="h-auto w-full"
+                    loading="lazy"
+                    decoding="async"
+                  />
+                </aside>
+              ) : (
               <aside className="relative overflow-hidden rounded-2xl border bg-muted/30 p-6">
                 <div
                   aria-hidden
@@ -179,6 +200,7 @@ export function BlogPage() {
                   </p>
                 </div>
               </aside>
+              )}
             </article>
           </div>
         </section>

@@ -1,0 +1,248 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630" role="img"
+     aria-labelledby="heroTitle heroDesc">
+  <title id="heroTitle">Counting chemical environments, not peaks</title>
+  <desc id="heroDesc">A schematic proton NMR trace in which clusters of detector lines — a singlet, doublet,
+    triplet, quartet, AB system and multiplet — are bracketed and collapsed into six chemical-environment
+    markers. A magnifier over the quartet shows four resolved lines resolving to one environment. A panel
+    reports the measured figures from the 19-fixture corpus: a median difference of 17 peaks against the
+    expert reference, with peak-count granularity matching on 37 percent of fixtures against 63 percent for
+    environment-count granularity.</desc>
+
+  <defs>
+    <!-- Brand palette, from app/globals.css: teal #00DFA0, cyan #00B8D9, violet #6B3FE0, amber #E8A030. -->
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%"   stop-color="#070B11"/>
+      <stop offset="55%"  stop-color="#0A121C"/>
+      <stop offset="100%" stop-color="#05080D"/>
+    </linearGradient>
+
+    <radialGradient id="teallight" cx="50%" cy="50%" r="50%">
+      <stop offset="0%"   stop-color="#00DFA0" stop-opacity="0.22"/>
+      <stop offset="100%" stop-color="#00DFA0" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="violetlight" cx="50%" cy="50%" r="50%">
+      <stop offset="0%"   stop-color="#6B3FE0" stop-opacity="0.20"/>
+      <stop offset="100%" stop-color="#6B3FE0" stop-opacity="0"/>
+    </radialGradient>
+
+    <pattern id="grid" width="34" height="34" patternUnits="userSpaceOnUse">
+      <path d="M34 0H0V34" fill="none" stroke="#7DD3FC" stroke-opacity="0.045" stroke-width="1"/>
+    </pattern>
+
+    <linearGradient id="lineFill" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"   stop-color="#00B8D9" stop-opacity="0.55"/>
+      <stop offset="100%" stop-color="#00B8D9" stop-opacity="0.02"/>
+    </linearGradient>
+
+    <filter id="glowTeal" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="4" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="glowSoft" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="2.2" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+
+    <clipPath id="lensClip"><circle cx="600" cy="392" r="104"/></clipPath>
+
+    <linearGradient id="lensGlass" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%"   stop-color="#00DFA0" stop-opacity="0.12"/>
+      <stop offset="45%"  stop-color="#0B1620" stop-opacity="0.30"/>
+      <stop offset="100%" stop-color="#00B8D9" stop-opacity="0.12"/>
+    </linearGradient>
+  </defs>
+
+  <style>
+    .mono { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace; }
+    .sans { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Inter, Helvetica, Arial, sans-serif; }
+    .tag  { font-size: 13px; letter-spacing: 0.20em; font-weight: 700; }
+    .micro{ font-size: 11px; letter-spacing: 0.16em; font-weight: 600; }
+    .lbl  { font-size: 12.5px; letter-spacing: 0.06em; font-weight: 600; }
+  </style>
+
+  <!-- ── Ground ─────────────────────────────────────────────────────────── -->
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <rect width="1200" height="630" fill="url(#grid)"/>
+  <ellipse cx="600" cy="470" rx="520" ry="240" fill="url(#teallight)"/>
+  <ellipse cx="1010" cy="150" rx="330" ry="200" fill="url(#violetlight)"/>
+
+  <!-- ── Overline ───────────────────────────────────────────────────────── -->
+  <g transform="translate(72,74)">
+    <rect x="0" y="-19" width="9" height="26" rx="4.5" fill="#00DFA0"/>
+    <text x="24" y="0" class="mono tag" fill="#00DFA0">SPECTRACHECK · GSD SIDECAR</text>
+    <!-- dx, not a space character: librsvg (the rasteriser behind sharp) collapses
+         both a plain space and &#160; at the head of a tspan, which ran the words
+         together as "environment,many lines." in the PNG while the browser
+         rendered it correctly. Explicit kerning is what both agree on. -->
+    <text x="0" y="42" class="sans" font-size="38" font-weight="700" fill="#F2F7FB" letter-spacing="-0.5"
+      >One environment,<tspan fill="#00B8D9" dx="11">many lines.</tspan></text>
+    <text x="0" y="74" class="mono micro" fill="#7C93A8">MULTIPLET CLUSTERING · PHASE 10</text>
+  </g>
+
+  <!-- ── Measured-figures panel ─────────────────────────────────────────── -->
+  <g transform="translate(820,52)">
+    <rect x="0" y="0" width="308" height="196" rx="16" fill="#0B131C" fill-opacity="0.86"
+          stroke="#1E2E3D" stroke-width="1"/>
+    <rect x="0" y="0" width="308" height="3" rx="1.5" fill="#00DFA0" fill-opacity="0.75"/>
+
+    <text x="20" y="30" class="mono micro" fill="#7C93A8">MEASURED · 19 FIXTURES · LEVEL 2</text>
+
+    <!-- The headline delta that read as an algorithm failure. -->
+    <text x="20" y="80" class="sans" font-size="46" font-weight="700" fill="#E8A030">17</text>
+    <text x="74" y="70" class="mono lbl" fill="#C2D2DE">MEDIAN Δ PEAKS</text>
+    <text x="74" y="88" class="mono micro" fill="#7C93A8">vs EXPERT REFERENCE</text>
+
+    <!-- Granularity comparison: the actual finding. -->
+    <g transform="translate(20,112)">
+      <text x="0" y="0" class="mono micro" fill="#7C93A8">WITHIN TOLERANCE OF REFERENCE</text>
+
+      <!-- Label column is 96px wide; keep both labels inside it or the bar
+           overruns the text. "ENVIRONMENT COUNT" did exactly that. -->
+      <g transform="translate(0,18)">
+        <text x="0" y="10" class="mono" font-size="11.5" fill="#8FA6B6">PEAKS</text>
+        <rect x="104" y="1" width="130" height="10" rx="5" fill="#152534"/>
+        <rect x="104" y="1" width="48"  height="10" rx="5" fill="#00B8D9" fill-opacity="0.55"/>
+        <text x="246" y="10" class="mono" font-size="11.5" font-weight="700" fill="#8FA6B6">37%</text>
+      </g>
+
+      <g transform="translate(0,42)">
+        <text x="0" y="10" class="mono" font-size="11.5" fill="#D6E6EF">ENVIRONMENTS</text>
+        <rect x="104" y="1" width="130" height="10" rx="5" fill="#152534"/>
+        <rect x="104" y="1" width="82"  height="10" rx="5" fill="#00DFA0" filter="url(#glowSoft)"/>
+        <text x="246" y="10" class="mono" font-size="11.5" font-weight="700" fill="#00DFA0">63%</text>
+      </g>
+    </g>
+  </g>
+
+  <!-- ── Environment markers ────────────────────────────────────────────── -->
+  <!-- One marker per chemically distinct nucleus — what the expert reference
+       counts. Each drops a leader down to the cluster of lines it accounts for. -->
+  <g class="mono" font-size="11" font-weight="700" fill="#00DFA0">
+    <g transform="translate(170,300)">
+      <line x1="0" y1="14" x2="0" y2="112" stroke="#00DFA0" stroke-opacity="0.30" stroke-width="1" stroke-dasharray="3 5"/>
+      <circle cx="0" cy="0" r="5.5" fill="#00DFA0" filter="url(#glowTeal)"/>
+      <text x="0" y="-14" text-anchor="middle">E1</text>
+    </g>
+    <g transform="translate(310,300)">
+      <line x1="0" y1="14" x2="0" y2="140" stroke="#00DFA0" stroke-opacity="0.30" stroke-width="1" stroke-dasharray="3 5"/>
+      <circle cx="0" cy="0" r="5.5" fill="#00DFA0" filter="url(#glowTeal)"/>
+      <text x="0" y="-14" text-anchor="middle">E2</text>
+    </g>
+    <g transform="translate(450,300)">
+      <line x1="0" y1="14" x2="0" y2="128" stroke="#00DFA0" stroke-opacity="0.30" stroke-width="1" stroke-dasharray="3 5"/>
+      <circle cx="0" cy="0" r="5.5" fill="#00DFA0" filter="url(#glowTeal)"/>
+      <text x="0" y="-14" text-anchor="middle">E3</text>
+    </g>
+    <g transform="translate(790,300)">
+      <line x1="0" y1="14" x2="0" y2="122" stroke="#00DFA0" stroke-opacity="0.30" stroke-width="1" stroke-dasharray="3 5"/>
+      <circle cx="0" cy="0" r="5.5" fill="#00DFA0" filter="url(#glowTeal)"/>
+      <text x="0" y="-14" text-anchor="middle">E5</text>
+    </g>
+    <g transform="translate(980,300)">
+      <line x1="0" y1="14" x2="0" y2="148" stroke="#00DFA0" stroke-opacity="0.30" stroke-width="1" stroke-dasharray="3 5"/>
+      <circle cx="0" cy="0" r="5.5" fill="#00DFA0" filter="url(#glowTeal)"/>
+      <text x="0" y="-14" text-anchor="middle">E6</text>
+    </g>
+  </g>
+
+  <!-- ── Spectrum ───────────────────────────────────────────────────────── -->
+  <!-- Schematic, not data: the shapes are drawn to show granularity, and the
+       panel above carries the figures that are actually measured. -->
+  <g>
+    <line x1="70" y1="545" x2="1130" y2="545" stroke="#24384A" stroke-width="1.5"/>
+    <g stroke="#24384A" stroke-width="1" opacity="0.65">
+      <line x1="170" y1="545" x2="170" y2="553"/>
+      <line x1="310" y1="545" x2="310" y2="553"/>
+      <line x1="450" y1="545" x2="450" y2="553"/>
+      <line x1="600" y1="545" x2="600" y2="553"/>
+      <line x1="790" y1="545" x2="790" y2="553"/>
+      <line x1="980" y1="545" x2="980" y2="553"/>
+    </g>
+
+    <!-- Detector output: every resolved line of every multiplet. -->
+    <g fill="url(#lineFill)" stroke="#00B8D9" stroke-width="1.6" stroke-linejoin="round">
+      <!-- E1 singlet · 1 line -->
+      <path d="M158,545 C166,545 167,415 170,415 C173,415 174,545 182,545 Z"/>
+      <!-- E2 doublet · 2 lines -->
+      <path d="M290,545 C298,545 299,440 302,440 C305,440 306,545 314,545 Z"/>
+      <path d="M306,545 C314,545 315,440 318,440 C321,440 322,545 330,545 Z"/>
+      <!-- E3 triplet · 3 lines -->
+      <path d="M422,545 C430,545 431,470 434,470 C437,470 438,545 446,545 Z"/>
+      <path d="M438,545 C446,545 447,425 450,425 C453,425 454,545 462,545 Z"/>
+      <path d="M454,545 C462,545 463,470 466,470 C469,470 470,545 478,545 Z"/>
+      <!-- E4 quartet · 4 lines (under the magnifier) -->
+      <path d="M570,545 C578,545 579,485 582,485 C585,485 586,545 594,545 Z"/>
+      <path d="M582,545 C590,545 591,430 594,430 C597,430 598,545 606,545 Z"/>
+      <path d="M594,545 C602,545 603,430 606,430 C609,430 610,545 618,545 Z"/>
+      <path d="M606,545 C614,545 615,485 618,485 C621,485 622,545 630,545 Z"/>
+      <!-- E5 AB system · 4 lines -->
+      <path d="M758,545 C766,545 767,455 770,455 C773,455 774,545 782,545 Z"/>
+      <path d="M772,545 C780,545 781,420 784,420 C787,420 788,545 796,545 Z"/>
+      <path d="M788,545 C796,545 797,420 800,420 C803,420 804,545 812,545 Z"/>
+      <path d="M802,545 C810,545 811,455 814,455 C817,455 818,545 826,545 Z"/>
+      <!-- E6 multiplet · 6 lines -->
+      <path d="M938,545 C946,545 947,490 950,490 C953,490 954,545 962,545 Z"/>
+      <path d="M950,545 C958,545 959,465 962,465 C965,465 966,545 974,545 Z"/>
+      <path d="M962,545 C970,545 971,445 974,445 C977,445 978,545 986,545 Z"/>
+      <path d="M974,545 C982,545 983,445 986,445 C989,445 990,545 998,545 Z"/>
+      <path d="M986,545 C994,545 995,465 998,465 C1001,465 1002,545 1010,545 Z"/>
+      <path d="M998,545 C1006,545 1007,490 1010,490 C1013,490 1014,545 1022,545 Z"/>
+    </g>
+
+    <!-- Clustering brackets: the layer that reconciles the two counts. -->
+    <g fill="none" stroke="#00DFA0" stroke-opacity="0.55" stroke-width="1.4" stroke-linecap="round">
+      <path d="M156,566 v7 h28 v-7"/>
+      <path d="M288,566 v7 h44 v-7"/>
+      <path d="M420,566 v7 h60 v-7"/>
+      <path d="M568,566 v7 h64 v-7"/>
+      <path d="M756,566 v7 h72 v-7"/>
+      <path d="M936,566 v7 h88 v-7"/>
+    </g>
+    <g class="mono" font-size="9.5" font-weight="700" fill="#4F6B7E" text-anchor="middle">
+      <text x="170" y="590">1 LINE</text>
+      <text x="310" y="590">2 LINES</text>
+      <text x="450" y="590">3 LINES</text>
+      <text x="600" y="590">4 LINES</text>
+      <text x="790" y="590">4 LINES</text>
+      <text x="980" y="590">6 LINES</text>
+    </g>
+  </g>
+
+  <!-- ── Magnifier over the quartet ─────────────────────────────────────── -->
+  <g>
+    <circle cx="600" cy="392" r="104" fill="#060A0F" fill-opacity="0.92"/>
+    <g clip-path="url(#lensClip)">
+      <rect x="496" y="288" width="208" height="208" fill="url(#grid)"/>
+      <!-- Four resolved lines, spread apart at magnification. -->
+      <g stroke="#00B8D9" stroke-width="2.4" stroke-linecap="round" filter="url(#glowSoft)">
+        <line x1="552" y1="452" x2="552" y2="408"/>
+        <line x1="584" y1="452" x2="584" y2="378"/>
+        <line x1="616" y1="452" x2="616" y2="378"/>
+        <line x1="648" y1="452" x2="648" y2="408"/>
+      </g>
+      <line x1="520" y1="452" x2="680" y2="452" stroke="#24384A" stroke-width="1.4"/>
+      <!-- Collapse to a single environment. -->
+      <path d="M552,362 v-12 h96 v12" fill="none" stroke="#00DFA0" stroke-width="1.6" stroke-linecap="round"/>
+      <path d="M600,350 v-7" fill="none" stroke="#00DFA0" stroke-width="1.6" stroke-linecap="round"/>
+      <circle cx="600" cy="336" r="7" fill="#00DFA0" filter="url(#glowTeal)"/>
+      <text x="600" y="318" text-anchor="middle" class="mono" font-size="11" font-weight="700" fill="#00DFA0">E4</text>
+      <!-- Sits at y=468, not lower: the circle narrows to ~146px of usable
+           width there, and at y=474 this caption was clipped at both ends. -->
+      <text x="600" y="468" text-anchor="middle" class="mono" font-size="9.5" font-weight="700" fill="#00B8D9">4 LINES → 1 ENVIRONMENT</text>
+    </g>
+    <circle cx="600" cy="392" r="104" fill="url(#lensGlass)"/>
+    <circle cx="600" cy="392" r="104" fill="none" stroke="#00DFA0" stroke-opacity="0.55" stroke-width="2"/>
+    <circle cx="600" cy="392" r="110" fill="none" stroke="#00DFA0" stroke-opacity="0.14" stroke-width="1"/>
+    <path d="M600,282 a110,110 0 0 1 95,55" fill="none" stroke="#00DFA0" stroke-opacity="0.5" stroke-width="2.5" stroke-linecap="round"/>
+  </g>
+
+  <!-- ── Footer strip ───────────────────────────────────────────────────── -->
+  <g transform="translate(72,612)">
+    <text x="0" y="0" class="mono" font-size="10.5" font-weight="600" fill="#3E566A" letter-spacing="0.14em">
+      SPECTRUM SCHEMATIC · FIGURES MEASURED ON THE NMRSHIFTDB2 CORPUS
+    </text>
+  </g>
+  <g transform="translate(1128,612)" text-anchor="end">
+    <text x="0" y="0" class="mono" font-size="10.5" font-weight="700" fill="#00DFA0" letter-spacing="0.14em">MOLTRACE</text>
+  </g>
+</svg>
