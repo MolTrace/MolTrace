@@ -113,27 +113,26 @@ export function BlogPage() {
                 the figure and sends the reader onward. `claim` still drives the
                 non-featured cards in BlogPostsGrid. */}
             <article
-              className={`mt-6 overflow-hidden rounded-3xl border bg-card shadow-sm ${
-                featured.heroImage ? "grid lg:grid-cols-[1.15fr_1fr]" : ""
-              }`}
+              className="mt-6 overflow-hidden rounded-3xl border bg-card shadow-sm"
               style={{ borderTop: "3px solid var(--mt-teal)" }}
             >
+              {/* Only the headline block sits beside the cover. The figure and
+                  the byline moved to a full-width band below, which is what
+                  keeps this row short enough for the cover to run near its own
+                  1.9:1 — the whole frame survives, magnet AND the gloved hand.
+                  With the figure still in this column the row ran ~860px tall,
+                  the cover was squeezed to a 44%-wide slice, and the hand — the
+                  "we" in "why we count" — was the first thing cropped out. */}
+              <div className={featured.heroImage ? "grid lg:grid-cols-[1.25fr_1fr]" : ""}>
               {featured.heroImage ? (
-                // Fills its column, so the cover sets the card's height.
-                // A photograph tolerates the crop that a diagram could not:
-                // its subject — the magnet and the projected spectrum — sits
-                // centre-left, so the focal point is biased there and the frame
-                // gives up only darkness at the edges.
-                <div className="relative min-h-[260px] sm:min-h-[360px] lg:min-h-[620px]">
+                <div className="relative min-h-[240px] sm:min-h-[320px]">
                   <img
                     src={featured.heroImage}
                     alt={featured.heroImageAlt ?? ""}
                     className="absolute inset-0 h-full w-full object-cover"
-                    // Biased left-of-centre and above-centre: at this column's
-                    // tall aspect only ~45% of a 1.9:1 frame survives, and the
-                    // magnet and the projected spectrum both sit in the upper
-                    // left. Dead-centre gave up half the frame to empty floor.
-                    style={{ objectPosition: "42% 42%" }}
+                    // Right-of-centre: whatever the row's height costs us comes
+                    // off the left, where there is only the equipment rack.
+                    style={{ objectPosition: "62% 45%" }}
                     loading="lazy"
                     decoding="async"
                   />
@@ -143,7 +142,7 @@ export function BlogPage() {
                 </div>
               ) : null}
 
-              <div className="flex flex-col justify-between gap-8 p-7 sm:p-10 lg:p-12">
+              <div className="flex flex-col justify-center gap-5 p-7 sm:p-10 lg:p-12">
                 <div>
                   <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
                     <span className="inline-flex items-center gap-1.5">
@@ -185,26 +184,32 @@ export function BlogPage() {
                   <p className="mt-5 text-lg leading-relaxed text-muted-foreground">
                     {featured.dek}
                   </p>
+                </div>
+              </div>
+              </div>
 
-                  {/* The figure the essay turns on. 17 is measured; 2 is what
-                      the strict gate asks for — the label and the wording keep
-                      those two apart rather than implying a result. */}
-                  <div className="relative mt-7 overflow-hidden rounded-2xl border bg-muted/30 p-5 sm:p-6">
-                    <div aria-hidden className="scientific-grid-subtle absolute inset-0 opacity-30" />
-                    <div className="relative">
+              {/* Full-width band: the figure the essay turns on, and the way in.
+                  17 is measured; 2 is what the strict gate asks for — the label
+                  and the wording keep those two apart rather than implying a
+                  result. */}
+              <div className="grid gap-6 border-t p-7 sm:p-10 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center lg:gap-10 lg:p-12">
+                <div className="relative overflow-hidden rounded-2xl border bg-muted/30 p-5 sm:p-6">
+                  <div aria-hidden className="scientific-grid-subtle absolute inset-0 opacity-30" />
+                  <div className="relative flex flex-wrap items-baseline gap-x-6 gap-y-2">
+                    <p
+                      className="font-mono text-4xl font-bold tabular-nums tracking-tight sm:text-5xl"
+                      style={{ color: "var(--mt-teal-ink)" }}
+                    >
+                      Δ=17 → Δ=2
+                    </p>
+                    <div className="min-w-[16rem] flex-1">
                       <p
                         className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
                         style={{ color: "var(--mt-teal-ink)" }}
                       >
                         Illustrative — sample figures
                       </p>
-                      <p
-                        className="mt-3 font-mono text-4xl font-bold tabular-nums tracking-tight sm:text-5xl"
-                        style={{ color: "var(--mt-teal-ink)" }}
-                      >
-                        Δ=17 → Δ=2
-                      </p>
-                      <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+                      <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
                         Median absolute peak-count delta against the NMRShiftDB2 reference, set
                         against the ≤2 the strict gate asks for.
                       </p>
@@ -212,7 +217,7 @@ export function BlogPage() {
                   </div>
                 </div>
 
-                <div className="flex flex-wrap items-center justify-between gap-4 border-t pt-6">
+                <div className="flex flex-wrap items-center justify-between gap-4 lg:flex-col lg:items-end">
                   <div className="flex items-center gap-3">
                     <span
                       aria-hidden
@@ -221,7 +226,9 @@ export function BlogPage() {
                     >
                       M
                     </span>
-                    <span className="text-sm text-muted-foreground">MolTrace research team</span>
+                    <span className="whitespace-nowrap text-sm text-muted-foreground">
+                      MolTrace research team
+                    </span>
                   </div>
                   {featured.status === "live" ? (
                     <Button asChild size="lg" className="gap-2 rounded-full px-6">
