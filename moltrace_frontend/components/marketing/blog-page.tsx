@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { ArrowRight, Bell, BookOpen, FileText, Mail, Rss } from "lucide-react"
+import { ArrowRight, Bell, BookOpen, Clock, FileText, Mail, Rss } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Footer } from "@/components/marketing/footer"
 import { Header } from "@/components/marketing/header"
@@ -106,101 +106,133 @@ export function BlogPage() {
             >
               Featured essay
             </p>
+            {/* Cover-first layout: the artwork owns one half at full bleed and
+                the type is sized to carry the other. The one-paragraph `claim`
+                is deliberately NOT repeated here — every point it makes is made
+                again in the essay body, so the card leads with the headline and
+                the figure and sends the reader onward. `claim` still drives the
+                non-featured cards in BlogPostsGrid. */}
             <article
-              className="mt-6 grid gap-10 rounded-3xl border bg-card p-6 shadow-sm sm:p-10 lg:grid-cols-[1.4fr_1fr]"
+              className={`mt-6 overflow-hidden rounded-3xl border bg-card shadow-sm ${
+                featured.heroImage ? "grid lg:grid-cols-[1.15fr_1fr]" : ""
+              }`}
               style={{ borderTop: "3px solid var(--mt-teal)" }}
             >
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="inline-flex items-center rounded-full border bg-violet-50 px-2.5 py-0.5 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-violet-700 dark:bg-violet-950/40 dark:text-violet-300 border-violet-200 dark:border-violet-900">
+              {featured.heroImage ? (
+                // Fills its column, so the cover sets the card's height.
+                // A photograph tolerates the crop that a diagram could not:
+                // its subject — the magnet and the projected spectrum — sits
+                // centre-left, so the focal point is biased there and the frame
+                // gives up only darkness at the edges.
+                <div className="relative min-h-[260px] sm:min-h-[360px] lg:min-h-[620px]">
+                  <img
+                    src={featured.heroImage}
+                    alt={featured.heroImageAlt ?? ""}
+                    className="absolute inset-0 h-full w-full object-cover"
+                    // Biased left-of-centre and above-centre: at this column's
+                    // tall aspect only ~45% of a 1.9:1 frame survives, and the
+                    // magnet and the projected spectrum both sit in the upper
+                    // left. Dead-centre gave up half the frame to empty floor.
+                    style={{ objectPosition: "42% 42%" }}
+                    loading="lazy"
+                    decoding="async"
+                  />
+                  <span className="absolute left-5 top-5 inline-flex items-center rounded-full bg-black/55 px-3 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-white backdrop-blur-sm">
                     {featured.topicLabel}
                   </span>
-                  {featured.status === "forthcoming" ? (
-                    <span className="inline-flex items-center rounded-full border border-dashed px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-                      Forthcoming
+                </div>
+              ) : null}
+
+              <div className="flex flex-col justify-between gap-8 p-7 sm:p-10 lg:p-12">
+                <div>
+                  <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+                    <span className="inline-flex items-center gap-1.5">
+                      <Clock className="h-3.5 w-3.5" aria-hidden />
+                      {featured.readingMinutes} min read
                     </span>
-                  ) : null}
+                    <span aria-hidden>•</span>
+                    <span className="font-mono tabular-nums">{featured.date}</span>
+                    {featured.heroImage ? null : (
+                      <span className="inline-flex items-center rounded-full border bg-violet-50 px-2.5 py-0.5 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-violet-700 dark:border-violet-900 dark:bg-violet-950/40 dark:text-violet-300">
+                        {featured.topicLabel}
+                      </span>
+                    )}
+                    {featured.status === "forthcoming" ? (
+                      <span className="inline-flex items-center rounded-full border border-dashed px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+                        Forthcoming
+                      </span>
+                    ) : null}
+                  </div>
+
+                  {/* The card's anchor: heavy, tight-leading, underlined in
+                      brand teal. Sized in rem rather than a type step so it can
+                      run larger than anything else on the page without
+                      disturbing the scale the rest of the index uses. */}
+                  <h2 className="mt-5 text-[2.1rem] font-bold leading-[1.06] tracking-tight sm:text-[2.7rem] lg:text-[3.1rem]">
+                    {featured.status === "live" ? (
+                      <Link
+                        href={`/blog/${featured.slug}`}
+                        className="underline decoration-[3px] underline-offset-[7px] transition-opacity hover:opacity-80"
+                        style={{ textDecorationColor: "var(--mt-teal)" }}
+                      >
+                        {featured.title}
+                      </Link>
+                    ) : (
+                      featured.title
+                    )}
+                  </h2>
+
+                  <p className="mt-5 text-lg leading-relaxed text-muted-foreground">
+                    {featured.dek}
+                  </p>
+
+                  {/* The figure the essay turns on. 17 is measured; 2 is what
+                      the strict gate asks for — the label and the wording keep
+                      those two apart rather than implying a result. */}
+                  <div className="relative mt-7 overflow-hidden rounded-2xl border bg-muted/30 p-5 sm:p-6">
+                    <div aria-hidden className="scientific-grid-subtle absolute inset-0 opacity-30" />
+                    <div className="relative">
+                      <p
+                        className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+                        style={{ color: "var(--mt-teal-ink)" }}
+                      >
+                        Illustrative — sample figures
+                      </p>
+                      <p
+                        className="mt-3 font-mono text-4xl font-bold tabular-nums tracking-tight sm:text-5xl"
+                        style={{ color: "var(--mt-teal-ink)" }}
+                      >
+                        Δ=17 → Δ=2
+                      </p>
+                      <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+                        Median absolute peak-count delta against the NMRShiftDB2 reference, set
+                        against the ≤2 the strict gate asks for.
+                      </p>
+                    </div>
+                  </div>
                 </div>
-                <h2 className="mt-5 text-3xl font-semibold leading-tight tracking-tight sm:text-4xl">
-                  {featured.title}
-                </h2>
-                <p className="mt-4 text-lg font-medium leading-relaxed text-foreground/85 sm:text-xl">
-                  {featured.dek}
-                </p>
-                <p className="mt-5 text-base leading-relaxed text-muted-foreground">
-                  {featured.claim}
-                </p>
-                <div className="mt-6 flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
-                  <span className="font-mono tabular-nums">{featured.date}</span>
-                  <span aria-hidden>·</span>
-                  <span>{featured.readingMinutes} min read</span>
-                  <span aria-hidden>·</span>
-                  <span>MolTrace research team</span>
-                </div>
-                {featured.status === "live" ? (
-                  <div className="mt-8">
-                    <Button asChild size="lg" className="gap-2">
+
+                <div className="flex flex-wrap items-center justify-between gap-4 border-t pt-6">
+                  <div className="flex items-center gap-3">
+                    <span
+                      aria-hidden
+                      className="flex h-9 w-9 items-center justify-center rounded-full border font-mono text-xs font-bold"
+                      style={{ color: "var(--mt-teal-ink)" }}
+                    >
+                      M
+                    </span>
+                    <span className="text-sm text-muted-foreground">MolTrace research team</span>
+                  </div>
+                  {featured.status === "live" ? (
+                    <Button asChild size="lg" className="gap-2 rounded-full px-6">
                       <Link href={`/blog/${featured.slug}`}>
                         Read the essay
                         <ArrowRight className="h-4 w-4" />
                       </Link>
                     </Button>
-                  </div>
-                ) : null}
-              </div>
-
-              {/* Visual flank — the essay's own hero artwork once it has one,
-                  falling back to the scientific-grid metric plate for essays
-                  that don't. The SVG is used here rather than the PNG twin:
-                  it stays crisp at any width and costs a fraction as much.
-                  Width/height are set so the space is reserved before the
-                  image loads and the card doesn't shift under it. */}
-              {featured.heroImage ? (
-                // self-start, and no object-cover: the grid stretches this column
-                // to the height of the essay text beside it, so a 1200x630 hero
-                // forced to fill it was cropped to a near-square centre slice —
-                // losing the headline and the figures the artwork exists to show.
-                // Letting it keep its own aspect ratio shows the whole thing.
-                <aside className="relative self-start overflow-hidden rounded-2xl border bg-muted/30">
-                  <img
-                    src={featured.heroImage}
-                    alt={featured.heroImageAlt ?? ""}
-                    width={1200}
-                    height={630}
-                    className="h-auto w-full"
-                    loading="lazy"
-                    decoding="async"
-                  />
-                </aside>
-              ) : (
-              <aside className="relative overflow-hidden rounded-2xl border bg-muted/30 p-6">
-                <div
-                  aria-hidden
-                  className="scientific-grid-subtle absolute inset-0 opacity-30"
-                />
-                <div className="relative">
-                  <p
-                    className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
-                    style={{ color: "var(--mt-teal-ink)" }}
-                  >
-                    Illustrative — sample figures
-                  </p>
-                  <p
-                    className="mt-4 font-mono text-5xl font-bold tabular-nums tracking-tight sm:text-6xl"
-                    style={{ color: "var(--mt-teal-ink)" }}
-                  >
-                    Δ=17 → Δ=2
-                  </p>
-                  <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-                    Example of the median absolute peak-count delta the multiplet-clustering layer is
-                    designed to reduce against the NMRShiftDB2 corpus.
-                  </p>
-                  <p className="mt-6 font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-                    Strict gate target: ≤2
-                  </p>
+                  ) : null}
                 </div>
-              </aside>
-              )}
+              </div>
             </article>
           </div>
         </section>
