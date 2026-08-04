@@ -1,0 +1,482 @@
+# MolTrace validation playbook
+
+Step-by-step prompts for validating every NMR analysis path and product module
+against real data. Each phase is self-contained: preconditions, the exact
+fixture, the command, what to measure, and what "pass" means.
+
+**Every route, blocker and line reference below was verified against the running
+code on 2026-08-04, not inferred.** Where a phase is blocked, the blocker is
+stated up front so nobody spends a day discovering it.
+
+---
+
+## Ground rules
+
+1. **One phase at a time.** Finish and report before starting the next.
+2. **Fix forward.** When a phase finds a defect, fix it, add the regression
+   test, re-run the phase, then move on.
+3. **Never validate against synthetic data when real data exists.** The three
+   defects found on day one were all invisible to the synthetic suite.
+4. **A passing HTTP status is not a pass.** Every phase asserts a scientific
+   or security property, never `200 OK`.
+5. **Re-baseline visibly.** If a test encodes a defect, change it in place with
+   a comment saying what moved and why. Never silently update an expectation.
+
+---
+
+## Environment
+
+```bash
+cd ~/MolTrace/moltrace_backend
+PYTHONPATH=src .venv/bin/python -m uvicorn --factory nmrcheck.api:create_app \
+  --host 127.0.0.1 --port 8000
+```
+
+Health check must return `{"status":"ok"}`:
+
+```bash
+curl -s http://127.0.0.1:8000/health
+```
+
+### Authentication
+
+```bash
+EMAIL="validation.$(date +%s)@moltrace.co"; PASS='V4lidation!Pass2026'
+curl -s -X POST http://127.0.0.1:8000/auth/register -H 'content-type: application/json' \
+  -d "{\"email\":\"$EMAIL\",\"password\":\"$PASS\"}"
+curl -s -X POST http://127.0.0.1:8000/auth/login -H 'content-type: application/json' \
+  -d "{\"email\":\"$EMAIL\",\"password\":\"$PASS\"}"
+```
+
+Use `access_token` as `authorization: Bearer <token>`.
+
+> **Reserved TLDs are rejected.** `.local`, `.test`, `.example` all 422. Use a
+> real domain.
+
+> **CRITICAL for any security phase.** With `API_KEY` unset — the default —
+> `Settings.local_auth_disabled` is `True` and the server does **not** enforce
+> per-user auth. Any cross-tenant test run against a default server proves
+> nothing. Set `API_KEY` before Phase B2.
+
+### Fixtures
+
+`validation_fixtures/` (gitignored), staged from the user's own Bruker data:
+
+| Fixture | Solvent | Recycle | Scans | Raw FID | Processed 1r |
+|---|---|---|---|---|---|
+| `naw-1-244-54pt/10` | CDCl₃ | 30.0 s | 16 | yes | yes |
+| `naw-1-244-54pt/11` | CDCl₃ | 5.0 s | 16 | yes | yes |
+| `MH0143-…-5/6/7/8` | D₂O | 5.0 s | 128 | yes | no |
+| `33` | MeOD | 5.0 s | 64 | yes | yes |
+
+`10` and `11` are the same sample at two recycle delays — the only true matched
+pair, and the anchor for every quantitation claim.
+
+Regenerate with `validation_fixtures/inventory.json`. Parse Bruker delays from
+the `##$D= (0..63)` **array**, not a `##$D1=` scalar — that scalar does not
+exist and reading it yields `D1 = 0` for every dataset.
+
+---
+
+# Track A — analysis paths
+
+## A1. Processed NMR upload
+
+> **BLOCKED for Bruker.** `parse_processed_spectrum` (`spectrum.py:2516`)
+> dispatches on file extension and accepts only
+> `csv/tsv/txt/xy/asc/dat/jcamp/jdx/dx`. **There is no reader for Bruker
+> processed data (`pdata/1/1r`).** Do not attempt to upload `1r` — scope the
+> reader instead, or validate this phase with CSV/JCAMP only.
+
+> **JCAMP is also unreliable.** `_parse_jcamp_text` (`spectrum.py:569-588`)
+> skips all `##` headers and treats every data line as consecutive `(x,y)`
+> pairs. It does **not** decode AFFN/PAC/SQZ/DIF/DUP, apply `XFACTOR`/`YFACTOR`,
+> convert `XUNITS` Hz→ppm, or reconstruct from `FIRSTX/LASTX/DELTAX`. Real
+> `(X++(Y..Y))` files mis-parse. The route's own warning concedes this.
+
+**Prompt:**
+
+> Validate the processed-spectrum upload path. First establish which formats
+> are genuinely supported by reading `parse_processed_spectrum`
+> (`spectrum.py:2516`) and its dispatch block (2537-2554) — do not assume.
+>
+> Export a fixture to a supported format and drive it through
+> `POST /nmr/processed/analyze` (`api.py:10538`, the primary FE route) and
+> `POST /spectrum/analyze` (`api.py:7507`, the legacy route that persists).
+>
+> Measure and report:
+> 1. Peak count detected vs peaks visible by manual inspection of the trace.
+>    Report the over-pick factor as a number.
+> 2. Whether `/nmr/processed/analyze` persisted an analysis record. **It does
+>    not** — there is no `save_analysis` call in its body. Confirm and report
+>    the consequence for any loop that expects to retrieve the analysis later.
+> 3. Whether passing `preview_points_json` causes the uploaded file bytes to be
+>    ignored (`api.py:9963`). If so, state plainly that the analysis then runs
+>    on the frontend's downsampled display trace, not the uploaded data.
+> 4. The peak-table CSV branch bypasses peak detection entirely and uses
+>    uploaded rows verbatim. Confirm, and state which validation claims that
+>    branch can and cannot support.
+>
+> **Pass:** every supported format round-trips with a documented over-pick
+> factor, and every unsupported format fails with an error naming the cause.
+> **Fail:** any format silently produces a degraded result.
+
+## A2. Raw FID upload — DONE, 3 defects fixed
+
+Path is `fully_implemented` and works end to end. `POST /fid/preview`,
+`POST /fid/process`, `GET /fid/runs/{id}/report`.
+
+Verified on `naw-1-244-54pt/10`: Bruker zip detected, 131072 points, group-delay
+correction, zero-fill ×2, 0.3 Hz exponential apodization, auto-phase −11.625°,
+Bernstein-polynomial baseline, nmrglue. Acquisition gating correctly returned
+**quantitative** (recycle 30.0 s, 30° pulse) and read `d1 = 22.00461` from acqus.
+
+**Three defects found and fixed:**
+
+1. **Solvent never read from acqus.** Every Bruker file carries
+   `##$SOLVENT=`; nothing read it, so solvent arrived only from the upload form.
+   An upload without one was analysed as solvent-unknown, silently disabling
+   residual-peak referencing, the impurity library and the exchange model.
+   Fixed: `_resolve_raw_fid_solvent`.
+2. **Raw FID was never referenced.** `_reference_axis` took a target only from
+   an explicit `reference_ppm` or a reference spectrum. Neither exists on an
+   ordinary upload, so the ordinary upload was never referenced.
+   Fixed: `_solvent_reference_target` residual-peak fallback.
+3. **The reference-peak selector could not correct anything.** It ranked by
+   distance to target, with intensity as a tiebreak — but `points` is the dense
+   trace, so a sample at the target always existed and always won, making the
+   shift ~0. It also ranked by `-abs(intensity)`, scoring a deep negative
+   baseline swing as highly as a real peak, and returned one (−4.6e8).
+   Fixed: take the tallest **positive** line in the window.
+
+Measured effect on `naw-1-244-54pt/10`: axis error corrected from **+0.024 ppm
+to 0.0000 ppm**; solvent resolves to CDCl₃; residual and water regions now
+masked; impurity candidates 1 → 6.
+
+**Remaining, not yet addressed:**
+
+- Bruker writes `Acetone` for acetone-d₆ but the profile set keys on
+  `acetone-d6`, so acetone datasets resolve to `acqus_unrecognised` and lose
+  solvent handling. One alias fixes it; `canonical_solvent` is broadly used, so
+  check blast radius.
+- Two inconsistent upload size caps (vault 2 GiB vs route limit);
+  `max_request_body_bytes` defaults to 0 (off) and multipart is exempt from the
+  body guard.
+- Caller processing settings are silently overridden for ¹H
+  (`_apply_raw_fid_advised_constraints`, `fid.py:802` forces
+  `zero_fill_factor=3`).
+- Peak detection is auto-tuned to best-match the structure's proton target
+  (`_structure_guided_peak_estimates`, `fid.py:3057`) — **this makes peak count
+  partly a function of the expected answer.** Assess whether that is defensible.
+- A 32-entry in-process LRU cache can return a stale result across a code
+  change. Restart the server between validation runs.
+
+## A3. Legacy vs P3 structure-constrained assignment
+
+> **P3 never runs in production.** The only switch is the process env var
+> `MOLTRACE_STRUCTURE_ASSIGNMENT` (`structure_assignment.py:43`), default off.
+> There is **no request-level opt-in**, and the var is set in no deployment
+> config — absent from Dockerfile, cloudbuild.yaml, settings.py. Cloud Run
+> therefore never executes P3.
+
+**Prompt:**
+
+> Run both arms over `naw-1-244-54pt/10` and `MH0143-…-5`, toggling
+> `MOLTRACE_STRUCTURE_ASSIGNMENT`.
+>
+> Before comparing, fix the **A/B input asymmetry**: legacy `observed.total`
+> excludes peaks categorised `solvent` *and* `impurity`; confirm what P3
+> excludes. Two arms fed different signals cannot be compared — resolve this
+> first or the whole comparison is void.
+>
+> Then address: **P3 fails silently.** `_build_structure_assignment`
+> (`peak_categorization.py:1140-1147`) swallows every exception and returns
+> `None`, which is indistinguishable in the payload from "ran and found
+> nothing". Make failure distinguishable before trusting any P3 result.
+>
+> There is no frozen golden for the P3 payload —
+> `tests/test_nmr_inventory_golden.py` runs with the flag unset, so all six
+> fixtures pin the legacy answer. Freeze a P3 golden as part of this phase.
+>
+> Also fix the env-var leak at `tests/test_nmr_real_spectra_accuracy.py:100`,
+> which sets the flag process-wide and never restores it.
+>
+> **Pass:** both arms fed identical signals, P3 failure is visible, a P3 golden
+> exists, and a recommendation on making P3 default is supported by measured
+> agreement/disagreement counts.
+
+## A4. GSD deconvolution
+
+> **The critical question is answered, and the answer is bad. The production
+> path discards the fit.** `spectrum.py:1275` emits `area=total_area`, where
+> `total_area` is the **pre-deconvolution** sum (`spectrum.py:1236`). The
+> production deconvolver never computes a per-component area at all —
+> `gsd.py:162` returns `(center_ppm, height, width)` tuples only.
+>
+> So GSD currently cannot deliver quantitation for overlapped multiplets in the
+> path SpectraCheck actually runs — which is the entire purpose of
+> deconvolution.
+
+**Prompt:**
+
+> Do not begin by writing tests. Begin by deciding whether to make the
+> production path use fitted areas.
+>
+> There are two independent GSD implementations: `nmrcheck.gsd` (production)
+> and `moltrace.spectroscopy.peaks.gsd` (sidecar, explicitly "deliberately
+> independent"). At level 4-5 the sidecar's areas are **not fitted either** —
+> they are re-derived by a pure-Lorentzian approximation
+> (`peaks/gsd.py:907`). Establish which, if either, produces a real fitted area.
+>
+> Note the code's own stated reason at `spectrum.py:1522-1524`: GSD runs once,
+> on the winning candidate only, because full deconvolution is too expensive.
+> Any fix must respect that cost constraint or explicitly renegotiate it.
+>
+> **No area/quantitation validation exists anywhere today.** The A/B gate
+> asserts only `peak_count` and `environment_count`
+> (`tests/test_gsd_prompt3_fe_ab_envelope.py:200-219`). Adding one is part of
+> this phase.
+>
+> Validate against `naw-1-244-54pt/10` (30 s recycle — the cleanest
+> quantitative data available). For a resolved multiplet, fitted areas must
+> reproduce integration ratios within a stated tolerance.
+>
+> **Pass:** production GSD returns fitted areas, a quantitation test guards
+> them, and the A/B fixture mechanism still works.
+> **Acceptable alternative:** GSD is documented as non-quantitative and every
+> user-facing surface stops implying otherwise.
+
+## A5. DP4
+
+> **DP4 exists and is genuinely implemented** — `dp4_scoring.py`, 360 lines,
+> Smith & Goodman 2010 in log space with an in-house regularised-incomplete-beta
+> Student-t CDF. `tests/test_dp4_scoring.py` passes (15 tests). It has **zero
+> HTTP routes**; it is reachable only internally (`api.py:10879`).
+>
+> Do not confuse it with Repho's Bayesian reaction optimization — unrelated.
+
+**Prompt:**
+
+> Validate DP4 as implemented, then close the gap between it and what is
+> claimed publicly.
+>
+> Confirm each of these by reading the code, then decide what to do:
+> 1. **DP4+ (Grimblat & Sarotti 2015) is absent** — no sp2/sp3 separate
+>    parameterisation, zero hits repo-wide.
+> 2. **DP5 (Howarth & Goodman 2022) is absent** but is **cited in disclaimer
+>    copy** (`unified_confidence.py:326`, `web.py:1490`). This is a
+>    public-claim/implementation mismatch of exactly the kind that produced the
+>    fabricated-qNEHVI incident. Treat as urgent.
+> 3. **Predicted shifts are not DFT/GIAO** — they come from the in-house RDKit
+>    empirical predictor (`nmr_prediction.py:419`). Published DP4 assumes DFT
+>    shifts with published error parameters. Using empirical shifts with
+>    DP4's Student-t parameters is not the published method; either source DFT
+>    shifts or re-derive parameters from the empirical predictor's own error
+>    distribution.
+> 4. **Pairing is greedy, not an assignment** — `_pair_observed_predicted`
+>    (`dp4_scoring.py:157-190`) walks observed peaks in list order. Two
+>    candidates can be scored on different pairings, making them
+>    non-commensurable.
+> 5. **A non-published penalty term** — `log_lik += unmatched * math.log(0.5)`
+>    (`dp4_scoring.py:278-283`) is not in Smith & Goodman. Either justify it in
+>    the code and the docs or remove it.
+> 6. **Silent failure** — `api.py:10879` swallows per-candidate prediction
+>    failures with `except Exception: continue`, dropping the candidate.
+>
+> **Pass:** every public claim matches the implementation, the probability is
+> commensurable across candidates, and failures are visible.
+
+## A6. RAG
+
+> **Exactly one RAG is real end to end: spectral similarity retrieval.** It has
+> a route (`POST /spectrum/retrieve`), a 42,449-molecule NMRShiftDB2 FAISS index
+> physically on disk, and it was verified to load and return neighbours.
+>
+> Everything else is dark:
+> - **Regulatory RAG** — library-only, no route, no corpus. Neither
+>   `moltrace.regulatory.intelligence` nor `.data` is imported under `nmrcheck`.
+> - **`VectorRetriever`** (`rag_search.py:210`) raises unless an embedder is
+>   injected; there is no default backend and none configured.
+> - **`/spectrum/reason`** — `anthropic` is not installed and
+>   `ANTHROPIC_API_KEY` is unset.
+> - **`/regulatory/sources/search`**, **`/regulatory/dossiers/{id}/query`** —
+>   real routes, `regulatory_source_documents = 0`, `regulatory_citations = 0`.
+> - **`/knowledge/search`** — all source tables 0 rows.
+> - **`retrieve_precedents`** — `reaction_literature_priors = 0` and the agent
+>   layer is off by default.
+
+**Prompt:**
+
+> Validate spectral similarity properly, and make the dark subsystems honest.
+>
+> For similarity: drive `POST /spectrum/retrieve` with peak lists from the
+> fixtures. Verify neighbours are chemically sensible, not just returned.
+> Confirm the encoder-version contract — a persisted index cannot detect an
+> encoding change from its dimension alone, so any encoder change requires
+> bumping `ENCODER_VERSION` **and** rebuilding.
+>
+> For every dark subsystem: it must not appear in any user-facing surface as
+> though it works. Either wire it (route + corpus) or gate it behind an
+> explicit "not configured" state that the UI renders honestly. A route that
+> returns an empty result because its corpus has zero rows is worse than a
+> route that says it is not configured — the first reads as "nothing matched".
+>
+> Note the 2.1 GB NMRexp corpus was deleted for disk space; re-fetch from
+> Zenodo `doi:10.5281/zenodo.17296666` if a phase needs it.
+>
+> **Pass:** similarity validated on real fixtures; every other RAG either wired
+> or explicitly marked unconfigured everywhere it surfaces.
+
+---
+
+# Track B — module loops
+
+## B1. SpectraCheck
+
+> **Good news: the loop closes with no background worker.** Every analyze route
+> is synchronous; `POST /jobs` executes inline (`orchestration_store.py:781`)
+> and `POST /jobs/submit` falls back to FastAPI `BackgroundTasks` when
+> `REDIS_URL` is unset. The undeployed Memorystore/RQ worker does not block this.
+
+**Prompt:**
+
+> Drive the full loop on `naw-1-244-54pt/10`: upload → analyze → review →
+> report. Fix what breaks.
+>
+> Known obstacles, confirm each:
+> 1. Analyze steps persist rows but **do not return their ids**, so a client
+>    cannot chain to the report step without a separate list call. Fix by
+>    returning the id.
+> 2. **There is no server-side route that generates a report from a session.**
+>    `POST /spectracheck/sessions/{id}/reports` stores a
+>    client-supplied payload. Decide whether the product needs server-side
+>    generation; a client-authored "report" is not defensible evidence.
+> 3. **No PDF export exists in the HTTP surface.** `export_pdfa` is
+>    library-only and needs optional `reportlab`.
+> 4. **Managed files and artifacts have no owner scoping** —
+>    `list_file_records`, `get_file_record`, `get_file_download`,
+>    `get_artifact_record` (`orchestration_store.py:371-391`). Treat as a
+>    security defect, not a loop defect.
+> 5. `/reports/{report_id}` resolves against two different tables under one URL
+>    space. Disambiguate.
+> 6. 6 of 10 declared orchestration job types have no execution adapter
+>    (`orchestration_store.py:41-52`). Either implement or stop declaring them.
+>
+> **Pass:** a chemist can upload a real FID and obtain a persisted report
+> artifact they would accept as evidence, with owner scoping enforced
+> throughout.
+
+## B2. Regentry — **security first, before any loop work**
+
+> **STOP. Five cross-tenant defects were confirmed by live probe, not
+> theorised.** These are data-integrity and confidentiality failures in the
+> regulatory module. Fix before anything else in this phase.
+>
+> 1. **Cross-tenant write** — `POST /regulatory/action-items` (`api.py:22858`)
+>    applies no ownership check; a non-owner posted an action item against
+>    another user's dossier.
+> 2. **Cross-tenant signing** — `POST /esignatures/records` (`api.py:15199`)
+>    validates step-up and resolves the content hash but never checks the
+>    caller may access the subject. **Someone can sign a record they cannot
+>    read.**
+> 3. **E-signature read leak** — `GET /esignatures/records`, `/{id}`,
+>    `/verify`, `/manifestation` (`:15252-15309`) are globally readable by any
+>    authenticated user.
+> 4. **ALCOA+ controlled records** — globally readable *and* globally mutable.
+> 5. **Globally writable registries** — `PATCH
+>    /compound-registry/compounds/{id}` (`api.py:22993`) returned 200 for a
+>    non-owner renaming another user's compound.
+>
+> Dossiers themselves are correctly protected: `require_dossier_access`
+> (`api.py:2819`) resolves `(created_by_user_id, team_access)` and defers to the
+> central PDP with a non-leaking 404. **The pattern exists and works — these
+> five routes simply do not use it.**
+>
+> Set `API_KEY` before probing. With it unset, `local_auth_disabled` is `True`
+> and cross-tenant tests prove nothing.
+
+**Prompt:**
+
+> Phase 1 — security. For each of the five routes, apply the existing
+> `require_dossier_access` / `authz.authorize` pattern. Add a regression test
+> per route asserting a non-owner receives a non-leaking 404. Then sweep every
+> remaining route in the module for the same omission; assume more exist.
+>
+> Phase 2 — loop. Only once Phase 1 is green: create → populate → review/sign →
+> export, using the existing 4 dossiers and 15 method registry entries.
+> Exercise Part 11 §11.70 verify and §11.50 manifestation, and ALCOA+
+> archive/restore.
+>
+> Note **export produces a manifest, not a file** —
+> `create_submission_package` writes a JSON manifest of file/artifact ids. If
+> the product promises a submission package, that is a gap.
+>
+> Keep all compliance language as "designed to support". SOC 2 is not held.
+>
+> **Pass:** every route owner-scoped with a test; a dossier round-trips through
+> sign and export; no compliance claim is stated as held fact.
+
+## B3. Repho
+
+> **Existing rows are unreadable.** All 8 projects have `owner_id = None`, and
+> `_owns_resource` (`authz.py:240-251`) returns `False` for a null owner, which
+> `require_reaction_access` maps to a 404. So every seeded project 404s for
+> everyone.
+>
+> Decide deliberately: backfill `owner_id` on the seed rows, or create fresh
+> owned rows. Do **not** relax `_owns_resource` — returning `False` for an
+> unowned resource is the correct default-deny.
+
+**Prompt:**
+
+> Establish readable data first (backfill owners or create fresh projects),
+> then drive project → experiment → cycle → recommendation → feedback.
+>
+> Known empty tables that bound what is testable without writes:
+> `reaction_execution_batches`, `reaction_execution_items`,
+> `reaction_analytical_results`, `reaction_optimization_runs` — all 0. The
+> make/test half of the loop cannot be exercised on existing rows at all.
+> Cost, safety and green profiles are also 0 rows, so those GETs 404 on every
+> project.
+>
+> Project 4 has a **rejected safety screening**, so
+> `assert_execution_allowed` (`reaction_safety.py:422`) raises → 409 on any
+> batch commit. That is correct behaviour — use it as a positive test that the
+> safety gate holds, not as a bug.
+>
+> Verify the three invariants that matter:
+> 1. Propose-next is human-gated and **executes nothing**.
+> 2. The safety review gate blocks execution when screening is rejected.
+> 3. Unsafe rejections stay **excluded** from preference learning.
+>
+> Then audit public copy against implementation. A fabricated algorithm name
+> (qNEHVI) shipped in marketing once. Verify every named method against backend
+> source, never against other marketing copy.
+>
+> **Pass:** loop completes on owned rows, all three invariants hold under test,
+> and every publicly named algorithm exists in code.
+
+---
+
+## Cross-cutting findings
+
+Not owned by a single phase; each needs a decision.
+
+- **Auth is off by default.** `API_KEY` unset → `local_auth_disabled = True`.
+  Any security conclusion drawn from a default local server is invalid.
+- **Two route families reach the same core.** Legacy (`/spectrum/*`,
+  `/analyze`, `/carbon13/*`) persists analyses; the newer FE family
+  (`/nmr/processed/*`) wraps the same parsers and does not persist. The newer
+  family self-identifies as `"legacy_route_wrapped": "/spectrum/analyze"`.
+  Converging them is a product decision worth taking explicitly.
+- **The 503 envelope hides the cause** — body is a generic "Service temporarily
+  unavailable" with a correlation id. Fine for users, but validation runs need
+  the real traceback; read the server log.
+- **No Makefile, docker-compose, seed script or fixture loader exists.** Every
+  phase currently re-derives its own setup. Worth building once.
+- **The heaviest real-data test is excluded by default** —
+  `tests/test_nmr_real_spectra_accuracy.py` is marked `slow` and `addopts`
+  carries `-m 'not slow'`. Opt in explicitly.
+- **`tests/test_regulatory_e2e.py` drives no HTTP route** — it is library-level
+  with stubbed calculators. It will not catch any of the five Regentry
+  security defects. Do not treat it as end-to-end coverage.

@@ -40,7 +40,9 @@ from .models import (
 )
 from .compound_class_priors import diagnostic_regions_for
 from .fid_pipeline_adapter import build_prompt_pipeline_runtime_contract
+from .nmr_tables import canonical_solvent
 from .parser import ReferencePeakAssignment, normalize_nmr_text, parse_reference_nmr_text
+from .solvents import SOLVENT_PROFILES
 from .raw_vault import RawVaultError, build_raw_upload_provenance, load_raw_archive_bytes
 from .spectrum import (
     _apply_reference_multiplicity,
@@ -797,6 +799,53 @@ def _resolve_raw_fid_nucleus(params: dict[str, Any], requested: str) -> str:
         or requested.strip()
         or "1H"
     )
+
+
+def _resolve_raw_fid_solvent(
+    params: dict[str, Any], requested: str | None
+) -> tuple[str | None, str]:
+    """Fall back to the solvent the spectrometer recorded.
+
+    Every Bruker acqus carries ``##$SOLVENT=`` and every Varian procpar carries
+    ``solvent``, but nothing read them: the solvent arrived only from the upload
+    form, so a raw FID uploaded without one was analysed as if the solvent were
+    unknown. That is not a cosmetic gap. Solvent selects the residual-peak window
+    used to reference the axis, the impurity library, and the exchangeable-proton
+    model, so all three silently degraded on a file that stated the answer.
+
+    A caller-supplied solvent still wins -- someone re-running an old dataset in
+    a different solvent is correcting the file, not contradicting themselves --
+    so acqus is consulted only when the request left it blank. The second return
+    value records which source was used, because a chemist reading a report is
+    entitled to know whether the solvent was asserted or inferred.
+    """
+    requested_clean = (requested or "").strip()
+    if requested_clean:
+        return requested_clean, "request"
+
+    detected = _param(params, "SOLVENT", "solvent", "Solvent")
+    if detected is None:
+        return None, "unknown"
+    text = str(detected).strip().strip("<>").strip()
+    if not text:
+        return None, "unknown"
+
+    # Bruker writes vendor spellings ("MeOD" for CD3OD); map to the vocabulary
+    # the rest of the pipeline indexes its tables by. An unrecognised label is
+    # passed through rather than dropped -- a downstream lookup that misses is
+    # recoverable, but discarding what the instrument recorded is not.
+    #
+    # canonical_solvent echoes an unknown string back rather than returning
+    # None, so identity with a known profile -- not truthiness -- is what
+    # distinguishes "mapped" from "passed through". The distinction is worth
+    # reporting: for an unrecognised solvent there is no residual peak to
+    # reference against and no impurity table to match, so a reader who sees
+    # the solvent named in the report would otherwise reasonably assume both ran.
+    canonical = canonical_solvent(text)
+    known = {profile.canonical_name for profile in SOLVENT_PROFILES}
+    if canonical in known:
+        return canonical, "acqus"
+    return (canonical or text), "acqus_unrecognised"
 
 
 def _apply_raw_fid_advised_constraints(
@@ -2234,20 +2283,80 @@ def _select_single_reference_peak(
     if not candidates:
         candidates = points
         mode = "global_nearest_fallback"
-    selected = min(
-        candidates,
+    # Rank by intensity, not by distance to the target.
+    #
+    # This used to sort on ``abs(shift - target)`` with intensity only breaking
+    # ties. But ``points`` is the dense spectrum trace, not a peak list, so a
+    # sample essentially AT the target always exists and always won -- the
+    # computed shift was therefore ~0 and referencing silently did nothing.
+    # Measured on a real CDCl3 dataset: the residual CHCl3 line sat at 7.284 ppm
+    # (a genuine +0.024 ppm error) and this returned the trace sample at
+    # 7.260029, for a correction of -0.000029 ppm.
+    #
+    # The old tiebreak also ranked by ``-abs(intensity)``, which scores a large
+    # NEGATIVE excursion as highly as a real peak; the point it actually
+    # returned had intensity -4.6e8. A reference peak is a maximum, so require a
+    # positive one and take the tallest in the window. Distance now only breaks
+    # ties between equally tall samples, which is what picks the apex out of a
+    # flat-topped maximum.
+    positive = [item for item in candidates if float(item[1]) > 0.0]
+    if not positive:
+        return (None, "none_no_positive_peak_in_window")
+    selected = max(
+        positive,
         key=lambda item: (
-            abs(float(item[0]) - target),
-            -abs(float(item[1])),
+            float(item[1]),
+            -abs(float(item[0]) - target),
         ),
     )
     return (selected, mode)
+
+
+def _solvent_reference_target(solvent: str | None) -> tuple[float | None, str | None]:
+    """The residual solvent peak, as a last-resort referencing anchor.
+
+    Referencing a raw FID used to require the caller to hand in a shift or a
+    reference spectrum. Neither is available on an ordinary upload, so the
+    ordinary upload was never referenced at all -- and an unreferenced axis is
+    not merely imprecise, it silently disables everything keyed to absolute
+    position. Measured on a real CDCl3 dataset: the axis sat +0.098 ppm off, so
+    the residual CHCl3 peak landed at 7.358 and escaped its own 7.20-7.32
+    masking window, and 87 protons of solvent were counted as analyte.
+
+    The residual peak of a known deuterated solvent is a defined constant, so
+    once the solvent is known the anchor is too. Preference order matters:
+
+    - A ``residual`` signal (CHCl3 in CDCl3, CHD2OD in CD3OD) is the standard
+      internal reference and is quoted to 0.01 ppm.
+    - D2O has no residual solvent signal -- it is fully deuterated, and the only
+      anchor is the HDO line. That line moves with temperature (roughly
+      -0.011 ppm/K) and with pH, so it is accepted but reported as approximate.
+      A lab that needs better in D2O uses an added standard such as DSS or TSP,
+      which arrives through ``reference_ppm`` and outranks this.
+    """
+    if not solvent:
+        return (None, None)
+    canonical = canonical_solvent(solvent) or solvent
+    profile = next(
+        (p for p in SOLVENT_PROFILES if p.canonical_name == canonical), None
+    )
+    if profile is None:
+        return (None, None)
+    signals = list(getattr(profile, "residual_signals", ()) or ())
+    residual = next((s for s in signals if getattr(s, "kind", "") == "residual"), None)
+    if residual is not None:
+        return (float(residual.ppm), "solvent_residual_peak")
+    water = next((s for s in signals if getattr(s, "kind", "") == "water"), None)
+    if water is not None:
+        return (float(water.ppm), "solvent_water_peak_approximate")
+    return (None, None)
 
 
 def _reference_axis(
     points: list[tuple[float, float]],
     reference_ppm: float | None,
     reference_nmr_text: str | None,
+    solvent: str | None = None,
 ) -> tuple[list[tuple[float, float]], float, dict[str, Any]]:
     if not points:
         return (points, 0.0, {"mode": "none", "selected_peak_count": 0})
@@ -2255,6 +2364,8 @@ def _reference_axis(
     target_source = "explicit_reference_ppm" if reference_ppm is not None else None
     if target_ppm is None:
         target_ppm, target_source = _reference_target_from_text(reference_nmr_text)
+    if target_ppm is None:
+        target_ppm, target_source = _solvent_reference_target(solvent)
     selected_peak, selection_mode = _select_single_reference_peak(points, target_ppm)
     if target_ppm is None or selected_peak is None:
         return (
@@ -2807,6 +2918,7 @@ def process_bruker_1d_zip(
                 )
         fid_for_qa = np.asarray(fid, dtype=np.complex128)
         nucleus = _resolve_raw_fid_nucleus(params, nucleus)
+        solvent, solvent_source = _resolve_raw_fid_solvent(params, solvent)
         settings, raw_fid_advised_processing, raw_fid_advised_notes = (
             _apply_raw_fid_advised_constraints(settings, nucleus=nucleus)
         )
@@ -2906,6 +3018,7 @@ def process_bruker_1d_zip(
             points,
             reference_ppm,
             reference_nmr_text,
+            solvent,
         )
         if reference_shift_applied:
             original_spectrum_points = [
@@ -2917,6 +3030,20 @@ def process_bruker_1d_zip(
                 f"({reference_peak_selection.get('observed_ppm')} ppm) mapped to "
                 f"{reference_peak_selection.get('target_ppm')} ppm."
             )
+            reference_target_source = reference_peak_selection.get("target_source")
+            if reference_target_source == "solvent_residual_peak":
+                warnings.append(
+                    "The axis was referenced to the residual solvent peak because no "
+                    "reference shift or reference spectrum was supplied. Supply an "
+                    "internal standard for work that must be traceable to one."
+                )
+            elif reference_target_source == "solvent_water_peak_approximate":
+                warnings.append(
+                    "This solvent has no residual solvent signal, so the axis was "
+                    "referenced to the water line, whose position moves with "
+                    "temperature and pH. Treat these shifts as approximate and add an "
+                    "internal standard such as DSS or TSP if they must be exact."
+                )
 
         inference_points = points
         nucleus_label = nucleus.strip() or "1H"
@@ -3174,6 +3301,7 @@ def process_bruker_1d_zip(
                 "vendor_format_detected": metadata.vendor_format_detected,
                 "nucleus": metadata.nucleus,
                 "solvent": solvent,
+                "solvent_source": solvent_source,
                 "reference_ppm": reference_ppm,
                 "reference_shift_applied_ppm": reference_shift_applied,
                 "reference_peak_selection": reference_peak_selection,
