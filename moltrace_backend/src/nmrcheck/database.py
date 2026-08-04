@@ -408,6 +408,34 @@ def _ensure_sqlite_schema(engine: Engine) -> None:
                     connection.exec_driver_sql(
                         f"ALTER TABLE prediction_service_configs ADD COLUMN {column} {ddl}"
                     )
+        # Registry attributability (migration 0039) on a pre-existing dev SQLite DB.
+        # These three tables recorded no creator at all, so a GxP registry could
+        # not say who registered a compound -- the "Attributable" of ALCOA+ --
+        # and, because there was no owner to compare against, a non-owner could
+        # rename another user's compound (verified: PATCH returned 200).
+        # NULL means "created before attribution existed" and is deliberately
+        # preserved rather than backfilled to an arbitrary user.
+        for attributable_table in (
+            "compound_entities",
+            "compound_batches",
+            "controlled_records",
+        ):
+            if attributable_table not in tables:
+                continue
+            existing_columns = {
+                str(row[1])
+                for row in connection.exec_driver_sql(
+                    f"PRAGMA table_info({attributable_table})"
+                ).fetchall()
+            }
+            if "created_by_user_id" not in existing_columns:
+                connection.exec_driver_sql(
+                    f"ALTER TABLE {attributable_table} ADD COLUMN created_by_user_id INTEGER"
+                )
+            connection.exec_driver_sql(
+                f"CREATE INDEX IF NOT EXISTS ix_{attributable_table}_created_by "
+                f"ON {attributable_table} (created_by_user_id)"
+            )
 
 
 def _sqlite_make_column_nullable(connection: Connection, table: str, column: str) -> None:

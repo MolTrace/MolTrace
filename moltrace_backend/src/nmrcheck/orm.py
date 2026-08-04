@@ -2000,6 +2000,10 @@ class ControlledRecordORM(Base):
         DateTime(timezone=True), nullable=True, index=True
     )
     deleted_by: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    #: See CompoundEntityORM.created_by_user_id -- ALCOA+ attributability.
+    #: ``deleted_by`` already recorded who removed a record; nothing recorded
+    #: who created one.
+    created_by_user_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
     metadata_json: Mapped[str] = mapped_column(Text, default="{}")
 
 
@@ -6910,6 +6914,13 @@ class CompoundEntityORM(Base):
     exact_mass: Mapped[float | None] = mapped_column(Float, nullable=True, index=True)
     stereochemistry_status: Mapped[str] = mapped_column(String(32), default="unknown")
     salt_solvent_status: Mapped[str] = mapped_column(String(32), default="unknown")
+    #: Who registered this compound. Required for ALCOA+ attributability
+    #: independently of access control -- a GxP registry that cannot say who
+    #: created a record is not attributable, whatever its read model is.
+    #: Nullable because rows predating migration 0039 have no recorded creator
+    #: and must not be silently reassigned to someone. NULL is treated as
+    #: legacy-shared on read and immutable-by-non-admin on write.
+    created_by_user_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, onupdate=utcnow
@@ -7003,6 +7014,8 @@ class CompoundBatchORM(Base):
     purity_percent: Mapped[float | None] = mapped_column(Float, nullable=True)
     purity_method: Mapped[str | None] = mapped_column(String(160), nullable=True)
     status: Mapped[str] = mapped_column(String(32), default="draft", index=True)
+    #: See CompoundEntityORM.created_by_user_id -- ALCOA+ attributability.
+    created_by_user_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, onupdate=utcnow
