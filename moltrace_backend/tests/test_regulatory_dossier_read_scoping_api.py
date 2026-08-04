@@ -483,3 +483,87 @@ def test_surveillance_writes_are_privileged(tmp_path):
             client.post("/regulatory/surveillance/sources", headers=admin, json={"title": "w"}).status_code
             == 201
         )
+
+
+# --------------------------------------------------------------------------- #
+# Body-addressed writes.
+#
+# Every test above gates a dossier named in the PATH, which is all
+# require_dossier_access can reach -- FastAPI resolves a dependency's arguments
+# from the path. Routes that take the dossier id in the BODY were never gated,
+# and the read side of the same resource being scoped is what hid it: the list
+# route passes owner_scope_id, so action items LOOKED owner-scoped.
+#
+# Probed against a running server with auth enforced: a caller who received a
+# non-leaking 404 reading a dossier posted an action item onto it and got 201.
+# --------------------------------------------------------------------------- #
+def test_non_owner_cannot_attach_an_action_item_to_a_dossier(tmp_path):
+    client = TestClient(_app(tmp_path))
+    with client:
+        alice = _sign_up(client, "alice@example.com")
+        bob = _sign_up(client, "bob@example.com")
+        did = _create_dossier(client, alice, title="Alice's dossier")
+
+        # Bob cannot read it ...
+        assert client.get(f"/regulatory/dossiers/{did}", headers=bob).status_code == 404
+
+        # ... so he must not be able to write to it either.
+        res = client.post(
+            "/regulatory/action-items",
+            headers=bob,
+            json={
+                "dossier_id": did,
+                "title": "INJECTED",
+                "description": "cross-tenant write",
+            },
+        )
+        assert res.status_code == 404, (
+            f"non-owner attached an action item to dossier {did}: "
+            f"{res.status_code} {res.text[:200]}"
+        )
+        # Same non-leaking wording as the read path: the response must not
+        # confirm the dossier exists.
+        assert res.json()["detail"] == "Regulatory dossier not found."
+
+
+def test_the_owner_can_still_attach_an_action_item(tmp_path):
+    """The gate must not close on the legitimate path."""
+    client = TestClient(_app(tmp_path))
+    with client:
+        alice = _sign_up(client, "alice@example.com")
+        did = _create_dossier(client, alice)
+        res = client.post(
+            "/regulatory/action-items",
+            headers=alice,
+            json={"dossier_id": did, "title": "Owner item", "description": "ok"},
+        )
+        assert res.status_code == 201, res.text
+        assert res.json()["dossier_id"] == did
+
+
+def test_an_unattached_action_item_is_still_allowed(tmp_path):
+    """dossier_id is optional; omitting it must not trip the gate."""
+    client = TestClient(_app(tmp_path))
+    with client:
+        alice = _sign_up(client, "alice@example.com")
+        res = client.post(
+            "/regulatory/action-items",
+            headers=alice,
+            json={"title": "Unattached", "description": "no dossier"},
+        )
+        assert res.status_code == 201, res.text
+        assert res.json()["dossier_id"] is None
+
+
+def test_a_system_api_key_may_still_attach_to_any_dossier(tmp_path):
+    """Scope None is the system caller; the gate defers to the same PDP rules."""
+    client = TestClient(_app(tmp_path))
+    with client:
+        alice = _sign_up(client, "alice@example.com")
+        did = _create_dossier(client, alice)
+        res = client.post(
+            "/regulatory/action-items",
+            headers=SYSTEM,
+            json={"dossier_id": did, "title": "System item", "description": "ok"},
+        )
+        assert res.status_code == 201, res.text

@@ -2834,6 +2834,30 @@ def require_dossier_access(
     is resolved once and passed in, then the PDP applies the system/admin/owner rules. The
     404 mapping (ownership-secret resource) is preserved exactly.
     """
+    authorize_dossier_access(dossier_id, request, context)
+
+
+def authorize_dossier_access(
+    dossier_id: int,
+    request: Request,
+    context: AccessContext,
+) -> None:
+    """The dossier ownership gate, callable outside the dependency chain.
+
+    ``require_dossier_access`` can only guard a dossier named by a PATH
+    parameter, because that is how FastAPI resolves a dependency's arguments.
+    Several routes instead take the dossier id in the REQUEST BODY, and those
+    routes were simply never gated -- ``POST /regulatory/action-items``
+    accepted any ``dossier_id`` and returned 201, so a caller who got a
+    non-leaking 404 reading a dossier could still write an action item onto it.
+    The read side of the same resource was already scoped (the list route
+    passes ``owner_scope_id``), which is what let the gap survive: the guard was
+    half applied, closing reads and leaving writes open.
+
+    Body-addressed callers must call this explicitly. Keeping one implementation
+    means the 404-not-403 mapping, the audit signal and the PDP rules cannot
+    drift between the two entry paths.
+    """
     owner_id, team_access = regulatory_store.dossier_access_facts(
         _state(request).session_factory, dossier_id, context.user_id
     )
@@ -22860,6 +22884,11 @@ def create_regulatory_action_item_route(
     request: Request,
     context: AccessContext = Depends(require_access_context),
 ) -> RegulatoryActionItem:
+    # The dossier is named in the body, so no route dependency can gate it.
+    # Without this an unrelated caller could attach an action item to any
+    # dossier: verified 201 against a dossier the same caller got 404 reading.
+    if payload.dossier_id is not None:
+        authorize_dossier_access(payload.dossier_id, request, context)
     try:
         return compliance_store.create_action_item(
             _state(request).session_factory,
