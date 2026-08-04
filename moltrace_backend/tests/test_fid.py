@@ -2008,3 +2008,127 @@ def test_raw_fid_vault_prompt_sidecar_is_metadata_only_and_non_disruptive(
     assert process_sidecar["analysis_guidance"]["used_for_plot"] is False
     assert process_sidecar["analysis_guidance"]["used_for_peak_markers"] is False
     assert process_sidecar["analysis_guidance"]["used_for_phase_or_baseline"] is False
+
+
+class TestSolventResolvedFromAcqus:
+    """The spectrometer already recorded the solvent; read it.
+
+    Nothing read ``##$SOLVENT=`` before, so a raw FID uploaded without a
+    solvent on the form was analysed as though the solvent were unknown --
+    which silently switched off residual-peak referencing, the impurity
+    library and the exchangeable-proton model on a file that stated the answer.
+    """
+
+    def test_bruker_solvent_is_read_when_the_caller_supplies_none(self) -> None:
+        from nmrcheck.fid import _resolve_raw_fid_solvent
+
+        assert _resolve_raw_fid_solvent({"SOLVENT": "<CDCl3>"}, None) == (
+            "CDCl3",
+            "acqus",
+        )
+
+    def test_vendor_spelling_is_mapped_to_the_canonical_name(self) -> None:
+        """Bruker writes MeOD; the impurity tables are keyed by CD3OD."""
+        from nmrcheck.fid import _resolve_raw_fid_solvent
+
+        assert _resolve_raw_fid_solvent({"SOLVENT": "<MeOD>"}, None) == (
+            "CD3OD",
+            "acqus",
+        )
+
+    def test_an_explicit_request_solvent_outranks_the_file(self) -> None:
+        """Re-running an old dataset in a new solvent corrects the file."""
+        from nmrcheck.fid import _resolve_raw_fid_solvent
+
+        assert _resolve_raw_fid_solvent({"SOLVENT": "<CDCl3>"}, "DMSO-d6") == (
+            "DMSO-d6",
+            "request",
+        )
+
+    def test_an_unrecognised_label_is_passed_through_not_dropped(self) -> None:
+        """A missed lookup is recoverable; discarding the instrument's word is not."""
+        from nmrcheck.fid import _resolve_raw_fid_solvent
+
+        solvent, source = _resolve_raw_fid_solvent({"SOLVENT": "<Novel-d3>"}, None)
+        assert solvent == "Novel-d3"
+        assert source == "acqus_unrecognised"
+
+    def test_absent_or_empty_is_unknown_not_a_guess(self) -> None:
+        from nmrcheck.fid import _resolve_raw_fid_solvent
+
+        assert _resolve_raw_fid_solvent({}, None) == (None, "unknown")
+        assert _resolve_raw_fid_solvent({"SOLVENT": "<>"}, None) == (None, "unknown")
+
+
+class TestSolventReferenceTarget:
+    def test_residual_peak_is_preferred(self) -> None:
+        from nmrcheck.fid import _solvent_reference_target
+
+        assert _solvent_reference_target("CDCl3") == (7.26, "solvent_residual_peak")
+        assert _solvent_reference_target("CD3OD") == (3.31, "solvent_residual_peak")
+
+    def test_d2o_falls_back_to_water_and_says_it_is_approximate(self) -> None:
+        """D2O is fully deuterated: HDO is the only anchor, and it moves.
+
+        Roughly -0.011 ppm/K, plus a pH dependence. Accepting it is right --
+        refusing to reference D2O at all would be worse -- but the source label
+        has to carry the caveat so the report can repeat it.
+        """
+        from nmrcheck.fid import _solvent_reference_target
+
+        ppm, source = _solvent_reference_target("D2O")
+        assert ppm == 4.79
+        assert source == "solvent_water_peak_approximate"
+
+    def test_unknown_solvent_yields_no_anchor(self) -> None:
+        from nmrcheck.fid import _solvent_reference_target
+
+        assert _solvent_reference_target(None) == (None, None)
+        assert _solvent_reference_target("not-a-solvent") == (None, None)
+
+
+class TestReferencePeakSelection:
+    """A reference peak is a maximum, not the nearest sample to the target."""
+
+    def test_the_tallest_line_in_the_window_wins_not_the_nearest_sample(self) -> None:
+        """The defect that made referencing a no-op.
+
+        ``points`` is the dense trace, so a sample essentially AT the target
+        always exists. Ranking by distance therefore always selected it and
+        computed a ~0 shift. Measured on a real CDCl3 dataset: the residual
+        CHCl3 line sat at 7.284 ppm and this returned the sample at 7.260029,
+        a correction of -0.000029 ppm against a true error of +0.024 ppm.
+        """
+        from nmrcheck.fid import _select_single_reference_peak
+
+        points = [(7.20, 1.0), (7.26, 5.0), (7.284, 1000.0), (7.32, 2.0)]
+        selected, mode = _select_single_reference_peak(points, 7.26)
+
+        assert selected is not None
+        assert selected[0] == 7.284, (
+            f"expected the tallest line at 7.284, got {selected[0]}"
+        )
+        assert mode == "nearest_target_window"
+
+    def test_a_negative_excursion_is_never_a_reference_peak(self) -> None:
+        """The old ranking used -abs(intensity), scoring a deep negative
+        baseline swing as highly as a real peak. It returned one: intensity
+        -4.6e8."""
+        from nmrcheck.fid import _select_single_reference_peak
+
+        points = [(7.26, -9999.0), (7.30, 12.0)]
+        selected, _ = _select_single_reference_peak(points, 7.26)
+
+        assert selected is not None
+        assert selected[1] > 0
+        assert selected[0] == 7.30
+
+    def test_a_window_with_no_positive_signal_selects_nothing(self) -> None:
+        """Better to decline than to reference off noise."""
+        from nmrcheck.fid import _select_single_reference_peak
+
+        selected, mode = _select_single_reference_peak(
+            [(7.25, -3.0), (7.26, -1.0), (7.27, -8.0)], 7.26
+        )
+        assert selected is None
+        assert mode == "none_no_positive_peak_in_window"

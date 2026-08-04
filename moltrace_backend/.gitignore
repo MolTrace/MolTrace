@@ -123,3 +123,4 @@ corpus_store/
 # ids + the pinned SHA-256) is small and IS intended to be version-controlled.
 gold_set_data/
 *.gold_eval.json
+validation_fixtures/
