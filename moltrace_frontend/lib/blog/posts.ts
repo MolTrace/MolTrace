@@ -355,6 +355,9 @@ export const POSTS: BlogPost[] = [
     metaDescription:
       "How MolTrace validates NMR peak detection against references that count environments and multiplet lines separately — and why one corpus is not gated.",
     author: "MolTrace research team",
+    heroImage: "/blog/hmdb-style-validation.jpg",
+    heroImageAlt:
+      "Two holographic panels face each other across a darkened laboratory bench. The left panel holds a neat grid of evenly spaced reference cells; the right shows real recorded traces, dense and irregular. Fine teal threads run between them, most pairing one cell to one trace, several fanning out from a single cell to many.",
     body: [
       {
         "type": "h2",
