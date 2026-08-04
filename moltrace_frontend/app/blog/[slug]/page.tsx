@@ -37,7 +37,12 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
     ? [{ url: heroPng, width: 1200, height: 630, alt: post.heroImageAlt ?? post.title }]
     : undefined
   return {
-    title: `${post.title} · Field notes`,
+    // No "· Field notes" suffix: the layout template already appends
+    // " | MolTrace", so carrying a section suffix too pushed the rendered tag
+    // to 89 characters against the ~60 Google shows — the headline was being
+    // truncated to make room for two suffixes. The section is already carried
+    // by the URL and by openGraph.section.
+    title: post.metaTitle ?? post.title,
     description,
     alternates: { canonical: `/blog/${post.slug}` },
     openGraph: {
