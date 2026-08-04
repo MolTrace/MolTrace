@@ -214,6 +214,9 @@ export const POSTS: BlogPost[] = [
     metaDescription:
       "How MolTrace promotes an experimental NMR backend to default: two published thresholds, an expected-to-fail test, and a diff recording when it cleared.",
     author: "MolTrace research team",
+    heroImage: "/blog/experimental-default-promotion-gate.jpg",
+    heroImageAlt:
+      "A darkened facility corridor at night. A heavy interlocked door stands half-open, cold teal light spilling through it, and a tall column of horizontal bar meters glows in the opening — most filled teal, one amber and short, sitting below the others. An analytical instrument waits on a wheeled trolley at the threshold, not yet through the door.",
     body: [
       {
         "type": "h2",
