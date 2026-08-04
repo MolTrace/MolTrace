@@ -443,3 +443,78 @@ def test_esign_columns_present_and_idempotent(tmp_path):
             .fetchall()
         }
     assert {"signer_user_id", "record_content_hash", "signature_digest"} <= cols
+
+
+# --------------------------------------------------------------------------- #
+# Confidentiality of the signature register.
+#
+# A Part 11 record names who signed what, when and why, so the LIST alone
+# discloses another customer's regulatory activity even when the signed subject
+# is unreachable. This listed every signature in the deployment to any
+# authenticated caller -- verified by probe against a running server with auth
+# enforced: a freshly registered user read a signature belonging to someone else.
+# --------------------------------------------------------------------------- #
+def _make_signature(client: TestClient, bearer: dict, target_id: int, name: str) -> int:
+    _step_up(client, bearer)
+    res = client.post(
+        "/esignatures/records",
+        headers=bearer,
+        json={
+            "signer_name": name,
+            "signature_meaning": "reviewed",
+            "target_type": "reaction_project",
+            "target_id": target_id,
+            "reason": "scoping test",
+        },
+    )
+    assert res.status_code == 201, res.text
+    return res.json()["id"]
+
+
+def test_the_signature_register_is_scoped_to_the_signer(tmp_path):
+    client = TestClient(_app(tmp_path))
+    with client:
+        alice = _signup(client, "alice@example.com")
+        bob = _signup(client, "bob@example.com")
+        _make_signature(client, alice, 1, "Alice")
+
+        alice_sees = client.get("/esignatures/records", headers=alice)
+        assert alice_sees.status_code == 200, alice_sees.text
+        assert len(alice_sees.json()) == 1, "signer must still see their own record"
+
+        bob_sees = client.get("/esignatures/records", headers=bob)
+        assert bob_sees.status_code == 200, bob_sees.text
+        assert bob_sees.json() == [], (
+            f"another user's signature register leaked: {bob_sees.json()}"
+        )
+
+
+def test_each_signer_sees_only_their_own_records(tmp_path):
+    client = TestClient(_app(tmp_path))
+    with client:
+        alice = _signup(client, "alice@example.com")
+        bob = _signup(client, "bob@example.com")
+        _make_signature(client, alice, 1, "Alice")
+        _make_signature(client, bob, 2, "Bob")
+
+        alice_ids = {r["id"] for r in client.get("/esignatures/records", headers=alice).json()}
+        bob_ids = {r["id"] for r in client.get("/esignatures/records", headers=bob).json()}
+
+        assert len(alice_ids) == 1 and len(bob_ids) == 1
+        assert not (alice_ids & bob_ids), "signature registers overlap across users"
+
+
+def test_the_system_api_key_still_sees_every_record(tmp_path):
+    """Unscoped access is reserved for system/admin, matching the action-item list."""
+    client = TestClient(_app(tmp_path))
+    with client:
+        alice = _signup(client, "alice@example.com")
+        bob = _signup(client, "bob@example.com")
+        _make_signature(client, alice, 1, "Alice")
+        _make_signature(client, bob, 2, "Bob")
+
+        res = client.get("/esignatures/records", headers={"x-api-key": "test-key"})
+        assert res.status_code == 200, res.text
+        assert len(res.json()) == 2, (
+            "the system key must retain the unscoped view used for oversight"
+        )

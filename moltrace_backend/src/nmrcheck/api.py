@@ -15284,6 +15284,7 @@ def list_esignature_records_route(
         _state(request).session_factory,
         target_type=target_type,
         target_id=target_id,
+        owner_scope_id=_user_scope_for_context(context),
         limit=limit,
     )
 

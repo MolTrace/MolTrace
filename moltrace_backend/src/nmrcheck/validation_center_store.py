@@ -1414,14 +1414,39 @@ def list_signatures(
     *,
     target_type: str | None = None,
     target_id: int | None = None,
+    owner_scope_id: int | None = None,
     limit: int = 200,
 ) -> list[ElectronicSignatureRecord]:
+    """List e-signature records, optionally scoped to one signer.
+
+    This listed every signature in the deployment to any authenticated caller.
+    A Part 11 signature record names who signed what, when and why, so the list
+    alone discloses another customer's regulatory activity even when the signed
+    subject is unreachable -- verified by probe: a freshly registered user read
+    a signature belonging to someone else.
+
+    ``owner_scope_id`` narrows the list to records that user signed.
+    ``None`` preserves the unscoped view and is reserved for the system api key
+    and admins, matching how the regulatory action-item list already treats
+    scope (``owner_scope_id=_user_scope_for_context(context)``).
+
+    Signer scope is deliberately narrower than "everything about subjects you
+    own": resolving a signature's target to an owner needs a per-target-type
+    lookup that does not exist yet (``target_type`` is a free string spanning
+    dossiers, reaction projects and reports), and no such resolver should be
+    guessed at inside a store function. A subject owner who needs to see
+    signatures on their own subject can still query by ``target_type`` +
+    ``target_id``; widening that path is the follow-up, and it must be a
+    deliberate authorization decision rather than a default of "show all".
+    """
     with session_scope(session_factory) as session:
         stmt = select(ElectronicSignatureRecordORM).order_by(ElectronicSignatureRecordORM.id.desc()).limit(limit)
         if target_type:
             stmt = stmt.where(ElectronicSignatureRecordORM.target_type == target_type)
         if target_id is not None:
             stmt = stmt.where(ElectronicSignatureRecordORM.target_id == target_id)
+        if owner_scope_id is not None:
+            stmt = stmt.where(ElectronicSignatureRecordORM.signer_user_id == owner_scope_id)
         return [_signature_to_record(row) for row in session.scalars(stmt).all()]
 
 
