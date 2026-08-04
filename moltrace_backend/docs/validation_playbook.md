@@ -366,34 +366,77 @@ masked; impurity candidates 1 → 6.
 > artifact they would accept as evidence, with owner scoping enforced
 > throughout.
 
-## B2. Regentry — **security first, before any loop work**
+## B2. Regentry — security phase DONE, loop phase remaining
 
-> **STOP. Five cross-tenant defects were confirmed by live probe, not
-> theorised.** These are data-integrity and confidentiality failures in the
-> regulatory module. Fix before anything else in this phase.
+> **Set `API_KEY` before any probe.** With it unset, `local_auth_disabled` is
+> `True` and cross-tenant tests prove nothing.
+
+**Each of the five reported defects was re-probed individually. Two did not
+hold.** Reporting them unverified would have burned a day fixing a
+non-existent exploit.
+
+| # | Defect | Verdict | Status |
+|---|---|---|---|
+| 1 | Cross-tenant write, `POST /regulatory/action-items` | CONFIRMED (201) | **Fixed** `b049003` |
+| 2 | Cross-tenant signing, `POST /esignatures/records` | **Not reproduced** — 401 `step_up_required` fires first | Open, needs step-up to test |
+| 3 | E-signature register globally readable | CONFIRMED | **Fixed** `0d4174b` |
+| 4a | Controlled records globally readable | CONFIRMED (200) | Open |
+| 4b | Controlled records globally *mutable* | **Refuted** — PATCH is 405 | n/a |
+| 5 | `PATCH /compound-registry/compounds/{id}` | CONFIRMED (renamed, 200) | **Fixed** `0039` |
+
+**What the fixes established, reusable for the rest:**
+
+- Dossiers are correctly protected by `require_dossier_access`
+  (`api.py:2819`) → `dossier_access_facts` → PDP, non-leaking 404. That gate can
+  only reach a dossier named in the **path**. Routes naming it in the **body**
+  must call `authorize_dossier_access()` explicitly.
+- `regulatory_action_items` has no ownership column, so #1 authorizes through
+  the parent `dossier_id`.
+- `compound_entities`, `compound_batches` and `controlled_records` had **no
+  ownership column at all**. Migration `0039` adds `created_by_user_id` to all
+  three — required for ALCOA+ attributability regardless of access control,
+  since "Attributable" is the *A*.
+- **Not tenant-scoped, deliberately.** There is no server-derived tenant on a
+  request: `AccessContext` carries none, `organizations` has no link to
+  `tenants`, `tenants` is empty, and `team_members` is empty and keyed by
+  `user_email`. Per-user is the only axis that can actually be enforced.
+  Widening to an organisation later is a read-model change on top of this
+  column; recovering who created an unattributed row is impossible.
+- **Reads vs writes were split on purpose.** A compound registry is a shared
+  reference — colleagues look up each other's structures — so closing reads
+  would break the feature rather than secure it. Writes were the actual defect.
+  This is the opposite call from dossiers, where ownership is itself
+  confidential, which is also why the registry returns **403** rather than a
+  non-leaking 404.
+- A NULL `created_by_user_id` (pre-migration row) is refused to non-admins
+  rather than treated as unowned-and-editable. "Nobody is recorded as
+  responsible" must not read as "anyone may change it".
+
+**Remaining prompt:**
+
+> Close #4a: `controlled_records` is globally readable. It now has
+> `created_by_user_id` from migration 0039, so the column exists — decide the
+> read model. Unlike the compound registry, a controlled record is a regulated
+> artefact rather than a shared reference, so owner-scoped reads are probably
+> right; confirm against how the FE uses the list.
 >
-> 1. **Cross-tenant write** — `POST /regulatory/action-items` (`api.py:22858`)
->    applies no ownership check; a non-owner posted an action item against
->    another user's dossier.
-> 2. **Cross-tenant signing** — `POST /esignatures/records` (`api.py:15199`)
->    validates step-up and resolves the content hash but never checks the
->    caller may access the subject. **Someone can sign a record they cannot
->    read.**
-> 3. **E-signature read leak** — `GET /esignatures/records`, `/{id}`,
->    `/verify`, `/manifestation` (`:15252-15309`) are globally readable by any
->    authenticated user.
-> 4. **ALCOA+ controlled records** — globally readable *and* globally mutable.
-> 5. **Globally writable registries** — `PATCH
->    /compound-registry/compounds/{id}` (`api.py:22993`) returned 200 for a
->    non-owner renaming another user's compound.
+> Then #2: satisfy step-up and re-probe whether `POST /esignatures/records`
+> checks that the caller may access the subject. If it does not, someone can
+> sign a record they cannot read, which is a Part 11 integrity failure. Do not
+> report it as an exploit until reproduced past the step-up gate.
 >
-> Dossiers themselves are correctly protected: `require_dossier_access`
-> (`api.py:2819`) resolves `(created_by_user_id, team_access)` and defers to the
-> central PDP with a non-leaking 404. **The pattern exists and works — these
-> five routes simply do not use it.**
+> Then sweep every remaining Regentry route for the same omission; assume more
+> exist, and check body-addressed parameters specifically — that is what hid #1.
 >
-> Set `API_KEY` before probing. With it unset, `local_auth_disabled` is `True`
-> and cross-tenant tests prove nothing.
+> Then the loop: create → populate → review/sign → export, using the existing
+> 4 dossiers and 15 method registry entries. Exercise Part 11 §11.70 verify and
+> §11.50 manifestation, and ALCOA+ archive/restore.
+>
+> Note **export produces a manifest, not a file** —
+> `create_submission_package` writes a JSON manifest of file/artifact ids. If
+> the product promises a submission package, that is a gap.
+>
+> Keep all compliance language as "designed to support". SOC 2 is not held.
 
 **Prompt:**
 

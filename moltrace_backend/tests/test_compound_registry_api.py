@@ -309,3 +309,123 @@ def test_compound_registry_endpoints_appear_in_openapi(client):
         "ScientificKnowledgeGraphEdge",
     ]:
         assert schema_name in schemas
+
+
+# --------------------------------------------------------------------------- #
+# Registry attributability and write ownership (migration 0039).
+#
+# compound_entities recorded no creator at all, so there was nothing to compare
+# a caller against and PATCH accepted an edit from anyone. Verified against a
+# running server with auth enforced: a second user renamed another user's
+# compound and received 200.
+#
+# Reads deliberately stay open. A compound registry is a shared reference --
+# people look up structures registered by colleagues -- so closing reads would
+# break the feature rather than secure it. Writes are the actual defect.
+# --------------------------------------------------------------------------- #
+def _signup(client: TestClient, email: str) -> dict[str, str]:
+    res = client.post(
+        "/auth/sign-up",
+        json={"email": email, "password": "password123", "password_confirm": "password123"},
+    )
+    assert res.status_code == 201, res.text
+    return {"Authorization": f"Bearer {res.json()['access_token']}"}
+
+
+def _register_compound(client: TestClient, headers: dict[str, str], name: str) -> int:
+    res = client.post(
+        "/compound-registry/compounds",
+        headers=headers,
+        json={
+            "preferred_name": name,
+            "original_structure_input": "CCO",
+            "original_structure_format": "smiles",
+            "compound_type": "target",
+        },
+    )
+    assert res.status_code == 201, res.text
+    return res.json()["id"]
+
+
+def test_a_non_registrant_cannot_rename_a_compound(client, api_headers):
+    alice = _signup(client, "cr-alice@example.com")
+    bob = _signup(client, "cr-bob@example.com")
+    cid = _register_compound(client, alice, "AliceCompound")
+
+    res = client.patch(
+        f"/compound-registry/compounds/{cid}",
+        headers=bob,
+        json={"preferred_name": "RENAMED BY BOB"},
+    )
+    assert res.status_code == 403, f"non-registrant edited the compound: {res.status_code} {res.text[:200]}"
+
+    # And the name must be untouched.
+    current = client.get(f"/compound-registry/compounds/{cid}", headers=alice)
+    assert current.status_code == 200, current.text
+    assert current.json()["preferred_name"] == "AliceCompound"
+
+
+def test_the_registrant_can_still_edit(client, api_headers):
+    alice = _signup(client, "cr-alice2@example.com")
+    cid = _register_compound(client, alice, "AliceCompound")
+    res = client.patch(
+        f"/compound-registry/compounds/{cid}",
+        headers=alice,
+        json={"preferred_name": "Alice renamed it"},
+    )
+    assert res.status_code == 200, res.text
+    assert res.json()["preferred_name"] == "Alice renamed it"
+
+
+def test_reads_stay_open_across_users(client, api_headers):
+    """The registry is a shared reference; only writes are owner-gated."""
+    alice = _signup(client, "cr-alice3@example.com")
+    bob = _signup(client, "cr-bob3@example.com")
+    cid = _register_compound(client, alice, "SharedLookup")
+
+    res = client.get(f"/compound-registry/compounds/{cid}", headers=bob)
+    assert res.status_code == 200, "a colleague must still be able to look the compound up"
+    assert res.json()["preferred_name"] == "SharedLookup"
+
+
+def test_the_system_key_keeps_the_unscoped_write(client, api_headers):
+    alice = _signup(client, "cr-alice4@example.com")
+    cid = _register_compound(client, alice, "AliceCompound")
+    res = client.patch(
+        f"/compound-registry/compounds/{cid}",
+        headers=api_headers,
+        json={"preferred_name": "Corrected by ops"},
+    )
+    assert res.status_code == 200, res.text
+
+
+def test_a_legacy_unattributed_row_is_not_editable_by_a_non_admin(client, api_headers):
+    """NULL creator means "created before attribution existed".
+
+    Reading that as "unowned, therefore anyone may change it" would leave the
+    original hole open for exactly the oldest records. An admin or the system
+    key can still correct them.
+    """
+    from sqlalchemy import text as sa_text
+
+    alice = _signup(client, "cr-alice5@example.com")
+    bob = _signup(client, "cr-bob5@example.com")
+    cid = _register_compound(client, alice, "LegacyRow")
+
+    # Simulate a pre-migration row.
+    engine = client.app.state.session_factory.kw["bind"]
+    with engine.begin() as conn:
+        conn.execute(
+            sa_text("UPDATE compound_entities SET created_by_user_id = NULL WHERE id = :i"),
+            {"i": cid},
+        )
+
+    assert client.patch(
+        f"/compound-registry/compounds/{cid}", headers=bob, json={"preferred_name": "x"}
+    ).status_code == 403
+    assert client.patch(
+        f"/compound-registry/compounds/{cid}", headers=alice, json={"preferred_name": "y"}
+    ).status_code == 403, "even the original registrant cannot be identified on a NULL row"
+    assert client.patch(
+        f"/compound-registry/compounds/{cid}", headers=api_headers, json={"preferred_name": "ops fix"}
+    ).status_code == 200

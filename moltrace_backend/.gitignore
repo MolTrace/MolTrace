@@ -24,6 +24,10 @@ torch_env/
 *.sqlite3
 *.db
 nmrcheck.sqlite3
+# Pre-migration safety copies of a dev DB (e.g. taken before an
+# additive ALTER TABLE); never a build input.
+*.sqlite3.bak
+*.sqlite.bak
 .nmrcheck/
 
 # Scientific/raw artifacts and generated archives

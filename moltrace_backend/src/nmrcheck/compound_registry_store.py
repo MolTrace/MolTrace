@@ -435,6 +435,8 @@ def _require_resource(session: Session, resource_type: str, resource_id: str | i
 def create_compound(
     session_factory: sessionmaker[Session],
     payload: CompoundEntityCreate,
+    *,
+    created_by_user_id: int | None = None,
 ) -> CompoundEntity:
     structure_format = payload.original_structure_format
     if payload.original_structure_input is not None and structure_format is None:
@@ -456,6 +458,7 @@ def create_compound(
             exact_mass=derived.exact_mass,
             stereochemistry_status=payload.stereochemistry_status,
             salt_solvent_status=payload.salt_solvent_status,
+            created_by_user_id=created_by_user_id,
             metadata_json=_json_dump(metadata, default={}),
         )
         session.add(row)
@@ -518,15 +521,47 @@ def get_compound(session_factory: sessionmaker[Session], compound_id: int) -> Co
         return _compound_to_record(row) if row is not None else None
 
 
+class CompoundRegistryAccessError(RuntimeError):
+    """The caller may not modify this compound."""
+
+
 def update_compound(
     session_factory: sessionmaker[Session],
     compound_id: int,
     payload: CompoundEntityUpdate,
+    *,
+    actor_user_id: int | None = None,
+    enforce_owner: bool = False,
 ) -> CompoundEntity | None:
+    """Update a compound, optionally restricting the edit to its registrant.
+
+    ``enforce_owner`` is opt-in so the system api key and admins -- which pass
+    ``enforce_owner=False`` -- keep the unscoped behaviour, matching how every
+    other gate in this codebase treats a system principal.
+
+    Reads stay open deliberately. A compound registry is a shared reference:
+    people look up structures registered by colleagues, and closing reads would
+    break the feature rather than secure it. Writes are the actual defect --
+    verified against a running server with auth enforced, a second user renamed
+    another user's compound and got 200 -- and nobody legitimately needs to
+    rename a compound they did not register.
+
+    A NULL ``created_by_user_id`` means the row predates attribution
+    (migration 0039). Those rows are refused to non-admins rather than treated
+    as unowned-and-therefore-editable: the safer reading of "nobody is recorded
+    as responsible for this" is not "anybody may change it". An admin or the
+    system key can still correct them.
+    """
     with session_scope(session_factory) as session:
         row = session.get(CompoundEntityORM, compound_id)
         if row is None:
             return None
+        if enforce_owner and (
+            row.created_by_user_id is None or row.created_by_user_id != actor_user_id
+        ):
+            raise CompoundRegistryAccessError(
+                "This compound was registered by another user and cannot be edited here."
+            )
         fields = payload.model_fields_set
         if "preferred_name" in fields:
             row.preferred_name = payload.preferred_name

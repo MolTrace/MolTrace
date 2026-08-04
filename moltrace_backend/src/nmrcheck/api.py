@@ -22961,7 +22961,11 @@ def create_compound_registry_compound_route(
     context: AccessContext = Depends(require_access_context),
 ) -> CompoundEntity:
     try:
-        record = compound_store.create_compound(_state(request).session_factory, payload)
+        record = compound_store.create_compound(
+            _state(request).session_factory,
+            payload,
+            created_by_user_id=_user_scope_for_context(context),
+        )
     except Exception as exc:
         _raise_compound_registry_http_error(exc)
         raise
@@ -23026,10 +23030,24 @@ def update_compound_registry_compound_route(
     request: Request,
     context: AccessContext = Depends(require_access_context),
 ) -> CompoundEntity:
+    # A user-scoped caller may only edit what they registered; scope None is the
+    # system key / admin and keeps the unscoped behaviour.
+    actor_user_id = _user_scope_for_context(context)
     try:
         record = compound_store.update_compound(
-            _state(request).session_factory, compound_id, payload
+            _state(request).session_factory,
+            compound_id,
+            payload,
+            actor_user_id=actor_user_id,
+            enforce_owner=actor_user_id is not None,
         )
+    except compound_store.CompoundRegistryAccessError as exc:
+        # 403, not 404: the compound registry is a shared reference and its rows
+        # are readable, so existence is not a secret here and pretending
+        # otherwise would only confuse a chemist who can see the record on
+        # screen. This is the opposite call from dossiers, where ownership is
+        # itself confidential and a non-owner gets a non-leaking 404.
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
     except Exception as exc:
         _raise_compound_registry_http_error(exc)
         raise
