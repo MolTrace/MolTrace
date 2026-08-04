@@ -47,6 +47,12 @@ export type BlogPost = {
   /** <=155-char summary for the per-post `<meta name="description">`. Falls
    *  back to `dek` when absent. */
   metaDescription?: string
+  /** Short title for the `<title>` tag only; the H1 and the cards keep `title`.
+   *
+   *  The rendered tag is this plus the layout's " | MolTrace", so keep it under
+   *  49 characters to stay inside the ~60 Google displays. An essay headline can
+   *  afford to be longer than a search result can. */
+  metaTitle?: string
   /** Byline for the article + JSON-LD author. */
   author?: string
   /** Hero artwork shown on the post and the featured card. Path under
@@ -196,14 +202,116 @@ export const POSTS: BlogPost[] = [
   {
     slug: "experimental-default-promotion-gate",
     title: "What 'experimental' actually means in our promotion gate",
-    dek: "Every new AI backend ships as opt-in. Promotion to default is a published-threshold decision, not a vibes call.",
+    dek: "A new analysis backend ships opt-in behind two published numbers. Promotion happens when the numbers move, and the commit that removes the failure marker is the record.",
     claim:
-      "GSD-Prompt-3 shipped as `experimental: true` with a documented promotion gate (target: 95% solvent detection, median compound-count delta ≤2). Until both clear, the default stays legacy. We publish the corpus, the threshold, and the date a feature crosses each one.",
+      "Our GSD sidecar shipped as experimental: true with a written promotion gate — 95% solvent auto-detection and a median compound-environment-count delta of 2 or better. The gate was declared before it was met, the test that enforced it was marked expected-to-fail, and clearing it is a diff you can read.",
     topic: "methodology",
     topicLabel: "Methodology",
-    date: "2026-05-27",
-    readingMinutes: 6,
-    status: "forthcoming",
+    date: "2026-05-28",
+    readingMinutes: 7,
+    status: "live",
+    metaTitle: "What 'experimental' means in our promotion gate",
+    metaDescription:
+      "How MolTrace promotes an experimental NMR backend to default: two published thresholds, an expected-to-fail test, and a diff recording when it cleared.",
+    author: "MolTrace research team",
+    body: [
+      {
+        "type": "h2",
+        "text": "\"Experimental\" is a promise about the default path"
+      },
+      {
+        "type": "p",
+        "text": "Most software uses \"experimental\" to mean *we are not confident yet*. That is a feeling, and feelings do not survive contact with a regulated workflow. For an analysis backend whose output ends up in someone's evidence trail, the label has to mean something a reader can check."
+      },
+      {
+        "type": "p",
+        "text": "Ours means two specific things. The backend is opt-in — the default `/spectrum/analyze` flow and the legacy pipeline stay authoritative, so a customer who changes nothing is unaffected by anything happening here. And the conditions under which it stops being experimental were written down *before* they were met."
+      },
+      {
+        "type": "p",
+        "text": "That second half is the part that is easy to skip, and skipping it is how a promotion decision quietly becomes a matter of who is in the room."
+      },
+      {
+        "type": "h2",
+        "text": "The gate is two numbers on a named corpus"
+      },
+      {
+        "type": "p",
+        "text": "The strict production promotion gate for the GSD sidecar is **95% solvent auto-detection** and a **median compound-environment-count delta of 2 or better**, measured on the curated NMRShiftDB2 corpus."
+      },
+      {
+        "type": "p",
+        "text": "Two numbers, one named corpus, both chosen before the run that would judge them. Neither is a threshold anyone can slide after seeing the result, because both were committed to the repository first — and a threshold you can adjust after seeing your score is not a gate, it is a rationalisation with a number attached."
+      },
+      {
+        "type": "p",
+        "text": "The corpus matters as much as the thresholds. \"95% solvent detection\" is meaningless without stating on what; the same detector will produce very different rates on curated reference spectra and on whatever arrives from a customer's instrument. Naming the corpus is what makes the number auditable rather than promotional."
+      },
+      {
+        "type": "h2",
+        "text": "A test that is expected to fail"
+      },
+      {
+        "type": "p",
+        "text": "The gate was enforced by `test_prompt3_gsd_meets_promotion_gate`, and for as long as the sidecar fell short, that test carried a `@pytest.mark.xfail` decorator — it ran on every commit, measured the real thing, and was expected to fail."
+      },
+      {
+        "type": "p",
+        "text": "This is worth more than deleting the test until the feature is ready. An expected-to-fail test keeps the measurement running continuously, so the distance to the gate is visible on every commit rather than rediscovered at the end. It also fails *loudly* if it ever unexpectedly passes, which is the case that matters: an xfail that starts passing means either you cleared the bar or you broke the measurement, and both deserve a human looking at them."
+      },
+      {
+        "type": "quote",
+        "text": "The moment a feature stops being experimental should be a diff, not a decision someone remembers making."
+      },
+      {
+        "type": "p",
+        "text": "So the promotion event is a removed decorator. The `xfail` came off, and the test now passes unconditionally. There is no separate approval artefact to trust, because the artefact is the commit."
+      },
+      {
+        "type": "h2",
+        "text": "What actually moved the number"
+      },
+      {
+        "type": "p",
+        "text": "The change that cleared the gate was one default: the ¹H clustering window in `_DEFAULT_CLUSTER_J_HZ_BY_NUCLEUS` went from **20 Hz to 30 Hz**. That dropped the NMRShiftDB2 median compound-environment-count delta from **3 to 2**, which is the strict target."
+      },
+      {
+        "type": "p",
+        "text": "The justification is chemical rather than numerical, and it has to be. A 20 Hz window splits couplings that belong together: strong-coupling AB systems and constrained-ring geminal H–H couplings run up to about 25–30 Hz, so lines from a single environment were being counted as separate environments. Widening the window to 30 Hz stops that. The number improved because the algorithm became more correct about coupling, not because a parameter was swept until the metric moved — and if the only defence of a parameter is that it improves the score, it is a fitted constant, not a decision."
+      },
+      {
+        "type": "h2",
+        "text": "The fixture we removed, and why that is allowed"
+      },
+      {
+        "type": "p",
+        "text": "One fixture, `60000023_1h`, was dropped from the corpus. Removing data from the corpus you are being judged against deserves the most scepticism of anything here, so the standard is that the reason must be checkable by someone who assumes you are cheating."
+      },
+      {
+        "type": "p",
+        "text": "Its chemical-shift referencing is off by roughly **1.7 ppm** — the CHCl₃ residual peak lands at **8.96 ppm** instead of **7.26 ppm**. No detector can find a solvent residual outside the curated window it is looking in, so the fixture measures the archive's referencing error rather than detector quality."
+      },
+      {
+        "type": "p",
+        "text": "Three things make that defensible rather than convenient. The exclusion and its rationale are recorded in the manifest's `removed_fixtures` array, not in a commit message someone has to go digging for. The raw archive is still committed, so the spectrum can be re-included the moment an evidence layer handles out-of-band TMS/DSS referencing correction. And the resulting corpus is stated plainly: 19 fixtures, with 100% solvent auto-detection across the 17 that carry a known residual reference."
+      },
+      {
+        "type": "h2",
+        "text": "What the label still means after promotion"
+      },
+      {
+        "type": "p",
+        "text": "Clearing the gate did not make the backend the default. It made it a *measured* backend with a published result — the opt-in boundary stays where it was, and the legacy pipeline remains authoritative on the default path."
+      },
+      {
+        "type": "p",
+        "text": "The gate is also narrower than it sounds. It is a detector-versus-reference reconciliation metric on curated fixtures, covering solvent auto-detection and environment-count agreement. It is not a claim of structure-identification accuracy. And as everywhere else here, MolTrace's controls are designed to *support* standards such as 21 CFR Part 11 and GAMP 5; full computerized-system validation remains the customer's responsibility."
+      },
+      {
+        "type": "p",
+        "text": "None of this is elaborate. Write the thresholds down before you measure, name the corpus, keep the failing test running, and let the diff be the record. The value is not in any one of those steps — it is that together they leave nobody, including us, able to quietly decide that a number was good enough."
+      }
+    ],
   },
   {
     slug: "auditable-confidence",
@@ -230,52 +338,126 @@ export const POSTS: BlogPost[] = [
     status: "forthcoming",
   },
   {
-    slug: "fit-chi-squared-of-10-15",
-    title: "Why legacy's fit χ² of 10¹⁵ is honest",
-    dek: "Per-peak QC metrics landed on legacy peaks and immediately surfaced a units mismatch. We shipped the column anyway.",
-    claim:
-      "GSD reports fit residuals normalized to baseline σ; legacy reports them in raw signal-domain units. The same threshold paints 31/37 peaks 'red' on legacy spectra. The right fix is detector-side normalization — but in the meantime, the column tells the truth.",
-    topic: "engineering",
-    topicLabel: "Engineering",
-    date: "2026-05-28",
-    readingMinutes: 6,
-    status: "forthcoming",
-  },
-  {
     slug: "hmdb-style-validation",
     title: "Validation against references that count the way detectors count",
-    dek: "NMRShiftDB2 said the algorithm was failing. HMDB-style references said it was clearing the strict gate. Both were right.",
+    dek: "If a reference table and a detector count in different units, no threshold you pick will mean anything. So we built a corpus that counts both ways.",
     claim:
-      "Same algorithm, two corpora, two verdicts. The Phase 14 framework added expert-curated multiplet-line references so we could finally separate detector quality from corpus granularity. Strict gate cleared at multiplet-line scale; NMRShiftDB2 environment-scale stays xfailed by design.",
+      "A published peak list and a deconvolution engine disagree by construction. The HMDB-style harness forward-models a spectrum from a reference list and then gates on environment-count and multiplet-line-count deltas separately, so detector quality can be separated from corpus granularity. It is also why one of our three corpora is deliberately not gated on peak count at all.",
     topic: "science",
     topicLabel: "Science",
-    date: "2026-05-27",
-    readingMinutes: 10,
-    status: "forthcoming",
-  },
-  {
-    slug: "additive-never-destructive",
-    title: "Additive, never destructive — across 39 evidence layers",
-    dek: "Every existing endpoint and regression test must stay green as new layers land. Here's how the typed-Pydantic contract makes that affordable.",
-    claim:
-      "Layer 22 (proton/carbon-13 scoring) and Layer 39 (LCMS feature grouping) speak the same API style. Stable JSON keys, additive fields, openapi-typescript regen on every contract change. The 'never overwrite a prior layer' rule is what lets us ship weekly without breaking last year's dossier.",
-    topic: "engineering",
-    topicLabel: "Engineering",
-    date: "2026-05-15",
-    readingMinutes: 12,
-    status: "forthcoming",
-  },
-  {
-    slug: "fda-ai-framework-2025",
-    title: "Reading the FDA's January 2025 AI framework, in code",
-    dek: "Stage-4 human oversight gates aren't a paragraph in a policy; they're a release queue in your audit table.",
-    claim:
-      "The FDA's 2025 framework formalizes risk-based credibility for AI in regulatory submissions. We mapped each stage onto concrete code: model-card registry, recipe-hash provenance, human-signoff queue, immutable raw vault. The PRs are linkable; the audit ledger is queryable.",
-    topic: "regulatory",
-    topicLabel: "Regulatory",
-    date: "2026-05-10",
-    readingMinutes: 11,
-    status: "forthcoming",
+    date: "2026-05-28",
+    readingMinutes: 9,
+    status: "live",
+    metaTitle: "Counting environments vs multiplet lines",
+    metaDescription:
+      "How MolTrace validates NMR peak detection against references that count environments and multiplet lines separately — and why one corpus is not gated.",
+    author: "MolTrace research team",
+    body: [
+      {
+        "type": "h2",
+        "text": "You cannot validate against a number you do not understand"
+      },
+      {
+        "type": "p",
+        "text": "A previous note worked through why our detector's peak count sat a median of **17 peaks** away from the NMRShiftDB2 reference: the reference counts distinct chemical environments, the detector resolves multiplet lines, and one environment can present as several lines. The conclusion was that the gap was a units mismatch rather than an algorithm defect."
+      },
+      {
+        "type": "p",
+        "text": "That conclusion is comfortable, and comfortable conclusions about your own software deserve suspicion. \"The reference is measuring something else\" is exactly what you would say if your detector were simply bad. The claim only becomes evidence if you can find a reference that counts the *other* way and show that the same algorithm, unchanged, agrees with that one."
+      },
+      {
+        "type": "p",
+        "text": "That is what the HMDB-style validation harness is for."
+      },
+      {
+        "type": "h2",
+        "text": "Forward-modelling a spectrum from a published list"
+      },
+      {
+        "type": "p",
+        "text": "`gsd_hmdb_style_validation.py` runs backwards relative to the normal pipeline. It starts from a published peak list at HMDB / Pretsch granularity — every resolved line of every multiplet, as a human tabulated them — and forward-models a noisy Lorentzian spectrum from it. That synthetic spectrum then goes through the full GSD pipeline as though it had come off an instrument, and the output is scored against the list it was built from."
+      },
+      {
+        "type": "p",
+        "text": "The point of generating the spectrum rather than measuring one is that the ground truth is known exactly. There is no curator judgement between the reference and the signal, because the signal was constructed from the reference. If the detector disagrees, the disagreement is the detector's."
+      },
+      {
+        "type": "p",
+        "text": "Two details keep the synthesis from being too kind. The noise is correlated rather than white — a Gaussian σ=2 filter, which mimics the band-limited baselines you actually get from Fourier-transformed NMR — because a detector tuned against white noise will flatter itself on real data. And sparse spectra carry synthesis-floor-aware per-fixture tolerances, recorded in each entry's `notes` field, so a fixture with three signals is not scored as though a one-peak error were the same fraction of the answer as it would be on a fixture with thirty."
+      },
+      {
+        "type": "p",
+        "text": "The corpus itself is 20 fixtures, hand-curated from Fulmer and Pretsch reference data, committed at `tests/fixtures/hmdb_style_minicorpus/hmdb_style_minicorpus_v1.json`. Small, and deliberately so: every entry was checked by hand, and a corpus nobody has read is not a reference."
+      },
+      {
+        "type": "h2",
+        "text": "Gating both counts, separately"
+      },
+      {
+        "type": "p",
+        "text": "The harness reports two deltas per fixture rather than one. The environment-count delta compares against distinct chemical environments; the multiplet-line-count delta compares against resolved lines. Keeping them apart is the whole design — a single blended score would hide precisely the effect we were trying to isolate."
+      },
+      {
+        "type": "p",
+        "text": "The committed report at detection level 2 (`gsd_hmdb_style_validation_report_v1`) reads:"
+      },
+      {
+        "type": "list",
+        "items": [
+          "20 fixtures processed, 20 completed, 0 errors.",
+          "Environment count within tolerance on **19 of 20** fixtures — a median absolute delta of **1**.",
+          "Multiplet-line count within tolerance on **20 of 20** fixtures — a median absolute delta of **2**."
+        ]
+      },
+      {
+        "type": "p",
+        "text": "The same clustering algorithm that looked 17 peaks adrift against an environment-counting reference lands within tolerance on every fixture of a line-counting one. That is the shape of result a units mismatch produces. It is not the shape a broken detector produces, because a broken detector has no reason to agree with either."
+      },
+      {
+        "type": "quote",
+        "text": "A validation number is only as meaningful as your understanding of what the reference was counting. Two references, two scales, one unchanged algorithm — that is the check that actually distinguishes a units problem from a defect."
+      },
+      {
+        "type": "h2",
+        "text": "The corpus we deliberately do not gate"
+      },
+      {
+        "type": "p",
+        "text": "There is a third corpus: 100 real-instrument HMDB acquisitions, with no synthesis anywhere in the path. It measures the things a forward-modelled corpus structurally cannot — whether we can read what an instrument actually wrote."
+      },
+      {
+        "type": "p",
+        "text": "**95 of 100 fixtures are parseable.** The five that are not were each traced to the archive rather than the reader: four are Bruker layouts carrying stray `acqu2` / `acqu2s` two-dimensional parameter remnants that the HMDB curator left inside 1D archives, and one is missing its `fid` binary entirely. Solvent auto-detection runs at **53 of 57** on the subset with a known solvent reference."
+      },
+      {
+        "type": "p",
+        "text": "What this corpus is *not* gated on is per-fixture peak count — and that omission is deliberate, documented, and worth explaining, because an ungated metric usually means someone is hiding from it."
+      },
+      {
+        "type": "p",
+        "text": "HMDB's `distinct-peaks` field is curator-dependent. Across the curated 100-fixture subset it ranges from **1 to 190 peaks per fixture**. That is not a scale; it is several different people's conventions stacked into one column. A single absolute-delta threshold across that range would be satisfied or violated mostly according to which curator happened to enter a given record, and a gate that moves with the curator rather than the detector tells you nothing about the detector. The semantically meaningful signals from this corpus are parseability and solvent auto-detection, so those are the ones with thresholds on them."
+      },
+      {
+        "type": "p",
+        "text": "Declining to gate a metric is a defensible engineering decision. Declining to *publish* that you declined is not, which is why the reasoning sits in the changelog next to the numbers."
+      },
+      {
+        "type": "h2",
+        "text": "What the result does and does not claim"
+      },
+      {
+        "type": "p",
+        "text": "Three corpora, three jobs. NMRShiftDB2 checks agreement with expert environment assignments on real spectra. The HMDB-style synthetic corpus checks the detector against a known ground truth at line granularity. The real-instrument HMDB corpus checks that we can read what instruments produce. No one of them would be sufficient, and the reason for running all three is that each is blind to what the others catch."
+      },
+      {
+        "type": "p",
+        "text": "The boundaries are narrow and worth stating plainly. These are peak-count reconciliation and solvent-detection metrics on curated fixtures. They say nothing about structure-identification accuracy, which is a different claim requiring different evidence. The GSD backend remains opt-in and `experimental: true`, with the legacy pipeline authoritative on the default path. And MolTrace's controls are designed to *support* standards such as 21 CFR Part 11 and GAMP 5 — full computerized-system validation remains the customer's responsibility."
+      },
+      {
+        "type": "p",
+        "text": "The generalisable part is smaller than the numbers and more useful than them: before you threshold a validation metric, find out what the reference was counting. If you cannot answer that, the threshold is decoration."
+      }
+    ],
   },
 ]
 
