@@ -380,9 +380,36 @@ non-existent exploit.
 | 1 | Cross-tenant write, `POST /regulatory/action-items` | CONFIRMED (201) | **Fixed** `b049003` |
 | 2 | Cross-tenant signing, `POST /esignatures/records` | **Not reproduced** — 401 `step_up_required` fires first | Open, needs step-up to test |
 | 3 | E-signature register globally readable | CONFIRMED | **Fixed** `0d4174b` |
-| 4a | Controlled records globally readable | CONFIRMED (200) | Open |
-| 4b | Controlled records globally *mutable* | **Refuted** — PATCH is 405 | n/a |
+| 4a | Controlled records globally readable | CONFIRMED (200) | **By design** — see below |
+| 4b | Controlled records globally *mutable* | **CONFIRMED** (see correction) | **Fixed** `0039` |
 | 5 | `PATCH /compound-registry/compounds/{id}` | CONFIRMED (renamed, 200) | **Fixed** `0039` |
+
+> **Correction, and a lesson worth keeping.** 4b was first recorded here as
+> *refuted* because `PATCH /controlled-records/{id}` returns 405. That was a bad
+> refutation: `PATCH` is not a route on this resource at all. The real mutations
+> are `POST .../lock`, `.../new-version` and `.../archive`, and **all three were
+> wide open** — an unrelated user locked another user's approved validation
+> protocol (200), created a new version of it (201), and archived a second one
+> (200).
+>
+> Probing one verb and generalising to "not mutable" nearly buried a GxP
+> integrity failure. When refuting a mutation claim, enumerate the resource's
+> actual write routes from the OpenAPI document first.
+>
+> A second defect surfaced with it: `locked_by` was taken from the request body,
+> so a probe locked a record and it came back reading `locked_by: "attacker"`.
+> The `archive` route on the same resource already attributed to the
+> authenticated principal ("never client-supplied"); `lock` did not. Now
+> server-derived, with the client's claim retained in metadata as
+> `locked_by_client_claimed` rather than dropped.
+
+**Controlled-record reads stay open deliberately.** The Validation Center
+workspace is an oversight surface — a reviewer is meant to see records raised by
+colleagues, and scoping reads to the creator would empty the screen for exactly
+the people the feature exists for. Cross-customer separation is a real and
+separate problem that **cannot be solved on this axis**, because there is no
+server-derived tenant; calling per-user scoping "tenant isolation" would be
+worse than naming the gap.
 
 **What the fixes established, reusable for the rest:**
 
@@ -414,13 +441,7 @@ non-existent exploit.
 
 **Remaining prompt:**
 
-> Close #4a: `controlled_records` is globally readable. It now has
-> `created_by_user_id` from migration 0039, so the column exists — decide the
-> read model. Unlike the compound registry, a controlled record is a regulated
-> artefact rather than a shared reference, so owner-scoped reads are probably
-> right; confirm against how the FE uses the list.
->
-> Then #2: satisfy step-up and re-probe whether `POST /esignatures/records`
+> #2: satisfy step-up and re-probe whether `POST /esignatures/records`
 > checks that the caller may access the subject. If it does not, someone can
 > sign a record they cannot read, which is a Part 11 integrity failure. Do not
 > report it as an exploit until reproduced past the step-up gate.

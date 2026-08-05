@@ -1462,6 +1462,8 @@ def get_signature(
 def create_controlled_record(
     session_factory: sessionmaker[Session],
     payload: ControlledRecordCreate,
+    *,
+    created_by_user_id: int | None = None,
 ) -> ControlledRecord:
     content_hash = payload.content_hash or (
         _hash_json(payload.content_json) if payload.content_json is not None else None
@@ -1479,6 +1481,7 @@ def create_controlled_record(
             status=payload.status,
             content_hash=content_hash,
             retention_policy_id=payload.retention_policy_id,
+            created_by_user_id=created_by_user_id,
             metadata_json=_json_dump(metadata, default={}),
         )
         session.add(row)
@@ -1506,6 +1509,23 @@ def list_controlled_records(
             # retrievable for the reversible-by-record audit trail via include_deleted=True).
             stmt = stmt.where(ControlledRecordORM.deleted_at.is_(None))
         return [_controlled_record_to_record(row) for row in session.scalars(stmt).all()]
+
+
+def controlled_record_owner(
+    session_factory: sessionmaker[Session],
+    record_id: int,
+) -> tuple[bool, int | None]:
+    """``(exists, created_by_user_id)`` for one controlled record.
+
+    Separate from :func:`get_controlled_record` so an authorization gate can ask
+    the ownership question without materialising and serialising the whole
+    record first -- the gate runs before the caller has been allowed to see it.
+    """
+    with session_scope(session_factory) as session:
+        row = session.get(ControlledRecordORM, record_id)
+        if row is None:
+            return (False, None)
+        return (True, row.created_by_user_id)
 
 
 def get_controlled_record(
@@ -1561,7 +1581,25 @@ def lock_controlled_record(
     session_factory: sessionmaker[Session],
     record_id: int,
     payload: ControlledRecordLockRequest,
+    *,
+    locked_by: str | None = None,
 ) -> ControlledRecord:
+    """Lock a controlled record, attributing the lock to the server principal.
+
+    ``locked_by`` was taken straight from the request body, so the record
+    recorded whatever string the client sent -- a probe locked a record and it
+    came back reading ``locked_by: "attacker"``. Locking is the act that freezes
+    a controlled record as evidence, so its attribution has to be the
+    authenticated principal for the same reason §11.100 requires it of a
+    signature. The archive route on this same resource already did this
+    correctly ("attributed to the authenticated principal, never
+    client-supplied"); lock did not.
+
+    The client-supplied value is kept, unused for attribution, only so an
+    existing caller does not 422 -- and it is recorded in metadata rather than
+    silently dropped, so a reviewer can see that a client asserted a different
+    name than the one the server recorded.
+    """
     with session_scope(session_factory) as session:
         row = session.get(ControlledRecordORM, record_id)
         if row is None:
@@ -1574,7 +1612,11 @@ def lock_controlled_record(
             raise ControlledRecordLockedError("Controlled record is already locked; create a new version.")
         row.status = "locked"
         row.locked_at = utcnow()
-        row.locked_by = payload.locked_by
+        row.locked_by = locked_by or payload.locked_by
+        if locked_by and payload.locked_by and payload.locked_by != locked_by:
+            claimed = _json_dict(row.metadata_json)
+            claimed["locked_by_client_claimed"] = payload.locked_by
+            row.metadata_json = _json_dump(claimed, default={})
         row.content_hash = payload.content_hash or row.content_hash or _hash_json(
             {
                 "record_id": row.id,

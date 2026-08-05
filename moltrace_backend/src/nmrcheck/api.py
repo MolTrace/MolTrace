@@ -2837,6 +2837,56 @@ def require_dossier_access(
     authorize_dossier_access(dossier_id, request, context)
 
 
+def authorize_controlled_record_write(
+    record_id: int,
+    request: Request,
+    context: AccessContext,
+) -> None:
+    """Gate every state change to a controlled record.
+
+    ``lock``, ``new-version`` and ``archive`` took no actor at all. Verified
+    against a running server with auth enforced: an unrelated user locked
+    another user's approved validation protocol (200), created a new version of
+    it (201), and archived a second one (200). For a GxP controlled record that
+    is a data-integrity failure, not merely an access-control one -- locking is
+    the act that freezes a record as evidence, and archiving removes it from the
+    effective set.
+
+    Reads are deliberately NOT gated here. The Validation Center controlled-
+    records workspace is an oversight surface: a reviewer is meant to see
+    records raised by colleagues, and scoping reads to the creator would empty
+    the screen for the very people the feature exists for. Cross-customer
+    separation is a real and separate problem, but it cannot be solved on this
+    axis -- there is no server-derived tenant on a request today -- and pretending
+    per-user scoping is tenant isolation would be worse than naming the gap.
+
+    A NULL ``created_by_user_id`` (row predates migration 0039) is refused to
+    non-admins for the same reason as the compound registry: "nobody is recorded
+    as responsible" must not be read as "anybody may change it".
+    """
+    actor_user_id = _user_scope_for_context(context)
+    if actor_user_id is None:
+        return  # system api key / admin: unscoped, as everywhere else.
+    exists, owner_id = validation_store.controlled_record_owner(
+        _state(request).session_factory, record_id
+    )
+    if not exists:
+        raise HTTPException(status_code=404, detail="Controlled record not found.")
+    if owner_id is None or owner_id != actor_user_id:
+        detections.emit_cross_tenant_denied(
+            request,
+            context,
+            resource_type="controlled_record",
+            resource_id=str(record_id),
+        )
+        # 403, not 404: the record is readable by design (see above), so its
+        # existence is not a secret and a 404 would only mislead.
+        raise HTTPException(
+            status_code=403,
+            detail="This controlled record was created by another user.",
+        )
+
+
 def authorize_dossier_access(
     dossier_id: int,
     request: Request,
@@ -15360,7 +15410,11 @@ def create_controlled_record_route(
     context: AccessContext = Depends(require_access_context),
 ) -> ControlledRecord:
     try:
-        record = validation_store.create_controlled_record(_state(request).session_factory, payload)
+        record = validation_store.create_controlled_record(
+            _state(request).session_factory,
+            payload,
+            created_by_user_id=_user_scope_for_context(context),
+        )
     except Exception as exc:
         _raise_validation_center_http_error(exc)
         raise
@@ -15428,6 +15482,7 @@ def create_controlled_record_new_version_route(
     request: Request,
     context: AccessContext = Depends(require_access_context),
 ) -> ControlledRecord:
+    authorize_controlled_record_write(record_id, request, context)
     try:
         record = validation_store.create_controlled_record_version(
             _state(request).session_factory,
@@ -15460,11 +15515,15 @@ def lock_controlled_record_route(
     request: Request,
     context: AccessContext = Depends(require_access_context),
 ) -> ControlledRecord:
+    authorize_controlled_record_write(record_id, request, context)
+    # §ALCOA+/§11.100: the lock is attributed to the authenticated principal,
+    # never to the client-supplied name, exactly as the archive route does.
     try:
         record = validation_store.lock_controlled_record(
             _state(request).session_factory,
             record_id,
             payload,
+            locked_by=context.user.email if context.user is not None else None,
         )
     except Exception as exc:
         _raise_validation_center_http_error(exc)
@@ -15492,6 +15551,7 @@ def archive_controlled_record_route(
     request: Request,
     context: AccessContext = Depends(require_access_context),
 ) -> ControlledRecord:
+    authorize_controlled_record_write(record_id, request, context)
     # §ALCOA+: the soft-delete is attributed to the authenticated principal, never client-supplied.
     deleted_by = context.user.email if context.user is not None else None
     try:
