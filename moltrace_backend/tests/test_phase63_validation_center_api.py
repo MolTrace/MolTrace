@@ -363,3 +363,121 @@ def test_phase63_openapi_includes_validation_endpoints(client, api_headers):
         ]
         for path in expected:
             assert path in paths
+
+
+# --------------------------------------------------------------------------- #
+# Controlled-record state changes are owner-gated (migration 0039).
+#
+# lock, new-version and archive took no actor at all. Verified against a running
+# server with auth enforced: an unrelated user locked another user's approved
+# validation protocol (200), created a new version of it (201), and archived a
+# second one (200). For a GxP controlled record that is a data-integrity
+# failure, not just an access-control one -- locking is what freezes a record as
+# evidence and archiving removes it from the effective set.
+#
+# Reads stay open on purpose: the Validation Center workspace is an oversight
+# surface, and scoping reads to the creator would empty the screen for the
+# reviewers the feature exists for.
+# --------------------------------------------------------------------------- #
+def _vc_signup(client, email: str) -> dict[str, str]:
+    res = client.post(
+        "/auth/sign-up",
+        json={"email": email, "password": "password123", "password_confirm": "password123"},
+    )
+    assert res.status_code == 201, res.text
+    return {"Authorization": f"Bearer {res.json()['access_token']}"}
+
+
+def _vc_record(client, headers: dict[str, str], title: str = "Protocol") -> int:
+    res = client.post(
+        "/controlled-records",
+        headers=headers,
+        json={"record_type": "validation_protocol", "title": title, "status": "approved"},
+    )
+    assert res.status_code == 201, res.text
+    return res.json()["id"]
+
+
+def test_a_non_creator_cannot_lock_version_or_archive(client, api_headers):
+    alice = _vc_signup(client, "vc-alice@example.com")
+    bob = _vc_signup(client, "vc-bob@example.com")
+    rid = _vc_record(client, alice, "Alice's protocol")
+
+    assert client.post(
+        f"/controlled-records/{rid}/lock",
+        headers=bob,
+        json={"locked_by": "bob", "reason": "hostile lock"},
+    ).status_code == 403
+
+    assert client.post(
+        f"/controlled-records/{rid}/new-version",
+        headers=bob,
+        json={"title": "BOB VERSION", "version": "99"},
+    ).status_code == 403
+
+    assert client.post(
+        f"/controlled-records/{rid}/archive",
+        headers=bob,
+        json={"reason": "hostile archive"},
+    ).status_code == 403
+
+    # And the record is untouched.
+    current = client.get(f"/controlled-records/{rid}", headers=alice).json()
+    assert current["status"] == "approved"
+    assert current.get("locked_by") is None
+
+
+def test_the_creator_can_still_lock(client, api_headers):
+    alice = _vc_signup(client, "vc-alice2@example.com")
+    rid = _vc_record(client, alice)
+    res = client.post(
+        f"/controlled-records/{rid}/lock",
+        headers=alice,
+        json={"locked_by": "alice", "reason": "legitimate lock"},
+    )
+    assert res.status_code == 200, res.text
+    assert res.json()["status"] == "locked"
+
+
+def test_the_lock_is_attributed_to_the_server_principal(client, api_headers):
+    """§11.100 / ALCOA+ attributability.
+
+    locked_by came straight from the request body, so a probe locked a record
+    and it came back reading locked_by "attacker". The archive route on this
+    same resource already attributed to the authenticated principal; lock did
+    not. The client's claim is retained in metadata rather than dropped, so a
+    reviewer can see that a different name was asserted.
+    """
+    alice = _vc_signup(client, "vc-alice3@example.com")
+    rid = _vc_record(client, alice)
+    res = client.post(
+        f"/controlled-records/{rid}/lock",
+        headers=alice,
+        json={"locked_by": "SPOOFED NAME", "reason": "legitimate"},
+    )
+    assert res.status_code == 200, res.text
+    body = res.json()
+    assert body["locked_by"] == "vc-alice3@example.com", (
+        f"lock attributed to the client-supplied name: {body['locked_by']}"
+    )
+    metadata = body.get("metadata_json") or {}
+    assert metadata.get("locked_by_client_claimed") == "SPOOFED NAME"
+
+
+def test_reads_stay_open_for_oversight(client, api_headers):
+    alice = _vc_signup(client, "vc-alice4@example.com")
+    bob = _vc_signup(client, "vc-bob4@example.com")
+    rid = _vc_record(client, alice, "Shared oversight record")
+    res = client.get(f"/controlled-records/{rid}", headers=bob)
+    assert res.status_code == 200, "a reviewer must still be able to read the record"
+
+
+def test_the_system_key_keeps_the_unscoped_write(client, api_headers):
+    alice = _vc_signup(client, "vc-alice5@example.com")
+    rid = _vc_record(client, alice)
+    res = client.post(
+        f"/controlled-records/{rid}/lock",
+        headers=api_headers,
+        json={"locked_by": "ops", "reason": "operational lock"},
+    )
+    assert res.status_code == 200, res.text
