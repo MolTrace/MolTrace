@@ -101,9 +101,9 @@ export const POSTS: BlogPost[] = [
     // A raster hero is its own social image, so no heroSocialImage twin is
     // needed here. JPEG, not PNG: the same photograph encodes to 71 KB as JPEG
     // and 1,379 KB as PNG, and this page is one we want crawled quickly.
-    heroImage: "/blog/chemical-environments-not-peaks-lab.jpg",
+    heroImage: "/blog/chemical-environments-not-peaks-hud.jpg",
     heroImageAlt:
-      "A darkened NMR facility. A superconducting magnet vents cryogenic vapour inside a yellow-and-black floor marking, beside a rack of spectrometer electronics. A proton NMR spectrum is projected into the air above the bench in glowing teal, its peak clusters gathered by brackets into single points, with a magnifier hovering over one cluster. At the right, a gloved hand holds a sample tube.",
+      "A darkened NMR facility. A superconducting magnet vents cryogenic vapour inside a yellow-and-black floor marking. Projected in the air in front of it, a proton NMR spectrum runs along a chemical-shift axis from 10 to 0 ppm, its peak clusters gathered from above by brackets that converge each cluster to a single point. A magnifier over one cluster resolves it into three separate lines. At the left, a gloved hand holds a sample tube.",
     body: [
       {
         "type": "h2",
