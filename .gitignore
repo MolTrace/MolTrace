@@ -88,3 +88,7 @@ week10/
 # Kept on disk for local use; relocate to a private repo. Do NOT re-commit to the public repo.
 /MolTrace_Testing_AI_ML_Playbook.docx
 /MolTrace_WhitePaper_Maintenance.md
+
+# Third-party agent-definition repo cloned here for local use only (nested git
+# repo; installed into ~/.claude/agents/). Not part of MolTrace's source.
+/agency-agents/
