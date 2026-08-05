@@ -2928,6 +2928,54 @@ def authorize_dossier_access(
         raise HTTPException(status_code=404, detail="Regulatory dossier not found.")
 
 
+def authorize_signature_target(
+    target_type: str,
+    target_id: int,
+    request: Request,
+    context: AccessContext,
+) -> None:
+    """Refuse to sign a subject the caller may not reach.
+
+    ``POST /esignatures/records`` enforced §11.200 step-up, §11.100 server
+    principal and §11.70 content binding, but never checked that the signer may
+    access the thing being signed. Verified against a running server with auth
+    enforced: a user satisfied step-up with their OWN password and produced an
+    ``approved`` signature on a regulatory dossier that returned 404 to them a
+    moment earlier. A Part 11 signature is a legally significant assertion, so
+    one made by somebody with no access to the subject is a data-integrity
+    failure, not merely an access-control one.
+
+    ``target_type`` is a free string, not an enum, so it cannot be covered
+    exhaustively by construction. An unrecognised type is therefore allowed
+    through rather than refused, and that is a deliberate reversal of the
+    obvious "fail closed" instinct. The reasoning:
+
+    - The attack requires naming the REAL resource type. A subject is
+      identified by the ``(target_type, target_id)`` pair, so a signature
+      claiming ``analysis#7`` does not attach to dossier 7 and cannot be
+      displayed against it. Only ``regulatory_dossier#7`` can, and that is
+      exactly what the table below gates.
+    - Signing an unresolvable type is existing, intentional behaviour: the
+      signature is created but stays honestly unbound -- no content hash, no
+      digest, ``binding_status: "unbound"`` on the manifestation. Refusing it
+      would break a documented §11.70 honesty path in the name of a hole it
+      does not open.
+
+    Binding and authorization are separate axes, and conflating them was the
+    first attempt at this function. Adding a genuinely ownable subject type to
+    the product does mean adding it here.
+    """
+    actor_user_id = _user_scope_for_context(context)
+    if actor_user_id is None:
+        return  # system api key / admin, as with every other gate here.
+
+    normalized = (target_type or "").strip().lower()
+    if normalized == "regulatory_dossier":
+        authorize_dossier_access(target_id, request, context)
+    elif normalized == "controlled_record":
+        authorize_controlled_record_write(target_id, request, context)
+
+
 def require_reaction_access(
     request: Request,
     context: AccessContext = Depends(require_access_context),
@@ -15279,6 +15327,10 @@ def create_esignature_record_route(
     # §11.100: signer identity is the authenticated server principal — the client-supplied
     #          signer_name/signer_email in the payload are ignored/overridden here.
     # §11.70:  the record content hash is resolved server-side and bound into the signature digest.
+    # Authorization on the SUBJECT, which none of the clauses above cover: a
+    # correctly stepped-up principal signing their own name is still forging
+    # evidence if they cannot reach the record they are signing.
+    authorize_signature_target(payload.target_type, payload.target_id, request, context)
     state = _state(request)
     _, step_up_factor, step_up_aal = mfa_store.read_step_up(state.session_factory, context.raw_token)
     signer_user_id = context.user.id if context.user is not None else None
