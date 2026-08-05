@@ -80,7 +80,19 @@ exist and reading it yields `D1 = 0` for every dataset.
 
 # Track A — analysis paths
 
-## A1. Processed NMR upload
+## A1. Processed NMR upload — PARTLY DONE, see "A1 RESULT" at the end
+
+> **Status 2026-08-04.** The Bruker blocker below is real and unchanged, but it
+> does **not** block the phase: the path was exercised end to end by converting
+> a real `1r` to CSV offline. The A/B against the raw-FID path found that the
+> two ingest routes agree on peak POSITIONS (median Δ 0.009 ppm) and disagree
+> wildly on INTEGRALS (per-peak ratio spanning 0.12–20.0), with both differing
+> from the trace itself by ≥30% at every integration window. Full method,
+> numbers and limits in **A1 RESULT** at the end of this document.
+>
+> Still untested from the list below: `/nmr/processed/analyze` persistence,
+> the `preview_points_json` override, and the peak-table CSV branch. The run
+> used `POST /spectrum/preview`, not the full analyze routes.
 
 > **BLOCKED for Bruker.** `parse_processed_spectrum` (`spectrum.py:2516`)
 > dispatches on file extension and accepts only
@@ -574,3 +586,76 @@ Not owned by a single phase; each needs a decision.
 - **`tests/test_regulatory_e2e.py` drives no HTTP route** — it is library-level
   with stubbed calculators. It will not catch any of the five Regentry
   security defects. Do not treat it as end-to-end coverage.
+
+---
+
+## A1 RESULT — processed NMR upload (run 2026-08-04, real data)
+
+**Scope correction.** A1 was written as blocked because there is no Bruker `1r`
+reader. That was true but not the whole picture: the reader is missing, yet the
+processed-upload path itself is fully exercisable. `parse_processed_spectrum`
+(`spectrum.py:2516`) accepts CSV, TSV, TXT, XY, ASC, DAT, JCAMP, JDX and DX. A
+chemist with Bruker data simply cannot use it without converting first — that
+is a real product gap, but a different one from "untestable".
+
+Note also that `/analyze/upload` is a *different* thing again: it takes
+JSON/CSV batches of `{smiles, nmr_text, solvent}` — reported NMR **text**, not
+spectral data.
+
+**Method.** Vault archive 28 (`33.zip`, the user's own 500 MHz spectrum: zg30,
+NS=64, d1=1 s, AQ 4.0 s, MeOD) carries both a raw `fid` and a processed
+`pdata/1/1r`. The `1r` was converted to CSV offline with nmrglue and uploaded
+to `POST /spectrum/preview`; the same archive was previewed via
+`POST /raw-fid/28/preview`. Same physical spectrum, two ingest paths.
+
+**Peak DETECTION agrees. Peak INTEGRATION does not.**
+
+- Positions: 17 mutual-nearest pairs within 0.15 ppm, median Δ **0.009 ppm**.
+  Both paths are looking at the same resonances.
+- Integrals: the per-peak H ratio between the two paths spans **0.12 to 20.0**.
+  If the paths differed only in scale anchor — both report
+  `integration_scale_basis: provisional`, so neither is anchored — that ratio
+  would be one constant. A 167x spread means they genuinely disagree about
+  which peaks are the big ones.
+
+**Both disagree with the spectrum itself.** The `1r` trace was integrated
+directly (baseline = median of the −2.0 to −0.5 ppm signal-free region) and each
+path's proton shares compared against it, excluding the MeOD residual (3.31) and
+water (4.87) so solvent suppression could not be mistaken for error:
+
+| half-window | processed-CSV | raw-FID |
+|---|---|---|
+| ±0.02 | 83.9% | 83.8% |
+| ±0.03 | 69.2% | 66.5% |
+| ±0.05 | 58.6% | 50.4% |
+| ±0.06 | 52.9% | 53.6% |
+| ±0.08 | 30.0% | 72.3% |
+| ±0.10 | 31.3% | 70.4% |
+| ±0.15 | 40.9% | 63.6% |
+
+Total absolute error in relative proton share, summed over 22 non-solvent
+peaks. **Neither path falls below 30% at any window.** Worst individual cases at
+±0.06: 4.706 ppm true 6.2% vs processed 25.1%; 7.837 ppm true 8.6% vs raw-FID
+15.6% while processed says 1.4%.
+
+**Honest limits of this measurement.** The reference integration uses a fixed
+window and a crude baseline, so it under-integrates broad multiplets and cannot
+serve as a precise ground truth. That is exactly why the window was swept
+rather than chosen: the *ranking* of the two paths flips with it (processed
+wins at ±0.08–0.10, raw-FID at ±0.05), so **no claim is made that either path
+is better**. The robust claim is only that both are far from the trace at every
+window, which no windowing artefact explains.
+
+**Next prompt:**
+
+> Do not fix this from the API surface. Both paths converge on the same peak
+> LIST and diverge only on integrals, so the defect is downstream of detection
+> and upstream of reporting — the integration/scale chain in `spectrum.py` that
+> `project_nmr_quantitation_accuracy` already lists as partly outstanding
+> (`_normalize_integrations_to_target` still forces sum == structural total;
+> 0.5 H quantiser floor; solvent not masked from the denominator by default).
+>
+> Build the reference integrator properly first — per-peak windows from fitted
+> linewidth, not a fixed ±0.06 — so there is a trustworthy arbiter. Without it
+> you cannot tell a fix from a regression. Then re-run this A/B; it is cheap and
+> now scripted.
