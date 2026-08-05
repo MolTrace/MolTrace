@@ -518,3 +518,98 @@ def test_the_system_api_key_still_sees_every_record(tmp_path):
         assert len(res.json()) == 2, (
             "the system key must retain the unscoped view used for oversight"
         )
+
+
+# --------------------------------------------------------------------------- #
+# §11.100 authorization on the SUBJECT.
+#
+# The route enforced step-up (§11.200), server principal (§11.100) and content
+# binding (§11.70), but never checked the signer may reach the record being
+# signed. Probed against a running server with auth enforced: a user satisfied
+# step-up with their OWN password and produced an "approved" signature on a
+# regulatory dossier that had returned 404 to them a moment earlier.
+#
+# A correctly stepped-up principal signing under their own name is still forging
+# evidence if they cannot reach the subject.
+# --------------------------------------------------------------------------- #
+def _dossier(client: TestClient, bearer: dict, title: str = "Signing subject") -> int:
+    res = client.post("/regulatory/dossiers", headers=bearer, json={"title": title})
+    assert res.status_code == 201, res.text
+    return res.json()["id"]
+
+
+def test_a_non_owner_cannot_sign_a_dossier(tmp_path):
+    client = TestClient(_app(tmp_path))
+    with client:
+        alice = _signup(client, "sign-alice@example.com")
+        bob = _signup(client, "sign-bob@example.com")
+        did = _dossier(client, alice, "Alice's dossier")
+
+        assert client.get(f"/regulatory/dossiers/{did}", headers=bob).status_code == 404
+
+        _step_up(client, bob)
+        res = client.post(
+            "/esignatures/records",
+            headers=bob,
+            json={
+                "signer_name": "Bob",
+                "signature_meaning": "approved",
+                "target_type": "regulatory_dossier",
+                "target_id": did,
+                "reason": "cross-subject signing",
+            },
+        )
+        assert res.status_code == 404, (
+            f"a non-owner signed the dossier: {res.status_code} {res.text[:200]}"
+        )
+        # Non-leaking, same wording as the read path.
+        assert res.json()["detail"] == "Regulatory dossier not found."
+
+
+def test_the_owner_can_still_sign_their_dossier(tmp_path):
+    client = TestClient(_app(tmp_path))
+    with client:
+        alice = _signup(client, "sign-alice2@example.com")
+        did = _dossier(client, alice)
+        _step_up(client, alice)
+        res = client.post(
+            "/esignatures/records",
+            headers=alice,
+            json={
+                "signer_name": "Alice",
+                "signature_meaning": "approved",
+                "target_type": "regulatory_dossier",
+                "target_id": did,
+                "reason": "legitimate approval",
+            },
+        )
+        assert res.status_code == 201, res.text
+
+
+def test_an_unresolvable_target_type_still_signs_unbound(tmp_path):
+    """The deliberate reversal of "fail closed", pinned.
+
+    A subject is identified by the (target_type, target_id) PAIR, so a
+    signature claiming analysis#7 does not attach to dossier 7 and cannot be
+    displayed against it. Refusing unresolvable types would break the
+    documented §11.70 honesty path -- see test_unbound_target_is_honest -- in
+    the name of a hole it does not open. Binding and authorization are separate
+    axes.
+    """
+    client = TestClient(_app(tmp_path))
+    with client:
+        bob = _signup(client, "sign-bob2@example.com")
+        _step_up(client, bob)
+        res = client.post(
+            "/esignatures/records",
+            headers=bob,
+            json={
+                "signer_name": "Bob",
+                "signature_meaning": "reviewed",
+                "target_type": "analysis",
+                "target_id": 123,
+                "reason": "unbound path",
+            },
+        )
+        assert res.status_code == 201, res.text
+        assert res.json()["record_content_hash"] is None

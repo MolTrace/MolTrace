@@ -378,7 +378,7 @@ non-existent exploit.
 | # | Defect | Verdict | Status |
 |---|---|---|---|
 | 1 | Cross-tenant write, `POST /regulatory/action-items` | CONFIRMED (201) | **Fixed** `b049003` |
-| 2 | Cross-tenant signing, `POST /esignatures/records` | **Not reproduced** — 401 `step_up_required` fires first | Open, needs step-up to test |
+| 2 | Cross-tenant signing, `POST /esignatures/records` | **CONFIRMED** once step-up is satisfied | **Fixed** — subject gate |
 | 3 | E-signature register globally readable | CONFIRMED | **Fixed** `0d4174b` |
 | 4a | Controlled records globally readable | CONFIRMED (200) | **By design** — see below |
 | 4b | Controlled records globally *mutable* | **CONFIRMED** (see correction) | **Fixed** `0039` |
@@ -439,9 +439,39 @@ worse than naming the gap.
   rather than treated as unowned-and-editable. "Nobody is recorded as
   responsible" must not read as "anyone may change it".
 
+> **Second correction, same lesson.** #2 was first recorded as *not reproduced*
+> because the route returns 401 `step_up_required`. That was also premature:
+> step-up is trivially satisfied by any legitimate user with their **own**
+> password. Once stepped up, a user produced an `approved` Part 11 signature on
+> a regulatory dossier that had returned 404 to them a moment earlier.
+>
+> The route already enforced §11.200 step-up, §11.100 server principal and
+> §11.70 content binding — but nothing checked that the signer could reach the
+> subject. A correctly stepped-up principal signing under their own name is
+> still forging evidence if they cannot reach the record.
+>
+> **The first fix attempt was wrong and the tests caught it.** Making unknown
+> `target_type` values fail closed broke `test_unbound_target_is_honest`, which
+> pins deliberate behaviour: an unresolvable type signs but stays honestly
+> *unbound* (no content hash, `binding_status: "unbound"`). Binding and
+> authorization are separate axes. The attack requires naming the **real**
+> resource type — a subject is the `(target_type, target_id)` pair, so
+> `analysis#7` does not attach to dossier 7 — so gating the ownable types and
+> letting unknown ones through is both correct and non-breaking.
+
 **Remaining prompt:**
 
-> #2: satisfy step-up and re-probe whether `POST /esignatures/records`
+> Extend `authorize_signature_target` as ownable subject types are added. It
+> currently gates `regulatory_dossier` and `controlled_record`. `reaction_project`
+> and `spectracheck_session` are real ownable subjects with existing gates
+> (`require_reaction_access`) and should be added when someone confirms the
+> signing flows that use them.
+>
+> Then sweep the rest of Regentry the same way: enumerate write routes from
+> OpenAPI, probe each with a **valid** body (a 422 is schema validation, not a
+> denial), and test the legitimate path too — the controlled-record fix
+> initially failed closed for the owner because the create route was left
+> unwired.
 > checks that the caller may access the subject. If it does not, someone can
 > sign a record they cannot read, which is a Part 11 integrity failure. Do not
 > report it as an exploit until reproduced past the step-up gate.
