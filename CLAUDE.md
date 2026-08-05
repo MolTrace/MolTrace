@@ -93,7 +93,7 @@ In production, migrations run as the one-off Cloud Run job `moltrace-migrate` �
 
 ## Deploy and CI
 
-- Frontend → **Vercel** (`moltrace.co`). Vercel auto-deploy is disabled (`vercel.json` `git.deploymentEnabled: false`); only green CI reaches production. Manual deploy: `npx vercel@latest --prod --archive=tgz` — a plain `git push` ships nothing, and the archive flag is required.
+- Frontend → **Vercel** (`moltrace.co`). Vercel auto-deploy is disabled (`vercel.json` `git.deploymentEnabled: false`); only green CI reaches production, via the deploy hook in `ci-cd.yml`. A `git push` alone therefore ships nothing — ask the maintainer for the manual deploy procedure rather than guessing at CLI flags.
 - Backend → **Google Cloud Run** (service `moltrace-backend`, project `moltrace-prod`, us-central1) via keyless Workload Identity Federation, sequence build → migrate job → new revision.
 - Database → **Cloud SQL for PostgreSQL 16** on a private IP over Direct VPC egress.
 - `render.yaml` and any Render references are **legacy** — production has been GCP since July 2026. Verify infra facts against the README, not against older docs.
