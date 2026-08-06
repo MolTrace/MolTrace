@@ -1,9 +1,65 @@
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { ArrowRight } from "lucide-react"
+import { ArrowRight, ArrowUpRight, FileSignature, FlaskConical, ShieldCheck, Waves } from "lucide-react"
 import Link from "next/link"
 import { HeroMoleculeLayer } from "./hero-molecule-layer"
 import { EvidenceCard } from "./evidence-card"
+
+/**
+ * The four beats of the arc, each wearing the colour it wears inside the app so
+ * the name a reader meets here is the one they recognise once they are in it.
+ *
+ * These were four lines of plain text; they are cards now, and the reason that
+ * is worth the pixels is that all four destinations already exist. The row used
+ * to name four products and offer no way to reach any of them.
+ *
+ * `accent` is the vivid token — it fills the left rule and the icon.
+ * `ink` is the AA-safe variant — it colours every piece of type.
+ * `soft` is the low-alpha fill behind the pill.
+ * Never swap those roles: the vivid tokens sit at 2–3:1 on a light page.
+ */
+const HERO_MODULES = [
+  {
+    name: "SpectraCheck",
+    tag: "Spectroscopy",
+    desc: "Raw spectra → structure evidence",
+    href: "/spectroscopy",
+    icon: Waves,
+    accent: "var(--mt-teal)",
+    ink: "var(--mt-teal-ink)",
+    soft: "var(--mt-teal-soft)",
+  },
+  {
+    name: "Regentry",
+    tag: "Regulatory",
+    desc: "Evidence → ICH action items",
+    href: "/regulatory-hub",
+    icon: ShieldCheck,
+    accent: "var(--mt-cyan)",
+    ink: "var(--mt-cyan-ink)",
+    soft: "var(--mt-cyan-soft)",
+  },
+  {
+    name: "Repho",
+    tag: "Reaction",
+    desc: "Constraints → optimized reactions",
+    href: "/reaction-optimization",
+    icon: FlaskConical,
+    accent: "var(--mt-violet)",
+    ink: "var(--mt-violet-ink)",
+    soft: "var(--mt-violet-soft)",
+  },
+  {
+    name: "Report",
+    tag: "Dossier",
+    desc: "Audit-ready dossier & sign-off",
+    href: "/reports",
+    icon: FileSignature,
+    accent: "var(--mt-amber)",
+    ink: "var(--mt-amber-ink)",
+    soft: "var(--mt-amber-soft)",
+  },
+] as const
 
 /**
  * Hero.
@@ -82,22 +138,45 @@ export function Hero() {
             on purpose: nested in the column it stacked ABOVE the card on a phone,
             which put the one artifact worth showing about two and a half screens
             down and undid the reason for the rewrite. */}
-        <div className="hero-stat-grid mt-16 grid grid-cols-2 gap-x-8 gap-y-6 border-t pt-8 sm:grid-cols-4 lg:mt-20">
-          {[
-            { value: "SpectraCheck", label: "Raw spectra → structure evidence", ink: "var(--mt-teal-ink)" },
-            { value: "Regentry", label: "Evidence → ICH action items", ink: "var(--mt-cyan-ink)" },
-            { value: "Repho", label: "Constraints → optimized reactions", ink: "var(--mt-violet-ink)" },
-            { value: "Report", label: "Audit-ready dossier & sign-off", ink: "var(--mt-amber-ink)" },
-          ].map((stat) => (
-            <div key={stat.label} className="min-w-0">
-              {/* The "ink" variants, never the vivid accents: the bright tokens
-                  are tuned for fills and icons and fail AA as type on a light
-                  page. */}
-              <div className="text-lg font-semibold tracking-tight" style={{ color: stat.ink }}>
-                {stat.value}
+        <div className="hero-stat-grid mt-16 grid grid-cols-1 gap-4 border-t pt-10 sm:grid-cols-2 lg:mt-20 lg:grid-cols-4">
+          {HERO_MODULES.map((m) => (
+            <Link
+              key={m.name}
+              href={m.href}
+              className="group relative block h-full min-w-0 rounded-xl border bg-card p-4 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring motion-reduce:transition-none motion-reduce:hover:translate-y-0"
+              /* The 3px left rule is the whole signature of this card: it is what
+                 carries the module's colour without tinting any text. The `border`
+                 class sets 1px on all four sides and this overrides the left. */
+              style={{ borderLeftWidth: "3px", borderLeftColor: m.accent }}
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex min-w-0 items-center gap-2">
+                  {/* Icons keep the vivid accent — they are shapes, not type, so
+                      the AA rule that pushes text to the ink tokens does not
+                      apply to them. */}
+                  <m.icon className="h-5 w-5 shrink-0" style={{ color: m.accent }} aria-hidden />
+                  <h3 className="truncate text-sm font-semibold" style={{ color: m.ink }}>
+                    {m.name}
+                  </h3>
+                </div>
+                <ArrowUpRight
+                  className="h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform duration-200 group-hover:-translate-y-0.5 group-hover:translate-x-0.5 motion-reduce:transition-none"
+                  aria-hidden
+                />
               </div>
-              <div className="mt-1 text-xs leading-relaxed text-muted-foreground">{stat.label}</div>
-            </div>
+
+              {/* The reference prints this pill in the raw accent. On a light page
+                  that is 2–3:1 and fails AA at 11px, so the fill uses the -soft
+                  token and the text the -ink token. Same look, readable. */}
+              <span
+                className="mt-2.5 inline-block rounded-full px-2 py-0.5 text-[11px] font-medium"
+                style={{ backgroundColor: m.soft, color: m.ink }}
+              >
+                {m.tag}
+              </span>
+
+              <p className="mt-2.5 text-xs leading-relaxed text-muted-foreground">{m.desc}</p>
+            </Link>
           ))}
         </div>
       </div>
