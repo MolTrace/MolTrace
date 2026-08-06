@@ -32,6 +32,8 @@ from __future__ import annotations
 import json
 import os
 import re
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 
 import pytest
@@ -96,22 +98,45 @@ def _cases() -> list[dict[str, object]]:
 CASES = _cases()
 
 
-def _analyse(case: dict[str, object]) -> dict[str, object]:
+@contextmanager
+def _structure_assignment_enabled() -> Iterator[None]:
+    """Enable P3 for the duration of one analysis, then put the flag back.
+
+    This used to be a bare ``os.environ[...] = "1"`` with no restore. Because
+    pytest shares a process (and each xdist worker shares one across every test
+    it runs), the flag leaked from the first case in this module into every test
+    that ran afterwards in the same worker. Those tests then silently exercised
+    a code path they were written to avoid, and which arm they measured depended
+    on execution order -- so a P3 regression could have been masked, or blamed
+    on an unrelated test, depending on sharding.
+    """
+    previous = os.environ.get("MOLTRACE_STRUCTURE_ASSIGNMENT")
     os.environ["MOLTRACE_STRUCTURE_ASSIGNMENT"] = "1"
+    try:
+        yield
+    finally:
+        if previous is None:
+            os.environ.pop("MOLTRACE_STRUCTURE_ASSIGNMENT", None)
+        else:
+            os.environ["MOLTRACE_STRUCTURE_ASSIGNMENT"] = previous
+
+
+def _analyse(case: dict[str, object]) -> dict[str, object]:
     from nmrcheck.chemistry import structure_summary_from_smiles
     from nmrcheck.fid import process_bruker_1d_zip
 
     structure = structure_summary_from_smiles(str(case["smiles"]))
     archive = case["archive"]
     assert isinstance(archive, Path)
-    report = process_bruker_1d_zip(
-        filename=archive.name,
-        content=archive.read_bytes(),
-        solvent=case["solvent"],  # type: ignore[arg-type]
-        nucleus="1H",
-        expected_total_h=structure.total_hydrogens,
-        expected_non_labile_h=structure.non_labile_hydrogens,
-    )
+    with _structure_assignment_enabled():
+        report = process_bruker_1d_zip(
+            filename=archive.name,
+            content=archive.read_bytes(),
+            solvent=case["solvent"],  # type: ignore[arg-type]
+            nucleus="1H",
+            expected_total_h=structure.total_hydrogens,
+            expected_non_labile_h=structure.non_labile_hydrogens,
+        )
     peaks = list(report.inferred_peaks)
     return {
         "structure": structure,
