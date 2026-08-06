@@ -14,7 +14,7 @@
 
 import { apiFetch } from "@/lib/api/client"
 
-export type ComplianceRowStatus = "non_compliant" | "flagged" | "within_limits"
+export type ComplianceRowStatus = "non_compliant" | "flagged" | "not_checked" | "within_limits"
 
 export type ComplianceViolation = {
   constraintId: number | null
@@ -71,7 +71,9 @@ function readNumArray(v: unknown): number[] {
   return Array.isArray(v) ? v.map(readNum).filter((n): n is number => n != null) : []
 }
 
-function parseViolation(v: unknown): ComplianceViolation | null {
+/** Exported so the proposal-time reader (`regulatory-proposal.ts`) parses the
+ *  identical `ConstraintViolation` wire shape rather than duplicating it. */
+export function parseViolation(v: unknown): ComplianceViolation | null {
   if (!isRecord(v)) return null
   return {
     constraintId: readNum(v.constraint_id),
@@ -122,11 +124,18 @@ export function parseComplianceReport(raw: unknown): ComplianceReport {
 }
 
 /** Per-experiment row status: hard violation → non-compliant; soft violation →
- *  flagged; otherwise within limits. A field with a limit but no measured value
- *  is NEVER counted as passing (see `unmeasured`). */
+ *  flagged; a limit with nothing to compare against → not checked; otherwise
+ *  within limits.
+ *
+ *  A field with a limit but no measured value is NEVER counted as passing. This
+ *  used to fall through to `within_limits` — a green badge on an experiment whose
+ *  limit was never actually evaluated — which is the same false-clear the
+ *  proposal-side reader guards against. `within_limits` now requires that every
+ *  applicable limit had a value AND none was breached. */
 export function itemStatus(item: ComplianceItem): ComplianceRowStatus {
   if (item.hardBlock) return "non_compliant"
   if (item.violations.length > 0) return "flagged"
+  if (item.unmeasured.length > 0) return "not_checked"
   return "within_limits"
 }
 
@@ -149,6 +158,10 @@ export const COMPLIANCE_STATUS: Record<
   flagged: {
     label: "Flagged",
     badgeClass: "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300",
+  },
+  not_checked: {
+    label: "Not checked",
+    badgeClass: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
   },
   within_limits: {
     label: "Within limits",

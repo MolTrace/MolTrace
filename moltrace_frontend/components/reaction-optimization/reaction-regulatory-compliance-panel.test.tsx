@@ -79,8 +79,25 @@ describe("regulatory-compliance lib", () => {
   })
 
   it("classifies soft-violation as flagged, clean as within_limits", () => {
-    expect(itemStatus({ hardBlock: false, violations: [{} as never], feasible: true } as never)).toBe("flagged")
-    expect(itemStatus({ hardBlock: false, violations: [], feasible: true } as never)).toBe("within_limits")
+    expect(
+      itemStatus({ hardBlock: false, violations: [{} as never], feasible: true, unmeasured: [] } as never),
+    ).toBe("flagged")
+    expect(
+      itemStatus({ hardBlock: false, violations: [], feasible: true, unmeasured: [] } as never),
+    ).toBe("within_limits")
+  })
+
+  it("does not clear an experiment whose limit had nothing to compare against", () => {
+    // Re-baselined: this used to return "within_limits" — a green badge on a limit
+    // that was never actually evaluated. `feasible` only means "no hard violation".
+    expect(
+      itemStatus({
+        hardBlock: false,
+        violations: [],
+        feasible: true,
+        unmeasured: ["impurity_percent"],
+      } as never),
+    ).toBe("not_checked")
   })
 })
 
