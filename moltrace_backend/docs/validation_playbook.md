@@ -778,3 +778,112 @@ small-peak bias is measured on well-isolated peaks, where clustering is not in
 play, so fixing GSD areas will not by itself close A1's 21% median error. Treat
 them as independent and re-measure A1 after any GSD change rather than assuming
 credit.
+
+---
+
+## A3 RESULT — legacy vs P3 (run 2026-08-04, real spectra)
+
+**Headline: the comparison that looked decisive was circular, and the number
+worth having was one nobody is reading.**
+
+### The three prerequisite defects, all fixed
+
+1. **Input asymmetry.** Legacy `observed_total` excludes `{"solvent",
+   "impurity"}`; P3 excluded only `"solvent"`. The arms were solving different
+   problems. Worse in P3's direction: conservation is a hard constraint there,
+   so a leaked impurity is not merely over-counted, it is forced onto real
+   structural positions and displaces the analyte's assignment.
+2. **Silent failure.** `_build_structure_assignment` collapsed *never ran*,
+   *raised and was swallowed*, and *ran and was infeasible* into a bare `None`.
+   An arm that crashes on every fixture scored identically to one that
+   legitimately declines, so the comparison could not fail. Now returns a named
+   `status` (`ok` / `infeasible` / `error` / `no_assignable_signals`) with the
+   exception type on error.
+3. **Env-var leak.** `tests/test_nmr_real_spectra_accuracy.py` set
+   `MOLTRACE_STRUCTURE_ASSIGNMENT=1` process-wide with no restore. pytest shares
+   a process per xdist worker, so the flag leaked into every later test in that
+   worker — meaning **which arm the slow suite measured depended on execution
+   order**. Past green runs of that suite are not evidence about P3.
+
+### The scored A/B, and why it means nothing
+
+Seven structure-paired nmrshiftdb2 1H spectra, scored as summed absolute error
+per class (aromatic / anomeric-olefinic / aliphatic / labile) against the
+structure-derived `expected` block:
+
+```
+total class error   legacy = 33.0 H     p3 = 0.0 H
+per-spectrum wins   legacy = 0   p3 = 6   tie = 1
+```
+
+P3 scores a perfect zero on all seven. **That is an identity, not a result.**
+The solver pins it (`structure_assignment.py`, equality constraints):
+
+```python
+for j in range(n_cols):
+    ...
+    b_eq.append(demand[j])     # demand[j] = that environment's proton
+                               # count, taken from the STRUCTURE
+```
+
+Every environment receives exactly its structural proton count as a hard
+equality, so summing by class reproduces the structure's own composition.
+Scoring `class_rollup` against a structure-derived expectation compares the
+structure with itself.
+
+**Falsified directly.** Feeding indole's structure three unrelated spectra:
+
+```
+real-ish indole spectrum     {'aromatic': 6.0, 'labile': 1.0}   status=ok
+PURELY ALIPHATIC spectrum    {'aromatic': 6.0, 'labile': 1.0}   status=ok
+ONE peak at 4.0 ppm          {'aromatic': 6.0, 'labile': 1.0}   status=ok
+```
+
+A spectrum with no aromatic signal whatsoever still reports 6 aromatic H.
+
+This is the same circularity as the reported TOTAL, which
+`_normalize_integrations_to_target` pins to the structural count in **both**
+arms — which is why all seven spectra report a total exactly equal to truth in
+both arms.
+
+### The signal that is real, and unused
+
+`total_cost` — the transport cost of moving observed signal onto the structure's
+environments — is strongly spectrum-dependent:
+
+```
+matching spectrum        total_cost =    1.39
+wrong compound entirely  total_cost = 1721.22      (~1234x)
+```
+
+But `feasible` stays `True`, `status` stays `ok`, and `notes` stays empty in
+both. **The product computes a working structure-vs-spectrum mismatch signal and
+does not surface it as any kind of verdict**, while surfacing a class rollup that
+carries no spectral information at all.
+
+Pinned in `tests/test_structure_assignment_is_not_a_measurement.py`.
+
+### Recommendation
+
+**Do not enable P3 by default on the strength of the class comparison**, and do
+not present `class_rollup` anywhere as an *observed* inventory — least of all
+beside the expected inventory, where it reads as independent corroboration and is
+the structure agreeing with itself. In a regulated report that is a fabricated
+cross-check.
+
+**Next prompt:**
+
+> Make `total_cost` a verdict. It already separates a matching spectrum from a
+> mismatched one by ~1200x; calibrate a threshold from the seven fixtures plus
+> deliberate mismatches, and have P3 report structure-spectrum disagreement
+> instead of `feasible: true` on a spectrum from another compound. That converts
+> P3 from a tautology into the consistency check it was meant to be.
+>
+> Then decide what, if anything, `class_rollup` is for. If it stays, rename it so
+> no caller can read it as observed — it is the structure's composition, and the
+> legacy arm is the only one attempting a measurement.
+>
+> Legacy's 33.0 H of class error is real and worth fixing on its own: an N-H
+> resonating in the aromatic window is counted aromatic (indole: legacy 7
+> aromatic / 0 labile, truth 6/1), and one fixture reports `aromatic: 1.0` for a
+> C6H10O2 with no aromatic ring available at all.

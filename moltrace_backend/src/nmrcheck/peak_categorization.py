@@ -1118,9 +1118,21 @@ def _build_structure_assignment(
 ) -> dict[str, Any] | None:
     """Run the assignment engine and roll its result up by inventory class.
 
-    Returns None (rather than raising) whenever the structure cannot be parsed
-    or the solve is infeasible: this is a shadow view, so it must never be able
-    to break the analysis that ships today.
+    Never raises: this is a shadow view, so it must not be able to break the
+    analysis that ships today. But "did not raise" is not the same as "has
+    nothing to say", and this used to collapse three very different outcomes
+    into a bare ``None``:
+
+      * the engine was never reached (no assignable signals),
+      * the engine raised and the exception was swallowed,
+      * the engine ran and returned an infeasible solve.
+
+    In the payload all three looked identical to "ran and found nothing", so a
+    crashing engine was indistinguishable from a working one with a quiet
+    spectrum. That makes any legacy-vs-P3 comparison unfalsifiable: an arm that
+    silently fails on every fixture scores the same as an arm that legitimately
+    declines. ``status`` now names which happened, and a raised exception is
+    reported with its type so it can be found and fixed rather than absorbed.
     """
     signals: list[tuple[float, float]] = []
     for peak in peaks:
@@ -1129,24 +1141,44 @@ def _build_structure_assignment(
             continue
         # Residual solvent and water are identified, not analyte; feeding them
         # in would make the contaminant sink absorb tens of protons of solvent.
-        if peak.get("category") == "solvent":
+        #
+        # Impurity is excluded for the same reason and, additionally, because
+        # the legacy arm already excludes it: ``observed_total`` below sums only
+        # peaks whose category is not in {"solvent", "impurity"}. Feeding P3 a
+        # signal legacy discards meant the two arms were solving different
+        # problems, so any measured disagreement was partly just that input gap
+        # rather than a difference between the algorithms. A structure-
+        # constrained solver is the worse place to leak an impurity into as
+        # well: conservation is a hard constraint there, so contaminant protons
+        # cannot simply be over-counted, they are forced onto real structural
+        # positions and displace the analyte's own assignment.
+        if peak.get("category") in {"solvent", "impurity"}:
             continue
         integration = _inventory_integration(peak)
         if integration is None or integration <= 0:
             continue
         signals.append((float(shift), float(integration)))
     if not signals:
-        return None
+        return {"status": "no_assignable_signals", "feasible": False, "notes": []}
     try:
         result = assign_from_smiles(
             smiles=structure.smiles, signals=signals, solvent=solvent
         )
-    except Exception:
-        return None
+    except Exception as exc:  # shadow view: never propagate, but never hide either
+        return {
+            "status": "error",
+            "feasible": False,
+            "error_type": type(exc).__name__,
+            "notes": [
+                "The structure-constrained assignment could not be completed "
+                "for this spectrum; the standard result is unaffected."
+            ],
+        }
     if not result.feasible:
-        return {"feasible": False, "notes": list(result.notes)}
+        return {"status": "infeasible", "feasible": False, "notes": list(result.notes)}
     payload = result.to_payload()
     payload["class_rollup"] = class_rollup(result)
+    payload["status"] = "ok"
     return payload
 
 
