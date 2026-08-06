@@ -887,3 +887,98 @@ cross-check.
 > resonating in the aromatic window is counted aromatic (indole: legacy 7
 > aromatic / 0 labile, truth 6/1), and one fixture reports `aromatic: 1.0` for a
 > C6H10O2 with no aromatic ring available at all.
+
+---
+
+## A4 RESULT — GSD deconvolution (run 2026-08-04)
+
+**The blocker is confirmed, with evidence, and the decision is NOT to wire the
+fitted areas in yet. Reason below — it is a mixed-basis hazard, not reluctance.**
+
+### The defect, pinned
+
+`deconvolve_region` (`nmrcheck/gsd.py:155`) fits a sum of pseudo-Voigt lines,
+each `[amp, centre, hwhm, eta]`. The area of such a line is analytic:
+
+```
+area = amp * (eta * pi * hwhm + (1 - eta) * hwhm * sqrt(pi / ln 2))
+```
+
+Every fitted area exists at the moment of the fit. The function returns
+`(centre, height, hwhm)` — dropping `eta` — and its sole consumer
+(`spectrum.py:1263`) reads `[line[0] for line in resolved_lines]`, the centres
+and nothing else. The number a chemist reads is
+`total_area = sum(component.area ...)` (`spectrum.py:1236`), summed over raw
+local maxima **before** any deconvolution.
+
+So the deconvolution informs multiplicity and never touches quantitation.
+
+### The fit is good — that is what makes the discard costly
+
+Verified on closed-form synthetics (`tests/test_gsd_fitted_areas.py`):
+
+- two equal-width lines with heights 1:3 → fitted areas recovered in ratio 3.0
+- a broad/short line and a sharp/tall one carrying **equal** area (50×π×0.06 vs
+  150×π×0.02) → recovered in ratio 1.0 despite a 3× height difference
+
+That second case is precisely what a raw local-maximum sum cannot do, and it is
+the case overlapped multiplets present.
+
+### Measured stake on real data — with a caveat that matters
+
+`naw-1-244-54pt/10`, comparing raw trapezoid integration against the sum of
+fitted line areas:
+
+```
+  region ppm    lines   fitted/raw
+  7.80- 7.60      6       1.310
+  4.35- 4.20      9       1.272
+  4.80- 4.40     10       1.171
+  2.15- 1.85      2       1.018
+  1.55- 1.15      2       0.932
+  aggregate                1.151
+```
+
+The denser the overlap, the more the fit recovers — the expected signature of
+raw integration losing tail area to neighbours.
+
+**Caveat, and it is load-bearing:** those fitted sums assume a pure Lorentzian
+(`h·π·w`) because **the return type drops `eta`**. A pseudo-Voigt with `eta < 1`
+carries up to ~32% less area for the same height and width, so every ratio above
+is an UPPER BOUND. The true gap cannot be measured from outside the function at
+all. That is not a footnote — it is the strongest single argument for exposing
+the area from inside the fit rather than reconstructing it downstream.
+
+### Why not wire it in now
+
+A cluster is emitted as ONE `_PeakEstimate`. Deconvolution runs only when
+`len(cluster) >= 2` and the region has enough points, so swapping in fitted areas
+would put **some** clusters on a fitted basis and leave others on the raw basis,
+within the same spectrum. Mixed-basis integrals are worse than consistently-raw
+ones: the ratios between peaks — the only thing a proton count depends on —
+would then depend on whether each peak happened to qualify for deconvolution.
+
+This also interacts with two results already in hand: A1's 21% median
+integration error on isolated peaks, and the apportionment change in `4099eb8`.
+Changing the area basis without re-measuring against the exp-10 ground truth
+would make all three uninterpretable together.
+
+**Next prompt:**
+
+> 1. Widen `deconvolve_region` to return the fitted area per line, computed
+>    inside the fit where `eta` is known. `tests/test_gsd_fitted_areas.py`
+>    asserts the current 3-tuple deliberately — re-baseline it in the same
+>    change and say so.
+> 2. Decide the basis rule BEFORE using the areas, and make it all-or-nothing
+>    per spectrum: either every cluster's area comes from a fit (deconvolve
+>    unconditionally, including singletons) or none does. Record the basis in
+>    the payload next to `integration_scale` so a reader can tell which was used.
+> 3. Re-measure against exp 10 with `tests/test_processed_upload_accuracy.py`.
+>    That fixture is quantitative, so its trace areas are the true ratios: if
+>    fitted areas are the improvement they look like, the 21.1% median error must
+>    drop. If it does not drop, the deconvolution is not the constraint and the
+>    remaining error is in the scale chain.
+> 4. Only then consider splitting a cluster into multiple environments. That is a
+>    separate and much larger feature — it needs a rule for telling "one
+>    environment, several J-coupled lines" from "two environments that overlap",
+>    which the line positions alone cannot settle.
