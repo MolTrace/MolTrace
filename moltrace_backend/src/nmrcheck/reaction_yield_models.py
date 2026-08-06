@@ -266,6 +266,10 @@ class SklearnSurrogatePredictor:
         self.std_floor = std_floor
         self.featurizer = ConditionFeaturizer()
         self._model: Any = None
+        # Set during fit; the same transform must be applied at predict time or the query lands in
+        # a different space from the training data.
+        self._feature_mean: Any = None
+        self._feature_scale: Any = None
 
     def fit(self, examples: Sequence[YieldExample]) -> SklearnSurrogatePredictor:
         examples = _validated_examples(examples)
@@ -282,6 +286,19 @@ class SklearnSurrogatePredictor:
             [self.featurizer.transform(example.conditions) for example in examples], dtype=float
         )
         targets = np.asarray([float(example.yield_percent) for example in examples], dtype=float)
+        # Standardise the features before fitting. The featurisation mixes wildly different scales
+        # — a temperature spans tens of degrees while a one-hot catalyst spans 0 to 1 — and the
+        # kernel below is isotropic, so on raw features the temperature axis swamps the distance
+        # metric entirely. Every query then sits effectively infinitely far from the training data
+        # and the GP returns its prior mean for everything: the surrogate silently stops learning
+        # the categorical signal it exists to capture. Standardising is preferred to per-dimension
+        # length scales here because a handful of experiments cannot support fitting one
+        # hyperparameter per feature.
+        self._feature_mean = features.mean(axis=0)
+        scale = features.std(axis=0)
+        # A constant column carries no information; leave it alone rather than dividing by zero.
+        self._feature_scale = np.where(scale > 0, scale, 1.0)
+        features = (features - self._feature_mean) / self._feature_scale
         # WhiteKernel models observation noise: without it the GP interpolates replicated
         # conditions exactly and reports ~zero uncertainty on inherently noisy assay data.
         kernel = ConstantKernel(1.0) * Matern(nu=2.5) + WhiteKernel(noise_level=1.0)
@@ -299,6 +316,7 @@ class SklearnSurrogatePredictor:
         import numpy as np  # noqa: PLC0415
 
         vector = np.asarray([self.featurizer.transform(conditions)], dtype=float)
+        vector = (vector - self._feature_mean) / self._feature_scale
         mean, std = self._model.predict(vector, return_std=True)
         warnings = (
             [f"unrepresented condition(s) encoded as zero: {self.featurizer.last_unknowns}"]
