@@ -88,6 +88,15 @@ import { ReactionResponseOverview } from "@/components/reaction-optimization/rea
 import { ReactionRegulatoryConstraintsPanel } from "@/components/reaction-optimization/reaction-regulatory-constraints-panel"
 import { ReactionRegulatoryCompliancePanel } from "@/components/reaction-optimization/reaction-regulatory-compliance-panel"
 import {
+  CandidateRegulatoryCell,
+  RunRegulatoryStrip,
+} from "@/components/reaction-optimization/reaction-candidate-regulatory"
+import {
+  candidateRegulatoryById,
+  candidateRegulatoryForRow,
+  readRunRegulatorySummary,
+} from "@/lib/reaction/regulatory-proposal"
+import {
   ReactionStudioCompoundLinkingPanel,
   ReactionStudioCompoundLinkSummary,
 } from "@/components/reaction-optimization/reaction-studio-compound-linking-panel"
@@ -2458,6 +2467,20 @@ export function ReactionProjectDetail() {
   )
   const paretoNonDominatedIds = useMemo(() => nonDominatedExperimentIds(paretoFront), [paretoFront])
   const paretoKneeId = paretoFront?.kneeExperimentId ?? null
+
+  // Repho — proposal-time regulatory verdicts. Run-level counts + the
+  // unchecked-limits caveat ride in the BO run; the per-candidate verdict rides on
+  // each acquisition candidate's metadata_json. The recommendation rows the batch
+  // table renders are a DIFFERENT id space, so the verdicts are indexed by every
+  // id a row might carry and joined per row.
+  const boRegulatorySummary = useMemo(
+    () => readRunRegulatorySummary(execTabLatestBoRunRecord),
+    [execTabLatestBoRunRecord],
+  )
+  const candidateRegulatoryIndex = useMemo(
+    () => candidateRegulatoryById(execTabLatestBoRunRecord),
+    [execTabLatestBoRunRecord],
+  )
 
   const execTabLatestAdvisorRunRecord = useMemo((): Record<string, unknown> | null => {
     if (lastAdvisorRun != null && isRecord(lastAdvisorRun)) return lastAdvisorRun
@@ -6745,6 +6768,13 @@ export function ReactionProjectDetail() {
                         </AlertDescription>
                       </Alert>
                     ) : null}
+                    {/* A caveat goes ABOVE the number it qualifies (handoff §4.2, same
+                        rule as qNMR purity), so the unchecked-limits warning and the
+                        feasibility counts precede the run's status badges. */}
+                    <RunRegulatoryStrip
+                      summary={boRegulatorySummary}
+                      hasActiveLimits={candidateRegulatoryIndex.size > 0}
+                    />
                     <div className="flex flex-wrap gap-2 text-sm">
                       <Badge variant="outline" className="font-mono text-xs">
                         BO run ID: {readBoRunId(lastBoRun)}
@@ -6762,7 +6792,10 @@ export function ReactionProjectDetail() {
                     </div>
                     <MlModelProvenanceSummary sources={[lastBoRun]} className="rounded-md border border-dashed px-3 py-2" />
                     {(() => {
-                      const ws = mergeRunStringLists(lastBoRun.warnings, lastBoRun.warnings_json)
+                      // The unchecked-limits warning is hoisted into the strip above; listing
+                      // it again down here would bury the caveat under the figures a second
+                      // time. Inside this branch lastBoRun IS execTabLatestBoRunRecord.
+                      const ws = boRegulatorySummary.otherWarnings
                       return (
                         <div className="space-y-2">
                           <p className="text-sm font-medium">warnings</p>
@@ -8483,6 +8516,7 @@ export function ReactionProjectDetail() {
                         <TableHead className="min-w-[100px] text-xs">model uncertainty</TableHead>
                         <TableHead className="text-xs">estimated cost</TableHead>
                         <TableHead className="text-xs">safety status</TableHead>
+                        <TableHead className="min-w-[120px] text-xs">regulatory</TableHead>
                         <TableHead className="text-xs">acquisition score</TableHead>
                         <TableHead className="min-w-[120px] text-xs">rationale</TableHead>
                         <TableHead className="text-xs">status</TableHead>
@@ -8493,7 +8527,7 @@ export function ReactionProjectDetail() {
                     <TableBody>
                       {loading ? (
                         <TableRow>
-                          <TableCell colSpan={13} className="text-muted-foreground">
+                          <TableCell colSpan={14} className="text-muted-foreground">
                             Loading…
                           </TableCell>
                         </TableRow>
@@ -8536,6 +8570,11 @@ export function ReactionProjectDetail() {
                                 {formatEstimatedCostDisplay(r)}
                               </TableCell>
                               <TableCell className="max-w-[100px] text-xs">{String(r.safety_status ?? "—")}</TableCell>
+                              <TableCell className="max-w-[160px] align-top">
+                                <CandidateRegulatoryCell
+                                  reg={candidateRegulatoryForRow(r, candidateRegulatoryIndex)}
+                                />
+                              </TableCell>
                               <TableCell className="font-mono text-xs tabular-nums">
                                 {formatAcquisitionScoreDisplay(r)}
                               </TableCell>
@@ -8602,7 +8641,7 @@ export function ReactionProjectDetail() {
                           if (showCritiqueRow) {
                             rowsOut.push(
                               <TableRow key={`${id}-advisor-critique`}>
-                                <TableCell colSpan={13} className="align-top bg-muted/10 p-4">
+                                <TableCell colSpan={14} className="align-top bg-muted/10 p-4">
                                   {critBusy && critPayload == null ? (
                                     <p className="text-sm text-muted-foreground">Loading critique…</p>
                                   ) : isRecord(critPayload) ? (

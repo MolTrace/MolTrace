@@ -26,6 +26,7 @@ import {
 import { InfoTooltip } from "@/components/ui/info-tooltip"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { cn } from "@/lib/utils"
 import {
   Select,
   SelectContent,
@@ -216,6 +217,21 @@ export function RegulatoryActionQueue({ dossierId, compact }: RegulatoryActionQu
     return m
   }, [dossiers])
 
+  // Deep link from a Repho reaction proposal: /regulatory/action-queue?item=<id>.
+  // A regulatory limit shown against a candidate names the action item it came
+  // from, and that link is the audit trail — landing on an unfiltered queue would
+  // not be one. Read from `location` rather than `useSearchParams` so this
+  // component stays usable where there is no Suspense boundary (the embedded
+  // dossier card has none). Dossier-scoped embeds ignore it.
+  const [focusedItemId, setFocusedItemId] = useState<number | null>(null)
+  useEffect(() => {
+    if (typeof window === "undefined" || dossierId != null) return
+    const raw = new URLSearchParams(window.location.search).get("item")
+    if (raw == null) return
+    const parsed = Number.parseInt(raw, 10)
+    setFocusedItemId(Number.isFinite(parsed) ? parsed : null)
+  }, [dossierId])
+
   const load = useCallback(async () => {
     setLoading(true)
     setErr("")
@@ -241,6 +257,11 @@ export function RegulatoryActionQueue({ dossierId, compact }: RegulatoryActionQu
 
   const filteredItems = useMemo(() => {
     let rows = items
+    // A deep link asks for one specific item; the other filters would only be able
+    // to hide it, so they are bypassed while a focus is active.
+    if (focusedItemId != null) {
+      return rows.filter((r) => readRecordNumber(r, "id") === focusedItemId)
+    }
     const sev = filterSeverity === "__all__" ? null : filterSeverity
     const st = filterStatus === "__all__" ? null : filterStatus
     const at = filterActionType === "__all__" ? null : filterActionType
@@ -262,7 +283,16 @@ export function RegulatoryActionQueue({ dossierId, compact }: RegulatoryActionQu
       rows = rows.filter((r) => (readRecordString(r, "assigned_to") ?? "").toLowerCase().includes(assignQ))
     }
     return rows
-  }, [items, filterSeverity, filterStatus, filterActionType, filterDossierId, filterAssigned, dossierId])
+  }, [
+    items,
+    filterSeverity,
+    filterStatus,
+    filterActionType,
+    filterDossierId,
+    filterAssigned,
+    dossierId,
+    focusedItemId,
+  ])
 
   const patchStatus = async (id: number, status: string, row: Record<string, unknown>) => {
     setPatchBusyId(id)
@@ -382,7 +412,38 @@ export function RegulatoryActionQueue({ dossierId, compact }: RegulatoryActionQu
         </div>
       ) : null}
 
-      {!compact ? (
+      {focusedItemId != null ? (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-muted/30 p-3">
+          <div className="text-sm">
+            {loading ? (
+              <span className="text-muted-foreground">Looking up action item {focusedItemId}…</span>
+            ) : filteredItems.length > 0 ? (
+              <>
+                Showing the single action item behind a regulatory limit you followed here.
+                <span className="ml-1 font-mono text-xs text-muted-foreground">
+                  Action item {focusedItemId}
+                </span>
+              </>
+            ) : (
+              <span>
+                Action item {focusedItemId} is not in this queue — it may belong to a dossier you
+                cannot open, or it may have been removed.
+              </span>
+            )}
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-7 px-2 text-[11px]"
+            onClick={() => setFocusedItemId(null)}
+          >
+            Show all action items
+          </Button>
+        </div>
+      ) : null}
+
+      {!compact && focusedItemId == null ? (
         (() => {
           const filtersActive =
             filterSeverity !== "__all__" ||
@@ -422,11 +483,14 @@ export function RegulatoryActionQueue({ dossierId, compact }: RegulatoryActionQu
       ) : null}
 
       <div
-        className={
+        className={cn(
           compact
             ? "grid gap-2 rounded-lg border bg-muted/20 p-2 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5"
-            : "grid gap-3 rounded-lg border bg-muted/20 p-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5"
-        }
+            : "grid gap-3 rounded-lg border bg-muted/20 p-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5",
+          // A focus bypasses these filters, so showing controls that cannot change
+          // the result would just be misleading.
+          focusedItemId != null && "hidden",
+        )}
       >
         <div className="space-y-1.5">
           <Label className="text-xs">Severity</Label>
