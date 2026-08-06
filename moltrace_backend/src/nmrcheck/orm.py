@@ -5131,6 +5131,16 @@ class RegulatoryActionItemORM(Base):
         ForeignKey("regulatory_requirements.id", ondelete="SET NULL"),
         nullable=True,
     )
+    # Who raised it, and their team. An action item can legitimately hang off a batch, a compound
+    # or nothing at all, but the list only ever joined through the dossier — so any item without
+    # one was created successfully and then permanently invisible to the person who created it.
+    # Ownership here is what makes those reachable, and it mirrors how a dossier is owned.
+    created_by_user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    organization_id: Mapped[int | None] = mapped_column(
+        ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     action_type: Mapped[str] = mapped_column(String(64), default="human_review")
     title: Mapped[str] = mapped_column(String(300))
     description: Mapped[str] = mapped_column(Text)
@@ -7242,3 +7252,77 @@ class AppMetricDailyORM(Base):
     reviews_count: Mapped[int] = mapped_column(Integer, default=0)
     overrides_count: Mapped[int] = mapped_column(Integer, default=0)
     hours_saved_estimate: Mapped[float] = mapped_column(Float, default=0.0)
+
+
+class SpectralImpurityObservationORM(Base):
+    """One contaminant observed in a spectrum, with the ICH Q3C clause that applies to it.
+
+    The audit record for the SpectraCheck -> Regentry seam: it lets a reviewer walk from a
+    regulatory limit back to the exact peak in the exact analysis it came from.
+
+    **Scoped by the analysis owner, deliberately.** ``user_id`` is denormalized from the source
+    analysis at write time and is the ONLY authorizing column. ``reaction_project_id`` is
+    provenance, never permission: reaction projects widen to active organization members via
+    ``reaction_access.project_scope_predicate``, while ``analyses`` has no organization column at
+    all, so scoping these rows by the project would let a campaign teammate read the compound name
+    and chemical shift out of a spectrum they provably cannot open. Any reaction-side reader must
+    gate on the INTERSECTION of both, never the union.
+
+    Every regulatory column is nullable because a refusal is a first-class outcome — an
+    unresolved identity carries no class, no limit, and no rule-set version, and forcing NOT NULL
+    would make the three refusal branches unstorable.
+    """
+
+    __tablename__ = "spectral_impurity_observations"
+    __table_args__ = (
+        # The scope axis. analysis_id and reaction_project_id get their own single-column
+        # indexes from `index=True` on the columns themselves — do not repeat them here.
+        Index(
+            "ix_spectral_impurity_observations_user_created",
+            "user_id",
+            "created_at",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    # SET NULL, not CASCADE: the observation is the audit record and must outlive the analysis
+    # row. A NULL analysis_id means "the source was removed", not "unowned" — `user_id` still
+    # carries the scope.
+    analysis_id: Mapped[int | None] = mapped_column(
+        ForeignKey("analyses.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    user_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # Provenance only. NOT an access-control column — see the class docstring.
+    reaction_project_id: Mapped[int | None] = mapped_column(
+        ForeignKey("reaction_projects.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+
+    observed_shift_ppm: Mapped[float] = mapped_column(Float, default=0.0)
+    solvent: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    observed_label: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    compound: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    expected_ppm: Mapped[float | None] = mapped_column(Float, nullable=True)
+    delta_ppm: Mapped[float | None] = mapped_column(Float, nullable=True)
+    match_kind: Mapped[str | None] = mapped_column(String(32), nullable=True)
+
+    identity_status: Mapped[str] = mapped_column(String(32), default="unresolved")
+    unresolved_reason: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    unresolved_detail: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    q3c_class_number: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    q3c_class_description: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    concentration_limit_ppm: Mapped[float | None] = mapped_column(Float, nullable=True)
+    pde_mg_per_day: Mapped[float | None] = mapped_column(Float, nullable=True)
+    regulatory_basis: Mapped[str | None] = mapped_column(Text, nullable=True)
+    table_reference: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    rule_set_version: Mapped[str | None] = mapped_column(String(80), nullable=True)
+
+    # Stated, never implied: no measured level is attributable to a named contaminant, so the
+    # limit above is not a compliance verdict.
+    quantitation_available: Mapped[bool] = mapped_column(Boolean, default=False)
+    observed_level_ppm: Mapped[float | None] = mapped_column(Float, nullable=True)
+    compliance_note: Mapped[str] = mapped_column(Text, default="")
+    human_review_required: Mapped[bool] = mapped_column(Boolean, default=True)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    metadata_json: Mapped[str] = mapped_column(Text, default="{}")
