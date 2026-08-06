@@ -1,76 +1,105 @@
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { ArrowRight, Eye } from "lucide-react"
+import { ArrowRight } from "lucide-react"
 import Link from "next/link"
 import { HeroMoleculeLayer } from "./hero-molecule-layer"
+import { EvidenceCard } from "./evidence-card"
 
+/**
+ * Hero.
+ *
+ * It used to open with a three-line paragraph, two competing calls to action,
+ * and a compliance strip that the very next section repeated verbatim — then
+ * described confidence scores, citations and contradiction flags in prose four
+ * screens before showing any. The card was the only unfakeable thing on the
+ * page and it was fifth.
+ *
+ * So: one line of subhead, the card itself, one call to action. Show the
+ * artifact, do not describe the capability.
+ */
 export function Hero() {
   return (
     <section className="hero-compat-surface relative overflow-hidden bg-background text-foreground">
       <HeroMoleculeLayer />
       <div className="hero-compat-overlay pointer-events-none absolute inset-0 z-[5]" aria-hidden />
-      <div className="relative z-10 mx-auto max-w-7xl px-4 py-24 sm:px-6 sm:py-32 lg:px-8 lg:py-40">
-        <div className="mx-auto max-w-4xl text-center">
-          <Badge variant="outline" className="mb-6 px-4 py-1.5 text-sm font-medium">
-            Evidence-first AI for regulated pharma &amp; chemical R&amp;D
-          </Badge>
-          <h1 className="hero-copy-wrap text-balance text-4xl font-semibold tracking-tight sm:text-5xl lg:text-6xl">
-            Analytical evidence you can trace under audit.
-          </h1>
-          <p className="hero-copy-wrap mx-auto mt-6 max-w-2xl text-pretty text-lg text-muted-foreground sm:text-xl">
-            MolTrace turns raw NMR and LC-MS data into verified structures, ICH-aligned
-            regulatory deliverables, and optimized reactions &mdash; every result backed by
-            calibrated confidence scores, citations, and a tamper-evident audit trail.
-          </p>
-          <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
-            <Button size="lg" className="min-w-[180px] gap-2" asChild>
-              <Link href="/contact?reason=Request%20a%20demo">
-                Request Demo
-                <ArrowRight className="h-4 w-4" />
+      <div className="relative z-10 mx-auto max-w-7xl px-4 py-20 sm:px-6 sm:py-24 lg:px-8 lg:py-28">
+        {/* min-w-0 on both tracks: a grid item defaults to min-width:auto, so the
+            card's own content (the formula + status badge row) pushed the track
+            wider than the viewport. It was invisible only because the body clips
+            overflow — on a phone the right edge of the card, confidence figures
+            included, was simply cut off. */}
+        <div className="grid gap-12 lg:grid-cols-[1.05fr_minmax(0,26rem)] lg:items-center lg:gap-16">
+          <div className="min-w-0">
+            {/* Badge is whitespace-nowrap by design (it is built for one-word
+                status chips). This one is a sentence, so it has to be allowed to
+                wrap or it runs straight off a phone screen. */}
+            <Badge
+              variant="outline"
+              className="mb-6 max-w-full whitespace-normal px-4 py-1.5 text-left text-sm font-medium leading-snug"
+            >
+              Evidence-first AI for regulated pharma &amp; chemical R&amp;D
+            </Badge>
+            <h1 className="hero-copy-wrap text-balance text-4xl font-semibold tracking-tight sm:text-5xl lg:text-6xl">
+              Analytical evidence you can trace under audit.
+            </h1>
+            {/* One line. The detail belongs to the card beside it and to the
+                sections below, not to a paragraph nobody finishes. */}
+            <p className="hero-copy-wrap mt-6 max-w-xl text-pretty text-lg text-muted-foreground sm:text-xl">
+              Every result carries its confidence, its citations, and its contradictions.
+            </p>
+            <div className="mt-10 flex flex-col items-start gap-4 sm:flex-row sm:items-center">
+              <Button size="lg" className="min-w-[180px] gap-2" asChild>
+                <Link href="/contact?reason=Request%20a%20demo">
+                  Request Demo
+                  <ArrowRight className="h-4 w-4" />
+                </Link>
+              </Button>
+              <Link
+                href="#solutions"
+                className="text-sm font-medium text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+              >
+                See how the evidence trail works
               </Link>
-            </Button>
-            <Button variant="outline" size="lg" className="min-w-[180px] gap-2" asChild>
-              <Link href="#solutions">
-                <Eye className="h-4 w-4" />
-                See how evidence works
-              </Link>
-            </Button>
+            </div>
+
+          </div>
+
+          {/* The artifact, above the fold. */}
+          <div className="min-w-0 lg:justify-self-end">
+            <EvidenceCard className="w-full max-w-full overflow-hidden shadow-xl" />
+            <p className="mt-3 text-center text-[11px] text-muted-foreground lg:text-right">
+              Illustrative example of a MolTrace result — not a measured sample.
+            </p>
           </div>
         </div>
 
-        {/* Stats bar */}
-        <div className="hero-stat-grid mx-auto mt-20 grid max-w-4xl grid-cols-2 gap-8 border-t pt-10 sm:grid-cols-4">
-          {/* Each product wears the colour it wears inside the app, so the name
-              a reader meets here is the one they recognise once they are in it.
-              The "ink" variants, not the vivid accents: the bright tokens are
-              tuned for fills and icons and fail AA as type on a light page.
-              These clear full AA in both themes (teal 6.2:1 on white / 11.3:1 on
-              dark, cyan 5.8 / 8.3, violet 7.4 / 7.2).
+        {/* The four beats, each in the colour it wears inside the app, so the name
+            a reader meets here is the one they recognise once they are in it.
+            This replaced a separate 4-step strip that told the same story again —
+            and called two of the products by names they no longer use.
 
-              Report is amber, which needed a new token: the vivid --mt-amber is
-              2.21:1 on white and could never be type. --mt-amber-ink darkens it
-              for light mode and keeps the vivid value on dark, exactly as teal
-              and cyan do. */}
+            It sits in its own full-width row rather than inside the copy column
+            on purpose: nested in the column it stacked ABOVE the card on a phone,
+            which put the one artifact worth showing about two and a half screens
+            down and undid the reason for the rewrite. */}
+        <div className="hero-stat-grid mt-16 grid grid-cols-2 gap-x-8 gap-y-6 border-t pt-8 sm:grid-cols-4 lg:mt-20">
           {[
             { value: "SpectraCheck", label: "Raw spectra → structure evidence", ink: "var(--mt-teal-ink)" },
             { value: "Regentry", label: "Evidence → ICH action items", ink: "var(--mt-cyan-ink)" },
             { value: "Repho", label: "Constraints → optimized reactions", ink: "var(--mt-violet-ink)" },
-            { value: "Report", label: "Audit-ready dossier & human sign-off", ink: "var(--mt-amber-ink)" },
+            { value: "Report", label: "Audit-ready dossier & sign-off", ink: "var(--mt-amber-ink)" },
           ].map((stat) => (
-            <div key={stat.label} className="text-center">
-              <div
-                className="text-3xl font-semibold tracking-tight"
-                style={stat.ink ? { color: stat.ink } : undefined}
-              >
+            <div key={stat.label} className="min-w-0">
+              {/* The "ink" variants, never the vivid accents: the bright tokens
+                  are tuned for fills and icons and fail AA as type on a light
+                  page. */}
+              <div className="text-lg font-semibold tracking-tight" style={{ color: stat.ink }}>
                 {stat.value}
               </div>
-              <div className="mt-1 text-sm text-muted-foreground">{stat.label}</div>
+              <div className="mt-1 text-xs leading-relaxed text-muted-foreground">{stat.label}</div>
             </div>
           ))}
         </div>
-        <p className="mt-8 text-center font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-          Designed to support 21 CFR Part 11 &middot; EU Annex 11 &middot; ICH Q-Series &middot; GxP / GAMP 5
-        </p>
       </div>
     </section>
   )

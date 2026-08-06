@@ -1,6 +1,5 @@
-import { Card, CardContent } from "@/components/ui/card"
-import { Progress } from "@/components/ui/progress"
-import { Check, AlertTriangle } from "lucide-react"
+import { Check } from "lucide-react"
+import { EvidenceCard } from "./evidence-card"
 
 const features = [
   {
@@ -19,13 +18,6 @@ const features = [
     label: "Full audit trail",
     desc: "Every decision timestamped, attributed, and exportable for regulatory inspection.",
   },
-]
-
-const evidenceRows = [
-  { label: "NMR Match",    value: 92 },
-  { label: "MS/MS Fit",    value: 89 },
-  { label: "LC-MS Family", value: 78 },
-  { label: "Literature",   value: 94 },
 ]
 
 export function EvidenceSection() {
@@ -64,94 +56,10 @@ export function EvidenceSection() {
             </ul>
           </div>
 
-          {/* Right: evidence card mockup */}
+          {/* Right: the same card the hero shows — one copy, so the two can
+              never drift into quoting different numbers at each other. */}
           <div className="flex items-center justify-center">
-            <Card className="w-full max-w-md overflow-hidden">
-
-              {/* Card header */}
-              <div className="flex items-start justify-between border-b px-5 py-4">
-                <div>
-                  <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
-                    Structure Candidate #1
-                  </p>
-                  <p className="mt-1 font-mono text-sm font-bold text-foreground">
-                    C<sub>12</sub>H<sub>16</sub>N<sub>2</sub>O<sub>3</sub>
-                    &nbsp;&nbsp;MW 236.27
-                  </p>
-                </div>
-                <span className="rounded border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest text-amber-600 dark:text-amber-400">
-                  Requires Review
-                </span>
-              </div>
-
-              <CardContent className="space-y-5 px-5 py-5">
-
-                {/* Overall confidence */}
-                <div>
-                  <div className="mb-2 flex items-baseline justify-between">
-                    <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
-                      Overall Confidence
-                    </span>
-                    <span className="font-mono text-2xl font-bold text-teal-500 dark:text-teal-400">
-                      87.3%
-                    </span>
-                  </div>
-                  <Progress value={87.3} className="h-1.5" />
-                </div>
-
-                {/* Evidence breakdown — stacked rows */}
-                <div>
-                  <p className="mb-3 text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">
-                    Evidence Breakdown
-                  </p>
-                  <div className="space-y-2.5">
-                    {evidenceRows.map((row) => (
-                      <div key={row.label}>
-                        <div className="mb-1 flex items-center justify-between text-xs">
-                          <span className="text-muted-foreground">{row.label}</span>
-                          <span className="font-mono font-semibold text-foreground">{row.value}%</span>
-                        </div>
-                        <div className="h-1 w-full overflow-hidden rounded-full bg-muted">
-                          <div
-                            className="h-full rounded-full bg-teal-500/70 dark:bg-teal-400/70"
-                            style={{ width: `${row.value}%` }}
-                          />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Contradiction */}
-                <div className="flex gap-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
-                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500 dark:text-amber-400" />
-                  <p className="text-xs leading-relaxed text-amber-700 dark:text-amber-300">
-                    Expected <sup>13</sup>C peak at 142 ppm not observed in spectrum
-                  </p>
-                </div>
-
-                {/* Citations */}
-                <div>
-                  <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">
-                    Citations
-                  </p>
-                  <div className="space-y-1.5">
-                    {[
-                      "SDBS Database Entry #12847",
-                      "J. Org. Chem. 2023, 88, 4521–4539",
-                    ].map((cite) => (
-                      <p
-                        key={cite}
-                        className="cursor-pointer font-mono text-[11px] text-cyan-600 underline decoration-dotted underline-offset-2 dark:text-cyan-400"
-                      >
-                        {cite}
-                      </p>
-                    ))}
-                  </div>
-                </div>
-
-              </CardContent>
-            </Card>
+            <EvidenceCard className="w-full max-w-md overflow-hidden" />
           </div>
 
         </div>
