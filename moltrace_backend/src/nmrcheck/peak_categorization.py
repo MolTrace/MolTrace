@@ -556,6 +556,11 @@ def _impurity_match_for_peak(
     best = matches[0]
     return {
         "label": best["label"],
+        # The bare compound name, kept alongside the display label. The label carries the proton
+        # ("ethyl acetate CH3CO") and resolves against nothing; the compound name is what an ICH
+        # Q3C lookup can actually match. Dropping it here severed the only identity the regulatory
+        # engines can consume from a spectrum.
+        "compound": best.get("compound"),
         "expected_ppm": best["expected_ppm"],
         "observed_ppm": best["observed_ppm"],
         "delta_ppm": best["delta_ppm"],
