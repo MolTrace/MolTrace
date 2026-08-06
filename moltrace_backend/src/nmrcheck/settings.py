@@ -134,6 +134,14 @@ class Settings:
     # plus RAW_VAULT_BUCKET or uploaded archives are lost on instance recycle.
     raw_vault_backend: str = "local"
     raw_vault_bucket: str | None = None
+    # Where uploaded files and generated artifacts live. Separate from the raw vault because the
+    # vault is immutable evidence with its own retention rules, while these are working objects.
+    # Defaults to the local filesystem so dev, tests and existing deployments are unchanged — but a
+    # serverless host (Cloud Run) has an ephemeral filesystem, so leaving this local there means an
+    # uploaded file disappears on the next instance recycle while its database row still says it
+    # is there.
+    file_storage_backend: str = "local"
+    file_storage_bucket: str | None = None
     raw_archive_max_bytes: int = 2 * 1024 * 1024 * 1024
     raw_archive_max_files: int = 5000
     raw_archive_allowed_extensions: tuple[str, ...] = (".zip", ".tar.gz", ".tgz")
@@ -298,6 +306,8 @@ def get_settings() -> Settings:
         raw_data_vault_dir=raw_vault_dir,
         raw_vault_backend=(os.getenv("RAW_VAULT_BACKEND") or "local").strip().lower(),
         raw_vault_bucket=(os.getenv("RAW_VAULT_BUCKET") or None),
+        file_storage_backend=(os.getenv("FILE_STORAGE_BACKEND") or "local").strip().lower(),
+        file_storage_bucket=(os.getenv("FILE_STORAGE_BUCKET") or None),
         raw_archive_max_bytes=_parse_int(
             os.getenv("RAW_ARCHIVE_MAX_BYTES"), 2 * 1024 * 1024 * 1024
         ),
@@ -382,6 +392,16 @@ def validate_startup_settings(settings: Settings) -> list[str]:
         normalize_enabled_modules(settings.enabled_modules)
     except ValueError as exc:
         issues.append(str(exc))
+    # A misconfigured object backend must fail here, not at the first upload — and a production
+    # host still writing files to a local disk is worth saying out loud, because the symptom
+    # (a download 404 hours later) points nowhere near the cause.
+    if settings.file_storage_backend not in {"local", "filesystem", "file", "gcs", "gs", "google"}:
+        issues.append(
+            f"FILE_STORAGE_BACKEND {settings.file_storage_backend!r} is not recognised; "
+            "expected 'local' or 'gcs'."
+        )
+    elif settings.file_storage_backend in {"gcs", "gs", "google"} and not settings.file_storage_bucket:
+        issues.append("FILE_STORAGE_BACKEND=gcs requires FILE_STORAGE_BUCKET.")
     if settings.app_env == "production" and not settings.api_key:
         issues.append("API_KEY is not set for production.")
     if settings.app_env == "production" and not settings.sso_encryption_key:

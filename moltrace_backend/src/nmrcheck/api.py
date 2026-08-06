@@ -13639,10 +13639,10 @@ def download_managed_file_route(
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     if download is None:
         raise HTTPException(status_code=404, detail="Managed file not found.")
-    record, path = download
+    record, content = download
     headers = {"Content-Disposition": f'attachment; filename="{record.original_filename}"'}
     return StreamingResponse(
-        _stream_file_path(path),
+        _stream_text(content) if isinstance(content, str) else iter((content,)),
         media_type=record.content_type or "application/octet-stream",
         headers=headers,
     )

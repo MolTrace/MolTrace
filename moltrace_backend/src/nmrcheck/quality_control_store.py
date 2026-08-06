@@ -10,6 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
 from .database import session_scope
+from .orchestration_store import read_managed_file_bytes
 from .models import (
     QualityAssessment,
     QualityAssessmentRequest,
@@ -602,13 +603,19 @@ def _build_file_assessment(
         actions.append("Review raw archive inventory and acquisition metadata before using derived spectra.")
         return (modality, metrics, findings, warnings, notes, actions, {"source": "managed_file"}, not_assessed)
     if row.file_kind in {"processed_nmr", "spectrum_table", "spectrum_jcamp"}:
-        path = _file_path(row, storage_root)
-        if not path.exists():
-            findings.append(_finding(severity="error", code="stored_file_missing", title="Stored file unavailable", message="Managed file record exists but local file bytes are unavailable."))
-            actions.append("Restore managed local storage or re-upload the processed spectrum.")
+        # Read through the shared reader rather than resolving a path here: a deployment that
+        # stores uploads in an object store has no path, and a local copy of this logic would
+        # report every such file as missing.
+        try:
+            file_bytes = read_managed_file_bytes(row, storage_root)
+        except FileNotFoundError:
+            file_bytes = None
+        if file_bytes is None:
+            findings.append(_finding(severity="error", code="stored_file_missing", title="Stored file unavailable", message="Managed file record exists but the stored file bytes are unavailable."))
+            actions.append("Restore managed storage or re-upload the processed spectrum.")
         else:
             try:
-                preview = parse_processed_spectrum(filename=row.original_filename, content=path.read_bytes())
+                preview = parse_processed_spectrum(filename=row.original_filename, content=file_bytes)
             except SpectrumParseError as exc:
                 findings.append(_finding(severity="warning", code="processed_parse_warning", title="Processed spectrum not parsed", message=str(exc), recommendation="Review the processed file export format."))
                 not_assessed = True
