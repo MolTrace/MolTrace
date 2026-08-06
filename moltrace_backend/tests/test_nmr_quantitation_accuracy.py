@@ -33,7 +33,9 @@ from nmrcheck.spectrum import (
     _infer_peak_estimates,
     _PeakEstimate,
     _provisional_integrations,
+    _estimates_to_peaks,
     _normalize_integrations_to_target,
+    _PeakEstimate,
     _round_half_integrations,
 )
 
@@ -488,3 +490,99 @@ def test_more_peaks_than_protons_no_longer_abandons_the_structural_budget() -> N
     assert allocated is not None
     assert sum(allocated) == pytest.approx(2.0)
     assert all(value == 0.0 for value in allocated[2:])
+
+
+# ---------------------------------------------------------------------------
+# Integration must never DELETE observed signal.
+#
+# Removing the half-proton floor (above) was right, but the first attempt paid
+# for it by dropping every peak the apportionment valued at zero. An adversarial
+# review found three ways that destroys real observations, all reproduced:
+#
+#   1. A trace impurity between roughly 0.75 and 11 mol% of a 10 H analyte was
+#      deleted before `_build_spectrum_comparison` and `_build_impurity_candidates`
+#      ran, so a partner-corroborated ethyl-acetate identification became an
+#      affirmative "no extra peaks, no impurity candidates" result.
+#   2. A dominant residual-solvent or water line consumed the proton budget and
+#      deleted the analyte: CD3OD residual at 53% + its water at 37% left seven of
+#      eight genuine analyte resonances missing, with solvent and water reported as
+#      9.5 of the molecule's 10 protons.
+#   3. On a 13C spectrum the proton budget zeroed the low-intensity quaternary
+#      carbons -- carbonyls and ring junctions, the signals that identify the
+#      compound -- even though for 13C the peak POSITION is the deliverable and the
+#      intensity is explicitly not treated as quantitative.
+#
+# The category error: the noise gate decides whether a peak EXISTS; apportionment
+# only decides how many protons it represents. Letting the second answer the first
+# throws away observation. A peak that survives the noise gate is reported, and a
+# sub-proton peak reports its MEASURED value rather than being rounded up to half a
+# proton (fabrication) or deleted (loss).
+# ---------------------------------------------------------------------------
+
+
+def _est(shift: float, area: float, multiplicity: str = "s") -> _PeakEstimate:
+    return _PeakEstimate(
+        shift_ppm=shift, area=area, intensity=area, multiplicity=multiplicity,
+        width_ppm=0.01, component_count=1, j_values_hz=(),
+    )
+
+
+def test_a_trace_impurity_survives_into_the_peak_table() -> None:
+    """2 mol% ethyl acetate in a 10 H analyte must remain visible.
+
+    It is above the noise gate (_NOISE_AREA_FRACTION_OF_MAX = 0.75%), so the
+    pipeline has already classified it as real signal. Deleting it here made the
+    impurity screen report a clean spectrum.
+    """
+    peaks, meta = _estimates_to_peaks(
+        [
+            _est(7.80, 2.0), _est(6.90, 2.0), _est(3.85, 3.0), _est(2.35, 3.0),
+            _est(2.05, 0.06), _est(4.12, 0.04),   # ~2 mol% ethyl acetate
+        ],
+        target_total_h=10.0, solvent="CDCl3",
+    )
+    shifts = [round(p.shift_ppm, 2) for p in peaks]
+    assert 2.05 in shifts and 4.12 in shifts, (
+        f"the impurity was deleted before the impurity screen could see it: {shifts}"
+    )
+    trace = next(p for p in peaks if round(p.shift_ppm, 2) == 2.05)
+    assert 0.0 < trace.integration_h < 0.5, (
+        f"a 0.6% signal reported as {trace.integration_h} H -- it must be neither "
+        "rounded up to half a proton nor deleted"
+    )
+
+
+def test_a_dominant_solvent_line_does_not_delete_the_analyte() -> None:
+    """CD3OD residual 53% + water 37%, analyte 10 H sharing the remaining 10%.
+
+    Solvent peaks are NOT removed upstream: `_analyte_reference_areas` only supplies
+    a divisor, which cancels in the proportional share. The analyte's resonances
+    must still be reported.
+    """
+    ests = [_est(3.31, 53.0), _est(4.87, 37.0)] + [
+        _est(shift, 1.25) for shift in (7.85, 7.60, 7.20, 6.95, 4.30, 3.70, 2.50, 1.90)
+    ]
+    peaks, meta = _estimates_to_peaks(ests, target_total_h=10.0, solvent="CD3OD")
+    analyte = [p for p in peaks if round(p.shift_ppm, 2) in
+               {7.85, 7.60, 7.20, 6.95, 4.30, 3.70, 2.50, 1.90}]
+    assert len(analyte) == 8, (
+        f"only {len(analyte)} of 8 analyte resonances survived; a dominant solvent "
+        "line must not delete the compound being analysed"
+    )
+
+
+def test_a_quaternary_carbon_is_not_deleted_by_a_proton_budget() -> None:
+    """13C: the peak POSITION is the deliverable, and intensity is not quantitative.
+
+    Quaternary carbons are weak by nature. Judging them against a proton budget and
+    removing the losers deletes exactly the carbonyl and ring-junction signals that
+    identify the compound.
+    """
+    ests = [_est(s, 300.0) for s in (29.7, 31.6, 33.6)]          # 3 x CH3
+    ests += [_est(141.5, 95.0)]                                   # 1 x CH
+    ests += [_est(s, a) for s, a in                               # 4 x quaternary
+             ((107.6, 12.0), (148.7, 15.0), (151.7, 20.0), (155.4, 22.0))]
+    peaks, _ = _estimates_to_peaks(ests, target_total_h=10.0, nucleus="13C")
+    shifts = {round(p.shift_ppm, 1) for p in peaks}
+    missing = {107.6, 148.7, 151.7, 155.4} - shifts
+    assert not missing, f"quaternary carbons deleted: {sorted(missing)}"

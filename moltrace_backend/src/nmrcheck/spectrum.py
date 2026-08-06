@@ -1654,6 +1654,13 @@ _DATA_SCALE_RESIDUAL_LIMIT = 0.12
 #: between the noise and signal populations — see ``_estimates_to_peaks``.
 _NOISE_AREA_FRACTION_OF_MAX = 0.0075
 
+#: Smallest integration the wire model can carry (``Peak.integration_h`` is
+#: ``gt=0``). A peak whose measured share rounds below this is still reported —
+#: losing an observed signal is worse than reporting it as vanishingly small —
+#: so this is a representational floor, not a detection threshold. Detection is
+#: decided upstream by :data:`_NOISE_AREA_FRACTION_OF_MAX`.
+_MIN_REPORTABLE_INTEGRATION_H = 0.001
+
 
 def _normalize_integrations_to_target(values: list[float], target_total_h: float) -> list[float] | None:
     """Divide a structure's proton budget among peaks **in proportion to signal**.
@@ -1687,13 +1694,21 @@ def _normalize_integrations_to_target(values: list[float], target_total_h: float
     Measured — one 1 H peak among proportional areas reports exactly 1.00 H at total
     proton counts of 6, 10, 20, 40, 60 and 100.
 
-    LIMITATION — a single dominant resonance compresses everything else. With one
-    peak holding 50–95 % of the integral (an incompletely suppressed solvent or water
-    signal, say) a real 1 H peak still reports 0.50 H, but at **98 %** it rounds to
-    zero and is dropped. Solvent resonances are meant to be removed upstream
-    (``_analyte_reference_areas``); if one survives to here, the proton counts were
-    already meaningless. The old floor happened to report 0.5 H in that case, but it
-    did so by fabricating, and paid for it by fabricating for every noise peak too.
+    LIMITATION — a single dominant resonance compresses everything else, and the
+    compression bites earlier than first documented here. With one line holding
+    ~75 % or more of the integral (an incompletely suppressed solvent or water
+    signal) a genuine 1 H resonance falls below one unit; at 95 % four of five
+    analyte resonances do. Those peaks are still REPORTED, at their measured
+    sub-proton value — see the caller — but their integrals are not quantitative.
+
+    A correction worth recording, because it was shipped: an earlier version of this
+    docstring claimed solvent resonances "are removed upstream by
+    ``_analyte_reference_areas``". They are not. That function supplies only the
+    divisor for :func:`_provisional_integrations`, and a common divisor cancels out
+    of ``value / total`` here; the solvent estimate is still in the list this
+    apportions. ``mask_solvent_regions`` masks display points, defaults to False on
+    the preview routes, and does not remove estimates either. A rule that deleted
+    data was justified by a guard that does not exist.
     """
 
     if not values:
@@ -2212,16 +2227,34 @@ def _estimates_to_peaks(
             normalized_to_target = True
             scale_basis = "normalized_to_structure"
 
-    # A peak allotted zero protons carries no assignable signal, so it does not
-    # belong in a proton table — reporting it as 0 H would be as misleading as the
-    # half-proton floor this replaces, just in the other direction. Drop it and
-    # count it, because a silent drop reads as full coverage.
+    # Apportionment answers "how many protons is this peak", never "does this peak
+    # exist" — the noise gate above already answered that. Letting the proton budget
+    # decide existence deletes real observations: a trace impurity between roughly
+    # 0.75 and 11 mol% of a 10 H analyte disappeared before the impurity screen and
+    # the reference comparison ran, turning a partner-corroborated identification
+    # into an affirmative "no extra peaks"; a dominant residual-solvent line deleted
+    # seven of eight analyte resonances; and on ¹³C, where the peak POSITION is the
+    # deliverable and intensity is explicitly not quantitative, it removed the weak
+    # quaternary carbons that identify the compound.
+    #
+    # So a peak that cleared the noise gate is always reported. One the budget values
+    # below half a proton is trace signal, and the honest number is its MEASURED
+    # share: rounding it up to half a proton fabricates (the defect above), and
+    # deleting it destroys an observation.
+    total_area = sum(float(est.area) for est in in_range_estimates)
+    trace_scale = float(target_total_h) if target_total_h else raw_total_h
     peaks: list[Peak] = []
-    unassignable = 0
+    below_quantitation: list[float] = []
     for est, integration in zip(in_range_estimates, integrations):
         if integration <= 0:
-            unassignable += 1
-            continue
+            measured = (
+                float(est.area) / total_area * trace_scale if total_area > 0 else 0.0
+            )
+            # `Peak.integration_h` is gt=0, so a value that rounds to nothing still
+            # has to carry the smallest number the wire model admits. That floor is
+            # a representational limit, not a claim about the chemistry.
+            integration = max(round(measured, 3), _MIN_REPORTABLE_INTEGRATION_H)
+            below_quantitation.append(round(est.shift_ppm, 3))
         peaks.append(
             Peak(
                 shift_ppm=round(est.shift_ppm, 3),
@@ -2245,10 +2278,12 @@ def _estimates_to_peaks(
         # where the totals agreeing is corroboration rather than arithmetic.
         "integration_totals_agree_independently": totals_agree_independently,
         "noise_peaks_dropped": dropped_noise_count,
-        # Detected maxima whose share of the signal came to less than half a
-        # proton once the structural budget was apportioned. They are excluded
-        # from the peak table rather than rounded up into it.
-        "unassignable_peaks_dropped": unassignable,
+        # Detected maxima whose share came to less than half a proton once the
+        # structural budget was apportioned. They ARE reported, at their measured
+        # value; these keys say which ones, so a reviewer can see that those
+        # integrals are trace-level rather than quantitated.
+        "below_quantitation_peaks": len(below_quantitation),
+        "below_quantitation_shifts": below_quantitation,
     }
     if out_of_range_shifts:
         meta["out_of_range_dropped_count"] = len(out_of_range_shifts)
