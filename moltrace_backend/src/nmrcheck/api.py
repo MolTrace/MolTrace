@@ -54,15 +54,13 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from . import ai_evidence_store as ai_evidence_store
 from . import ai_inference_store as ai_store
+from . import alcoa as alcoa
 from . import analytics_store as analytics_store
 from . import authz as authz
 from . import collaboration_store as collab_store
-from . import alcoa as alcoa
 from . import compound_registry_store as compound_store
 from . import detections as detections
 from . import esign as esign
-from . import rate_limit as rate_limit
-from . import wellknown as wellknown
 
 # build_proton_inventory exported by peak_categorization — imported alongside
 # the other category builders below.
@@ -73,13 +71,14 @@ from . import method_registry_store as method_store
 from . import mfa_store as mfa_store
 from . import mfa_webauthn as mfa_webauthn
 from . import ml_model_factory_store as ml_store
-from . import module_access as module_access
 from . import mobile_store as mobile_store
+from . import module_access as module_access
 from . import oidc_client as oidc_client
 from . import operations_store as ops_store
 from . import orchestration_store as orch_store
 from . import product_orchestration_store as product_store
 from . import quality_control_store as qc_store
+from . import rate_limit as rate_limit
 from . import reaction_access as reaction_access
 from . import reaction_advisor as reaction_advisor
 from . import reaction_bo as reaction_bo
@@ -91,8 +90,8 @@ from . import reaction_green as reaction_green
 from . import reaction_hte as reaction_hte
 from . import reaction_ml as reaction_ml
 from . import reaction_priors_store as reaction_priors_store
-from . import reaction_retro_store as reaction_retro_store
 from . import reaction_regulatory_compliance as reaction_regulatory_compliance
+from . import reaction_retro_store as reaction_retro_store
 from . import reaction_safety as reaction_safety
 from . import reaction_store as reaction_store
 from . import reaction_structures as reaction_structures
@@ -106,6 +105,7 @@ from . import spectracheck_store as sc_store
 from . import sso_store as sso_store
 from . import tenant_saas_store as tenant_store
 from . import validation_center_store as validation_store
+from . import wellknown as wellknown
 from . import workflow_store as wf_store
 from .adduct_inference import AdductInferenceError, infer_adducts_and_isotopes
 from .analysis import analyze_inputs, validate_inputs
@@ -362,14 +362,14 @@ from .models import (
     DriftAlert,
     ElectronicSignatureRecord,
     ElectronicSignatureRecordCreate,
-    ESignatureManifestation,
-    ESignatureVerification,
     ElementalImpurityAssessmentRequest,
     EmailActionRequest,
     EmailOutboxRecord,
     EnvironmentCheckResponse,
     ErrorAnalysisSlice,
     ErrorAnalysisSliceCreate,
+    ESignatureManifestation,
+    ESignatureVerification,
     EvidenceCommentCreate,
     EvidenceCommentRecord,
     EvidenceCommentUpdate,
@@ -446,6 +446,8 @@ from .models import (
     JobRecord,
     JurisdictionalRequirementMap,
     JurisdictionalRequirementMapCreate,
+    KineticFitOut,
+    KineticRefusalOut,
     KnowledgeExtractionRun,
     KnowledgeExtractionRunCreate,
     KnowledgeGraphLink,
@@ -761,6 +763,7 @@ from .models import (
     RegulatorySurveillanceRunCreate,
     RegulatoryToReactionBridge,
     RegulatoryToReactionBridgeCreate,
+    ReleaseEvidenceIngestRequest,
     RenewalValueReport,
     RenewalValueReportCreate,
     ReportLock,
@@ -771,10 +774,6 @@ from .models import (
     ReviewDecisionRecord,
     ReviewQueueItem,
     ReviewTaskCreate,
-    SubjectApprovalCreate,
-    SubjectReviewerCreate,
-    SubjectCommentCreate,
-    SubjectReviewTaskCreate,
     ReviewTaskRecord,
     ReviewTaskUpdate,
     RoiSnapshot,
@@ -810,10 +809,6 @@ from .models import (
     SPCAnalyzeResult,
     SPCCapabilityOut,
     SPCSignalOut,
-    SpectralImpurityObservationCreate,
-    SpectralImpurityObservationListResult,
-    SpectralImpurityObservationOut,
-    SpectralImpurityObservationResult,
     SpectraCheckAuditEventRecord,
     SpectraCheckEvidenceCreate,
     SpectraCheckEvidenceRecord,
@@ -834,6 +829,10 @@ from .models import (
     SpectraCheckSessionUpdate,
     SpectraCheckUnifiedEvidenceRecord,
     SpectraCheckUnifiedEvidenceSave,
+    SpectralImpurityObservationCreate,
+    SpectralImpurityObservationListResult,
+    SpectralImpurityObservationOut,
+    SpectralImpurityObservationResult,
     SpectralSimilarityRequest,
     SpectralSimilarityResult,
     SpectroscopyToRegulatoryBridge,
@@ -844,6 +843,7 @@ from .models import (
     SpectrumGSDTelemetrySummary,
     SpectrumIntegrationAnalyzeRequest,
     SpectrumIntegrationAnalyzeResult,
+    SpectrumKineticsResult,
     SpectrumMultipletAnalyzeRequest,
     SpectrumMultipletAnalyzeResult,
     SpectrumPredictShiftsRequest,
@@ -857,6 +857,10 @@ from .models import (
     SpectrumRetrieveHit,
     SpectrumRetrieveRequest,
     SpectrumRetrieveResult,
+    SpectrumSeriesCreate,
+    SpectrumSeriesOut,
+    SpectrumSeriesPointCreate,
+    SpectrumSeriesPointOut,
     SpectrumSolventCatalog,
     SpectrumSolventInfo,
     SSOConnectionCreate,
@@ -878,15 +882,17 @@ from .models import (
     StructureSummary,
     StructureValidateRequest,
     StructureValidateResponse,
+    SubjectApprovalCreate,
+    SubjectCommentCreate,
+    SubjectReviewerCreate,
+    SubjectReviewTaskCreate,
     SubscriptionPlan,
     SubscriptionPlanCreate,
     SystemCapabilities,
     SystemHealthResponse,
-    ReleaseEvidenceIngestRequest,
     SystemReleaseApproveRequest,
     SystemReleaseRecord,
     SystemReleaseRecordCreate,
-    ValidationPackage,
     SystemStatusResponse,
     TeamMemberCreate,
     TeamMemberRecord,
@@ -941,6 +947,7 @@ from .models import (
     UserRequirementSpecificationCreate,
     UserSignIn,
     UserSignUp,
+    ValidationPackage,
     ValidationProject,
     ValidationProjectCreate,
     ValidationProjectUpdate,
@@ -30971,3 +30978,119 @@ def _spectral_impurity_out(record: Any) -> dict[str, Any]:
     data = dict(vars(record))
     data.pop("user_id", None)
     return data
+
+
+_SPECTRUM_KINETICS_DISCLAIMER = (
+    "Decision-support only. The rate constant is a least-squares fit over the values recorded in "
+    "this series, and it is only as reliable as the integrals those values came from — peak "
+    "integration accuracy is an open programme. Read the rate constant with its standard error, "
+    "never alone, and obtain qualified review before drawing a mechanistic conclusion."
+)
+
+
+@router.post(
+    "/spectrum/series",
+    response_model=SpectrumSeriesOut,
+    dependencies=[Depends(require_access_context)],
+)
+def create_series(
+    payload: SpectrumSeriesCreate,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> SpectrumSeriesOut:
+    """Create a spectrum series — the ordered set of spectra a rate is fitted over."""
+    from .spectrum_series_store import create_spectrum_series
+
+    record = create_spectrum_series(
+        _state(request).session_factory,
+        user_id=context.user_id,
+        name=payload.name,
+        tracked_quantity=payload.tracked_quantity,
+    )
+    return SpectrumSeriesOut(
+        id=record.id,
+        name=record.name,
+        tracked_quantity=record.tracked_quantity,
+        point_count=record.point_count,
+    )
+
+
+@router.post(
+    "/spectrum/series/{series_id}/points",
+    response_model=SpectrumSeriesPointOut,
+    dependencies=[Depends(require_access_context)],
+)
+def add_series_observation(
+    series_id: int,
+    payload: SpectrumSeriesPointCreate,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> SpectrumSeriesPointOut:
+    """Append one timed observation, together with the analysis it was read from."""
+    from .spectrum_series_store import add_series_point
+
+    user_id = None if context.system_api_key else context.user_id
+    record = add_series_point(
+        _state(request).session_factory,
+        series_id=series_id,
+        elapsed_seconds=payload.elapsed_seconds,
+        observed_value=payload.observed_value,
+        analysis_id=payload.analysis_id,
+        user_id=user_id,
+    )
+    if record is None:
+        raise HTTPException(status_code=404, detail="Spectrum series not found.")
+    return SpectrumSeriesPointOut(
+        id=record.id,
+        series_id=record.series_id,
+        analysis_id=record.analysis_id,
+        elapsed_seconds=record.elapsed_seconds,
+        observed_value=record.observed_value,
+    )
+
+
+@router.get(
+    "/spectrum/series/{series_id}/kinetics",
+    response_model=SpectrumKineticsResult,
+    dependencies=[Depends(require_access_context)],
+)
+def series_kinetics(
+    series_id: int,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> SpectrumKineticsResult:
+    """Fit a rate constant over the series, or return why no rate could be fitted.
+
+    A refusal is a 200 carrying ``outcome: "refusal"`` and the reason, not an error — "this
+    series cannot support a rate, and here is why" is the answer, not a failure. The two outcomes
+    are separate fields so a refusal can never be read as a rate of zero.
+    """
+    from moltrace.spectroscopy.kinetics import KineticFit
+
+    from .spectrum_series_store import fit_series_kinetics
+
+    user_id = None if context.system_api_key else context.user_id
+    outcome = fit_series_kinetics(_state(request).session_factory, series_id, user_id=user_id)
+    if outcome is None:
+        raise HTTPException(status_code=404, detail="Spectrum series not found.")
+
+    if isinstance(outcome, KineticFit):
+        return SpectrumKineticsResult(
+            outcome="fit",
+            fit=KineticFitOut(
+                order=outcome.order,
+                rate_constant=outcome.rate_constant,
+                standard_error=outcome.standard_error,
+                r_squared=outcome.r_squared,
+                half_life=outcome.half_life,
+                point_count=outcome.point_count,
+            ),
+            disclaimer=_SPECTRUM_KINETICS_DISCLAIMER,
+        )
+    return SpectrumKineticsResult(
+        outcome="refusal",
+        refusal=KineticRefusalOut(
+            reason=outcome.reason, detail=outcome.detail, point_count=outcome.point_count
+        ),
+        disclaimer=_SPECTRUM_KINETICS_DISCLAIMER,
+    )

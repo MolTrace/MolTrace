@@ -16838,3 +16838,86 @@ class SpectralImpurityObservationListResult(BaseModel):
     observations: list[SpectralImpurityObservationOut] = Field(default_factory=list)
     disclaimer: str
     human_review_required: bool = True
+
+
+# --- Spectrum series + kinetics ----------------------------------------------------------------
+
+KineticOrderName = Literal["first", "second"]
+KineticRefusalReason = Literal[
+    "length_mismatch",
+    "too_few_points",
+    "duplicate_timestamps",
+    "non_positive_value",
+    "no_change_over_time",
+    "degenerate_fit",
+    "order_not_identifiable",
+]
+
+
+class SpectrumSeriesCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str = Field(default="", max_length=200)
+    tracked_quantity: str = Field(default="", max_length=200)
+
+
+class SpectrumSeriesPointCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    elapsed_seconds: float = Field(..., ge=0.0)
+    observed_value: float
+    #: The analysis this reading was taken from. Optional, but it is the provenance link — without
+    #: it the point states a value with nothing behind it.
+    analysis_id: int | None = Field(default=None, ge=1)
+
+
+class SpectrumSeriesOut(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: int
+    name: str
+    tracked_quantity: str
+    point_count: int
+
+
+class SpectrumSeriesPointOut(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: int
+    series_id: int
+    analysis_id: int | None = None
+    elapsed_seconds: float
+    observed_value: float
+
+
+class KineticFitOut(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    order: KineticOrderName
+    rate_constant: float
+    #: Never optional. A rate constant without its uncertainty is the exact shape this feature
+    #: exists to prevent, so the wire model cannot express one.
+    standard_error: float
+    r_squared: float
+    half_life: float | None = None
+    point_count: int
+
+
+class KineticRefusalOut(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    reason: KineticRefusalReason
+    detail: str
+    point_count: int
+
+
+class SpectrumKineticsResult(BaseModel):
+    """Either a fit or a refusal, discriminated so a refusal cannot be read as a rate."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    outcome: Literal["fit", "refusal"]
+    fit: KineticFitOut | None = None
+    refusal: KineticRefusalOut | None = None
+    disclaimer: str
+    human_review_required: bool = True
