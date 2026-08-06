@@ -217,14 +217,28 @@ class TestAgainstMeasuredSpectra:
     def test_the_predicted_bias_brackets_what_was_measured(self) -> None:
         """The estimate must not fall SHORT of the observed spread.
 
-        It read 1.078 against an observed 1.141 before the T1 range was
+        It read 1.078 against the observed value before the T1 range was
         widened, i.e. it told the chemist the integrals were better than they
         were. Being conservative in the other direction is acceptable; being
         optimistic is not.
+
+        RE-MEASURED 2026-08-04 on the full matched pair with a better method:
+        signal windows are now taken from the FULLY RELAXED spectrum (exp 10,
+        >2% of max, 28 windows) and each window compared as a share of its own
+        spectrum's total, which removes the receiver-gain and NC_proc scaling
+        difference between the two datasets instead of assuming it away. That
+        gives 1.1334, against 1.141 from the earlier cruder pass -- close
+        enough to confirm the original figure, and preferred here because the
+        normalisation is principled rather than incidental.
+
+        Against 1.1334 the current model reads 1.1543 (+0.021, conservative)
+        and the pre-fix model read 1.0784 (-0.055, optimistic). The fix cut the
+        magnitude of the error by ~2.6x and, more importantly, moved it to the
+        safe side.
         """
         from nmrcheck.acquisition_quality import differential_saturation_ratio
 
-        MEASURED = 1.141
+        MEASURED = 1.1334
         predicted = differential_saturation_ratio(recycle_s=5.0, angle_deg=30.0)
 
         assert predicted >= MEASURED, (
