@@ -19,6 +19,7 @@ from moltrace.regulatory.compliance import (
 )
 from moltrace.spectroscopy.infra.contract import content_hash
 
+from . import org_membership
 from . import regulatory_intelligence
 from .database import session_scope
 from .models import (
@@ -557,6 +558,12 @@ def create_action_item(
             compound_id=payload.compound_id,
             evidence_link_id=payload.evidence_link_id,
             requirement_id=payload.requirement_id,
+            # Stamp the raiser and their team, so an item that hangs off a batch, a compound or
+            # nothing at all is still reachable by someone. Without this the create succeeded and
+            # the record was immediately unreachable — the API reported success and the work
+            # disappeared.
+            created_by_user_id=actor.user_id,
+            organization_id=org_membership.sole_active_org_id(session, actor.user_id),
             action_type=payload.action_type,
             title=payload.title,
             description=payload.description,
@@ -597,13 +604,22 @@ def list_action_items(
     with session_scope(session_factory) as session:
         stmt = select(RegulatoryActionItemORM).order_by(RegulatoryActionItemORM.id.desc()).limit(limit)
         if owner_scope_id is not None:
-            # Restrict to action items whose dossier the caller owns (a system api key /
-            # admin passes owner_scope_id=None and sees all). The inner join also drops
-            # action items with no dossier from a user-scoped view.
-            stmt = stmt.join(
+            # An item is visible if the caller can reach its dossier, or if they raised it, or if
+            # their team owns it. The dossier arm used to be the ONLY arm, via an inner join —
+            # which silently dropped every item without a dossier, including ones the caller had
+            # just created. An outer join keeps those rows in play so the ownership arms can
+            # decide, instead of the join deciding for them.
+            org_ids = org_membership.active_org_ids_for_user(session, owner_scope_id)
+            arms = [
+                regulatory_intelligence.dossier_scope_predicate(session, owner_scope_id),
+                RegulatoryActionItemORM.created_by_user_id == owner_scope_id,
+            ]
+            if org_ids:
+                arms.append(RegulatoryActionItemORM.organization_id.in_(org_ids))
+            stmt = stmt.outerjoin(
                 RegulatoryDossierORM,
                 RegulatoryActionItemORM.dossier_id == RegulatoryDossierORM.id,
-            ).where(regulatory_intelligence.dossier_scope_predicate(session, owner_scope_id))
+            ).where(or_(*arms))
         if dossier_id is not None:
             stmt = stmt.where(RegulatoryActionItemORM.dossier_id == dossier_id)
         if status is not None:
@@ -622,6 +638,23 @@ def _dossier_owned_by(session: Session, dossier_id: int | None, owner_scope_id: 
     return regulatory_intelligence.dossier_owned_by(session, dossier_id, owner_scope_id)
 
 
+def _action_item_reachable_by(
+    session: Session, row: RegulatoryActionItemORM, owner_scope_id: int | None
+) -> bool:
+    """Whether a caller may see and progress this action item.
+
+    The row-level counterpart of the list predicate, and it must stay in step with it: showing a
+    task in a queue that then refuses to be updated is worse than not showing it at all.
+    """
+    if owner_scope_id is None:
+        return True
+    if row.created_by_user_id is not None and row.created_by_user_id == owner_scope_id:
+        return True
+    if org_membership.user_shares_org(session, owner_scope_id, row.organization_id):
+        return True
+    return _dossier_owned_by(session, row.dossier_id, owner_scope_id)
+
+
 def update_action_item(
     session_factory: sessionmaker[Session],
     action_item_id: int,
@@ -632,9 +665,10 @@ def update_action_item(
 ) -> RegulatoryActionItem | None:
     with session_scope(session_factory) as session:
         row = session.get(RegulatoryActionItemORM, action_item_id)
-        # An action item is a dossier child; a user-scoped caller may patch it only if they own
-        # the parent dossier. Missing/unowned both return None -> non-leaking 404.
-        if row is None or not _dossier_owned_by(session, row.dossier_id, owner_scope_id):
+        # Reachability must match the list exactly, or a caller sees a task they cannot then
+        # progress. An item is patchable if the caller can reach its dossier, raised it, or their
+        # team owns it. Missing and unreachable both return None -> non-leaking 404.
+        if row is None or not _action_item_reachable_by(session, row, owner_scope_id):
             return None
         fields = payload.model_fields_set
         for field_name in ("action_type", "title", "description", "severity", "status", "due_date", "assigned_to"):

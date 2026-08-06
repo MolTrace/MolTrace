@@ -196,6 +196,19 @@ def _ensure_sqlite_schema(engine: Engine) -> None:
                 "ON session_reviewers (subject_type, subject_id)"
             )
             _sqlite_make_column_nullable(connection, "session_reviewers", "session_id")
+        if "regulatory_action_items" in tables:
+            # Action-item ownership (migration 0040) on a pre-existing dev SQLite DB.
+            action_existing = {
+                str(row[1])
+                for row in connection.exec_driver_sql(
+                    "PRAGMA table_info(regulatory_action_items)"
+                ).fetchall()
+            }
+            for column in ("created_by_user_id", "organization_id"):
+                if column not in action_existing:
+                    connection.exec_driver_sql(
+                        f"ALTER TABLE regulatory_action_items ADD COLUMN {column} INTEGER"
+                    )
         if "approval_records" in tables:
             # Subject-addressed approvals (migration 0037) on a pre-existing dev SQLite DB.
             approval_existing = {
