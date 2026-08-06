@@ -33,6 +33,7 @@ from nmrcheck.spectrum import (
     _infer_peak_estimates,
     _PeakEstimate,
     _provisional_integrations,
+    _normalize_integrations_to_target,
     _round_half_integrations,
 )
 
@@ -404,3 +405,86 @@ def test_a_lone_proton_beside_a_large_envelope_is_not_discarded_as_noise() -> No
     assert 5.20 in shifts, f"the lone proton was dropped as noise; kept {shifts}"
     assert 3.90 not in shifts, f"noise was kept as a peak; kept {shifts}"
     assert meta["noise_peaks_dropped"] == 1
+
+
+# ---------------------------------------------------------------------------
+# Integration ALLOCATION.
+#
+# The scale tests above ask what number a peak's area becomes. These ask a
+# different question that was separately wrong: how the fixed proton budget of
+# a known structure gets DIVIDED among the detected peaks.
+#
+# `_normalize_integrations_to_target` used to allocate with a per-peak floor::
+#
+#     scaled_units = [max(1.0, value / total * target_units) for value in values]
+#     base_units   = [max(1, int(math.floor(value))) for value in scaled_units]
+#
+# so every detected maximum was guaranteed at least one half-proton unit no
+# matter how little signal it carried. Measured on nmrshiftdb2 spectrum
+# 40255417 (allyl glycidyl ether, C6H10O2, 10 H, 15 detected peaks against a
+# budget of 20 half-proton units): seven peaks carried 6.3% of the signal
+# between them and the floor awarded them 35% of the molecule -- 5.6x -- while
+# consuming 5.75 of the 20 units that belonged to the peaks that did carry
+# signal. The reported total was exactly 10.00 H, which looked like a perfect
+# result and was in fact 55% quantiser output.
+#
+# The invariant: a reported proton count is a MEASUREMENT, so a peak's share of
+# the protons must track its share of the signal. A peak carrying a fraction of
+# a percent of the integral is noise or an impurity, and the honest report is
+# to drop it and say so -- never to promote it to half a proton.
+# ---------------------------------------------------------------------------
+
+#: The real area list from nmrshiftdb2 spectrum 40255417, largest first.
+_SPECTRUM_40255417_AREAS = [
+    128.7102, 100.0468, 90.1796, 88.7092, 72.7462, 70.7444,
+    40.2768, 39.4886, 27.7171, 5.8135, 2.7000, 1.7964, 1.6344, 1.4303, 1.0000,
+]
+
+
+def test_noise_peaks_are_not_awarded_protons_they_did_not_carry() -> None:
+    """The defect that made a 10.00 H total 55% fabrication."""
+    areas = _SPECTRUM_40255417_AREAS
+    total_area = sum(areas)
+    allocated = _normalize_integrations_to_target(areas, 10.0)
+    assert allocated is not None
+    assert sum(allocated) == pytest.approx(10.0), "the structural budget must be honoured"
+
+    # Peaks carrying under 1% of the signal each -- unambiguously not protons.
+    noise = [got for area, got in zip(areas, allocated) if area / total_area < 0.01]
+    assert len(noise) == 6, "fixture drifted; re-derive the areas"
+    true_share = sum(a for a in areas if a / total_area < 0.01) / total_area
+    got_share = sum(noise) / sum(allocated)
+    assert got_share <= 2.0 * true_share, (
+        f"peaks carrying {true_share:.1%} of the signal were awarded "
+        f"{got_share:.1%} of the protons ({got_share / max(true_share, 1e-9):.1f}x). "
+        "A proton count must be measured, not allocated."
+    )
+
+
+def test_a_peak_carrying_no_measurable_signal_gets_no_protons() -> None:
+    """One dominant resonance plus detector noise: the noise gets zero, not 0.5 H."""
+    allocated = _normalize_integrations_to_target([500.0, 480.0, 1.0, 0.8, 0.5], 4.0)
+    assert allocated is not None
+    assert sum(allocated) == pytest.approx(4.0)
+    assert allocated[-3:] == [0.0, 0.0, 0.0], (
+        f"noise peaks were awarded {allocated[-3:]} H rather than nothing"
+    )
+    assert allocated[0] > 0 and allocated[1] > 0
+
+
+def test_allocation_still_tracks_signal_when_every_peak_is_real() -> None:
+    """The fix must not disturb a clean spectrum: 1:2:3 areas -> 1:2:3 protons."""
+    allocated = _normalize_integrations_to_target([10.0, 20.0, 30.0], 6.0)
+    assert allocated == [1.0, 2.0, 3.0]
+
+
+def test_more_peaks_than_protons_no_longer_abandons_the_structural_budget() -> None:
+    """Previously refused (returned None) and fell back to the floored path.
+
+    That routed exactly the most over-picked spectra -- the ones where the floor
+    does the most damage -- into the code that applies it.
+    """
+    allocated = _normalize_integrations_to_target([100.0, 90.0] + [0.5] * 20, 2.0)
+    assert allocated is not None
+    assert sum(allocated) == pytest.approx(2.0)
+    assert all(value == 0.0 for value in allocated[2:])
