@@ -982,3 +982,108 @@ would make all three uninterpretable together.
 >    separate and much larger feature — it needs a rule for telling "one
 >    environment, several J-coupled lines" from "two environments that overlap",
 >    which the line positions alone cannot settle.
+
+---
+
+## A5 RESULT — DP4 (run 2026-08-04)
+
+**DP4 exists and is implemented correctly. It is fed the wrong kind of
+prediction, and it scores only the peaks the predictor already got right.**
+
+### First, a correction to an earlier note
+
+The standing note said "DP4 exists but DP5 is claimed-not-built". That
+overstates it. DP5 appears in three places and **none is an implementation
+claim**: two disclaimers that explicitly say results are "not ... calibrated
+DP4/DP5 probabilities", and one bibliographic entry (title, authors, venue, DOI)
+appended to the reference block when a DP4 ranking exists. Citing subsequent
+literature beside a related result is normal practice. On DP5, the code is
+honest.
+
+`smith_goodman_2010_dp4` — the method actually implemented — is cited in the
+base reference list, correctly.
+
+### The real defect: DFT constants on an empirical predictor
+
+`dp4_probabilities` is a faithful Smith & Goodman 2010 implementation: Student-t
+likelihood, regularised incomplete beta, published σ/ν, linear calc→exp scaling.
+15 unit tests cover that arithmetic and it is sound.
+
+Those constants —
+
+```
+DP4_SIGMA_1H = 0.185     DP4_NU_1H = 14.18
+```
+
+— are the residual distribution of **DFT/GIAO-computed** shifts after scaling.
+The paper is *"Assigning the Stereochemistry of Pairs of Diastereoisomers from
+GIAO NMR Shift Calculations"*.
+
+Production computes no DFT. `api.py:10995` calls
+`predict_nmr_from_smiles_fast`, documented as **"RDKit atom-environment
+prediction"** — an empirical predictor with a different, wider error
+distribution.
+
+The failure mode is asymmetric and therefore dangerous: a DP4 posterior is steep
+in σ, so an understated σ **saturates the posterior toward 1.0** for whichever
+candidate sits nearest. It yields a confident number, not an obviously wrong
+one — the worst shape for a figure quoted into a structure-assignment argument.
+
+### Measured on the seven structure-paired real spectra
+
+```
+paired within DP4's own 0.3 ppm window   n=24   RMSE 0.416 ppm   2.25x sigma
+paired without any window                n=51   RMSE 1.429 ppm   7.72x sigma
+```
+
+**Both are biased, in opposite directions** — the narrow window silently drops
+every badly-predicted peak; the wide one greedily pairs distant ones. The truth
+is bracketed between them, not pinned. A first pass reported only the censored
+2.25x and looked like six clean cases plus one outlier; uncensoring showed every
+case above σ (0.53 to 2.04 ppm RMSE) and the "clean six" to be an artefact of the
+window. Do not quote either number without its pairing rule.
+
+What is unambiguous: **even the favourably-selected matched subset sits at 2.25x
+the assumed σ**, and **fewer than half the peaks pair at all** (n 24 of 51).
+
+### The likelihood is built on a favourable subset
+
+Because pairing happens at 0.3 ppm, the Student-t likelihood is evaluated over
+the peaks the predictor already placed well. Everything it could not place is
+absorbed by a **flat** penalty:
+
+```python
+log_lik += unmatched * math.log(0.5)      # dp4_scoring.py:279
+```
+
+That does not scale with the residual. Verified: a candidate missing by 0.4 ppm
+and one missing by 4.4 ppm on the same peak produce **identical** log
+likelihoods. (When *nothing* matches, DP4 short-circuits to `-inf` / probability
+0, which is separate and reasonable.)
+
+So a candidate that is slightly wrong everywhere and one that is absurdly wrong
+everywhere are charged the same for the peaks neither could place, while the
+posterior's confidence comes from the minority that happened to land.
+
+Pinned in `tests/test_dp4_input_calibration.py`.
+
+**Next prompt:**
+
+> Do not "fix" this by widening σ to the measured value. That trades a wrong
+> constant for a hand-fitted one and still calls the output a DP4 probability.
+>
+> Decide first what the number is FOR. Two defensible routes:
+>
+> 1. **Keep DP4 honest by feeding it DFT.** Requires a GIAO pipeline the product
+>    does not have. Large, and the right answer only if calibrated posteriors
+>    are actually a selling point.
+> 2. **Stop calling it DP4.** Keep the Bayesian ranking as a relative
+>    discriminator, calibrate σ/ν empirically against a proper corpus (the seven
+>    fixtures are far too few), and rename the output so no reader takes it for
+>    the published DP4 posterior. The existing "not a calibrated DP4/DP5
+>    probability" disclaimer already points this way — the ranking payload should
+>    say the same thing.
+>
+> Either way, make the unmatched penalty scale with the residual, and surface the
+> matched fraction next to the probability. A posterior computed from 24 of 51
+> peaks should say so.
