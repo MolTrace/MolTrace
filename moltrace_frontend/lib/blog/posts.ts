@@ -216,7 +216,7 @@ export const POSTS: BlogPost[] = [
     author: "MolTrace research team",
     heroImage: "/blog/experimental-default-promotion-gate.jpg",
     heroImageAlt:
-      "A darkened facility corridor at night. A heavy interlocked door stands half-open, cold teal light spilling through it, and a tall column of horizontal bar meters glows in the opening — most filled teal, one amber and short, sitting below the others. An analytical instrument waits on a wheeled trolley at the threshold, not yet through the door.",
+      "A darkened facility corridor at night. A heavy interlocked door stands open, and a tall column of horizontal bar meters glows across the opening — all of them teal except one, which is amber. An analytical instrument waits on a wheeled trolley outside the threshold, not yet through the door.",
     body: [
       {
         "type": "h2",
