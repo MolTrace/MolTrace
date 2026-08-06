@@ -810,6 +810,10 @@ from .models import (
     SPCAnalyzeResult,
     SPCCapabilityOut,
     SPCSignalOut,
+    SpectralImpurityObservationCreate,
+    SpectralImpurityObservationListResult,
+    SpectralImpurityObservationOut,
+    SpectralImpurityObservationResult,
     SpectraCheckAuditEventRecord,
     SpectraCheckEvidenceCreate,
     SpectraCheckEvidenceRecord,
@@ -30860,3 +30864,110 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.startup_issues = startup_issues
     app.state.started_at = datetime.now(UTC)
     return app
+
+
+_SPECTRAL_IMPURITY_DISCLAIMER = (
+    "Identity and applicable limit only, NOT a compliance determination. The signal was assigned "
+    "to a substance by chemical shift and matched against the cited ICH Q3C guideline, but no "
+    "amount is attributable to it — contaminants are excluded from integration as a group, so "
+    "nothing here may be read as a pass or a failure against the limit. Verify against ICH "
+    "Q3C(R8) and obtain qualified sign-off before any release decision."
+)
+
+
+@router.post(
+    "/regulatory/spectral-impurities",
+    response_model=SpectralImpurityObservationResult,
+    dependencies=[Depends(require_access_context)],
+)
+def record_spectral_impurity(
+    payload: SpectralImpurityObservationCreate,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> SpectralImpurityObservationResult:
+    """Record the ICH Q3C clause that applies to a contaminant observed in a stored spectrum.
+
+    The substance is re-derived server-side from the analysis rather than named by the caller —
+    a supplied compound name would let anyone fabricate a regulatory identity and its citation.
+    A substance the guidance does not cover is returned **unresolved** with the reason named,
+    never with a guessed limit.
+
+    Returns the applicable limit and its provenance. It does **not** return compliance: no
+    measured level is attributable to a named contaminant, so a pass/fail cannot be formed.
+    """
+    from .spectral_impurity_observations_store import record_spectral_impurity_observation
+
+    # Matches the analysis surface (/history): an admin is scoped to their own analyses, since
+    # these rows carry verbatim spectral content and `analyses` has no organization widening.
+    user_id = None if context.system_api_key else context.user_id
+    record = record_spectral_impurity_observation(
+        _state(request).session_factory,
+        analysis_id=payload.analysis_id,
+        nucleus=payload.nucleus,
+        shift_ppm=payload.shift_ppm,
+        solvent=payload.solvent,
+        route=payload.route,
+        reaction_project_id=payload.reaction_project_id,
+        user_id=user_id,
+    )
+    if record is None:
+        # Absent and not-yours are the same 404 — the store returns None for both.
+        raise HTTPException(status_code=404, detail="Analysis record not found.")
+
+    # NOT wrapped in a swallowing try/except: this record is Part 11 evidence, not telemetry, and
+    # an endpoint that reports success while its audit link is missing has lost the linkage the
+    # record exists to provide.
+    _audit_from_context(
+        request,
+        context=context,
+        event_type="regulatory.spectral_impurity.record",
+        message="Spectral impurity observation recorded against an analysis.",
+        entity_type="analysis",
+        entity_id=record.analysis_id,
+        metadata={
+            "observation_id": record.id,
+            "identity_status": record.identity_status,
+            "compound": record.compound,
+        },
+    )
+
+    versions = (
+        {"q3c_solvents": record.rule_set_version} if record.rule_set_version is not None else {}
+    )
+    return SpectralImpurityObservationResult(
+        observation=SpectralImpurityObservationOut(**_spectral_impurity_out(record)),
+        rule_set_versions=versions,
+        disclaimer=_SPECTRAL_IMPURITY_DISCLAIMER,
+    )
+
+
+@router.get(
+    "/regulatory/spectral-impurities",
+    response_model=SpectralImpurityObservationListResult,
+    dependencies=[Depends(require_access_context)],
+)
+def list_spectral_impurities(
+    request: Request,
+    analysis_id: int | None = None,
+    context: AccessContext = Depends(require_access_context),
+) -> SpectralImpurityObservationListResult:
+    """List recorded spectral impurity observations the caller owns."""
+    from .spectral_impurity_observations_store import list_spectral_impurity_observations
+
+    user_id = None if context.system_api_key else context.user_id
+    records = list_spectral_impurity_observations(
+        _state(request).session_factory, user_id=user_id, analysis_id=analysis_id
+    )
+    return SpectralImpurityObservationListResult(
+        observations=[
+            SpectralImpurityObservationOut(**_spectral_impurity_out(r)) for r in records
+        ],
+        disclaimer=_SPECTRAL_IMPURITY_DISCLAIMER,
+    )
+
+
+def _spectral_impurity_out(record: Any) -> dict[str, Any]:
+    """Project a store record onto the wire model, dropping the internal owner column."""
+    data = dict(vars(record))
+    data.pop("user_id", None)
+    return data
