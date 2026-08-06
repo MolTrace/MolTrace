@@ -1087,3 +1087,83 @@ Pinned in `tests/test_dp4_input_calibration.py`.
 > Either way, make the unmatched penalty scale with the residual, and surface the
 > matched fraction next to the probability. A posterior computed from 24 of 51
 > peaks should say so.
+
+---
+
+## A6 RESULT — RAG subsystems (run 2026-08-04)
+
+**Two RAGs exist. One is wired and works on a real corpus; the other is
+library-only. The wired one has a licence gate that fails OPEN.**
+
+### Which is actually reachable
+
+| module | wired? |
+|---|---|
+| `moltrace/spectroscopy/ai/rag.py` | **yes** — `POST /spectrum/reason` (`api.py:9290`) |
+| `moltrace/regulatory/intelligence/rag_search.py` | **no** — 0 references in `api.py` |
+| `moltrace/regulatory/ai/rag_reasoner.py` | **no** — 0 references in `api.py` |
+
+So the regulatory RAG is library-only, as the standing note said. The
+spectroscopy RAG is live.
+
+### Correction: the corpus is real, not synthetic
+
+A standing note read "`raw_data_vault` is 95% synthetic residue" and it was easy
+to carry that over to the RAG. **It does not apply.** The similarity index is a
+separate artefact: `spectrum_similarity_index/` — 51 MB, FAISS, separate 1H and
+13C indices, **42,449 records, every one carrying a SMILES**, all sourced from
+`nmrshiftdb2.nmredata.sd`. That is a real public NMR database. Retrieved
+precedent is genuine.
+
+`raw_data_vault` (uploaded files) and `spectrum_similarity_index` (the retrieval
+corpus) are different things; do not carry a judgement about one onto the other.
+
+### The finding: the licence gate defaults to off
+
+Every index record carries:
+
+```json
+"license": "CC-BY-SA (NMRShiftDB2) - local use only, do not distribute"
+```
+
+The plumbing around this is genuinely well built:
+
+- `SpectrumReasonAnalogue.license` carries the terms into the API response
+  (`api.py:8605`), so attribution travels with the data;
+- `build_reasoning_context(..., allowed_licenses=...)` implements a filter;
+- the index itself is gitignored, so it is not shipped in the repo.
+
+But the filter is caller-supplied and **defaults to nothing**:
+
+```python
+allowed_licenses: list[str] | None = Field(default=None, max_length=64)   # models.py:16422
+license_filter = {str(x) for x in allowed_licenses} if allowed_licenses is not None else None
+```
+
+So by default `POST /spectrum/reason` returns SMILES from records whose own
+metadata says *"local use only, do not distribute"*, to any authenticated
+caller. The safe behaviour requires the caller to opt in, which is the wrong way
+round for a commercial product — a licence gate should fail closed.
+
+**This is a legal question, not a scientific one, and it is not mine to settle.**
+CC-BY-SA does permit redistribution with attribution and share-alike, and the
+"do not distribute" wording appears to have been added by whoever built the
+index rather than by the upstream licence. The point is narrower: the product
+currently redistributes by default, on data it has itself labelled
+non-distributable, and nobody has to make a decision for that to happen.
+
+**Next prompt:**
+
+> Make the licence gate fail closed. Give `allowed_licenses` a deployment-level
+> default rather than `None`, so serving a record is a configured decision
+> instead of the fallback. Keep the per-request override.
+>
+> Then get a ruling on the corpus terms and put it in writing next to the index
+> builder — if NMRShiftDB2 CC-BY-SA redistribution is fine with attribution,
+> change the metadata string, because the current one contradicts what the
+> product does with it every time the endpoint is called.
+>
+> Separately: decide whether the regulatory RAG is a product or dead code. It
+> has been library-only across two audits. If it is meant to ship it needs an
+> endpoint and an indexed corpus; if not, say so in the module docstring so the
+> next audit does not re-derive this.
