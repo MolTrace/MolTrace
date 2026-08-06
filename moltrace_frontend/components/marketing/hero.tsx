@@ -40,14 +40,30 @@ export function Hero() {
 
         {/* Stats bar */}
         <div className="hero-stat-grid mx-auto mt-20 grid max-w-4xl grid-cols-2 gap-8 border-t pt-10 sm:grid-cols-4">
+          {/* Each product wears the colour it wears inside the app, so the name
+              a reader meets here is the one they recognise once they are in it.
+              The "ink" variants, not the vivid accents: the bright tokens are
+              tuned for fills and icons and fail AA as type on a light page.
+              These clear full AA in both themes (teal 6.2:1 on white / 11.3:1 on
+              dark, cyan 5.8 / 8.3, violet 7.4 / 7.2).
+
+              Report is amber, which needed a new token: the vivid --mt-amber is
+              2.21:1 on white and could never be type. --mt-amber-ink darkens it
+              for light mode and keeps the vivid value on dark, exactly as teal
+              and cyan do. */}
           {[
-            { value: "SpectraCheck", label: "Raw spectra → structure evidence" },
-            { value: "Regentry", label: "Evidence → ICH action items" },
-            { value: "Repho", label: "Constraints → optimized reactions" },
-            { value: "Report", label: "Audit-ready dossier & human sign-off" },
+            { value: "SpectraCheck", label: "Raw spectra → structure evidence", ink: "var(--mt-teal-ink)" },
+            { value: "Regentry", label: "Evidence → ICH action items", ink: "var(--mt-cyan-ink)" },
+            { value: "Repho", label: "Constraints → optimized reactions", ink: "var(--mt-violet-ink)" },
+            { value: "Report", label: "Audit-ready dossier & human sign-off", ink: "var(--mt-amber-ink)" },
           ].map((stat) => (
             <div key={stat.label} className="text-center">
-              <div className="text-3xl font-semibold tracking-tight">{stat.value}</div>
+              <div
+                className="text-3xl font-semibold tracking-tight"
+                style={stat.ink ? { color: stat.ink } : undefined}
+              >
+                {stat.value}
+              </div>
               <div className="mt-1 text-sm text-muted-foreground">{stat.label}</div>
             </div>
           ))}
