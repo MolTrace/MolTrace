@@ -1656,36 +1656,81 @@ _NOISE_AREA_FRACTION_OF_MAX = 0.0075
 
 
 def _normalize_integrations_to_target(values: list[float], target_total_h: float) -> list[float] | None:
+    """Divide a structure's proton budget among peaks **in proportion to signal**.
+
+    Returns one value per input peak, in half-proton units, summing to
+    ``target_total_h``. A peak whose share of the signal is below half a proton
+    receives **0.0** — it is a detected maximum that carries no assignable proton,
+    and the caller is expected to drop it and say how many it dropped.
+
+    Awarding zero is the whole point. This used to floor every peak at one
+    half-proton unit::
+
+        scaled_units = [max(1.0, value / total * target_units) for value in values]
+
+    which guaranteed a proton to every detected maximum regardless of how little
+    signal it carried. Measured on nmrshiftdb2 spectrum 40255417 (allyl glycidyl
+    ether, C6H10O2, 10 H, 15 peaks against a 20 half-proton budget): seven peaks
+    carried 6.3 % of the signal between them and the floor awarded them 35 % of
+    the molecule — 5.6× — taking 5.75 of the 20 units from the peaks that did
+    carry signal. The reported total was exactly 10.00 H, which looks like a
+    perfect answer and was 55 % quantiser output. A proton count presented to a
+    chemist has to be a measurement, not an allocation.
+
+    Largest-remainder apportionment is used so the reported total still equals the
+    budget exactly; ties go to the larger residual, then to the larger area, so the
+    result does not depend on input order.
+
+    Dropping is safe for real signal because the rule is *proportional*, and so is
+    self-consistent as molecules grow: a genuine 1 H resonance holds ~1/H of the
+    integral while the budget holds 2H units, so its share is ~2 units at any size.
+    Measured — one 1 H peak among proportional areas reports exactly 1.00 H at total
+    proton counts of 6, 10, 20, 40, 60 and 100.
+
+    LIMITATION — a single dominant resonance compresses everything else. With one
+    peak holding 50–95 % of the integral (an incompletely suppressed solvent or water
+    signal, say) a real 1 H peak still reports 0.50 H, but at **98 %** it rounds to
+    zero and is dropped. Solvent resonances are meant to be removed upstream
+    (``_analyte_reference_areas``); if one survives to here, the proton counts were
+    already meaningless. The old floor happened to report 0.5 H in that case, but it
+    did so by fabricating, and paid for it by fabricating for every noise peak too.
+    """
+
     if not values:
         return []
     total = sum(values)
     target_units = int(round(target_total_h * 2))
-    if total <= 0 or target_units <= 0 or target_units < len(values):
+    if total <= 0 or target_units <= 0:
         return None
 
-    scaled_units = [max(1.0, value / total * target_units) for value in values]
-    base_units = [max(1, int(math.floor(value))) for value in scaled_units]
-    residuals = [scaled - base for scaled, base in zip(scaled_units, base_units)]
+    exact = [value / total * target_units for value in values]
+    base_units = [int(math.floor(value)) for value in exact]
+    residuals = [value - base for value, base in zip(exact, base_units)]
     diff = target_units - sum(base_units)
 
+    # Largest-remainder: hand the leftover units to the peaks with the biggest
+    # fractional parts. Area breaks a residual tie so the outcome is independent
+    # of the order peaks were detected in.
     if diff > 0:
-        order = sorted(range(len(base_units)), key=lambda idx: residuals[idx], reverse=True)
-        cursor = 0
-        while diff > 0 and order:
-            base_units[order[cursor % len(order)]] += 1
-            cursor += 1
-            diff -= 1
+        order = sorted(
+            range(len(base_units)),
+            key=lambda idx: (residuals[idx], values[idx]),
+            reverse=True,
+        )
+        for idx in order[:diff]:
+            base_units[idx] += 1
     elif diff < 0:
-        order = sorted(range(len(base_units)), key=lambda idx: residuals[idx])
+        # Unreachable arithmetically — floor() never exceeds the exact share, so
+        # the shortfall is always non-negative — but kept as a cheap guard against
+        # a floating-point share landing a hair above an integer.
+        order = sorted(range(len(base_units)), key=lambda idx: (residuals[idx], values[idx]))
         cursor = 0
-        while diff < 0 and order:
+        while diff < 0 and cursor <= len(order) * 3:
             idx = order[cursor % len(order)]
-            if base_units[idx] > 1:
+            if base_units[idx] > 0:
                 base_units[idx] -= 1
                 diff += 1
             cursor += 1
-            if cursor > len(order) * 3:
-                break
 
     if sum(base_units) != target_units:
         return None
@@ -2167,8 +2212,16 @@ def _estimates_to_peaks(
             normalized_to_target = True
             scale_basis = "normalized_to_structure"
 
+    # A peak allotted zero protons carries no assignable signal, so it does not
+    # belong in a proton table — reporting it as 0 H would be as misleading as the
+    # half-proton floor this replaces, just in the other direction. Drop it and
+    # count it, because a silent drop reads as full coverage.
     peaks: list[Peak] = []
+    unassignable = 0
     for est, integration in zip(in_range_estimates, integrations):
+        if integration <= 0:
+            unassignable += 1
+            continue
         peaks.append(
             Peak(
                 shift_ppm=round(est.shift_ppm, 3),
@@ -2192,6 +2245,10 @@ def _estimates_to_peaks(
         # where the totals agreeing is corroboration rather than arithmetic.
         "integration_totals_agree_independently": totals_agree_independently,
         "noise_peaks_dropped": dropped_noise_count,
+        # Detected maxima whose share of the signal came to less than half a
+        # proton once the structural budget was apportioned. They are excluded
+        # from the peak table rather than rounded up into it.
+        "unassignable_peaks_dropped": unassignable,
     }
     if out_of_range_shifts:
         meta["out_of_range_dropped_count"] = len(out_of_range_shifts)
