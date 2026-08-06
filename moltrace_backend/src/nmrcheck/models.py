@@ -16765,3 +16765,76 @@ class SpectrumSolventCatalog(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     solvents: list[SpectrumSolventInfo] = Field(default_factory=list)
+
+
+# --- Spectral impurity observations (SpectraCheck -> Regentry audit record) --------------------
+
+SpectralImpurityNucleus = Literal["1H", "13C"]
+SpectralImpurityRoute = Literal["oral", "parenteral", "inhalation"]
+SpectralImpurityIdentityStatus = Literal["resolved", "unresolved"]
+SpectralImpurityUnresolvedReason = Literal[
+    "no_library_match", "label_only_no_compound", "not_in_q3c_subset"
+]
+
+
+class SpectralImpurityObservationCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    analysis_id: int = Field(..., ge=1)
+    shift_ppm: float = Field(..., ge=-100.0, le=400.0)
+    nucleus: SpectralImpurityNucleus = "1H"
+    solvent: str | None = Field(default=None, max_length=50)
+    # Bounded to the engine's own vocabulary so an unsupported route is a 422 at the edge rather
+    # than a ValidationReport raised from inside classify_solvent.
+    route: SpectralImpurityRoute = "oral"
+    # Provenance only — it never widens who can read the resulting record.
+    reaction_project_id: int | None = Field(default=None, ge=1)
+
+
+class SpectralImpurityObservationOut(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: int
+    analysis_id: int | None = None
+    reaction_project_id: int | None = None
+    observed_shift_ppm: float
+    solvent: str | None = None
+    observed_label: str | None = None
+    compound: str | None = None
+    expected_ppm: float | None = None
+    delta_ppm: float | None = None
+    match_kind: str | None = None
+    identity_status: SpectralImpurityIdentityStatus
+    unresolved_reason: SpectralImpurityUnresolvedReason | None = None
+    unresolved_detail: str | None = None
+    q3c_class_number: int | None = None
+    q3c_class_description: str | None = None
+    concentration_limit_ppm: float | None = None
+    pde_mg_per_day: float | None = None
+    regulatory_basis: str | None = None
+    table_reference: str | None = None
+    rule_set_version: str | None = None
+    # A limit is not a measurement — both fields are carried so no caller has to infer it.
+    quantitation_available: bool = False
+    observed_level_ppm: float | None = None
+    compliance_note: str
+    human_review_required: bool = True
+
+
+class SpectralImpurityObservationResult(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    observation: SpectralImpurityObservationOut
+    # Empty when the identity was not resolved — no rule set produced a number, and an empty dict
+    # says that honestly rather than implying an engine ran.
+    rule_set_versions: dict[str, str] = Field(default_factory=dict)
+    disclaimer: str
+    human_review_required: bool = True
+
+
+class SpectralImpurityObservationListResult(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    observations: list[SpectralImpurityObservationOut] = Field(default_factory=list)
+    disclaimer: str
+    human_review_required: bool = True
