@@ -3,6 +3,7 @@ from __future__ import annotations
 import itertools
 import json
 import math
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
@@ -47,9 +48,16 @@ from .orm import (
     ReactionSafetyConstraintProfileORM,
     ReactionSurrogateModelRecordORM,
     ReactionVariableORM,
+    RegulatoryConstraintSetORM,
     utcnow,
 )
 from .reaction_pareto import pareto_summary
+from .reaction_regulatory_constraints import (
+    FeasibilityVerdict,
+    RegulatoryLimit,
+    evaluate_candidate,
+    parse_limits,
+)
 from .reaction_store import ReactionActor, ReactionError
 
 
@@ -448,6 +456,7 @@ def run_bayesian_optimization(
         objective_profile = _latest_objective_profile(session, project_id)
         cost_profile = _latest_cost_profile(session, project_id)
         safety_profile = _latest_safety_profile(session, project_id)
+        regulatory_limits = _active_regulatory_limits(session, project_id)
 
         objective_type = (
             objective_profile.objective_type if objective_profile is not None else project.objective
@@ -491,6 +500,7 @@ def run_bayesian_optimization(
             safety_aware=payload.safety_aware,
             cost_profile=cost_profile,
             safety_profile=safety_profile,
+            regulatory_limits=regulatory_limits,
         )
         warnings.extend(model_warnings)
         status = "requires_review" if len(training) < 5 else "succeeded"
@@ -813,6 +823,89 @@ def list_benchmark_runs(
         return [_benchmark_to_record(row) for row in rows]
 
 
+def _active_regulatory_limits(session: Session, project_id: int) -> list[RegulatoryLimit]:
+    """The project's enforceable regulatory limits, normalized by the pure R4 engine.
+
+    Only active/reviewed constraints carrying a numeric bound are enforceable; the engine drops
+    the rest as advisory. Shapes each row the way ``parse_limits`` expects — note the ORM column
+    is ``source_action_item_ids_json`` while the engine reads ``source_action_item_ids``.
+    """
+    rows = session.scalars(
+        select(RegulatoryConstraintSetORM).where(
+            RegulatoryConstraintSetORM.reaction_project_id == project_id
+        )
+    ).all()
+    return parse_limits(
+        [
+            {
+                "id": row.id,
+                "constraint_type": row.constraint_type,
+                "severity": row.severity,
+                "status": row.status,
+                "constraint_json": _json_dict(row.constraint_json),
+                "source_action_item_ids": _json_list(row.source_action_item_ids_json),
+            }
+            for row in rows
+        ]
+    )
+
+
+def _candidate_predicted_outcome(item: Mapping[str, Any]) -> dict[str, float]:
+    """Per-field outcome predictions for one candidate, keyed by reaction-outcome field.
+
+    The surrogate scores a candidate on a single **scalarized** objective (``_score_outcome``
+    collapses yield/selectivity/impurity/... into one number), so today it supplies none of the
+    per-field values a regulatory limit is written against. This reads the forward-compatible
+    ``metadata_json["predicted_outcome"]`` slot, which is empty until per-field predictors exist.
+
+    Non-numeric entries are dropped rather than coerced: a limit is better reported as unmeasured
+    than compared against a value that was never a measurement.
+    """
+    meta = item.get("metadata_json")
+    if not isinstance(meta, Mapping):
+        return {}
+    raw = meta.get("predicted_outcome")
+    if not isinstance(raw, Mapping):
+        return {}
+    out: dict[str, float] = {}
+    for field, value in raw.items():
+        number = _float_or_none(value)
+        if number is not None:
+            out[str(field)] = number
+    return out
+
+
+def _regulatory_verdict_for_candidate(
+    item: Mapping[str, Any], limits: Sequence[RegulatoryLimit]
+) -> FeasibilityVerdict:
+    """Evaluate one ranked candidate against the project's active regulatory limits.
+
+    A limit whose objective field the surrogate cannot predict comes back in ``unmeasured`` —
+    never as a pass. When per-field predictors land, the same call starts blocking without a
+    code change.
+    """
+    return evaluate_candidate(_candidate_predicted_outcome(item), limits)
+
+
+def _unchecked_limits_warning(
+    limits: Sequence[RegulatoryLimit], unmeasured_fields: Sequence[str]
+) -> str | None:
+    """Name the active limits that could not be checked, and say they were not applied.
+
+    Without this the run reads as regulatory-cleared when nothing was compared. The wording states
+    the consequence (not applied to ranking) rather than the mechanism alone.
+    """
+    if not limits or not unmeasured_fields:
+        return None
+    fields = sorted(set(unmeasured_fields))
+    return (
+        f"{len(fields)} active regulatory limit field(s) ({', '.join(fields)}) could not be "
+        "checked against these proposals and were not applied to ranking: the surrogate predicts a "
+        "scalarized objective, not per-field outcomes. These limits are checked against measured "
+        "results after an experiment is recorded; human review is required before scheduling."
+    )
+
+
 def _rank_candidates(
     *,
     training: list[_TrainingExample],
@@ -827,6 +920,7 @@ def _rank_candidates(
     safety_aware: bool,
     cost_profile: ReactionCostProfileORM | None,
     safety_profile: ReactionSafetyConstraintProfileORM | None,
+    regulatory_limits: Sequence[RegulatoryLimit] = (),
 ) -> tuple[list[dict[str, Any]], dict[str, Any], str, dict[str, Any], list[str]]:
     warnings: list[str] = []
     feature_encoding = _build_feature_encoding(domain, training)
@@ -869,6 +963,8 @@ def _rank_candidates(
 
     scored: list[dict[str, Any]] = []
     blocked: list[dict[str, Any]] = []
+    unchecked_fields: set[str] = set()
+    regulatory_blocked = 0
     for prediction in predictions:
         conditions = prediction["conditions_json"]
         safety = _assess_safety(conditions, safety_profile)
@@ -908,16 +1004,47 @@ def _rank_candidates(
             safety=safety,
             cost=cost,
         )
+        # Regulatory limits follow the SAFETY precedent, not the cost one: a hard (high/critical)
+        # violation filters the candidate rather than merely costing it points. A limit whose
+        # field the surrogate cannot predict lands in `unmeasured` and is collected for the
+        # run-level advisory below — it is never counted as a pass.
+        verdict = _regulatory_verdict_for_candidate(item, regulatory_limits)
+        if regulatory_limits:
+            item["metadata_json"]["regulatory"] = verdict.summary()
+            unchecked_fields.update(verdict.unmeasured)
+            if verdict.penalty > 0.0:
+                item["acquisition_score"] = round(
+                    float(item["acquisition_score"]) - verdict.penalty, 6
+                )
+        if verdict.hard_block:
+            regulatory_blocked += 1
+            blocked.append(item)
+            continue
         if safety_aware and safety.status == "blocked":
             blocked.append(item)
             continue
         scored.append(item)
 
+    unchecked_warning = _unchecked_limits_warning(regulatory_limits, sorted(unchecked_fields))
+    if unchecked_warning is not None:
+        warnings.append(unchecked_warning)
+
     scored.sort(key=lambda item: (item["acquisition_score"], -(item.get("estimated_cost") or 0)), reverse=True)
     if not scored and blocked:
         blocked.sort(key=lambda item: item["acquisition_score"], reverse=True)
         scored = blocked[:batch_size]
-        warnings.append("All enumerated candidates violate safety constraints; only blocked records were returned.")
+        # Name the actual cause: regulatory hard limits and safety constraints both land here,
+        # and telling a chemist "safety" when a candidate was filtered by an ICH limit sends them
+        # to the wrong profile to fix it.
+        if regulatory_blocked and regulatory_blocked == len(blocked):
+            cause = "a hard regulatory limit"
+        elif regulatory_blocked:
+            cause = "a hard regulatory limit or a safety constraint"
+        else:
+            cause = "safety constraints"
+        warnings.append(
+            f"All enumerated candidates violate {cause}; only blocked records were returned."
+        )
     if not scored:
         scored = [
             {
