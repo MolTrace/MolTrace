@@ -7326,3 +7326,52 @@ class SpectralImpurityObservationORM(Base):
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     metadata_json: Mapped[str] = mapped_column(Text, default="{}")
+
+
+class SpectrumSeriesORM(Base):
+    """An ordered set of spectra of one reaction, the substrate a rate constant is fitted over.
+
+    Scoped by ``user_id`` for the same reason as the impurity observations: members point at
+    analyses, and ``analyses`` has no organization widening, so nothing here may be reachable
+    through a wider lattice than the spectra it is assembled from.
+    """
+
+    __tablename__ = "spectrum_series"
+    __table_args__ = (Index("ix_spectrum_series_user_created", "user_id", "created_at"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    name: Mapped[str] = mapped_column(String(200), default="")
+    #: What the tracked value measures, e.g. "product multiplet integral (H)". Free text because
+    #: the quantity is the analyst's choice; the fit never interprets it.
+    tracked_quantity: Mapped[str] = mapped_column(String(200), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    metadata_json: Mapped[str] = mapped_column(Text, default="{}")
+
+
+class SpectrumSeriesPointORM(Base):
+    """One timed observation in a series, carrying the analysis it was read from.
+
+    ``observed_value`` is supplied rather than derived from the stored report on purpose. Deriving
+    it would mean re-picking the tracked signal out of every spectrum, and peak integration is the
+    subject of an open accuracy programme here — a rate fitted on automatically re-derived
+    integrals would inherit that uncertainty invisibly. Recording what the analyst tracked, next
+    to the analysis it came from, keeps the provenance intact and the uncertainty visible.
+    """
+
+    __tablename__ = "spectrum_series_points"
+    __table_args__ = (
+        Index("ix_spectrum_series_points_series_elapsed", "series_id", "elapsed_seconds"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    series_id: Mapped[int] = mapped_column(
+        ForeignKey("spectrum_series.id", ondelete="CASCADE"), index=True
+    )
+    # SET NULL: the point remains evidence of what was observed even if the analysis is removed.
+    analysis_id: Mapped[int | None] = mapped_column(
+        ForeignKey("analyses.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    elapsed_seconds: Mapped[float] = mapped_column(Float, default=0.0)
+    observed_value: Mapped[float] = mapped_column(Float, default=0.0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
