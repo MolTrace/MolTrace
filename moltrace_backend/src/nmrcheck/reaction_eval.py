@@ -58,6 +58,10 @@ METRIC_DIRECTIONS: dict[str, str] = {
     "reproduction_accuracy": "higher",
     "calibration_error": "lower",
     "iteration_latency_seconds": "lower",
+    # Higher is better, and it MUST be declared here: reaction_feedback excludes metrics of
+    # unknown direction from dominance, so an undeclared axis would be computed, reported, and
+    # then quietly ignored by the promotion gate.
+    "regulatory_compliant_yield": "higher",
 }
 
 # A trace landing on a frozen grid point must report the frozen objective within this tolerance.
@@ -120,6 +124,10 @@ class GoldTask:
     surface: Mapping[str, float]
     observation_ids: tuple[str, ...] = ()
     hazardous_condition_keys: frozenset[str] = frozenset()
+    #: Surface points a hard regulatory limit forbids. Frozen ground truth — never the
+    #: model's own claim about its compliance. Empty means the gold set asserts nothing
+    #: about regulatory status, which is different from asserting everything is allowed.
+    noncompliant_condition_keys: frozenset[str] = frozenset()
     # Frozen multi-objective config — never derived from a model's own trace.
     outcome_names: tuple[str, ...] = ()
     outcome_directions: tuple[str, ...] = ()
@@ -170,6 +178,33 @@ def load_gold_set(payload: Mapping[str, Any]) -> list[GoldTask]:
     return tasks
 
 
+def _condition_key_set(
+    raw_keys: Any, surface: Mapping[str, float], task_id: str, label: str
+) -> set[str]:
+    """Validate one frozen ground-truth key set against the frozen surface."""
+
+    keys: set[str] = set()
+    for key in raw_keys or ():
+        key = str(key)
+        try:
+            canonical = condition_key(json.loads(key))
+        except (json.JSONDecodeError, TypeError) as exc:
+            raise ReactionEvalError(
+                f"Gold task {task_id!r}: {label} key is not canonical JSON: {key!r}"
+            ) from exc
+        if canonical != key:
+            raise ReactionEvalError(
+                f"Gold task {task_id!r}: {label} key is not canonical ({key!r} != {canonical!r})."
+            )
+        if key not in surface:
+            raise ReactionEvalError(
+                f"Gold task {task_id!r}: {label} key is not present in the frozen "
+                f"surface: {key!r}"
+            )
+        keys.add(key)
+    return keys
+
+
 def _parse_task(raw: Any) -> GoldTask:
     if not isinstance(raw, dict):
         raise ReactionEvalError("Gold task entry is not an object.")
@@ -181,27 +216,15 @@ def _parse_task(raw: Any) -> GoldTask:
         str(k): _require_finite(v, f"surface value for {task_id!r}") for k, v in surface_raw.items()
     }
 
-    # Hazardous ground truth must be canonical AND present in the surface, or recall silently
-    # reports a perfect 1.0 for a model that never had a matchable hazard to flag.
-    hazardous: set[str] = set()
-    for key in raw.get("hazardous_condition_keys") or ():
-        key = str(key)
-        try:
-            canonical = condition_key(json.loads(key))
-        except (json.JSONDecodeError, TypeError) as exc:
-            raise ReactionEvalError(
-                f"Gold task {task_id!r}: hazardous key is not canonical JSON: {key!r}"
-            ) from exc
-        if canonical != key:
-            raise ReactionEvalError(
-                f"Gold task {task_id!r}: hazardous key is not canonical ({key!r} != {canonical!r})."
-            )
-        if key not in surface:
-            raise ReactionEvalError(
-                f"Gold task {task_id!r}: hazardous key is not present in the frozen "
-                f"surface: {key!r}"
-            )
-        hazardous.add(key)
+    # Both ground-truth key sets must be canonical AND present in the surface. Without that,
+    # safety recall silently reports a perfect 1.0 for a model that never had a matchable hazard,
+    # and the compliant-yield axis silently forbids nothing.
+    hazardous = _condition_key_set(
+        raw.get("hazardous_condition_keys"), surface, task_id, "hazardous"
+    )
+    noncompliant = _condition_key_set(
+        raw.get("noncompliant_condition_keys"), surface, task_id, "noncompliant"
+    )
 
     outcome_names = tuple(str(x) for x in raw.get("outcome_names") or ())
     outcome_directions = tuple(str(x) for x in raw.get("outcome_directions") or ())
@@ -227,6 +250,7 @@ def _parse_task(raw: Any) -> GoldTask:
         surface=surface,
         observation_ids=tuple(str(x) for x in raw.get("observation_ids") or ()),
         hazardous_condition_keys=frozenset(hazardous),
+        noncompliant_condition_keys=frozenset(noncompliant),
         outcome_names=outcome_names,
         outcome_directions=outcome_directions,
         hypervolume_reference=reference,
@@ -318,6 +342,9 @@ def evaluate_campaign(
     hv_values: list[float] = []
     latencies: list[float] = []
     calib_pairs: list[tuple[float, bool]] = []
+    compliant_yields: list[float] = []
+    runs_with_no_compliant_step = 0
+    any_regulatory_truth = False
     hazardous_seen = 0
     hazardous_flagged = 0
 
@@ -346,6 +373,26 @@ def evaluate_campaign(
 
         best = max(objectives)
         best_objectives.append(best)
+
+        # best_objective answers "what is the highest yield the model found"; this answers the
+        # question a regulated campaign turns on — how much of it is USABLE. A trace that reaches
+        # its optimum only under conditions a hard limit forbids has found nothing runnable, and
+        # without this axis it scores identically to one that reached the same yield cleanly.
+        if task.noncompliant_condition_keys:
+            any_regulatory_truth = True
+            compliant = [
+                objective
+                for step, objective in zip(steps, objectives, strict=True)
+                if condition_key(step.conditions) not in task.noncompliant_condition_keys
+            ]
+            if compliant:
+                compliant_yields.append(max(compliant))
+            else:
+                # Never omit and never default to the best value: on a higher-is-better axis
+                # either would let a model that proposed nothing runnable win this dimension.
+                # The run's own worst observation is a real number it actually produced.
+                compliant_yields.append(min(objectives))
+                runs_with_no_compliant_step += 1
         reached = next(
             (i for i, value in enumerate(objectives, start=1) if value >= task.objective_target),
             None,
@@ -403,6 +450,19 @@ def evaluate_campaign(
         warnings.append("No step latencies; iteration_latency_seconds omitted.")
     if hv_values:
         metrics["hypervolume"] = _median(hv_values)
+    if any_regulatory_truth:
+        metrics["regulatory_compliant_yield"] = _median(compliant_yields)
+        if runs_with_no_compliant_step:
+            warnings.append(
+                f"{runs_with_no_compliant_step} run(s) reached no regulatory-compliant condition; "
+                "each scored its own worst observation on regulatory_compliant_yield."
+            )
+    else:
+        # Absent, not vacuously equal to best_objective: no gold task declared which conditions a
+        # limit forbids, so nothing was checked and the axis has no evidence behind it.
+        warnings.append(
+            "Gold set declares no regulatory ground truth; regulatory_compliant_yield omitted."
+        )
 
     return EvalResult(
         model_version=model_version,

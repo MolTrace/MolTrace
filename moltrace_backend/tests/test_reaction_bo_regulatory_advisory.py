@@ -11,6 +11,7 @@ the moment a per-field prediction exists.
 from nmrcheck.reaction_bo import (
     _candidate_predicted_outcome,
     _regulatory_verdict_for_candidate,
+    _run_status,
     _unchecked_limits_warning,
 )
 from nmrcheck.reaction_regulatory_constraints import parse_limits
@@ -108,3 +109,70 @@ def test_predicted_outcome_is_read_from_candidate_metadata():
 def test_predicted_outcome_is_empty_when_the_surrogate_supplied_none():
     assert _candidate_predicted_outcome({"metadata_json": {}}) == {}
     assert _candidate_predicted_outcome({}) == {}
+
+
+# --- a run that produced nothing feasible must not report success ------------------------------
+#
+# Enforcement (masks + penalties) and provenance already existed on this seam. What did not: the
+# run STATUS ignored the outcome. `status = "requires_review" if len(training) < 5 else
+# "succeeded"` looks only at how much training data there was, so a run with ample history whose
+# every candidate was filtered by a hard ICH limit was recorded as **succeeded** while returning
+# only blocked records. The warning said so in prose; the status field — the thing a queue, a
+# dashboard or an auditor filters on — said the opposite.
+
+
+def test_a_run_with_no_feasible_candidate_requires_review_however_much_data_it_had():
+    """The defect: 50 training points and zero feasible candidates reported "succeeded"."""
+    status = _run_status(
+        training_count=50,
+        algorithm="ucb",
+        diagnostics={"feasible_candidate_count": 0, "regulatory_blocked_candidate_count": 12},
+    )
+    assert status == "requires_review", (
+        "every candidate violated a hard regulatory limit and the run still reported success"
+    )
+
+
+def test_a_run_with_feasible_candidates_and_enough_data_still_succeeds():
+    """The fix must not make every run require review — that would make the flag meaningless."""
+    assert (
+        _run_status(
+            training_count=50,
+            algorithm="ucb",
+            diagnostics={"feasible_candidate_count": 8, "regulatory_blocked_candidate_count": 4},
+        )
+        == "succeeded"
+    )
+
+
+def test_thin_training_data_still_requires_review():
+    assert (
+        _run_status(
+            training_count=2,
+            algorithm="ucb",
+            diagnostics={"feasible_candidate_count": 8, "regulatory_blocked_candidate_count": 0},
+        )
+        == "requires_review"
+    )
+
+
+def test_advisory_llm_algorithm_still_requires_review():
+    assert (
+        _run_status(
+            training_count=50,
+            algorithm="llm_guided_advisory",
+            diagnostics={"feasible_candidate_count": 8, "regulatory_blocked_candidate_count": 0},
+        )
+        == "requires_review"
+    )
+
+
+def test_absent_feasibility_diagnostics_do_not_silently_pass():
+    """An older diagnostics blob carries no count; that is unknown, not "all clear".
+
+    Reading a missing key as zero-blocked would let a stale writer bypass the gate.
+    """
+    assert (
+        _run_status(training_count=50, algorithm="ucb", diagnostics={})
+        == "requires_review"
+    )
