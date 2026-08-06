@@ -441,6 +441,35 @@ def patch_safety_profile(
         return _safety_profile_to_record(row)
 
 
+def _run_status(
+    *, training_count: int, algorithm: str, diagnostics: Mapping[str, Any]
+) -> str:
+    """Whether a completed BO run may be recorded as ``succeeded``.
+
+    Three things force review, and the third is the one this exists for.
+
+    Thin training data and the advisory LLM algorithm were already handled. What was
+    not: a run whose every enumerated candidate was filtered by a hard regulatory
+    limit still reported **succeeded**, because the status looked only at how much
+    history the model had. The run-level warning said so in prose, but the status
+    field — what a queue, a dashboard or an auditor actually filters on — said the
+    opposite, and the records returned in that case are the *blocked* ones.
+
+    A missing feasibility count is treated as unknown, therefore review-worthy,
+    rather than as "nothing was blocked". Reading absence as all-clear would let a
+    diagnostics blob written by an older path bypass the gate silently.
+    """
+
+    if training_count < 5:
+        return "requires_review"
+    if algorithm == "llm_guided_advisory":
+        return "requires_review"
+    feasible = diagnostics.get("feasible_candidate_count")
+    if not isinstance(feasible, int) or feasible <= 0:
+        return "requires_review"
+    return "succeeded"
+
+
 def run_bayesian_optimization(
     session_factory: sessionmaker[Session],
     project_id: int,
@@ -503,9 +532,11 @@ def run_bayesian_optimization(
             regulatory_limits=regulatory_limits,
         )
         warnings.extend(model_warnings)
-        status = "requires_review" if len(training) < 5 else "succeeded"
-        if payload.algorithm == "llm_guided_advisory":
-            status = "requires_review"
+        status = _run_status(
+            training_count=len(training),
+            algorithm=payload.algorithm,
+            diagnostics=diagnostics,
+        )
         diagnostics.update(
             {
                 "objective_type": objective_type,
@@ -641,6 +672,15 @@ def run_bayesian_optimization(
                 "model_type": model_type,
                 "recommendation_count": len(candidate_rows),
                 "human_review_required": True,
+                # The audit trail has to show that limits were applied and what they
+                # did, not merely that a run happened. Without these a reviewer cannot
+                # tell an unconstrained run from one where every proposal was filtered.
+                "status": status,
+                "regulatory_limits_applied": diagnostics.get("regulatory_limits_applied", 0),
+                "regulatory_blocked_candidate_count": diagnostics.get(
+                    "regulatory_blocked_candidate_count", 0
+                ),
+                "feasible_candidate_count": diagnostics.get("feasible_candidate_count"),
             },
         )
         return _bo_run_to_record(run, candidate_rows, model_type=model_type)
@@ -1030,6 +1070,10 @@ def _rank_candidates(
         warnings.append(unchecked_warning)
 
     scored.sort(key=lambda item: (item["acquisition_score"], -(item.get("estimated_cost") or 0)), reverse=True)
+    # Captured BEFORE the fallback below replaces `scored` with blocked records, so the
+    # run status can tell "we ranked eight candidates" from "we returned eight records
+    # that every one of them violates a hard limit".
+    feasible_candidate_count = len(scored)
     if not scored and blocked:
         blocked.sort(key=lambda item: item["acquisition_score"], reverse=True)
         scored = blocked[:batch_size]
@@ -1067,6 +1111,11 @@ def _rank_candidates(
         "best_observed_objective": round(y_best, 6) if y_best is not None else None,
         "evaluated_candidate_count": len(predictions),
         "safety_blocked_candidate_count": len(blocked),
+        # Candidates that survived every hard limit. Zero means the batch returned is
+        # blocked records, not proposals — see `_run_status`.
+        "feasible_candidate_count": feasible_candidate_count,
+        "regulatory_blocked_candidate_count": regulatory_blocked,
+        "regulatory_limits_applied": len(regulatory_limits),
         "model_metrics": model_metrics,
         "feature_encoding": feature_encoding,
         "scalarization": _objective_summary(objective_type, weights),

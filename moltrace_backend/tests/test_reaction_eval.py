@@ -8,6 +8,7 @@ CI exit codes, and the R10 gold-exclusion bridge.
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -454,3 +455,115 @@ def test_cli_writes_the_evidence_artifact(tmp_path):
     assert evidence["exit_code"] == EXIT_OK
     assert evidence["gold_checksum"] == gold_set_checksum(payload)
     assert evidence["model_version"] == "candidate.v2"
+
+
+# --- regulatory-compliant yield ----------------------------------------------------------------
+#
+# best_objective answers "what is the highest yield the model found". It does not answer the
+# question a regulated campaign actually turns on: how much of that yield is USABLE. A model that
+# drives to 91% under conditions a hard ICH limit forbids has found nothing a chemist can run, and
+# scores identically to one that found 91% cleanly.
+#
+# `regulatory_compliant_yield` is the best objective reached among conditions the FROZEN gold set
+# marks compliant. The ground truth is the gold set's, never the model's own claim about itself.
+
+
+def _noncompliant_task(key: str):
+    """The frozen gold tasks, with one surface point marked regulatory-noncompliant."""
+    tasks = _tasks()
+    return [
+        replace(task, noncompliant_condition_keys=frozenset({key}))
+        if task.task_id == "bh_sim_v1"
+        else task
+        for task in tasks
+    ]
+
+
+def test_compliant_yield_ignores_a_higher_yield_that_breaches_a_limit():
+    """The 91% optimum is forbidden, so the reportable yield is the 84% compliant one."""
+    forbidden = condition_key(_cond("Pd-XPhos", "KOtBu", 80))
+    result = evaluate_campaign(
+        "cand", [_run_reaching_target()], _noncompliant_task(forbidden),
+        gold_checksum=_checksum(),
+    )
+    assert result.metrics["best_objective"] == 91.0
+    assert result.metrics["regulatory_compliant_yield"] == 84.0, (
+        "a yield only reachable by breaching a hard limit is not a yield the campaign can use"
+    )
+
+
+def test_compliant_yield_equals_best_objective_when_nothing_is_forbidden():
+    result = evaluate_campaign(
+        "cand", [_run_reaching_target()], _noncompliant_task(condition_key(_cond("x", "y", 999))),
+        gold_checksum=_checksum(),
+    )
+    assert result.metrics["regulatory_compliant_yield"] == result.metrics["best_objective"]
+
+
+def test_a_run_with_no_compliant_condition_is_not_rewarded_by_omission():
+    """Every step forbidden: the run scores its own worst observation, never a silent pass.
+
+    Omitting the run, or defaulting it to the best value, would let a model that proposed
+    nothing runnable dominate the incumbent on this axis.
+    """
+    run = _run_reaching_target()
+    tasks = [
+        replace(
+            task,
+            noncompliant_condition_keys=frozenset(
+                condition_key(step.conditions) for step in run.steps
+            ),
+        )
+        if task.task_id == "bh_sim_v1"
+        else task
+        for task in _tasks()
+    ]
+    result = evaluate_campaign("cand", [run], tasks, gold_checksum=_checksum())
+    assert result.metrics["regulatory_compliant_yield"] == 33.0  # the run's worst observation
+    assert any("no regulatory-compliant" in w for w in result.warnings)
+
+
+def test_metric_is_omitted_when_the_gold_set_declares_no_regulatory_truth():
+    """Nothing was checked, so the axis is absent rather than vacuously perfect."""
+    result = _evaluate("cand", [_run_reaching_target()])
+    assert "regulatory_compliant_yield" not in result.metrics
+    assert any("no regulatory ground truth" in w for w in result.warnings)
+
+
+def test_noncompliant_key_must_be_canonical_and_present_in_the_surface():
+    payload = _payload()
+    payload["tasks"][0]["noncompliant_condition_keys"] = ['{"catalyst": "Pd-XPhos"}']
+    payload["checksum"] = gold_set_checksum(payload)
+    with pytest.raises(ReactionEvalError, match="noncompliant key"):
+        load_gold_set(payload)
+
+
+def test_compliant_yield_actually_gates_rather_than_being_reported_and_ignored():
+    """Metrics of unknown direction are dropped from dominance, so this must be declared."""
+    from nmrcheck.reaction_eval import METRIC_DIRECTIONS
+
+    assert METRIC_DIRECTIONS["regulatory_compliant_yield"] == "higher"
+
+
+def test_a_candidate_that_wins_only_on_forbidden_conditions_does_not_dominate():
+    """The point of the axis: raw yield up, usable yield down => not a promotion."""
+    forbidden = condition_key(_cond("Pd-XPhos", "KOtBu", 80))
+    tasks = _noncompliant_task(forbidden)
+    incumbent = evaluate_campaign(
+        "inc", [_run_reaching_target()], tasks, gold_checksum=_checksum()
+    )
+    # Candidate reaches the same 91 optimum but its compliant best is worse (71 vs 84).
+    candidate_run = CampaignRun(
+        task_id="bh_sim_v1",
+        steps=[
+            _step("Pd-dppf", "K3PO4", 60, 33.0, latency_seconds=10.0),
+            _step("Pd-SPhos", "KOtBu", 80, 71.0, latency_seconds=10.0),
+            _step("Pd-XPhos", "KOtBu", 80, 91.0, latency_seconds=10.0),
+        ],
+    )
+    candidate = evaluate_campaign("cand", [candidate_run], tasks, gold_checksum=_checksum())
+    assert candidate.metrics["best_objective"] == incumbent.metrics["best_objective"]
+    assert (
+        candidate.metrics["regulatory_compliant_yield"]
+        < incumbent.metrics["regulatory_compliant_yield"]
+    )
