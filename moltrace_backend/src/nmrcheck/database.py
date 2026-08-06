@@ -461,11 +461,12 @@ def _sqlite_make_column_nullable(connection: Connection, table: str, column: str
     if not any(str(row[1]) == column and int(row[3]) for row in info):
         return
 
-    create_sql = str(
-        connection.exec_driver_sql(
-            "SELECT sql FROM sqlite_master WHERE type='table' AND name=?", (table,)
-        ).fetchone()[0]
-    )
+    stored = connection.exec_driver_sql(
+        "SELECT sql FROM sqlite_master WHERE type='table' AND name=?", (table,)
+    ).fetchone()
+    if stored is None:
+        raise RuntimeError(f"Cannot rebuild {table}: it has no stored schema.")
+    create_sql = str(stored[0])
     # Match the column's own definition — ``name TYPE NOT NULL`` opening a line — and keep
     # everything but the constraint. The foreign-key clause naming the same column cannot match:
     # there the name is followed by ``)``, not by a type.
