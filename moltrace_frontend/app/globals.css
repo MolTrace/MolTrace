@@ -242,6 +242,20 @@
   display: none !important;
 }
 
+[data-stable-results-surface] [data-spectrum-hover-surface] .js-plotly-plot,
+[data-stable-results-surface] [data-spectrum-hover-surface] .plot-container,
+[data-stable-results-surface] [data-spectrum-hover-surface] .svg-container,
+[data-stable-results-surface] [data-spectrum-hover-surface] .main-svg,
+[data-stable-results-surface] [data-spectrum-hover-surface] .draglayer,
+[data-stable-results-surface] [data-spectrum-hover-surface] .nsewdrag {
+  pointer-events: auto !important;
+}
+
+[data-stable-results-surface] [data-spectrum-hover-surface] .hoverlayer {
+  display: block !important;
+  pointer-events: none !important;
+}
+
 /* ─── MolTrace design system palette ─────────────────────────────
    Additive only — does not override the semantic tokens above.
    Module palette: teal (spectroscopy), cyan (regulatory), violet (optimization).
@@ -273,6 +287,11 @@
   --mt-teal-ink: #0B6E5A;
   --mt-cyan-ink: #0B6E8C;
   --mt-violet-ink: #5B3FB8;
+  /* Amber is the worst offender of the set: #E8A030 is only 2.21:1 on white,
+     so it could never be type in light mode and had no ink until now. This
+     darkens it to 5.68:1 while holding the hue (~38°, against the vivid 36°),
+     which puts it between cyan-ink and teal-ink rather than off on its own. */
+  --mt-amber-ink: #8F5C00;
 }
 
 .dark {
@@ -281,6 +300,9 @@
   --mt-teal-ink: #00DFA0;
   --mt-cyan-ink: #00B8D9;
   --mt-violet-ink: #A78BFA;
+  /* Amber behaves like teal and cyan here, not like violet: the vivid token is
+     already 8.92:1 on the dark page, so it stays put. */
+  --mt-amber-ink: #E8A030;
 }
 
 /* Scientific grid background */
