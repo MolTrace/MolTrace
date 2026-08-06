@@ -357,7 +357,7 @@ export const POSTS: BlogPost[] = [
     author: "MolTrace research team",
     heroImage: "/blog/hmdb-style-validation.jpg",
     heroImageAlt:
-      "Two holographic panels face each other across a darkened laboratory bench. The left panel holds a neat grid of evenly spaced reference cells; the right shows real recorded traces, dense and irregular. Fine teal threads run between them, most pairing one cell to one trace, several fanning out from a single cell to many.",
+      "Two holographic panels stand facing each other above a dark steel bench. The left panel is a regular lattice of evenly spaced points in neat rows; the right panel shows rows of recorded spectral traces, dense and spiky. Fine teal threads run from the points across to the traces — some pairing one to one, others crossing and fanning out from a single point to several traces.",
     body: [
       {
         "type": "h2",
