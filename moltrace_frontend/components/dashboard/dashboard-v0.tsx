@@ -41,6 +41,7 @@ import {
   DashboardPriorityCallout,
   type DashboardPriority,
 } from "@/components/dashboard/dashboard-priority-callout"
+import { GoldenPathCard } from "@/components/dashboard/golden-path-card"
 import { KpiCard } from "@/components/dashboard/kpi-card"
 import { ModuleCard } from "@/components/dashboard/module-card"
 import { StatusFilterPills } from "@/components/dashboard/status-filter-pills"
@@ -1389,8 +1390,12 @@ export function DashboardV0() {
           sub={reportsSub}
         />
 
+        {/* "Hours saved" is Σ(completed tasks × a fixed per-task constant), not a measured
+            duration — the ORM column is `estimated_minutes_saved` and the API model drops the
+            qualifier on the way out. So the qualifier goes back on here, and the basis stays
+            one click away. The counts on the other tiles are real event counts. */}
         <KpiCard
-          title="Hours Saved"
+          title="Hours Saved (estimated)"
           icon={Clock}
           href="/roi"
           accent="violet"
@@ -1399,7 +1404,9 @@ export function DashboardV0() {
             roiLoading ? (
               <p className="mt-1 text-xs text-muted-foreground">Loading ROI snapshot…</p>
             ) : roiLive ? (
-              <p className="mt-1 text-xs text-muted-foreground">Across automated workflows.</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Estimated from your per-task time-saved assumptions, not measured.
+              </p>
             ) : (
               <>
                 {DEMO_STATS.hoursSub}
@@ -1420,6 +1427,10 @@ export function DashboardV0() {
       </div>
 
       <ValidationReadinessDashboardCards />
+
+      {/* The golden path spans all three products, so it sits in Overview rather than under any
+          one module — it is the thing that makes them one arc instead of three screens. */}
+      <GoldenPathCard />
 
       {showCustomerDeploymentCard ? (
         <Card>
