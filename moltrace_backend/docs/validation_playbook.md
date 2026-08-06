@@ -659,3 +659,122 @@ window, which no windowing artefact explains.
 > linewidth, not a fixed ±0.06 — so there is a trustworthy arbiter. Without it
 > you cannot tell a fix from a regression. Then re-run this A/B; it is cheap and
 > now scripted.
+
+---
+
+## A1 RESULT, part 2 — a real ground truth (run 2026-08-04)
+
+The run above had a genuine weakness and said so: with no trustworthy arbiter it
+could show the two ingest paths *disagreeing*, but not which one was *wrong*.
+That gap is now closed, and it did not need the reference integrator.
+
+**The arbiter is the sample, not the software.** The fixture is a matched pair —
+one sample, one probe, one pulse program (`zg30`), one solvent (CDCl3), differing
+only in recycle delay:
+
+| exp | d1 | AQ | recycle | verdict |
+|---|---|---|---|---|
+| 10 | 22.005 s | 7.995 s | **30.00 s** | fully relaxed → quantitative |
+| 11 | 1.000 s | 3.998 s | 5.00 s | routine → semi-quantitative |
+
+At 30 s recycle with a 30° pulse, exp 10 is quantitative. **Its own trace areas
+therefore ARE the true proton ratios** — no structure knowledge required, no
+arbiter that could itself be wrong.
+
+### Finding 1 — the acquisition model change is validated
+
+Measured differential saturation between the two halves (28 signal windows taken
+from the relaxed spectrum, each compared as a share of its own spectrum's total,
+which cancels the receiver-gain/`NC_proc` difference instead of assuming it away):
+
+```
+measured spread (exp11/exp10)  1.1334
+current model  (T1_SLOW_S 8 s) 1.1543   +0.021  conservative
+pre-fix model  (T1_SLOW_S 5 s) 1.0784   -0.055  OPTIMISTIC
+```
+
+The `b4014fc` change cut the error ~2.6× **and** moved it to the safe side: the
+model now slightly over-warns rather than telling a chemist the integrals are
+better than they are. Both classifications are also correct — exp 10
+`quantitative`, exp 11 `semi_quantitative`. Baseline re-pinned in
+`test_acquisition_quality.py` (1.141 → 1.1334, better method).
+
+### Finding 2 — the processed path does NOT recover true proton ratios
+
+Feeding exp 10 through `parse_processed_spectrum` gives 19 peaks summing to
+353 H. Comparing each peak's reported share of total H against its share of true
+trace area, over **well-isolated peaks only** (nearest neighbour > 0.15 ppm and
+< 40 H, so the measurement's own partition error is excluded):
+
+```
+  ppm      H      H share   area share    error
+ 5.227    5.00      1.42%        1.51%     -6.4%
+ 2.100    2.00      0.57%        0.78%    -27.0%
+ 1.933    9.50      2.69%        2.34%    +15.2%
+ 1.472   25.50      7.22%        6.69%     +7.9%
+ 1.186    5.00      1.42%        2.59%    -45.4%
+ 0.812    1.00      0.28%        1.00%    -71.5%
+
+median |error| 21.1%     worst 71.5%     within 10%: 2/6
+```
+
+**The error is systematic, not noise.** Large multiplets come back close to
+right (+8%, +15%); the smallest signals are badly under-reported (−27%, −45%,
+−71%). So the chemist most misled is the one reading a minor impurity or a single
+diagnostic proton — the opposite of how an integration should degrade. Every
+reported value also lands on the 0.5 H quantiser grid, across a 124:1 dynamic
+range.
+
+Pinned in `tests/test_processed_upload_accuracy.py`, which **skips** when the
+fixture is absent (real spectra are gitignored, and a synthetic stand-in would
+quietly turn this into a test that cannot fail).
+
+**Next prompt:**
+
+> The arbiter problem is solved — stop blocking on the reference integrator.
+> `tests/test_processed_upload_accuracy.py` measures the error against a real
+> quantitative spectrum, so a fix can now be told from a regression directly.
+>
+> Chase the small-peak bias specifically; that is where the whole error lives.
+> Candidates, in order: the 0.5 H quantiser floor (50% granularity on a 1 H
+> signal); `_normalize_integrations_to_target` still forcing sum == structural
+> total; and per-peak integration windows still being width-insensitive, which
+> costs a broad small peak proportionally more of its area than a sharp large
+> one. Re-baseline `MEASURED_MEDIAN_ERROR_PCT` downward in the same change and
+> say so.
+>
+> Then re-run the exp10-vs-exp11 comparison as a second check: a fix that
+> improves the relaxed spectrum but not the routine one has probably tuned to
+> this fixture rather than fixed the chain.
+
+---
+
+## A4 PREMISE — re-verified 2026-08-04 (it holds)
+
+Re-checked while waiting on a suite run, and worth recording because the first
+check reached the **opposite, wrong** conclusion.
+
+`moltrace/spectroscopy/peaks/gsd.py` derives peak areas from fitted amplitudes
+(`amplitude` at :654 and :823, analytic `height * fwhm * pi/2` at :912, with a
+trapezoid fallback at :965). Reading only that file makes the A4 blocker look
+stale — "GSD fits areas properly, the note is wrong".
+
+It is not wrong. That file is the **sidecar**. The A4 claim is about the
+**production** path, and there it holds exactly as written:
+
+- `nmrcheck/gsd.py:155` `deconvolve_region` returns `(center_ppm, height,
+  hwhm_ppm)` per line. **No area is computed at all.**
+- `nmrcheck/spectrum.py:1236` `total_area = sum(component.area for component in
+  cluster)` — the PRE-deconvolution cluster sum.
+- `nmrcheck/spectrum.py:1275` emits `area=total_area`.
+
+So production GSD uses its fit for **multiplicity only**; the area a chemist
+reads never passes through the deconvolution. Two implementations with the same
+name is the trap — check which one the path under test imports before
+concluding anything about "GSD".
+
+**Consequence for A1.** These are related but not the same defect. A1's
+small-peak bias is measured on well-isolated peaks, where clustering is not in
+play, so fixing GSD areas will not by itself close A1's 21% median error. Treat
+them as independent and re-measure A1 after any GSD change rather than assuming
+credit.
