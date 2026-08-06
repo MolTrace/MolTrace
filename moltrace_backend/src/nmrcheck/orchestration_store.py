@@ -318,6 +318,7 @@ def upload_file_record(
     file_kind: ManagedFileKind,
     metadata_json: dict[str, Any] | None,
     storage_root: Path,
+    created_by_user_id: int | None = None,
 ) -> FileRecord:
     metadata = dict(metadata_json or {})
     _assert_no_uploaded_file_bytes(metadata, path="metadata_json")
@@ -351,6 +352,7 @@ def upload_file_record(
                 storage_backend=existing.storage_backend,
                 storage_key=existing.storage_key,
                 file_kind=file_kind,
+                created_by_user_id=created_by_user_id,
                 metadata_json=_json_dump(metadata, default={}),
             )
             session.add(row)
@@ -371,6 +373,7 @@ def upload_file_record(
             storage_backend=backend.name,
             storage_key="pending",
             file_kind=file_kind,
+            created_by_user_id=created_by_user_id,
             metadata_json="{}",
         )
         session.add(row)
@@ -405,19 +408,52 @@ def list_file_records(
     *,
     limit: int = 200,
     file_kind: str | None = None,
+    owner_scope_id: int | None = None,
 ) -> list[FileRecord]:
+    """List managed files, optionally scoped to the user who uploaded them.
+
+    ``owner_scope_id=None`` keeps the unscoped view and is reserved for the
+    system api key and admins, matching ``list_signatures`` and the regulatory
+    action-item list. A user-scoped caller passes their own id.
+
+    Before migration 0043 there was no owner column, so this listed every file
+    in the deployment to any authenticated caller -- and the by-id and download
+    routes below let them fetch the bytes.
+    """
     with session_scope(session_factory) as session:
         stmt = select(ManagedFileRecordORM).order_by(ManagedFileRecordORM.id.desc()).limit(limit)
         if file_kind:
             stmt = stmt.where(ManagedFileRecordORM.file_kind == file_kind)
+        if owner_scope_id is not None:
+            stmt = stmt.where(ManagedFileRecordORM.created_by_user_id == owner_scope_id)
         rows = list(session.scalars(stmt).all())
         return [_file_to_record(row) for row in rows]
 
 
-def get_file_record(session_factory: sessionmaker[Session], file_id: int) -> FileRecord | None:
+def get_file_record(
+    session_factory: sessionmaker[Session],
+    file_id: int,
+    *,
+    owner_scope_id: int | None = None,
+) -> FileRecord | None:
+    """One managed file, or None when the caller may not see it.
+
+    Returning None for "exists but is not yours" is deliberate: the caller maps
+    it to a 404, so an uploaded file's EXISTENCE stays confidential. That is the
+    dossier pattern rather than the compound-registry one -- a shared registry
+    row's existence is not a secret, an uploaded spectrum's is.
+
+    A NULL ``created_by_user_id`` (row predates 0043) is refused to a scoped
+    caller for the same reason as the registry: "nobody is recorded as
+    responsible" must not read as "anyone may download it".
+    """
     with session_scope(session_factory) as session:
         row = session.get(ManagedFileRecordORM, file_id)
-        return _file_to_record(row) if row is not None else None
+        if row is None:
+            return None
+        if owner_scope_id is not None and row.created_by_user_id != owner_scope_id:
+            return None
+        return _file_to_record(row)
 
 
 def get_file_download(
@@ -425,11 +461,19 @@ def get_file_download(
     file_id: int,
     *,
     storage_root: Path,
+    owner_scope_id: int | None = None,
 ) -> tuple[FileRecord, bytes] | None:
     """The record and its bytes. Returns bytes rather than a path because an object store has no
-    path to hand back, and the caller only ever streamed the contents anyway."""
+    path to hand back, and the caller only ever streamed the contents anyway.
+
+    ``owner_scope_id`` gates the bytes themselves. This is the route that made
+    the missing owner column a data leak rather than a metadata leak: an
+    unrelated account fetched another user's uploaded spectrum in full.
+    """
     with session_scope(session_factory) as session:
         row = session.get(ManagedFileRecordORM, file_id)
+        if row is not None and owner_scope_id is not None and row.created_by_user_id != owner_scope_id:
+            return None
         if row is None:
             return None
         return (_file_to_record(row), _read_file_bytes(row, Path(storage_root)))
@@ -984,10 +1028,21 @@ def list_session_jobs(
 def get_artifact_record(
     session_factory: sessionmaker[Session],
     artifact_id: int,
+    *,
+    owner_scope_id: int | None = None,
 ) -> ArtifactRecord | None:
+    """One artifact, or None when the caller may not see it.
+
+    Same contract as ``get_file_record``: None covers both "absent" and "not
+    yours" so the caller can return a non-leaking 404.
+    """
     with session_scope(session_factory) as session:
         row = session.get(ArtifactRecordORM, artifact_id)
-        return _artifact_to_record(row) if row is not None else None
+        if row is None:
+            return None
+        if owner_scope_id is not None and row.created_by_user_id != owner_scope_id:
+            return None
+        return _artifact_to_record(row)
 
 
 def get_artifact_download(

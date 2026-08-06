@@ -428,10 +428,17 @@ def _ensure_sqlite_schema(engine: Engine) -> None:
         # rename another user's compound (verified: PATCH returned 200).
         # NULL means "created before attribution existed" and is deliberately
         # preserved rather than backfilled to an arbitrary user.
+        # Registry attributability (0039) and managed-file attributability
+        # (0043) share one loop: both add a nullable created_by_user_id so a
+        # row can be scoped to whoever made it. The managed-file half is the
+        # more urgent of the two -- without it any authenticated caller could
+        # download any other user's upload, verified live.
         for attributable_table in (
             "compound_entities",
             "compound_batches",
             "controlled_records",
+            "managed_file_records",
+            "artifact_records",
         ):
             if attributable_table not in tables:
                 continue

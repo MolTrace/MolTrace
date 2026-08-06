@@ -13587,6 +13587,10 @@ async def upload_managed_file_route(
             file_kind=file_kind,
             metadata_json=metadata,
             storage_root=_orchestration_storage_root(request),
+            # Stamped here or the file is unattributable forever: the read gate
+            # refuses NULL-owner rows to non-admins, so an unstamped upload
+            # would be invisible even to the person who uploaded it.
+            created_by_user_id=_user_scope_for_context(context),
         )
     except orch_store.OrchestrationError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -13616,7 +13620,10 @@ def list_managed_files_route(
     context: AccessContext = Depends(require_access_context),
 ) -> list[FileRecord]:
     return orch_store.list_file_records(
-        _state(request).session_factory, limit=limit, file_kind=file_kind
+        _state(request).session_factory,
+        limit=limit,
+        file_kind=file_kind,
+        owner_scope_id=_user_scope_for_context(context),
     )
 
 
@@ -13628,7 +13635,14 @@ def get_managed_file_route(
     request: Request,
     context: AccessContext = Depends(require_access_context),
 ) -> FileRecord:
-    record = orch_store.get_file_record(_state(request).session_factory, file_id)
+    # A non-owner gets the same 404 as a missing file: an uploaded spectrum's
+    # existence is confidential, so this follows the dossier pattern rather than
+    # the compound registry's 403.
+    record = orch_store.get_file_record(
+        _state(request).session_factory,
+        file_id,
+        owner_scope_id=_user_scope_for_context(context),
+    )
     if record is None:
         raise HTTPException(status_code=404, detail="Managed file not found.")
     return record
@@ -13645,6 +13659,7 @@ def download_managed_file_route(
             _state(request).session_factory,
             file_id,
             storage_root=_orchestration_storage_root(request),
+            owner_scope_id=_user_scope_for_context(context),
         )
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
@@ -23968,7 +23983,11 @@ def get_artifact_route(
     request: Request,
     context: AccessContext = Depends(require_access_context),
 ) -> ArtifactRecord:
-    record = orch_store.get_artifact_record(_state(request).session_factory, artifact_id)
+    record = orch_store.get_artifact_record(
+        _state(request).session_factory,
+        artifact_id,
+        owner_scope_id=_user_scope_for_context(context),
+    )
     if record is None:
         raise HTTPException(status_code=404, detail="Artifact not found.")
     return record
@@ -24013,7 +24032,11 @@ def get_visualization_artifact_route(
     request: Request,
     context: AccessContext = Depends(require_access_context),
 ) -> VisualizationArtifact:
-    record = orch_store.get_artifact_record(_state(request).session_factory, artifact_id)
+    record = orch_store.get_artifact_record(
+        _state(request).session_factory,
+        artifact_id,
+        owner_scope_id=_user_scope_for_context(context),
+    )
     if record is None:
         raise HTTPException(status_code=404, detail="Artifact not found.")
     return normalize_artifact_record(record)
