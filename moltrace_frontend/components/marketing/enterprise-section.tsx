@@ -47,8 +47,11 @@ export function EnterpriseSection() {
             Security and compliance controls designed for regulated industries.
           </h2>
           <p className="mx-auto mt-4 max-w-lg text-base leading-relaxed text-muted-foreground">
-            Built for regulated industries. Your data stays yours, with the controls
-            and audit trails required for GxP environments.
+            {/* "Built for regulated industries." was here and is now gone: the h2
+                directly above already ends on "designed for regulated
+                industries", so the page said it twice, two lines apart. */}
+            Your data stays yours, with the controls and audit trails required for
+            GxP environments.
           </p>
         </div>
 
