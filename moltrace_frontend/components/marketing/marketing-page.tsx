@@ -16,8 +16,9 @@ import { ModuleCards } from "@/components/marketing/module-cards"
  *
  *   TrustBar          The hero already ends on the compliance line; this
  *                     restated the same five standards immediately below it.
- *                     The badges now appear once, in Enterprise, where a reader
- *                     is actually asking the question.
+ *                     The badge row now appears once, in the Footer, and
+ *                     Enterprise states the same standards in prose — see the
+ *                     note below, that pairing is still one repeat too many.
  *
  *   WorkflowStrip     Told the same four-beat story as the hero's module row —
  *                     and called two of the products "Regulatory Hub" and

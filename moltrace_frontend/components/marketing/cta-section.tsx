@@ -40,7 +40,10 @@ export function CTASection() {
               </Button>
             </div>
             <p className="mt-6 text-xs uppercase tracking-widest text-background/50">
-              Request a demo &middot; Built for regulated R&amp;D &middot; Designed to support SOC 2 readiness
+              {/* "Request a demo ·" led this line, directly beneath the Request
+                  Demo button it named. A trust strip should carry what the
+                  buttons cannot. */}
+              Built for regulated R&amp;D &middot; Designed to support SOC 2 readiness
             </p>
           </div>
         </div>
