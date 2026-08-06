@@ -22,6 +22,15 @@ The platform is architected **deterministic-first**: regulated math and classifi
 
 MolTrace presents three modules around one unified evidence trail, with a closed loop: spectroscopy evidence becomes ICH-classified regulatory action items, which become reaction-optimization constraints, which inform the next experiment — all linked by recipe-hash reproducibility and an ALCOA+ audit ledger. The three modules are surfaced in a single tabbed Programs workspace in the signed-in app.
 
+### Golden path — one seeded arc, end to end
+*Route: `/pilot/golden-path` (summarised on the command centre)*
+
+A guided run of one seeded scenario across all three modules, so the closed loop above can be watched happening rather than described. It calls five live endpoints in order — raw-FID processing, candidate comparison, the unified ICH impurity assessment, a regulatory-constrained BO run, and dossier creation with its evidence links — chaining them on real data: the peak list the FID processor actually produced is what the candidate comparison is scored against. Each panel renders that endpoint's own response body and the wall-clock it took.
+
+What the surface deliberately does **not** do is as load-bearing as what it does. The pilot subsystem supplies the frozen inputs, the expected-output contracts, the run record and the evidence bundle; it does not execute the modules, and none of its recorded step summaries is ever rendered as engine output. The structure step is presented as **ranked candidate evidence**, never as a verifier verdict — the deterministic verifier (`moltrace.spectroscopy.verification.verify_structure`) has no HTTP route, and simulating one on screen would misstate what the platform checked. The expected-output contracts are evaluated against the real responses rather than against a stored summary of them, and a step the engine flagged for review is reported as such rather than as a clean pass. On the value strip, event counts are labelled measured and the time-saved figure is labelled **estimated**, with its per-task assumption table one click away at `/roi`: that figure is a sum of configurable constants, not a measured duration. The genuinely measured duration is the arc's own elapsed time.
+
+The most demo-worthy moment is the optimizer declining: a BO run whose every candidate breaches a hard regulatory limit reports `requires_review` with its feasible and blocked candidate counts, instead of confidently proposing something unfilable.
+
 ### SpectraCheck — Spectroscopy Intelligence
 *Route: `/spectracheck` (marketing page at `/spectroscopy`)*
 
