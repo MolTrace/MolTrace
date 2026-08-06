@@ -13223,6 +13223,46 @@ class AuditChainVerification(BaseModel):
     key_id: str
 
 
+class SubjectAuditChainVerification(BaseModel):
+    """Integrity of the audit entries recorded about ONE subject (a filing or a campaign).
+
+    Scoped to what the caller can already open, so it answers the question a scientist
+    actually asks — "can I trust the trail behind *this* number?" — rather than the
+    admin-only whole-chain question.
+
+    Two different things are established, and they are reported separately because the
+    subject's own slice cannot establish both:
+
+    * ``content_ok`` — every chained entry about this subject still hashes to the digest
+      recorded with it, so none has been **altered**. Provable from the slice alone.
+    * ``chain_ok`` — the global hash chain re-walks cleanly. Needed to rule out an entry
+      about this subject having been **removed or reordered**, which the slice by itself
+      cannot detect: entries carry no per-subject sequence, so a deletion leaves no gap
+      inside the subject's own view.
+
+    ``ok`` is both together, and is the only field a summary UI should reduce to.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    subject_type: str
+    subject_id: int
+    entry_count: int = Field(ge=0)  # chained entries about this subject
+    verified_count: int = Field(ge=0)
+    ok: bool
+    content_ok: bool
+    chain_ok: bool
+    #: ``chain_seq`` of the first altered subject entry, when ``content_ok`` is false.
+    first_break_seq: int | None = None
+    #: Machine-readable cause, so a client never string-matches ``detail``.
+    #: ``"entry_hash_mismatch"`` for the subject slice; the global walk may also report
+    #: ``"sequence_gap"`` (an entry was removed) or ``"prev_hash_mismatch"`` (reordered).
+    break_kind: str | None = None
+    chain_break_kind: str | None = None
+    key_id: str
+    detail: str
+
+
 class AuditAnchorRecord(BaseModel):
     """A signed checkpoint over the audit chain (Prompt 10)."""
 

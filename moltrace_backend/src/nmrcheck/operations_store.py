@@ -13,6 +13,7 @@ from typing import Any, cast
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, sessionmaker
 
+from . import collaboration_subjects
 from .audit_chain import (
     GENESIS_HASH,
     anchor_payload,
@@ -36,6 +37,7 @@ from .models import (
     SecurityEvent,
     SecurityEventCreate,
     SecuritySummary,
+    SubjectAuditChainVerification,
     SystemHealthResponse,
     SystemHealthStatus,
     SystemStatusResponse,
@@ -303,6 +305,100 @@ def verify_audit_chain(
             detail=final_detail,
             key_id=key_id(settings.audit_signing_key),
         )
+
+
+def verify_subject_audit_chain(
+    session_factory: sessionmaker[Session],
+    subject_type: str,
+    subject_id: int,
+    *,
+    owner_scope_id: int | None,
+    settings: Settings,
+) -> SubjectAuditChainVerification:
+    """Verify the audit entries recorded about one subject the caller can already open.
+
+    The whole-chain walk is admin-only and answers a compliance question. This answers the
+    scientist's question — "can I trust the trail behind *this* number?" — under the
+    subject's own access rule, so an unreachable subject and a missing one are the same
+    non-leaking 404 (both raise ``KeyError``).
+
+    Scope of the guarantee, kept honest because the slice cannot give both halves:
+
+    * **Alteration** is provable here. Each entry's canonical payload is re-hashed and
+      compared to the digest stored with it. The per-entry hash is an unkeyed SHA-256, so
+      this needs no secret and would hold for an offline re-computation too.
+    * **Removal or reordering** is not provable from the slice. Entries carry a global
+      ``chain_seq`` and no per-subject sequence, so deleting one about this subject leaves
+      no gap in the subject's own view. The global walk is what surfaces that, and its
+      verdict rides along as ``chain_ok`` / ``chain_break_kind`` rather than being folded
+      into a single boolean that would overstate what was checked.
+    """
+
+    if subject_type not in collaboration_subjects.SUBJECT_TYPES:
+        # An unrecognised type is a KeyError, not a distinct error: answering it differently
+        # from "you cannot reach this one" would let an outsider enumerate which subject
+        # types this deployment addresses.
+        raise KeyError(f"Unknown subject type: {subject_type}")
+    if not collaboration_subjects.is_generic_subject(subject_type):
+        # Mirrors the collaboration surface: SpectraCheck sessions keep their richer
+        # role-based review path, and a second, weaker route to the same records would be
+        # a way around it rather than a convenience. Naming a type that is already public
+        # in SUBJECT_TYPES discloses nothing.
+        raise ValueError("Use the session review surface for spectroscopy sessions.")
+
+    with session_scope(session_factory) as session:
+        if not collaboration_subjects.can_access_subject(
+            session, subject_type, subject_id, owner_scope_id=owner_scope_id
+        ):
+            raise KeyError(f"{subject_type} {subject_id} not found.")
+
+        rows = session.execute(
+            select(AuditEventORM)
+            .where(
+                AuditEventORM.chain_seq.is_not(None),
+                AuditEventORM.entity_type == subject_type,
+                AuditEventORM.entity_id == subject_id,
+            )
+            .order_by(AuditEventORM.chain_seq.asc())
+        ).scalars().all()
+
+        verified = 0
+        first_break_seq: int | None = None
+        for row in rows:
+            if compute_entry_hash(row, chain_ts=row.chain_ts) != row.entry_hash:
+                first_break_seq = int(row.chain_seq)
+                break
+            verified += 1
+
+    content_ok = first_break_seq is None
+    chain = verify_audit_chain(session_factory, settings=settings)
+    chain_break_kind = None if chain.ok else chain.detail
+
+    if not content_ok:
+        detail = "entry_hash_mismatch"
+    elif not chain.ok:
+        # The subject's own entries are intact, but the chain they sit in is not, so an
+        # entry about this subject may have been removed. Say which, rather than "ok".
+        detail = f"subject_entries_intact_but_chain_{chain.detail}"
+    elif not rows:
+        detail = "no_chained_entries"
+    else:
+        detail = "ok"
+
+    return SubjectAuditChainVerification(
+        subject_type=subject_type,
+        subject_id=subject_id,
+        entry_count=len(rows),
+        verified_count=verified,
+        ok=content_ok and chain.ok,
+        content_ok=content_ok,
+        chain_ok=chain.ok,
+        first_break_seq=first_break_seq,
+        break_kind="entry_hash_mismatch" if first_break_seq is not None else None,
+        chain_break_kind=chain_break_kind,
+        key_id=key_id(settings.audit_signing_key),
+        detail=detail,
+    )
 
 
 def reconcile_audit_chain(
