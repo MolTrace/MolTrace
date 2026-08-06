@@ -28,7 +28,7 @@ const steps = [
     n: "03",
     icon: FlaskConical,
     label: "Optimization",
-    desc: "Analytical evidence and Regulatory constraints guide Bayesian reaction optimization.",
+    desc: "Analytical evidence guides Bayesian reaction optimization. Regulatory limits accompany every proposal and are checked against measured results.",
     color: {
       text: "text-violet-500 dark:text-violet-400",
       border: "border-violet-500 dark:border-violet-400",
