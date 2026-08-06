@@ -195,3 +195,148 @@ def test_health_check_ok_on_clean_chain(tmp_path):
     _seed(sf, 3)
     ops.create_audit_anchor(sf, settings=st)
     assert ops.audit_chain_check(sf, settings=st).status == "ok"
+
+
+# --------------------------------------------------------- subject-scoped verification
+#
+# The whole-chain walk above is admin-only and answers a compliance question. A scientist
+# looking at a number asks a narrower one — "can I trust the trail behind THIS number?" —
+# and could not ask it at all before. These pin what the subject-scoped answer establishes,
+# and just as importantly what it does not.
+
+
+def _dossier(sf, *, owner_id: int) -> int:
+    """A minimal owned dossier, so subject access has something real to resolve."""
+    from nmrcheck.orm import RegulatoryDossierORM
+
+    with session_scope(sf) as session:
+        row = RegulatoryDossierORM(title="D", created_by_user_id=owner_id)
+        session.add(row)
+        session.flush()
+        return int(row.id)
+
+
+def test_subject_verify_reports_only_that_subjects_entries(tmp_path):
+    sf, settings = _factory(tmp_path, "subj1.sqlite3")
+    did = _dossier(sf, owner_id=1)
+    for i in range(3):
+        audit_event(sf, event_type=f"d.{i}", message="m",
+                    entity_type="regulatory_dossier", entity_id=did)
+    _seed(sf, 4)  # unrelated chained events
+
+    report = ops.verify_subject_audit_chain(
+        sf, "regulatory_dossier", did, owner_scope_id=None, settings=settings
+    )
+    assert report.entry_count == 3, "must scope to the subject, not the whole chain"
+    assert report.verified_count == 3
+    assert report.ok is True and report.content_ok is True and report.chain_ok is True
+    assert report.break_kind is None and report.detail == "ok"
+
+
+def test_altering_one_subject_entry_is_detected_and_named(tmp_path):
+    sf, settings = _factory(tmp_path, "subj2.sqlite3")
+    did = _dossier(sf, owner_id=1)
+    for i in range(3):
+        audit_event(sf, event_type=f"d.{i}", message="m",
+                    entity_type="regulatory_dossier", entity_id=did)
+
+    with session_scope(sf) as session:
+        row = session.execute(
+            select(AuditEventORM)
+            .where(AuditEventORM.entity_id == did)
+            .order_by(AuditEventORM.chain_seq.asc())
+        ).scalars().all()[1]
+        row.message = "tampered"
+        target_seq = int(row.chain_seq)
+
+    report = ops.verify_subject_audit_chain(
+        sf, "regulatory_dossier", did, owner_scope_id=None, settings=settings
+    )
+    assert report.ok is False
+    assert report.content_ok is False
+    assert report.first_break_seq == target_seq
+    # A machine-readable cause, so no client has to parse `detail`.
+    assert report.break_kind == "entry_hash_mismatch"
+    assert report.verified_count == 1  # stopped at the altered entry
+
+
+def test_a_subject_whose_entries_are_intact_still_reports_a_broken_chain(tmp_path):
+    """The honest half: removal is not provable from the subject's own slice.
+
+    Entries carry a global chain_seq and no per-subject sequence, so deleting one about this
+    subject leaves no gap in the subject's own view. The global walk is what surfaces it, and
+    its verdict must not be folded away into a clean `ok`.
+    """
+    sf, settings = _factory(tmp_path, "subj3.sqlite3")
+    did = _dossier(sf, owner_id=1)
+    audit_event(sf, event_type="d.0", message="m",
+                entity_type="regulatory_dossier", entity_id=did)
+    _seed(sf, 4)
+
+    with session_scope(sf) as session:  # delete an UNRELATED entry -> global gap
+        victim = session.execute(
+            select(AuditEventORM)
+            .where(AuditEventORM.entity_id.is_(None))
+            .order_by(AuditEventORM.chain_seq.asc())
+        ).scalars().first()
+        session.delete(victim)
+
+    report = ops.verify_subject_audit_chain(
+        sf, "regulatory_dossier", did, owner_scope_id=None, settings=settings
+    )
+    assert report.content_ok is True, "the subject's own entries were untouched"
+    assert report.chain_ok is False
+    assert report.chain_break_kind is not None
+    assert report.ok is False, "a broken chain cannot be reported as a trustworthy trail"
+    assert report.detail.startswith("subject_entries_intact_but_chain_")
+
+
+def test_a_caller_outside_the_owner_scope_gets_the_missing_subject_answer(tmp_path):
+    """Unreachable and non-existent must be indistinguishable, or the trail leaks a census."""
+    import pytest
+
+    sf, settings = _factory(tmp_path, "subj4.sqlite3")
+    did = _dossier(sf, owner_id=1)
+    audit_event(sf, event_type="d.0", message="m",
+                entity_type="regulatory_dossier", entity_id=did)
+
+    with pytest.raises(KeyError):
+        ops.verify_subject_audit_chain(
+            sf, "regulatory_dossier", did, owner_scope_id=999, settings=settings
+        )
+    with pytest.raises(KeyError):  # same answer for one that does not exist
+        ops.verify_subject_audit_chain(
+            sf, "regulatory_dossier", 424242, owner_scope_id=999, settings=settings
+        )
+
+
+def test_an_unknown_subject_type_is_the_same_404_not_a_distinct_error(tmp_path):
+    """Answering differently would let an outsider enumerate the addressable types."""
+    import pytest
+
+    sf, settings = _factory(tmp_path, "subj5.sqlite3")
+    with pytest.raises(KeyError):
+        ops.verify_subject_audit_chain(
+            sf, "not_a_subject", 1, owner_scope_id=None, settings=settings
+        )
+
+
+def test_spectroscopy_sessions_are_refused_and_pointed_at_their_own_surface(tmp_path):
+    """A second, weaker path to session records would be a way around the role model."""
+    import pytest
+
+    sf, settings = _factory(tmp_path, "subj6.sqlite3")
+    with pytest.raises(ValueError, match="session review surface"):
+        ops.verify_subject_audit_chain(
+            sf, "spectracheck_session", 1, owner_scope_id=None, settings=settings
+        )
+
+
+def test_a_subject_with_no_chained_entries_says_so_rather_than_passing(tmp_path):
+    sf, settings = _factory(tmp_path, "subj7.sqlite3")
+    did = _dossier(sf, owner_id=1)
+    report = ops.verify_subject_audit_chain(
+        sf, "regulatory_dossier", did, owner_scope_id=None, settings=settings
+    )
+    assert report.entry_count == 0
+    assert report.detail == "no_chained_entries"

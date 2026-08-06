@@ -254,6 +254,7 @@ from .models import (
     AsyncJobAccepted,
     AuditAnchorRecord,
     AuditChainVerification,
+    SubjectAuditChainVerification,
     AuditEventRecord,
     AuthPageResponse,
     AutomationTaskDefinition,
@@ -3416,6 +3417,47 @@ def admin_audit_verify_route(
     """Full re-walk of the tamper-evident audit hash chain + anchor re-verification (admin-only)."""
     state = _state(request)
     return ops_store.verify_audit_chain(state.session_factory, settings=state.settings)
+
+
+@router.get(
+    "/audit/{subject_type}/{subject_id}/verify",
+    response_model=SubjectAuditChainVerification,
+    dependencies=[Depends(require_access_context)],
+)
+def subject_audit_verify_route(
+    subject_type: str,
+    subject_id: int,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> SubjectAuditChainVerification:
+    """Verify the audit trail behind one filing or campaign the caller can already open.
+
+    The whole-chain walk above is admin-only and answers a compliance question. This answers
+    the scientist's question — can I trust the trail behind *this* number? Access is the
+    subject's own rule, so a subject the caller cannot reach is the same 404 as one that does
+    not exist. Spectroscopy sessions keep their own review surface.
+
+    The response separates what was actually established: whether every entry about this
+    subject is unaltered, and whether the chain those entries sit in still re-walks (which is
+    what would reveal one having been removed). Read ``ok`` for the bottom line and
+    ``break_kind`` / ``chain_break_kind`` for the cause — never parse ``detail``.
+    """
+    state = _state(request)
+    try:
+        return ops_store.verify_subject_audit_chain(
+            state.session_factory,
+            subject_type,
+            subject_id,
+            owner_scope_id=_user_scope_for_context(context),
+            settings=state.settings,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except KeyError as exc:
+        # A subject that does not exist, one the caller cannot reach, and an unrecognised
+        # subject type are the same answer — anything else tells an outsider which filings
+        # exist, or which subject types this deployment addresses.
+        raise HTTPException(status_code=404, detail="Audit subject not found.") from exc
 
 
 @router.post(
