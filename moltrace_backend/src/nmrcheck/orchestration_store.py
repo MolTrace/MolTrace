@@ -10,6 +10,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.orm import Session, sessionmaker
 
 from .database import session_scope
+from .file_storage import default_file_storage
 from .models import (
     AnalysisJobCreate,
     AnalysisJobRecord,
@@ -133,6 +134,28 @@ def _file_path(row: ManagedFileRecordORM, storage_root: Path) -> Path:
     if isinstance(local_path, str) and local_path.strip():
         return Path(local_path)
     return _storage_path_from_key(storage_root, row.storage_key)
+
+
+def _read_file_bytes(row: ManagedFileRecordORM, storage_root: Path) -> bytes:
+    """The bytes behind a managed-file row, wherever they were actually stored.
+
+    Rows written before object storage existed carry ``storage_backend="local"`` and a
+    ``local_path`` in their metadata, so those keep reading from the filesystem exactly as before —
+    the backend is chosen from the *row*, not from current settings, which means flipping a
+    deployment to object storage cannot orphan the files it already has.
+    """
+    if (row.storage_backend or "local") == "local":
+        path = _file_path(row, Path(storage_root))
+        if not path.exists():
+            raise FileNotFoundError("Managed file bytes are not available in storage.")
+        return path.read_bytes()
+    return default_file_storage(storage_root).read(row.storage_key)
+
+
+#: The one way to get a managed file's bytes. Anything that reads an upload should call this
+#: rather than resolving a path itself, or it silently stops working the moment a deployment
+#: stores files anywhere other than the local disk.
+read_managed_file_bytes = _read_file_bytes
 
 
 def _project_visible(row: SpectraCheckProjectORM | None, *, owner_scope_id: int | None) -> bool:
@@ -335,13 +358,17 @@ def upload_file_record(
             session.refresh(row)
             return _file_to_record(row)
 
+        backend = default_file_storage(storage_root)
         row = ManagedFileRecordORM(
             filename=safe_name,
             original_filename=original_filename or safe_name,
             content_type=content_type,
             file_size_bytes=len(content),
             sha256=sha256,
-            storage_backend="local",
+            # The record names whatever actually stored the bytes, so an operator reading this
+            # table can tell where to look for them. It used to say "local" unconditionally, which
+            # was a lie on any host that was not storing them locally.
+            storage_backend=backend.name,
             storage_key="pending",
             file_kind=file_kind,
             metadata_json="{}",
@@ -350,14 +377,19 @@ def upload_file_record(
         session.flush()
         stored_filename = f"{row.id}_{safe_name}"
         storage_key = _storage_key_for(stored_filename)
-        target = _storage_path_from_key(storage_root, storage_key)
-        with target.open("xb") as handle:
-            handle.write(content)
+        backend.write(storage_key, content)
         metadata.update(
             {
-                "local_path": str(target),
+                # Only meaningful for the local backend; an object store is addressed by key.
+                "local_path": (
+                    str(_storage_path_from_key(storage_root, storage_key))
+                    if backend.name == "local"
+                    else None
+                ),
                 "raw_file_immutable": file_kind == "raw_fid",
-                "storage_policy": "Uploads are stored as immutable local objects and are not overwritten by jobs.",
+                "storage_policy": (
+                    "Uploads are stored as immutable objects and are not overwritten by jobs."
+                ),
             }
         )
         row.filename = stored_filename
@@ -393,15 +425,14 @@ def get_file_download(
     file_id: int,
     *,
     storage_root: Path,
-) -> tuple[FileRecord, Path] | None:
+) -> tuple[FileRecord, bytes] | None:
+    """The record and its bytes. Returns bytes rather than a path because an object store has no
+    path to hand back, and the caller only ever streamed the contents anyway."""
     with session_scope(session_factory) as session:
         row = session.get(ManagedFileRecordORM, file_id)
         if row is None:
             return None
-        path = _file_path(row, Path(storage_root))
-        if not path.exists():
-            raise FileNotFoundError("Managed file bytes are not available in local storage.")
-        return (_file_to_record(row), path)
+        return (_file_to_record(row), _read_file_bytes(row, Path(storage_root)))
 
 
 def delete_file_record(session_factory: sessionmaker[Session], file_id: int) -> bool:
@@ -596,14 +627,15 @@ def _execute_processed_preview(
     file_row = session.get(ManagedFileRecordORM, input_ids[0])
     if file_row is None:
         raise OrchestrationError(f"Input file {input_ids[0]} not found.")
-    path = _file_path(file_row, storage_root)
-    if not path.exists():
-        raise OrchestrationError("Input file bytes are not available in local storage.")
+    try:
+        file_bytes = _read_file_bytes(file_row, Path(storage_root))
+    except FileNotFoundError as exc:
+        raise OrchestrationError("Input file bytes are not available in storage.") from exc
     params = _json_dict(row.parameters_json)
     try:
         preview = parse_processed_spectrum(
             filename=file_row.original_filename,
-            content=path.read_bytes(),
+            content=file_bytes,
             solvent=params.get("solvent"),
             frequency_mhz=params.get("spectrometer_frequency_mhz"),
             reference_nmr_text=params.get("nmr_text"),
@@ -970,10 +1002,12 @@ def get_artifact_download(
             return None
         record = _artifact_to_record(row)
         if row.storage_key:
+            # Artifacts predate the backend split and were only ever written locally, so read them
+            # locally first and fall back to the configured backend for anything newer.
             path = _storage_path_from_key(Path(storage_root), row.storage_key)
-            if not path.exists():
-                raise FileNotFoundError("Artifact bytes are not available in local storage.")
-            return (record, path.read_bytes(), row.content_type)
+            if path.exists():
+                return (record, path.read_bytes(), row.content_type)
+            return (record, default_file_storage(storage_root).read(row.storage_key), row.content_type)
         if row.artifact_json:
             return (record, row.artifact_json.encode("utf-8"), row.content_type)
         return (record, b"", row.content_type)

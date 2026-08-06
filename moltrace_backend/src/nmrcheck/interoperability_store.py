@@ -1113,8 +1113,7 @@ def normalize_file(
     download = orch_store.get_file_download(session_factory, file_id, storage_root=storage_root)
     if download is None:
         raise KeyError("Managed file not found.")
-    _file_record, path = download
-    content = path.read_bytes()
+    _file_record, content = download
     with session_scope(session_factory) as session:
         file_row = session.get(ManagedFileRecordORM, file_id)
         if file_row is None:
