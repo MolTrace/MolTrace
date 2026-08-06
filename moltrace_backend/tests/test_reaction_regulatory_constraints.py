@@ -244,3 +244,42 @@ def test_build_impurity_limit_fields_empty_without_a_threshold():
     assert (
         build_impurity_limit_fields("impurity_reporting", {"observed_level_percent": 0.3}) == {}
     )
+
+
+# --- persisted-vocabulary invariants ----------------------------------------------------------
+
+
+def test_soft_penalty_tiers_on_the_persisted_severity_vocabulary():
+    """A warning-tier violation must outweigh an info-tier one.
+
+    The persisted vocabulary is ``CrossModuleSeverity = info|warning|high|critical`` (models.py),
+    so "medium" can never reach the engine from a stored row. Tiering only on "medium" flattens
+    every soft constraint to the same weight, which silently erases the severity distinction the
+    regulatory reviewer set.
+    """
+    warning_verdict = evaluate_candidate(
+        {"impurity_percent": 0.20},
+        parse_limits([_impurity_constraint(severity="warning")]),
+    )
+    info_verdict = evaluate_candidate(
+        {"impurity_percent": 0.20},
+        parse_limits([_impurity_constraint(severity="info")]),
+    )
+
+    assert warning_verdict.hard_block is False
+    assert info_verdict.hard_block is False
+    assert warning_verdict.penalty > info_verdict.penalty
+
+
+def test_provenance_survives_the_singular_bridge_key():
+    """The Regentry->Repho bridge writes the SINGULAR key into constraint_json.
+
+    ``product_orchestration_store`` records ``{"source_action_item_id": <id>}`` in the body, while
+    the engine reads the plural ``source_action_item_ids``. A consumer handed only the body — which
+    is what an audit record walking back to the source action item has — loses the link entirely.
+    """
+    constraint = _impurity_constraint(action_ids=(), source_action_item_id=7)
+    limit = parse_limit(constraint)
+
+    assert limit is not None
+    assert limit.source_action_item_ids == (7,)

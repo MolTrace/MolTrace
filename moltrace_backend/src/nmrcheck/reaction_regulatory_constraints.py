@@ -37,6 +37,19 @@ from typing import Any
 # is infeasible and filtered out of the ranking. Lower tiers only apply a soft ranking penalty.
 _HARD_SEVERITIES = frozenset({"high", "critical"})
 
+# Soft-penalty weight per severity tier. The keys must match the PERSISTED vocabulary
+# (``CrossModuleSeverity = info|warning|high|critical``, models.py) — a stored row can never carry
+# "medium", so tiering on that alone flattened every soft constraint to the same weight and erased
+# the distinction a regulatory reviewer set. "medium"/"low" are retained as legacy aliases for
+# callers that hand the engine a hand-built mapping.
+_SOFT_PENALTY_WEIGHTS: dict[str, float] = {
+    "warning": 0.6,
+    "medium": 0.6,  # legacy alias for "warning"
+    "info": 0.3,
+    "low": 0.3,  # legacy alias for "info"
+}
+_DEFAULT_SOFT_PENALTY_WEIGHT = 0.3
+
 # Default (outcome field, comparator) per constraint_type, used when constraint_json does not
 # name an objective_field explicitly. Only fields that map to a real reaction-outcome measurement
 # can be enforced; others remain advisory unless constraint_json names an explicit field.
@@ -176,7 +189,14 @@ def parse_limit(constraint: Mapping[str, Any]) -> RegulatoryLimit | None:
     if comparator not in ("max", "min"):
         comparator = "max"
 
+    # Provenance may arrive three ways: the plural top-level column, the plural body key, or the
+    # SINGULAR body key the Regentry->Repho bridge actually writes
+    # (``product_orchestration_store`` records ``source_action_item_id``). An audit record handed
+    # only the body must not lose the link back to the source action item.
     ids = constraint.get("source_action_item_ids") or body.get("source_action_item_ids") or []
+    if not ids:
+        singular = body.get("source_action_item_id")
+        ids = [singular] if singular is not None else []
     source_ids = tuple(int(i) for i in ids if isinstance(i, (int, str)) and str(i).isdigit())
 
     cid = constraint.get("id")
@@ -275,9 +295,13 @@ def evaluate_candidate(
         frac = _violation_fraction(predicted, limit)
         if frac <= 0.0:
             continue
-        # Weight the soft penalty by tier so a medium violation pushes a candidate down more
-        # than a low one, while hard violations are filtered outright (penalty still recorded).
-        weight = 1.0 if limit.is_hard else (0.6 if limit.severity == "medium" else 0.3)
+        # Weight the soft penalty by tier so a warning violation pushes a candidate down more
+        # than an info one, while hard violations are filtered outright (penalty still recorded).
+        weight = (
+            1.0
+            if limit.is_hard
+            else _SOFT_PENALTY_WEIGHTS.get(limit.severity, _DEFAULT_SOFT_PENALTY_WEIGHT)
+        )
         penalties.append(min(1.0, frac * weight))
         violations.append(
             ConstraintViolation(
