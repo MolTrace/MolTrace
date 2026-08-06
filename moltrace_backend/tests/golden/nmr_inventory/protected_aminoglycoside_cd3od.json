@@ -80,6 +80,7 @@
     {
       "integration_h": 30.0,
       "library_match": {
+        "compound": "water",
         "delta_ppm": 0.0,
         "expected_ppm": 4.87,
         "kind": "water",
@@ -94,6 +95,7 @@
     {
       "integration_h": 26.0,
       "library_match": {
+        "compound": "solvent residual peak",
         "delta_ppm": 0.0,
         "expected_ppm": 3.31,
         "kind": "residual",
@@ -108,6 +110,7 @@
     {
       "integration_h": 0.5,
       "library_match": {
+        "compound": "ethyl methyl ketone",
         "delta_ppm": 0.011,
         "expected_ppm": 2.12,
         "kind": "impurity",
@@ -122,6 +125,7 @@
     {
       "integration_h": 0.5,
       "library_match": {
+        "compound": "ethyl acetate",
         "delta_ppm": 0.007,
         "expected_ppm": 1.24,
         "kind": "impurity",
