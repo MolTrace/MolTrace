@@ -1311,6 +1311,11 @@ class ManagedFileRecordORM(Base):
     storage_backend: Mapped[str] = mapped_column(String(32), default="local", index=True)
     storage_key: Mapped[str] = mapped_column(Text)
     file_kind: Mapped[str] = mapped_column(String(64), default="other", index=True)
+    #: Who uploaded this file (migration 0043). Nothing recorded an owner before,
+    #: so any authenticated caller could read and DOWNLOAD any other user's
+    #: upload -- verified live. NULL means the row predates attribution and is
+    #: refused to non-admins rather than treated as unowned; see the migration.
+    created_by_user_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     metadata_json: Mapped[str] = mapped_column(Text, default="{}")
 
@@ -1428,6 +1433,8 @@ class ArtifactRecordORM(Base):
     threshold_profile_id: Mapped[int | None] = mapped_column(
         ForeignKey("threshold_profiles.id", ondelete="SET NULL"), nullable=True, index=True
     )
+    #: See ManagedFileRecordORM.created_by_user_id — migration 0043.
+    created_by_user_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     metadata_json: Mapped[str] = mapped_column(Text, default="{}")
 
