@@ -1167,3 +1167,81 @@ non-distributable, and nobody has to make a decision for that to happen.
 > has been library-only across two audits. If it is meant to ship it needs an
 > endpoint and an indexed corpus; if not, say so in the module docstring so the
 > next audit does not re-derive this.
+
+---
+
+## B1 RESULT — SpectraCheck: uploaded files are readable by any authenticated user
+
+**This is the most serious defect found in the whole validation programme, and
+it is NOT fixed. Read this before anything else in Track B.**
+
+### Probed live, with auth enforced
+
+Two unrelated accounts. Owner uploads `owner_private.csv` via `POST /files/upload`
+(201, file id 1). The **other** user then:
+
+```
+GET /files/1                -> 200      (record)
+GET /files/1/download       -> 200      ppm,intensity 1.0,10 2.0,20
+GET /files                  -> 200      1 file listed: "1_owner_private.csv"
+```
+
+The second user **downloaded the bytes**. For a product whose users upload
+proprietary FIDs, that is one customer reading another customer's raw spectral
+data — the single most confidential thing the system holds.
+
+### Why it is not a route patch
+
+```
+managed_file_records columns:
+  id, filename, original_filename, content_type, file_size_bytes, sha256,
+  storage_backend, storage_key, file_kind, created_at, metadata_json
+                                    *** no owner column ***
+```
+
+Same shape as the compound registry before migration 0039: nothing to scope
+against. None of `list_file_records`, `get_file_record`, `get_file_download`,
+`get_artifact_record` takes an owner parameter, because there is nothing to
+pass.
+
+### The fix, ready to execute
+
+1. **Migration 0041** — `created_by_user_id` on `managed_file_records` and the
+   artifact table, nullable + indexed, plus the `_ensure_sqlite_schema` arm.
+   Follow `0039_registry_attributability.py` exactly; the reasoning about
+   nullable-for-legacy and no-backfill applies unchanged.
+2. **Stamp on create** — `upload_file_record` takes `created_by_user_id`.
+3. **Scope on read** — `owner_scope_id` on all four readers; `None` keeps the
+   unscoped view for the system key/admin, matching `list_signatures` and the
+   action-item list.
+4. **Non-leaking 404 on the by-id routes**, not 403. Unlike the compound
+   registry — where a shared reference makes existence non-secret — an uploaded
+   file's existence *is* confidential, so this follows the dossier pattern.
+5. **Legacy NULL rows**: refuse to non-admins, as with 0039. A file uploaded
+   before attribution existed has no provable owner, and "nobody is recorded"
+   must not read as "anyone may download it".
+
+### Why it was not fixed in this pass
+
+The four routes live in `api.py`, which had uncommitted changes from a parallel
+session at the time. `git commit -- api.py` commits the WORKTREE version, so
+committing the fix would have swept that session's in-flight work into it.
+Fixing only the store layer would have left the routes unwired — the
+half-applied guard this codebase keeps producing, and the exact shape of the
+`action-items` hole (`b049003`).
+
+**Do this first, in a session with `api.py` uncontested.**
+
+### The other five B1 obstacles — status
+
+| # | claim | verdict |
+|---|---|---|
+| 1 | analyze steps do not return persisted ids | not re-probed this pass |
+| 2 | no server-side report generation; `POST .../reports` stores a client payload | **stands** — and `spectracheck_store` prefers a client-supplied `report_sha256` over the server computation, so the integrity hash is client-authored too |
+| 3 | no PDF export in the HTTP surface | not re-probed |
+| 4 | managed files unscoped | **CONFIRMED, above** |
+| 5 | `/reports/{id}` resolves two tables | not re-probed |
+| 6 | 6 of 10 job types have no adapter | not re-probed |
+
+Only #4 was probed live this pass; the rest are carried forward as claims, not
+findings. Do not cite them as verified.
