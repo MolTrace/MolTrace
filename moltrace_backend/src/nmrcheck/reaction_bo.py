@@ -99,6 +99,11 @@ class _ConditionDomain:
     boolean: dict[str, list[bool]]
     fixed: dict[str, Any]
     excluded: list[dict[str, Any]]
+    #: Numeric variables whose spec could not be read, so they contribute no
+    #: levels to the search. Carried out of the domain builder rather than
+    #: dropped, because an unsearched variable is indistinguishable from a
+    #: searched one in the run output otherwise.
+    unparsed_numeric: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -512,9 +517,25 @@ def run_bayesian_optimization(
             domain,
             max_candidates=max(payload.candidate_count, payload.batch_size * 4),
         )
+        for unreadable in domain.unparsed_numeric:
+            warnings.append(
+                f"Design-space variable '{unreadable}' could not be read and was not "
+                "searched. Give it a list of values, or a range as {\"low\": …, "
+                "\"high\": …}."
+            )
         if not candidate_conditions:
             candidate_conditions = [_default_candidate_from_experiments(experiments)]
             warnings.append("No enumerated design-space candidates were available; using a fallback shell.")
+        elif len(candidate_conditions) <= 1:
+            # The empty case above was guarded; exactly one was not, and it is
+            # the same failure wearing a success status -- the acquisition
+            # function has nothing to choose between, so whatever single point
+            # exists is returned with expected improvement 0.
+            warnings.append(
+                "Only one candidate condition could be enumerated from the design "
+                "space, so no search was performed and the recommendation is not "
+                "an optimisation result."
+            )
 
         ranked, diagnostics, model_type, feature_encoding, model_warnings = _rank_candidates(
             training=training,
@@ -1174,7 +1195,57 @@ def _sklearn_gp_predictions(
                 "metadata_json": {"model_branch": "gaussian_process"},
             }
         )
-    return "gaussian_process", predictions, {"kernel": str(model.kernel_)}, None
+    metrics: dict[str, Any] = {"kernel": str(model.kernel_)}
+    degenerate = _degenerate_length_scale(model.kernel_)
+    if degenerate is not None:
+        metrics["surrogate_degenerate"] = True
+        metrics["fitted_length_scale"] = degenerate
+    return "gaussian_process", predictions, metrics, (
+        None
+        if degenerate is None
+        else (
+            f"The surrogate model did not learn a usable relationship (fitted "
+            f"length scale {degenerate:g} sits at its optimiser bound), so every "
+            f"candidate scores near the mean of the observations and the ranking "
+            f"between them is not meaningful. Add more, better-spread experiments."
+        )
+    )
+
+
+#: A Matern/RBF length scale at or below this has hit scikit-learn's default
+#: lower bound (1e-5). It means the kernel found no correlation between points:
+#: the GP interpolates its training data and predicts the prior mean everywhere
+#: else, so every candidate ties. Measured on a real 8-observation run -- every
+#: recommendation came back at predicted 64.9, exactly the mean of the observed
+#: yields, with identical expected improvement.
+_DEGENERATE_LENGTH_SCALE = 1e-4
+
+
+def _degenerate_length_scale(kernel: Any) -> float | None:
+    """The fitted length scale when it has collapsed, else None.
+
+    Read off the fitted kernel's hyperparameters rather than parsed out of its
+    repr, so a kernel sum or product still reports correctly.
+    """
+    try:
+        params = kernel.get_params(deep=True)
+    except Exception:  # pragma: no cover - defensive; a kernel without params
+        return None
+    scales: list[float] = []
+    for name, value in params.items():
+        if not name.endswith("length_scale") or callable(value):
+            continue
+        if isinstance(value, (int, float)):
+            scales.append(float(value))
+        else:
+            try:
+                scales.extend(float(item) for item in value)
+            except TypeError:
+                continue
+    if not scales:
+        return None
+    smallest = min(scales)
+    return smallest if smallest <= _DEGENERATE_LENGTH_SCALE else None
 
 
 def _sklearn_forest_predictions(
@@ -1406,6 +1477,7 @@ def _build_domain(
     boolean: dict[str, list[bool]] = {}
     fixed: dict[str, Any] = {}
     excluded: list[dict[str, Any]] = []
+    unparsed_numeric: list[str] = []
 
     if design_space is not None:
         fixed.update(_json_dict(design_space.fixed_conditions_json))
@@ -1415,6 +1487,12 @@ def _build_domain(
             if values:
                 numeric[str(name)] = values
                 numeric_ranges[str(name)] = value_range
+            else:
+                # Silently dropping the variable is what made an unrecognised
+                # range spelling look like a working optimisation: the domain
+                # ends up empty, one candidate is enumerated, and the run
+                # reports success. Record it so the caller is told.
+                unparsed_numeric.append(str(name))
         for name, spec in _json_dict(design_space.categorical_variables_json).items():
             values = _categorical_values_from_spec(spec)
             if values:
@@ -1458,6 +1536,7 @@ def _build_domain(
         boolean=boolean,
         fixed=fixed,
         excluded=excluded,
+        unparsed_numeric=tuple(unparsed_numeric),
     )
 
 
@@ -1965,12 +2044,40 @@ def _numeric_values_from_spec(value: Any) -> tuple[list[float], tuple[float, flo
     if isinstance(value, dict):
         if isinstance(value.get("values"), list):
             return _numeric_values_from_spec(value["values"])
+        # Accept the spellings a chemist actually writes. Only min/max and
+        # min_value/max_value were understood, so {"low": 20, "high": 100} --
+        # an entirely natural range -- parsed to nothing, the variable was
+        # dropped from the search domain, and the optimizer then evaluated a
+        # single point and reported success. Measured: EI 0.0 on the worst
+        # region of the space while the best observed sat 30 points higher.
+        low = _first_present(value, ("min", "min_value", "low", "lower"))
+        high = _first_present(value, ("max", "max_value", "high", "upper"))
         return _numeric_values_from_bounds(
-            value.get("min", value.get("min_value")),
-            value.get("max", value.get("max_value")),
+            low,
+            high,
             value.get("default", value.get("default_value")),
         )
     return [], (0.0, 0.0)
+
+
+def _first_present(spec: dict[str, Any], keys: tuple[str, ...]) -> Any:
+    """The first key that is present AND not None.
+
+    ``dict.get(a, dict.get(b))`` evaluates the fallback eagerly and, worse,
+    returns ``None`` when the first key exists with a null value instead of
+    trying the alternatives. Both matter here because an unparsed bound silently
+    removes the variable from the search.
+    """
+    for key in keys:
+        if spec.get(key) is not None:
+            return spec[key]
+    return None
+
+
+#: Levels a continuous ``{low, high}`` range is expanded into for candidate
+#: enumeration. Nine keeps a two-variable space at 81 candidates -- cheap to
+#: score, fine enough for the acquisition function to rank meaningfully.
+_RANGE_LEVELS = 9
 
 
 def _numeric_values_from_bounds(
@@ -1984,8 +2091,17 @@ def _numeric_values_from_bounds(
         return [], (0.0, 0.0)
     if low > high:
         low, high = high, low
-    midpoint = (low + high) / 2.0
-    values = [low, midpoint, high]
+    # A grid, not three points. The acquisition function can only choose among
+    # the levels it is handed, so [low, mid, high] gives a 3x3 = 9 point search
+    # for two variables -- too coarse to discriminate, and coarse in a way that
+    # is invisible in the output. Nine levels keeps the enumeration cheap
+    # (9^2 = 81 candidates for a two-variable space) while letting the optimizer
+    # propose something other than the corners and the centre.
+    if high == low:
+        values = [low]
+    else:
+        step = (high - low) / (_RANGE_LEVELS - 1)
+        values = [low + step * index for index in range(_RANGE_LEVELS)]
     default_numeric = _float_or_none(default)
     if default_numeric is not None:
         values.append(default_numeric)
