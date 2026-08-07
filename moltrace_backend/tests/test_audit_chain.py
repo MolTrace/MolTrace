@@ -340,3 +340,109 @@ def test_a_subject_with_no_chained_entries_says_so_rather_than_passing(tmp_path)
     )
     assert report.entry_count == 0
     assert report.detail == "no_chained_entries"
+
+
+# ----------------------------------------------- verifiable export + offline re-verification
+#
+# `verify_subject_audit_chain` answers "is it intact?". These pin the harder promise: that an
+# outsider can check for themselves. The export must be in the exact shape the digest covers,
+# and the standalone script — which imports nothing from this package — must reach the same
+# verdict the server does, including when the record has been tampered with.
+
+
+def _offline_verifier():
+    """Load scripts/verify_audit_export.py by path, the way an auditor would run it."""
+    import importlib.util
+    from pathlib import Path
+
+    path = Path(__file__).resolve().parents[1] / "scripts" / "verify_audit_export.py"
+    spec = importlib.util.spec_from_file_location("verify_audit_export", path)
+    assert spec and spec.loader
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def _export(sf, did):
+    return [
+        e.model_dump(mode="json")
+        for e in ops.export_subject_audit_entries(
+            sf, "regulatory_dossier", did, owner_scope_id=None
+        )
+    ]
+
+
+def test_the_offline_verifier_agrees_with_the_server_on_a_clean_export(tmp_path):
+    sf, settings = _factory(tmp_path, "exp1.sqlite3")
+    did = _dossier(sf, owner_id=1)
+    for i in range(4):
+        audit_event(sf, event_type=f"d.{i}", message=f"m{i}",
+                    entity_type="regulatory_dossier", entity_id=did)
+
+    entries = _export(sf, did)
+    assert len(entries) == 4
+    # The raw stored string, not a parsed dict — the digest covers the text.
+    assert all(isinstance(e["metadata_json"], (str, type(None))) for e in entries)
+
+    findings = _offline_verifier().verify(entries)
+    assert findings == [], findings
+    assert ops.verify_subject_audit_chain(
+        sf, "regulatory_dossier", did, owner_scope_id=None, settings=settings
+    ).content_ok is True
+
+
+def test_the_offline_verifier_catches_a_tamper_the_server_also_catches(tmp_path):
+    """The whole point: the auditor does not have to take our word for it."""
+    sf, settings = _factory(tmp_path, "exp2.sqlite3")
+    did = _dossier(sf, owner_id=1)
+    for i in range(3):
+        audit_event(sf, event_type=f"d.{i}", message=f"m{i}",
+                    entity_type="regulatory_dossier", entity_id=did)
+
+    with session_scope(sf) as session:
+        row = session.execute(
+            select(AuditEventORM)
+            .where(AuditEventORM.entity_id == did)
+            .order_by(AuditEventORM.chain_seq.asc())
+        ).scalars().all()[1]
+        row.message = "tampered"
+
+    entries = _export(sf, did)
+    findings = _offline_verifier().verify(entries)
+    assert any("entry_hash_mismatch" in f for f in findings), findings
+    # ...and the server independently reaches the same conclusion.
+    assert ops.verify_subject_audit_chain(
+        sf, "regulatory_dossier", did, owner_scope_id=None, settings=settings
+    ).break_kind == "entry_hash_mismatch"
+
+
+def test_the_offline_verifier_catches_a_removed_entry(tmp_path):
+    sf, _ = _factory(tmp_path, "exp3.sqlite3")
+    did = _dossier(sf, owner_id=1)
+    for i in range(4):
+        audit_event(sf, event_type=f"d.{i}", message=f"m{i}",
+                    entity_type="regulatory_dossier", entity_id=did)
+
+    entries = _export(sf, did)
+    del entries[1]  # drop one from the middle of the subject's own slice
+    findings = _offline_verifier().verify(entries)
+    assert any("sequence_gap" in f or "prev_hash_mismatch" in f for f in findings), findings
+
+
+def test_an_empty_export_is_not_a_pass(tmp_path):
+    """Nothing checked must never read as verified — the failure mode this product exists to stop."""
+    findings = _offline_verifier().verify([])
+    assert findings and "not a pass" in findings[0]
+
+
+def test_the_export_uses_the_same_access_rule_as_verification(tmp_path):
+    import pytest
+
+    sf, _ = _factory(tmp_path, "exp4.sqlite3")
+    did = _dossier(sf, owner_id=1)
+    with pytest.raises(KeyError):
+        ops.export_subject_audit_entries(
+            sf, "regulatory_dossier", did, owner_scope_id=999
+        )
+    with pytest.raises(KeyError):
+        ops.export_subject_audit_entries(sf, "not_a_subject", 1, owner_scope_id=None)

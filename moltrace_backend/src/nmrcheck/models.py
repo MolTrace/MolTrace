@@ -13223,6 +13223,53 @@ class AuditChainVerification(BaseModel):
     key_id: str
 
 
+class AuditChainEntry(BaseModel):
+    """One chained audit entry, in the exact shape its ``entry_hash`` was computed over.
+
+    This is the *verifiable* projection: it exists so a third party can recompute the hash
+    chain themselves rather than take the server's word for it. Every field below is an
+    input to ``entry_hash``, which is why ``metadata_json`` is the **raw stored string**
+    and not the parsed dict :class:`AuditEventRecord` exposes — the digest covers the raw
+    text specifically to avoid projection drift, so a re-projected dict would not reproduce
+    it.
+
+    Discloses no payload that ``GET /audit/events`` does not already return for the same
+    entity; the addition is the integrity metadata (``chain_seq``, ``chain_ts``,
+    ``prev_hash``, ``entry_hash``).
+
+    To verify offline, for each entry in ``chain_seq`` order::
+
+        payload = {chain_seq, chain_ts, created_at, event_type, message, actor_user_id,
+                   actor_email, entity_type, entity_id, metadata_json, prev_hash}
+        canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"),
+                               ensure_ascii=True, allow_nan=False).encode()
+        assert "sha256:" + hashlib.sha256(canonical).hexdigest() == entry_hash
+
+    and confirm each entry's ``prev_hash`` equals the previous entry's ``entry_hash``.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    chain_seq: int
+    #: The timestamps are strings, not datetimes, and deliberately so: the digest covers
+    #: an exact ISO rendering (``+00:00``, never ``Z``), and a datetime field would let the
+    #: consumer's JSON encoder pick a different one — Pydantic's own ``mode="json"`` emits
+    #: ``Z`` and produced a hash mismatch on a healthy export. A verifiable projection must
+    #: not contain a field whose serialization is up to whoever reads it.
+    chain_ts: str
+    created_at: str
+    event_type: str
+    message: str
+    actor_user_id: int | None = None
+    actor_email: str | None = None
+    entity_type: str | None = None
+    entity_id: int | None = None
+    #: The RAW stored JSON string covered by the digest — not a parsed dict.
+    metadata_json: str | None = None
+    prev_hash: str
+    entry_hash: str
+
+
 class SubjectAuditChainVerification(BaseModel):
     """Integrity of the audit entries recorded about ONE subject (a filing or a campaign).
 

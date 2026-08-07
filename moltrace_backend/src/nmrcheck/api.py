@@ -253,8 +253,8 @@ from .models import (
     ArtifactRecord,
     AsyncJobAccepted,
     AuditAnchorRecord,
+    AuditChainEntry,
     AuditChainVerification,
-    SubjectAuditChainVerification,
     AuditEventRecord,
     AuthPageResponse,
     AutomationTaskDefinition,
@@ -884,6 +884,7 @@ from .models import (
     StructureValidateRequest,
     StructureValidateResponse,
     SubjectApprovalCreate,
+    SubjectAuditChainVerification,
     SubjectCommentCreate,
     SubjectReviewerCreate,
     SubjectReviewTaskCreate,
@@ -3457,6 +3458,41 @@ def subject_audit_verify_route(
         # A subject that does not exist, one the caller cannot reach, and an unrecognised
         # subject type are the same answer — anything else tells an outsider which filings
         # exist, or which subject types this deployment addresses.
+        raise HTTPException(status_code=404, detail="Audit subject not found.") from exc
+
+
+@router.get(
+    "/audit/{subject_type}/{subject_id}/entries",
+    response_model=list[AuditChainEntry],
+    dependencies=[Depends(require_access_context)],
+)
+def subject_audit_entries_route(
+    subject_type: str,
+    subject_id: int,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> list[AuditChainEntry]:
+    """The chained entries behind this subject, in the shape their digests cover.
+
+    The sibling ``/verify`` route answers "is it intact?". This one exists so nobody has to
+    take that on trust: it returns each entry exactly as its ``entry_hash`` was computed,
+    so an auditor can recompute the chain offline with a JSON encoder and SHA-256 and reach
+    their own verdict. ``scripts/verify_audit_export.py`` does precisely that and imports
+    nothing from this package.
+
+    Same access rule and same non-leaking 404 as ``/verify``. No payload here is absent from
+    ``GET /audit/events`` for the same entity; what is added is the integrity metadata.
+    """
+    try:
+        return ops_store.export_subject_audit_entries(
+            _state(request).session_factory,
+            subject_type,
+            subject_id,
+            owner_scope_id=_user_scope_for_context(context),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except KeyError as exc:
         raise HTTPException(status_code=404, detail="Audit subject not found.") from exc
 
 
