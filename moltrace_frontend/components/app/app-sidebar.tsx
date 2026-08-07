@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo } from "react"
+import { useLayoutEffect, useMemo, useRef } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
@@ -141,6 +141,47 @@ function mostSpecificActiveHref(pathname: string, hrefs: string[]): string | nul
 export function AppSidebar({ collapsed, onToggle }: AppSidebarProps) {
   const { isRouteOffered } = useIncludedModules()
   const pathname = usePathname()
+
+  /**
+   * Keep the current item in view.
+   *
+   * AppShell is rendered by each of the ~113 pages rather than by a layout, so
+   * every navigation unmounts this sidebar and mounts a fresh one — and a fresh
+   * scroll container starts at the top. For anything in the lower groups
+   * (Validation Center, Team, Admin, Settings) that means clicking an item
+   * scrolled it straight out of sight, which reads as the nav "jumping back up".
+   *
+   * This scrolls the nav — and ONLY the nav — so the active item is visible. It
+   * is a layout effect so the correction happens before paint rather than as a
+   * visible jump afterwards, and it does nothing when the item is already in
+   * view, so ordinary clicks near the top stay perfectly still.
+   *
+   * scrollIntoView is deliberately not used: it walks up the ancestor chain and
+   * can scroll the page as well as the nav, which is how a sidebar click ends up
+   * moving the document behind it.
+   */
+  const navRef = useRef<HTMLElement | null>(null)
+  const correctedFor = useRef<string | null>(null)
+  useLayoutEffect(() => {
+    // Once per route, not once per render. The nav items arrive asynchronously
+    // (useIncludedModules gates them on a capability readout), so this has to
+    // keep trying until the active item exists — but once it has corrected for
+    // a route it must stop, or any later re-render would drag the nav back and
+    // fight a user who has deliberately scrolled somewhere else.
+    if (correctedFor.current === pathname) return
+    const nav = navRef.current
+    const active = nav?.querySelector<HTMLElement>('[aria-current="page"]')
+    if (!nav || !active) return
+    correctedFor.current = pathname
+
+    const navBox = nav.getBoundingClientRect()
+    const itemBox = active.getBoundingClientRect()
+    if (itemBox.top >= navBox.top && itemBox.bottom <= navBox.bottom) return
+    // Centre it rather than butting it against an edge, so the neighbouring
+    // items stay visible and the position reads as deliberate.
+    nav.scrollTop = active.offsetTop - nav.clientHeight / 2 + active.offsetHeight / 2
+  }, [pathname, isRouteOffered])
+
 
   const primaryHrefs = useMemo(
     () => [...navGroups.flatMap((g) => g.items), ...teamNav, ...bottomNav].map((i) => i.href),
@@ -286,7 +327,7 @@ export function AppSidebar({ collapsed, onToggle }: AppSidebarProps) {
         </Tooltip>
 
         {/* Primary navigation — grouped by job */}
-        <nav className="flex-1 space-y-3 overflow-y-auto p-2" aria-label="Primary">
+        <nav ref={navRef} className="flex-1 space-y-3 overflow-y-auto p-2" aria-label="Primary">
           {/* Only offer what the server will serve. Routes belonging to a product this
               deployment does not include are refused with a 403, so showing them is a dead
               end; a group that empties out disappears entirely rather than leaving a header
