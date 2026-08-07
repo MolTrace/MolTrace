@@ -30,9 +30,21 @@ import type { FaqItem } from "@/components/seo/structured-data"
  * all of them stand down under prefers-reduced-motion.
  */
 
-/** How many entries render expanded. Enough to make the section read as answered
- *  content on arrival, few enough that the list stays scannable. */
-const OPEN_BY_DEFAULT = 3
+/**
+ * How many entries render expanded on arrival. Zero: the deck opens closed, so a
+ * reader meets six questions rather than three answers and three questions.
+ *
+ * This was 3, on the reasoning that an open entry is unambiguously visible
+ * content for an answer engine rather than something it must act to reveal.
+ * Collapsing them costs nothing there, and that is worth stating precisely
+ * because it is the kind of thing that gets "fixed" back later: a closed
+ * <details> still ships its full answer in the server HTML. The text is present
+ * and extractable either way — only its on-screen state changes. The FAQPage
+ * JSON-LD is emitted separately again and never depended on this at all.
+ *
+ * Raise it if the section should lead with answers instead of questions.
+ */
+const OPEN_BY_DEFAULT = 0
 
 export function FaqSection({
   items,
@@ -99,11 +111,11 @@ export function FaqSection({
               not against whatever ancestor happens to be positioned. */}
           <div className="relative min-w-0">
             {items.map((item, i) => (
-              // The first few open by default: a collapsed <details> still ships its
-              // answer in the server HTML, but an open one is unambiguously visible
-              // content rather than something a reader (or an extractor) must act to
-              // reveal. The questions are the only question-shaped strings on the
-              // site, so they are wrapped in <h3> to enter the document outline —
+              // Entries render closed (see OPEN_BY_DEFAULT). A collapsed <details>
+              // still ships its full answer in the server HTML, so nothing is
+              // withheld from a reader or an extractor by starting shut. The
+              // questions are the only question-shaped strings on the site, so
+              // they are wrapped in <h3> to enter the document outline —
               // <summary> alone carries no heading semantics.
               <details
                 key={i}
