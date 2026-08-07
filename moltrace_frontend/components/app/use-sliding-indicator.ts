@@ -24,6 +24,13 @@ export type IndicatorRect = { left: number; width: number }
 export function useSlidingIndicator<T extends HTMLElement = HTMLDivElement>(
   /** Changing this re-measures — pass whatever identifies the active item. */
   activeKey: string | undefined,
+  /**
+   * How the active item marks itself. Defaults to our own `data-active`, but
+   * Radix-driven strips pass `[data-state="active"]` so they can reuse this
+   * without being rewritten to carry a second attribute that means the same
+   * thing.
+   */
+  activeSelector = '[data-active="true"]',
 ) {
   const containerRef = useRef<T | null>(null)
   const [rect, setRect] = useState<IndicatorRect | null>(null)
@@ -31,7 +38,7 @@ export function useSlidingIndicator<T extends HTMLElement = HTMLDivElement>(
   const measure = useCallback(() => {
     const container = containerRef.current
     if (!container) return
-    const active = container.querySelector<HTMLElement>('[data-active="true"]')
+    const active = container.querySelector<HTMLElement>(activeSelector)
     if (!active || active.offsetWidth === 0) {
       setRect(null)
       return
@@ -41,7 +48,7 @@ export function useSlidingIndicator<T extends HTMLElement = HTMLDivElement>(
         ? prev
         : { left: active.offsetLeft, width: active.offsetWidth },
     )
-  }, [])
+  }, [activeSelector])
 
   // Layout effect so the indicator is placed in the same frame the active item
   // changes — measuring in a passive effect lets one frame paint with the
@@ -59,6 +66,22 @@ export function useSlidingIndicator<T extends HTMLElement = HTMLDivElement>(
     const observer = new ResizeObserver(() => measure())
     observer.observe(container)
     for (const child of Array.from(container.children)) observer.observe(child)
+    return () => observer.disconnect()
+  }, [measure])
+
+  // Watch the marker attribute itself. Callers that own the selected value pass
+  // it as `activeKey` and are already covered by the layout effect above, but a
+  // strip whose selection lives inside a third-party primitive (Radix Tabs) never
+  // tells us it changed — the only signal is the attribute flipping in the DOM.
+  useEffect(() => {
+    const container = containerRef.current
+    if (!container || typeof MutationObserver === "undefined") return
+    const observer = new MutationObserver(() => measure())
+    observer.observe(container, {
+      attributes: true,
+      attributeFilter: ["data-state", "data-active"],
+      subtree: true,
+    })
     return () => observer.disconnect()
   }, [measure])
 
