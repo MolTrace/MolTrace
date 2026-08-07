@@ -16,10 +16,25 @@ ratios**, up to integration-window choice. So the pipeline can be checked
 without anyone having to know the structure, and without an arbiter that could
 itself be wrong.
 
-Measured 2026-08-04 (median 21% error on isolated peaks, small peaks
-systematically under-reported, worst -71.5%). These tests pin that measurement
-so the number moves visibly when the scale chain is fixed, rather than being
-re-discovered later. See docs/validation_playbook.md section A1.
+CORRECTED 2026-08-06. The first version of this file claimed a median 21.1%
+error with small peaks under-reported to -71.5%, and concluded the pipeline does
+not recover true proton ratios. **That was wrong, and it was wrong in a
+particular way worth recording.**
+
+The 21.1% came from comparing reported integrations against a midpoint
+partition of the trace that the TEST computed -- every point assigned to its
+nearest reported peak. That is not how the pipeline integrates, so the number
+measured the disagreement between two window methods and then blamed the
+pipeline for it.
+
+Measured against the pipeline's own fitted areas on the identical run (19 peaks,
+353 H): **median 1.7%, worst 8.8%, 14 of 14 within 10%.** The area -> proton
+scaling is faithful.
+
+What that does NOT establish is whether the fitted AREAS are right. They come
+from raw local-maximum cluster sums, and the deconvolution fit that could
+correct them is discarded (see tests/test_gsd_fitted_areas.py, phase A4). That
+is the open question; this file no longer pretends to answer it.
 
 The fixture lives in validation_fixtures/ and is gitignored (real customer
 spectra are not committed to a public repo), so every test here skips when it
@@ -53,12 +68,12 @@ pytestmark = pytest.mark.skipif(
     ),
 )
 
-#: Median relative error between reported proton share and true area share,
-#: over well-isolated peaks, measured on exp 10. This is a BASELINE of current
-#: behaviour, not a target -- the target is well under 5%, which is what
-#: "readable as a proton count" means.
-MEASURED_MEDIAN_ERROR_PCT = 21.1
-MEASURED_WORST_ERROR_PCT = 71.5
+#: Median relative error between each peak's share of the reported proton total
+#: and its share of the pipeline's own fitted area, on exp 10. This measures the
+#: SCALING step only. Re-baselined 2026-08-06 from a bogus 21.1% -- see the
+#: module docstring.
+MEASURED_MEDIAN_ERROR_PCT = 1.7
+MEASURED_WORST_ERROR_PCT = 8.8
 
 
 def _load_trace():
@@ -97,13 +112,79 @@ def test_the_fixture_is_the_fully_relaxed_half_of_the_pair() -> None:
     )
 
 
-def test_reported_proton_ratios_still_deviate_from_the_true_area_ratios() -> None:
-    """The A1 finding, pinned.
+def test_the_area_to_proton_scaling_is_faithful() -> None:
+    """Each peak's share of the reported protons matches its share of the areas.
 
-    This asserts the CURRENT (wrong) behaviour so the gap is tracked. When the
-    scale chain improves, this test fails loudly and should be re-baselined
-    downward -- deliberately, in the same change, with the new measurement
-    written into MEASURED_MEDIAN_ERROR_PCT.
+    This is the step the pipeline is actually responsible for once areas exist:
+    turning areas into proton numbers without distorting their ratios. Measured
+    1.7% median / 8.8% worst, 14 of 14 within 10%.
+
+    It deliberately compares against the pipeline's OWN fitted areas rather than
+    against a trace partition computed here. The earlier version of this test did
+    the latter and reported 21.1%, which was the disagreement between two window
+    methods rather than an error in the pipeline.
+    """
+    import numpy as np
+
+    from nmrcheck.spectrum import _infer_peak_estimates, parse_processed_spectrum
+
+    ppm, y = _load_trace()
+    csv = "ppm,intensity\n" + "\n".join(f"{p:.6f},{v:.6f}" for p, v in zip(ppm, y))
+    report = parse_processed_spectrum(
+        filename="exp10.csv", content=csv.encode(), solvent="CDCl3", frequency_mhz=500.163
+    )
+    peaks = sorted(report.inferred_peaks, key=lambda p: -p.shift_ppm)
+    heights = np.array([p.integration_h for p in peaks], dtype=float)
+
+    estimates = _infer_peak_estimates(
+        list(zip(ppm.tolist(), y.tolist())), frequency_mhz=500.163
+    )
+    by_shift = {round(e.shift_ppm, 2): e.area for e in estimates}
+    areas = np.array([by_shift.get(round(p.shift_ppm, 2), np.nan) for p in peaks])
+    matched = ~np.isnan(areas)
+    assert matched.sum() >= 8, f"only matched {matched.sum()} peaks back to an area"
+
+    share_area = areas[matched] / areas[matched].sum()
+    share_h = heights[matched] / heights[matched].sum()
+    error = np.abs((share_h - share_area) / share_area * 100.0)
+
+    assert float(np.median(error)) == pytest.approx(MEASURED_MEDIAN_ERROR_PCT, abs=3.0), (
+        f"area-to-proton scaling drifted: median {np.median(error):.1f}% vs the "
+        f"pinned {MEASURED_MEDIAN_ERROR_PCT}%"
+    )
+    assert (error < 10.0).all(), (
+        f"a peak's proton share diverged from its area share by {error.max():.1f}%"
+    )
+
+
+def test_whether_the_areas_themselves_are_right_is_not_settled_here() -> None:
+    """Names the open question instead of pretending this file answers it.
+
+    The scaling above is faithful, but it inherits whatever the areas are. Those
+    come from raw local-maximum cluster sums; the pseudo-Voigt fit that could
+    correct them is computed and discarded (A4). So a spectrum can pass this
+    test and still report wrong proton counts if the windows are wrong.
+
+    Pinned as a reminder that "1.7% error" is a statement about one stage, not
+    about the product's accuracy.
+    """
+    import inspect
+
+    from nmrcheck import spectrum
+
+    source = inspect.getsource(spectrum._cluster_peak_components)
+    assert "area=total_area" in source, (
+        "cluster areas no longer come from the pre-deconvolution sum — if the "
+        "fit now feeds them, re-measure A1 against exp 10 and re-baseline"
+    )
+
+
+def test_the_reported_values_land_on_the_half_proton_grid() -> None:
+    """The quantiser is real and worth knowing about, independent of the above.
+
+    On a 1 H signal a 0.5 H grid is 50% granularity; on a 25 H multiplet it is
+    2%. That size-dependence is a genuine property of the output even though it
+    is not the 21% error this file once claimed.
     """
     import numpy as np
 
@@ -112,96 +193,10 @@ def test_reported_proton_ratios_still_deviate_from_the_true_area_ratios() -> Non
     ppm, y = _load_trace()
     csv = "ppm,intensity\n" + "\n".join(f"{p:.6f},{v:.6f}" for p, v in zip(ppm, y))
     report = parse_processed_spectrum(
-        filename="exp10.csv",
-        content=csv.encode(),
-        solvent="CDCl3",
-        frequency_mhz=500.163,
+        filename="exp10.csv", content=csv.encode(), solvent="CDCl3", frequency_mhz=500.163
     )
-    peaks = sorted(report.inferred_peaks, key=lambda p: -p.shift_ppm)
-    assert len(peaks) >= 10, f"expected a populated spectrum, got {len(peaks)} peaks"
-
-    centres = [p.shift_ppm for p in peaks]
-    heights = np.array([p.integration_h for p in peaks], dtype=float)
-
-    # Nearest-peak partition: every point is assigned to the reported peak it
-    # is closest to, which is what an integration effectively does.
-    edges = (
-        [centres[0] + 0.5]
-        + [(a + b) / 2 for a, b in zip(centres[:-1], centres[1:])]
-        + [centres[-1] - 0.5]
-    )
-    areas = np.array(
-        [
-            float(np.trapezoid(y[(ppm >= lo) & (ppm <= hi)], -ppm[(ppm >= lo) & (ppm <= hi)]))
-            for hi, lo in zip(edges[:-1], edges[1:])
-        ]
-    )
-
-    share_area = areas / areas.sum()
-    share_h = heights / heights.sum()
-    error_pct = (share_h - share_area) / share_area * 100.0
-
-    # Restrict to well-isolated peaks. Next to a very large neighbour the
-    # partition above mis-assigns tail area, and that is a limitation of the
-    # MEASUREMENT, not of the pipeline -- excluding those keeps the finding
-    # about the pipeline.
-    gap_left = [np.inf] + [centres[i - 1] - centres[i] for i in range(1, len(centres))]
-    gap_right = [centres[i] - centres[i + 1] for i in range(len(centres) - 1)] + [np.inf]
-    biggest_neighbour = [
-        max(
-            heights[i - 1] if i > 0 else 0.0,
-            heights[i + 1] if i < len(centres) - 1 else 0.0,
-        )
-        for i in range(len(centres))
-    ]
-    isolated = [
-        i
-        for i in range(len(centres))
-        if min(gap_left[i], gap_right[i]) > 0.15 and biggest_neighbour[i] < 40
-    ]
-    assert len(isolated) >= 4, f"too few isolated peaks to judge ({len(isolated)})"
-
-    magnitude = np.abs(error_pct[isolated])
-    median = float(np.median(magnitude))
-
-    assert median == pytest.approx(MEASURED_MEDIAN_ERROR_PCT, abs=8.0), (
-        f"processed-path proton-ratio error moved: median {median:.1f}% vs the "
-        f"pinned {MEASURED_MEDIAN_ERROR_PCT}%. If this DROPPED, the scale chain "
-        f"improved -- re-baseline this constant in the same change and say so."
-    )
-
-
-def test_small_peaks_are_the_ones_that_are_wrong() -> None:
-    """Direction matters for the fix: the error is not random noise.
-
-    Large multiplets come back close to right; the smallest signals are
-    systematically UNDER-reported (worst measured -71.5%). A chemist reading a
-    minor impurity or a single diagnostic proton is therefore the person most
-    misled, which is the opposite of what an integration should degrade toward.
-    """
-    import numpy as np
-
-    from nmrcheck.spectrum import parse_processed_spectrum
-
-    ppm, y = _load_trace()
-    csv = "ppm,intensity\n" + "\n".join(f"{p:.6f},{v:.6f}" for p, v in zip(ppm, y))
-    report = parse_processed_spectrum(
-        filename="exp10.csv",
-        content=csv.encode(),
-        solvent="CDCl3",
-        frequency_mhz=500.163,
-    )
-    peaks = sorted(report.inferred_peaks, key=lambda p: -p.shift_ppm)
-    heights = np.array([p.integration_h for p in peaks], dtype=float)
-
-    smallest = heights.min()
-    largest = heights.max()
-    assert largest / smallest > 50, (
-        "this fixture is expected to span a wide dynamic range; if it no longer "
-        "does, the premise of the small-peak finding has changed"
-    )
-    # Every reported value lands on the 0.5 H quantiser grid.
-    assert all(abs(h * 2 - round(h * 2)) < 1e-9 for h in heights), (
-        "reported integrations are expected to be multiples of 0.5 H; the "
-        "quantiser is part of what this baseline measures"
+    heights = np.array([p.integration_h for p in report.inferred_peaks], dtype=float)
+    assert all(abs(h * 2 - round(h * 2)) < 1e-9 for h in heights)
+    assert heights.max() / heights.min() > 50, (
+        "this fixture is expected to span a wide dynamic range"
     )
