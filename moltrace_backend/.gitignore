@@ -24,10 +24,14 @@ torch_env/
 *.sqlite3
 *.db
 nmrcheck.sqlite3
-# Pre-migration safety copies of a dev DB (e.g. taken before an
-# additive ALTER TABLE); never a build input.
-*.sqlite3.bak
-*.sqlite.bak
+# Safety copies of a dev DB (e.g. taken before an additive ALTER TABLE, or
+# before a cleanup); never a build input. The inner glob matters: copies get
+# named for the reason they were taken -- nmrcheck.sqlite3.pre-cleanup.bak --
+# which the plain `.sqlite3.bak` suffix does not match, leaving a 50 MB
+# database of real dev accounts untracked-but-not-ignored in a public repo,
+# one broad `git add` away from being published.
+*.sqlite3*.bak
+*.sqlite*.bak
 .nmrcheck/
 
 # Scientific/raw artifacts and generated archives
