@@ -99,9 +99,20 @@ export function Hero() {
               Analytical evidence you can trace under audit.
             </h1>
             {/* One line. The detail belongs to the card beside it and to the
-                sections below, not to a paragraph nobody finishes. */}
+                sections below, not to a paragraph nobody finishes.
+
+                THIS LINE USED TO READ: "Every result carries its confidence, its
+                citations, and its contradictions." It was replaced because it
+                promised the opposite of what the product does. `TraceableFigure`
+                renders "Not traced — no citation recorded" precisely because
+                plenty of results have no citation, and the spec calls that
+                absence-is-a-state rule "the whole product claim". A hero that
+                promises completeness undersells a product that sells honesty
+                about incompleteness — and two of that sentence's three nouns
+                (confidence, contradictions) rest on the verifier, which does not
+                run in the shipped image. Do not restore it. */}
             <p className="hero-copy-wrap mt-6 max-w-xl text-pretty text-lg text-muted-foreground sm:text-xl">
-              Every result carries its confidence, its citations, and its contradictions.
+              Every number shows its trail — or shows that it hasn&apos;t got one.
             </p>
             <div className="mt-10 flex flex-col items-start gap-4 sm:flex-row sm:items-center">
               <Button size="lg" className="min-w-[180px] gap-2" asChild>
