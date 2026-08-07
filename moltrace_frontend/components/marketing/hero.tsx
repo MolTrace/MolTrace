@@ -149,12 +149,12 @@ export function Hero() {
             on purpose: nested in the column it stacked ABOVE the card on a phone,
             which put the one artifact worth showing about two and a half screens
             down and undid the reason for the rewrite. */}
-        <div className="hero-stat-grid mt-16 grid grid-cols-1 gap-4 border-t pt-10 sm:grid-cols-2 lg:mt-20 lg:grid-cols-4">
+        <div className="hero-stat-grid mt-16 grid grid-cols-1 gap-5 border-t pt-10 sm:grid-cols-2 lg:mt-20 lg:grid-cols-4">
           {HERO_MODULES.map((m) => (
             <Link
               key={m.name}
               href={m.href}
-              className="group relative block h-full min-w-0 rounded-xl border bg-card p-4 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring motion-reduce:transition-none motion-reduce:hover:translate-y-0"
+              className="group relative block h-full min-w-0 rounded-xl border bg-card p-6 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring motion-reduce:transition-none motion-reduce:hover:translate-y-0"
               /* The 3px left rule is the whole signature of this card: it is what
                  carries the module's colour without tinting any text. The `border`
                  class sets 1px on all four sides and this overrides the left. */
@@ -165,8 +165,8 @@ export function Hero() {
                   {/* Icons keep the vivid accent — they are shapes, not type, so
                       the AA rule that pushes text to the ink tokens does not
                       apply to them. */}
-                  <m.icon className="h-5 w-5 shrink-0" style={{ color: m.accent }} aria-hidden />
-                  <h3 className="truncate text-sm font-semibold" style={{ color: m.ink }}>
+                  <m.icon className="h-6 w-6 shrink-0" style={{ color: m.accent }} aria-hidden />
+                  <h3 className="truncate text-base font-semibold" style={{ color: m.ink }}>
                     {m.name}
                   </h3>
                 </div>
@@ -186,7 +186,7 @@ export function Hero() {
                 {m.tag}
               </span>
 
-              <p className="mt-2.5 text-xs leading-relaxed text-muted-foreground">{m.desc}</p>
+              <p className="mt-3 text-sm leading-relaxed text-muted-foreground">{m.desc}</p>
             </Link>
           ))}
         </div>
