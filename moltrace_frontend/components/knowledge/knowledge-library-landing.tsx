@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import { ArrowUpRight } from "lucide-react"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { apiFetch } from "@/lib/api/client"
 import { formatApiError } from "@/components/spectracheck/spectracheck-helpers"
@@ -65,6 +66,59 @@ function formatWhen(iso: string | undefined): string {
 
 const PENDING_TASK_STATUSES = new Set(["open", "in_review", "needs_changes", "deferred"])
 const APPROVED_TASK_STATUS = "accepted"
+
+/**
+ * The eleven destinations this landing page offers, grouped by what they are.
+ *
+ * The order inside the first three groups is the order the work actually happens
+ * in: sources are ingested, extractions come off them, a human reviews those,
+ * and the reviewed output becomes records and then dataset candidates. A flat
+ * row of buttons threw that away and made "Method registry" look like a peer of
+ * "Sources workspace".
+ *
+ * `leavesModule` is not decoration. Those three hrefs go to other modules
+ * entirely, and a link that silently relocates you is worse than one that warns
+ * you first — especially on a page whose own banner says extracted knowledge is
+ * mid-review.
+ */
+const KNOWLEDGE_DESTINATIONS: ReadonlyArray<{
+  label: string
+  leavesModule?: boolean
+  items: ReadonlyArray<{ label: string; href: string }>
+}> = [
+  {
+    label: "Ingest and review",
+    items: [
+      { label: "Sources workspace", href: "/knowledge/sources" },
+      { label: "Extractions workspace", href: "/knowledge/extractions" },
+      { label: "Review tasks", href: "/knowledge/review" },
+    ],
+  },
+  {
+    label: "Reviewed records",
+    items: [
+      { label: "Reaction records", href: "/knowledge/reactions" },
+      { label: "Analytical records", href: "/knowledge/analytical" },
+      { label: "Regulatory records", href: "/knowledge/regulatory" },
+    ],
+  },
+  {
+    label: "What those records feed",
+    items: [
+      { label: "Dataset candidates", href: "/knowledge/datasets" },
+      { label: "Model improvement", href: "/knowledge/model-improvement" },
+    ],
+  },
+  {
+    label: "Related work",
+    leavesModule: true,
+    items: [
+      { label: "ML Model Factory", href: "/ml" },
+      { label: "Validation runs", href: "/validation" },
+      { label: "Method registry", href: "/settings/methods" },
+    ],
+  },
+]
 
 export function KnowledgeLibraryLanding() {
   const [loading, setLoading] = useState(true)
@@ -206,51 +260,71 @@ export function KnowledgeLibraryLanding() {
         description="Extracted knowledge requires human review. Citations, provenance, and dataset splits must be preserved before records are used for models or regulatory decisions."
       />
 
-      <div className="flex flex-wrap items-center gap-2">
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          disabled={loading}
-          onClick={() => setReloadToken((x) => x + 1)}
-        >
-          {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden /> : null}
-          Refresh
-        </Button>
-        <Button variant="outline" size="sm" asChild>
-          <Link href="/knowledge/sources">Sources workspace</Link>
-        </Button>
-        <Button variant="outline" size="sm" asChild>
-          <Link href="/knowledge/extractions">Extractions workspace</Link>
-        </Button>
-        <Button variant="outline" size="sm" asChild>
-          <Link href="/knowledge/review">Review tasks</Link>
-        </Button>
-        <Button variant="outline" size="sm" asChild>
-          <Link href="/knowledge/reactions">Reaction records</Link>
-        </Button>
-        <Button variant="outline" size="sm" asChild>
-          <Link href="/knowledge/analytical">Analytical records</Link>
-        </Button>
-        <Button variant="outline" size="sm" asChild>
-          <Link href="/knowledge/regulatory">Regulatory records</Link>
-        </Button>
-        <Button variant="outline" size="sm" asChild>
-          <Link href="/knowledge/datasets">Dataset candidates</Link>
-        </Button>
-        <Button variant="outline" size="sm" asChild>
-          <Link href="/knowledge/model-improvement">Model improvement</Link>
-        </Button>
-        <Button variant="outline" size="sm" asChild>
-          <Link href="/ml">ML Model Factory</Link>
-        </Button>
-        <Button variant="outline" size="sm" asChild>
-          <Link href="/validation">Validation runs</Link>
-        </Button>
-        <Button variant="outline" size="sm" asChild>
-          <Link href="/settings/methods">Method registry</Link>
-        </Button>
-      </div>
+      {/* The destinations, grouped.
+
+          This was twelve identical outline buttons in one wrapping row, which hid
+          three separate problems. Refresh is an ACTION and sat among eleven
+          navigation links, so the one control that changes nothing about where
+          you are looked exactly like the eleven that do. The eight in-module
+          links have a real order — a pipeline, then the records it produces,
+          then what those records feed — and a flat row showed none of it. And
+          three of them leave Knowledge entirely for other modules while looking
+          identical to the ones that stay.
+
+          So: Refresh moves out to sit with the section heading, the in-module
+          destinations are grouped by what they are, and anything that leaves the
+          module says so with an outward arrow rather than looking local. */}
+      <section aria-labelledby="knowledge-destinations" className="space-y-5">
+        <div className="flex items-center justify-between gap-4">
+          <h2
+            id="knowledge-destinations"
+            className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-muted-foreground"
+          >
+            Where to go next
+          </h2>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={loading}
+            onClick={() => setReloadToken((x) => x + 1)}
+          >
+            {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden /> : null}
+            Refresh
+          </Button>
+        </div>
+
+        {KNOWLEDGE_DESTINATIONS.map((group) => (
+          <div key={group.label} className="space-y-2">
+            <p className="text-xs font-medium text-muted-foreground">
+              {group.label}
+              {group.leavesModule ? (
+                // The leading space is not decorative: ml-1.5 separates these
+                // visually but leaves the accessible name as "Related work—opens
+                // another module", run together for anyone listening to it.
+                <span className="ml-1.5 font-normal opacity-70">{" "}— opens another module</span>
+              ) : null}
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {group.items.map((item) => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className="group inline-flex min-h-10 items-center gap-2 rounded-xl border-2 bg-card px-4 py-2 text-sm font-medium text-foreground transition-colors duration-200 hover:border-foreground/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring motion-reduce:transition-none"
+                >
+                  {item.label}
+                  {group.leavesModule ? (
+                    <ArrowUpRight
+                      className="h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform duration-200 group-hover:-translate-y-0.5 group-hover:translate-x-0.5 motion-reduce:transition-none"
+                      aria-hidden
+                    />
+                  ) : null}
+                </Link>
+              ))}
+            </div>
+          </div>
+        ))}
+      </section>
 
       {(errSources ||
         errRuns ||
