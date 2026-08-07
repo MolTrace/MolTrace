@@ -1,4 +1,4 @@
-import { AlertTriangle, BookMarked, Layers } from "lucide-react"
+import { BookMarked, FileSignature, Link2 } from "lucide-react"
 import { AccentCard } from "./accent-card"
 
 /**
@@ -10,15 +10,17 @@ import { AccentCard } from "./accent-card"
  * scrolled a reader 1,800px to see the picture they were already looking at,
  * and then described in prose — confidence scores, citations, contradictions —
  * what the picture showed in pixels. The card is now the hero's alone, and this
- * section answers the question the click actually asks: where does that number
- * come from?
+ * section answers the question the click actually asks: what can I check?
  *
- * Everything here is traceable to backend source rather than to other marketing
- * copy:
- *   - the four tests are `_ALL_TESTS` in
- *     moltrace_backend/src/moltrace/spectroscopy/verification/scorer.py:845
- *   - the combination is `"model": "bayesian_log_odds"` at scorer.py:868
- *   - AI-may-only-reorder-within-a-verdict is the deterministic-first contract
+ * Every claim here is traced to backend source rather than to other marketing
+ * copy, and — the harder test — to source that a customer request actually
+ * reaches. See the note above `mechanics` for a capability that passed the first
+ * test and failed the second.
+ *   - unkeyed SHA-256 entry chaining: `compute_entry_hash` in
+ *     moltrace_backend/src/nmrcheck/audit_chain.py returns "sha256:"; HMAC
+ *     appears only under that file's "anchor signing" heading
+ *   - the signature/record binding is `record_content_hash`, the §11.70 tie
+ *   - citations resolve through the /regulatory/sources/* routes
  *
  * NOTE ON THE CLAIM THAT WAS HERE: this section previously promised "a
  * calibrated confidence score with uncertainty bounds". Neither half survives
@@ -32,12 +34,39 @@ import { AccentCard } from "./accent-card"
 
 const TEAL = { accent: "var(--mt-teal)", ink: "var(--mt-teal-ink)", soft: "var(--mt-teal-soft)" }
 
+/**
+ * WHY THESE THREE AND NOT THE VERIFIER.
+ *
+ * Two earlier cards here described the four-test structure verifier — prediction
+ * bounds, assignment consistency, 2D HSQC ranges, mass-spec match, combined by
+ * Bayesian log-odds. That engine is real, well built, and does not run in the
+ * shipped product:
+ *
+ *   - `verify_structure` has exactly two callers, both inside the AI layer
+ *     (spectroscopy/ai/rag.py and ai/ms_models.py). `src/nmrcheck/` — the whole
+ *     HTTP layer — never imports the verification package.
+ *   - The only route in is POST /spectrum/reason, gated on
+ *     `_reasoning_llm_available()`, which returns False unless
+ *     `find_spec("anthropic")` succeeds — checked BEFORE the API key, so no
+ *     environment variable can rescue it.
+ *   - `anthropic` is declared only in the optional `rag` extra, and the
+ *     production Dockerfile installs `--extra fid --extra gcs` on both uv sync
+ *     lines. The shipped image has never contained the package.
+ *
+ * So a customer request returns `reasoner_available=false` with `candidates=[]`
+ * and the verifier is never called. A capability no customer can reach is not a
+ * claim this page can make.
+ *
+ * What replaced it is the trail itself, which IS reachable and IS the product
+ * claim: chained, citable, signed. If the reasoning path ships in the image, the
+ * verifier card can come back — with the Dockerfile change as its evidence.
+ */
 const mechanics = [
   {
-    icon: Layers,
-    title: "Four tests, one verdict",
-    pill: "Deterministic core",
-    desc: "Prediction bounds, assignment consistency, 2D HSQC ranges and mass-spec match run independently, then combine by Bayesian log-odds. A model may reorder candidates inside a verdict class — never across one.",
+    icon: Link2,
+    title: "A trail anyone can re-walk",
+    pill: "Integrity",
+    desc: "Audit entries are chained with unkeyed SHA-256, so the record can be re-verified from an export with no secret at all. Removal, reordering and alteration are named as separate findings.",
   },
   {
     // Was "Supporting evidence links the spectral database entry, literature
@@ -50,10 +79,10 @@ const mechanics = [
     desc: "Solvent and impurity assignments name the published shift table they were matched against, and literature records keep their DOI and source link.",
   },
   {
-    icon: AlertTriangle,
-    title: "Disagreement is reported",
-    pill: "Human review",
-    desc: "Unexplained integrals, and missing or extra cross-peaks, are reported per test — beside the score instead of folded into it. A qualified reviewer signs off.",
+    icon: FileSignature,
+    title: "Signatures bind their record",
+    pill: "Sign-off",
+    desc: "An e-signature carries a SHA-256 hash of the exact record snapshot it signed, so it cannot be moved to a different record, and the signed manifestation stays displayable.",
   },
 ]
 
@@ -68,11 +97,15 @@ export function EvidenceSection() {
             Reading the evidence
           </p>
           <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">
-            Where that confidence figure comes from.
+            What makes the trail checkable.
           </h2>
+          {/* This paragraph used to say the score "is a total produced by four
+              independent tests". See the note above the cards: that engine does
+              not run in the shipped image, so the page cannot say it does. */}
           <p className="mt-4 text-base leading-relaxed text-muted-foreground">
-            No black box, and no single model&apos;s opinion. The score above is a total produced by
-            four independent tests, and every part of it stays open to inspection.
+            The claim is not that our numbers are right because we say so. It is that the record
+            behind a result is chained, cited and signed — and that each of those is something you
+            can check rather than take on trust.
           </p>
         </div>
 
