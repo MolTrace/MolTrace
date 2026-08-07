@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from . import collaboration_subjects
 from .audit_chain import (
     GENESIS_HASH,
+    _iso_utc,
     anchor_payload,
     compute_entry_hash,
     key_id,
@@ -25,6 +26,7 @@ from .audit_chain import (
 from .database import audit_event, session_scope
 from .models import (
     AuditAnchorRecord,
+    AuditChainEntry,
     AuditChainVerification,
     AuditEventRecord,
     DataMode,
@@ -305,6 +307,68 @@ def verify_audit_chain(
             detail=final_detail,
             key_id=key_id(settings.audit_signing_key),
         )
+
+
+def export_subject_audit_entries(
+    session_factory: sessionmaker[Session],
+    subject_type: str,
+    subject_id: int,
+    *,
+    owner_scope_id: int | None,
+) -> list[AuditChainEntry]:
+    """The chained entries about one subject, in the shape their digests were computed over.
+
+    Exists so verification does not have to be taken on trust: with this an auditor can
+    recompute the hash chain themselves, offline, using nothing but a JSON encoder and
+    SHA-256. ``verify_subject_audit_chain`` answers "is it intact?"; this answers "check
+    for yourself".
+
+    ``metadata_json`` is returned as the RAW stored string because that is what the digest
+    covers — handing back the parsed dict would produce a payload that cannot reproduce
+    ``entry_hash``. It discloses no content that ``GET /audit/events`` does not already
+    return for the same entity; the delta is the integrity metadata.
+
+    Same access rule and same non-leaking 404 as the verification itself.
+    """
+
+    if subject_type not in collaboration_subjects.SUBJECT_TYPES:
+        raise KeyError(f"Unknown subject type: {subject_type}")
+    if not collaboration_subjects.is_generic_subject(subject_type):
+        raise ValueError("Use the session review surface for spectroscopy sessions.")
+
+    with session_scope(session_factory) as session:
+        if not collaboration_subjects.can_access_subject(
+            session, subject_type, subject_id, owner_scope_id=owner_scope_id
+        ):
+            raise KeyError(f"{subject_type} {subject_id} not found.")
+        rows = session.execute(
+            select(AuditEventORM)
+            .where(
+                AuditEventORM.chain_seq.is_not(None),
+                AuditEventORM.entity_type == subject_type,
+                AuditEventORM.entity_id == subject_id,
+            )
+            .order_by(AuditEventORM.chain_seq.asc())
+        ).scalars().all()
+        return [
+            AuditChainEntry(
+                chain_seq=int(row.chain_seq),
+                # Rendered with the SAME helper the digest uses, so the exported text is
+                # byte-for-byte what was hashed.
+                chain_ts=str(_iso_utc(row.chain_ts)),
+                created_at=str(_iso_utc(row.created_at)),
+                event_type=row.event_type,
+                message=row.message,
+                actor_user_id=row.actor_user_id,
+                actor_email=row.actor_email,
+                entity_type=row.entity_type,
+                entity_id=row.entity_id,
+                metadata_json=row.metadata_json,
+                prev_hash=str(row.prev_hash),
+                entry_hash=str(row.entry_hash),
+            )
+            for row in rows
+        ]
 
 
 def verify_subject_audit_chain(
