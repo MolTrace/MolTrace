@@ -22,6 +22,10 @@ The platform is architected **deterministic-first**: regulated math and classifi
 
 MolTrace presents three modules around one unified evidence trail, with a closed loop: spectroscopy evidence becomes ICH-classified regulatory action items, which become reaction-optimization constraints, which inform the next experiment — all linked by recipe-hash reproducibility and an ALCOA+ audit ledger. The three modules are surfaced in a single tabbed Programs workspace in the signed-in app.
 
+**Each module also runs on its own.** A deployment declares which products it serves via `MOLTRACE_ENABLED_MODULES`, and a router-level gate refuses routes belonging to anything else — a `403` carrying `module_not_licensed` and an `X-MolTrace-Module` header, so a client can tell "not in this plan" from "not permitted". `GET /system/capabilities` reports what a workspace includes so the interface offers only what is actually there. The classification covering every route is exhaustive and pinned by a test that fails the build when a new route is neither assigned to a product nor declared platform, and a CI matrix boots each single-product configuration to prove the cross-module surfaces degrade rather than break.
+
+The compliance floor ships with **every** configuration, which is the point of it: the audit chain, e-signatures, controlled records, validation and the compound registry are platform, not per-product. Collaboration is subject-addressed rather than spectroscopy-only — review tasks, comments, sign-off decisions and reviewer nominations can be raised against a regulatory filing or a reaction campaign, authorized by that subject's own access rule. Filings and campaigns are owned by a team rather than solely their creator, so regulatory affairs and process chemistry work as the group activities they are.
+
 ### Golden path — one seeded arc, end to end
 *Route: `/pilot/golden-path` (summarised on the command centre)*
 
@@ -278,7 +282,9 @@ Key environment variables (in production these are injected from **Secret Manage
 | `ANTHROPIC_API_KEY` | backend | Enables the optional RAG `/spectrum/reason` path (with the undeclared `anthropic` package). |
 | `API_BASE_URL` | frontend | Backend target for the same-origin proxy (local + root deploy). |
 | `NEXT_PUBLIC_API_BASE_URL` | frontend | Public API base. Note: the browser always calls the same-origin `/api/backend` proxy — an absolute URL here is deliberately ignored by `lib/api/client.ts`. |
+| `MOLTRACE_ENABLED_MODULES` | backend | Which products this deployment serves: any of `spectracheck`, `regulatory_hub`, `reaction_optimization` (default: all three). Routes belonging to a product not listed are refused with `module_not_licensed`. An unrecognised value is a startup issue, not a later 403. |
 | `RAW_VAULT_BACKEND` / `RAW_VAULT_BUCKET` | backend | Storage backend for the immutable raw-FID vault: `local` (default, filesystem) or `gcs` + a bucket. **Serverless deploys must use `gcs`** — Cloud Run's filesystem is ephemeral. |
+| `FILE_STORAGE_BACKEND` / `FILE_STORAGE_BUCKET` | backend | Storage for uploaded files and generated artifacts — separate from the raw vault, which is immutable evidence with its own retention. `local` (default) or `gcs` + a bucket. **Serverless deploys must use `gcs`**: on an ephemeral filesystem an upload disappears on the next instance recycle while its database row still says it is there, so the failure surfaces later as a broken download rather than an error at upload time. |
 | `RATE_LIMIT_ENABLED` / `RATE_LIMIT_TRUST_FORWARDED_FOR` | backend | API abuse protection; trust `X-Forwarded-For` when behind the Cloud Run edge. |
 | `ADMIN_EMAILS` | backend | Comma-separated admin allow-list. **No admin exists unless this is set** — the code default is empty. |
 
@@ -303,6 +309,8 @@ Correctness is enforced, not assumed:
 - **Fail-closed four-check deployment gate** (dominance / audit-chain / tests-green / data-leakage) — `moltrace-deployment-gate` must pass before any deploy hook fires.
 - **Two regulatory zero-tolerance hard gates** — calculation error rate must be 0 and formula coverage must be 100%.
 - **GSD A/B regression fixture** guards detector drift between the legacy and GSD pipelines.
+- **Route-classification completeness** — every route must be deliberately assigned to a product or declared platform; a route matching neither fails the build rather than silently shipping ungated.
+- **Single-product deployment matrix** — the app is booted once per product and swept to prove the other products' routes are refused, the shared platform still serves, and the cross-module surfaces degrade to empty instead of throwing.
 
 ## Documentation
 
