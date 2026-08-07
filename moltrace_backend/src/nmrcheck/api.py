@@ -12320,6 +12320,7 @@ def raw_fid_archive_process(
         generated_inputs,
         user_id=context.user_id,
         hours_saved_estimate=hours_saved,
+        automation_task_key="nmr_raw_fid_processing",
     )
     fid_run = save_fid_run(
         _state(request).session_factory,
@@ -12669,6 +12670,7 @@ async def fid_process(
         generated_inputs,
         user_id=context.user_id,
         hours_saved_estimate=hours_saved,
+        automation_task_key="nmr_raw_fid_processing",
     )
     fid_run = save_fid_run(
         _state(request).session_factory,

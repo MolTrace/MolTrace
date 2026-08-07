@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from . import orchestration_store as orch_store
 from . import quality_control_store as qc_store
+from .analytics_store import record_automation_event
 from .database import session_scope
 from .models import (
     AnalysisJobCreate,
@@ -1138,6 +1139,18 @@ def start_workflow_run(
             run.progress_percent = 100.0
             _add_event(session, workflow_run_id=run.id, event_type="blocked", message=warnings[-1], progress_percent=100.0)
             _add_session_audit(session, session_id=run.session_id, actor_id=actor_id, event_type="workflow.run.blocked", message="Workflow run blocked by missing required inputs.", metadata={"workflow_run_id": run.id, "missing_inputs": missing})
+            # This branch is terminal and returns below, so it needs its own event; the one
+            # after the step loop is never reached from here.
+            record_automation_event(
+                session,
+                event_type="workflow_run_completed",
+                task_key="workflow_run_execution",
+                status="failed",
+                user_id=actor_id,
+                workflow_run_id=run.id,
+                session_id=run.session_id,
+                metadata={"workflow_status": run.status, "template_id": run.template_id},
+            )
             session.flush()
             session.refresh(run)
             return _run_to_record(run, session)
@@ -1203,6 +1216,21 @@ def start_workflow_run(
         else:
             run.outputs_json = _json_dump({"status": stop_status, "message": stop_message, "human_review_required": True}, default={})
             _add_session_audit(session, session_id=run.session_id, actor_id=actor_id, event_type=f"workflow.run.{stop_status}", message=stop_message or "Workflow run stopped.", metadata={"workflow_run_id": run.id})
+        # Emitted in the transaction that writes the terminal state, so the run and its
+        # usage event commit together. The event's status answers "did this automation
+        # deliver its saving?", which is why a run that stopped at "requires_review" is
+        # recorded as failed and contributes no minutes -- it produced no finished work.
+        # The precise terminal state is kept in metadata rather than being flattened away.
+        record_automation_event(
+            session,
+            event_type="workflow_run_completed",
+            task_key="workflow_run_execution",
+            status="succeeded" if stop_status is None else "failed",
+            user_id=actor_id,
+            workflow_run_id=run.id,
+            session_id=run.session_id,
+            metadata={"workflow_status": run.status, "template_id": run.template_id},
+        )
         session.flush()
         session.refresh(run)
         return _run_to_record(run, session)
