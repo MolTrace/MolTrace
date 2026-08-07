@@ -1,3 +1,6 @@
+import { AlertTriangle, BookMarked, Layers } from "lucide-react"
+import { AccentCard } from "./accent-card"
+
 /**
  * The section a reader lands on after clicking "See how the evidence trail
  * works" in the hero (it owns #solutions, which the hero, the header nav and
@@ -27,21 +30,30 @@
  * not reintroduce the word without a measured ECE to back it.
  */
 
+const TEAL = { accent: "var(--mt-teal)", ink: "var(--mt-teal-ink)", soft: "var(--mt-teal-soft)" }
+
 const mechanics = [
   {
-    step: "01",
-    label: "Four tests, one verdict",
-    desc: "Prediction bounds, assignment consistency, 2D HSQC ranges and mass-spec match run independently, then combine by Bayesian log-odds. The deterministic result is the arbiter — a model may reorder candidates inside a verdict, never across one.",
+    icon: Layers,
+    title: "Four tests, one verdict",
+    pill: "Deterministic core",
+    desc: "Prediction bounds, assignment consistency, 2D HSQC ranges and mass-spec match run independently, then combine by Bayesian log-odds. A model may reorder candidates inside a verdict class — never across one.",
   },
   {
-    step: "02",
-    label: "Citations, not assertions",
-    desc: "Supporting evidence links the spectral database entry, literature reference or guidance section it came from, so a reviewer can open the source instead of trusting the summary.",
+    // Was "Supporting evidence links the spectral database entry, literature
+    // reference or guidance section it came from." That described the regulatory
+    // RAG, which is a different module; what spectroscopy actually carries is the
+    // published shift table behind an assignment and a DOI on literature records.
+    icon: BookMarked,
+    title: "Reference data, named",
+    pill: "Provenance",
+    desc: "Solvent and impurity assignments name the published shift table they were matched against, and literature records keep their DOI and source link.",
   },
   {
-    step: "03",
-    label: "Contradictions surfaced, not smoothed",
-    desc: "When evidence disagrees — an expected peak that never appeared — the conflict is reported beside the score rather than averaged into it, and the result is held for human review before sign-off.",
+    icon: AlertTriangle,
+    title: "Disagreement is reported",
+    pill: "Human review",
+    desc: "Unexplained integrals, and missing or extra cross-peaks, are reported per test — beside the score instead of folded into it. A qualified reviewer signs off.",
   },
 ]
 
@@ -64,18 +76,9 @@ export function EvidenceSection() {
           </p>
         </div>
 
-        <div className="mt-14 grid gap-10 sm:grid-cols-3 sm:gap-8">
+        <div className="mt-14 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {mechanics.map((m) => (
-            <div key={m.step} className="min-w-0">
-              <div
-                className="font-mono text-xs font-bold tracking-[0.18em]"
-                style={{ color: "var(--mt-teal-ink)" }}
-              >
-                {m.step}
-              </div>
-              <div className="mt-3 text-base font-semibold text-foreground">{m.label}</div>
-              <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{m.desc}</p>
-            </div>
+            <AccentCard key={m.title} {...m} {...TEAL} />
           ))}
         </div>
 
