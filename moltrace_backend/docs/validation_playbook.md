@@ -1245,3 +1245,62 @@ half-applied guard this codebase keeps producing, and the exact shape of the
 
 Only #4 was probed live this pass; the rest are carried forward as claims, not
 findings. Do not cite them as verified.
+
+---
+
+## A1 CORRECTION (2026-08-06) — the 21.1% figure was my measurement, not the pipeline
+
+**"A1 RESULT, part 2" above is wrong where it says the processed path does not
+recover true proton ratios. Read this instead.**
+
+That section reported a median 21.1% error with small peaks under-reported to
+-71.5%, over "well-isolated peaks". The comparison was against a **midpoint
+partition of the trace computed by the test itself** — every point assigned to
+its nearest reported peak. The pipeline does not integrate that way, so the
+number measured the disagreement between two window methods and then attributed
+it to the pipeline.
+
+Re-measured on the identical run (same fixture, same 19 peaks, same 353 H),
+comparing each peak's share of the reported proton total against its share of
+the pipeline's **own fitted areas**:
+
+```
+median |error| = 1.7%     worst = 8.8%     within 10%: 14/14
+```
+
+**The area-to-proton scaling is faithful.** The apportionment work in `4099eb8`
+and the reference fix in `b4014fc` did what they were supposed to.
+
+### What the correction does NOT clear
+
+Faithful scaling inherits whatever the areas are. Those come from raw
+local-maximum cluster sums (`spectrum.py:1236`), and the pseudo-Voigt fit that
+could correct them is computed and thrown away — that is A4, unchanged and still
+real. A spectrum can pass the corrected test and still report wrong proton
+counts if the integration windows are wrong.
+
+So the open question moves: **it is about the windows and the discarded fit, not
+about the scaling.** A4 measured fitted-vs-raw areas differing by up to 31% in
+dense regions, which is the same disagreement my partition was picking up — I
+just mislabelled its cause.
+
+### The methodological lesson, stated plainly
+
+The partition was a crude proxy for "true area" and it was **not a better
+arbiter than the thing it was auditing**. When a measurement disagrees with the
+system under test, the first question is which of the two is the better
+instrument. I skipped that question because the result matched what I already
+suspected.
+
+This is the same failure as the three harness errors in A3, and it got further
+because the output was plausible, size-ordered, and chemically narratable. It
+was committed, written into a test as a pinned baseline, and reported as a
+headline finding before anything caught it.
+
+**What caught it:** running the diagnostic through `_estimates_to_peaks` while
+looking for the *cause* of the error, and finding the stage-to-stage error was
+0.0%. A defect with no mechanism is usually not a defect.
+
+Corrected in `tests/test_processed_upload_accuracy.py`, which now measures the
+scaling step against the pipeline's own areas and names the window question as
+A4's rather than pretending to answer it.
