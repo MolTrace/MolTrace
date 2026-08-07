@@ -506,6 +506,7 @@ def update_review_task(
         row = session.get(KnowledgeReviewTaskORM, task_id)
         if row is None:
             return None
+        previous_status = row.status
         update = payload.model_dump(exclude_unset=True)
         for field in ("title", "status", "assigned_to", "reviewer_name", "reviewer_comment"):
             if field in update:
@@ -513,6 +514,25 @@ def update_review_task(
         if "metadata_json" in update:
             row.metadata_json = _json_dump(_metadata_with_review(update["metadata_json"]))
         row.updated_at = utcnow()
+        decided = {"accepted", "rejected"}
+        if row.status in decided and previous_status not in decided:
+            # Both accepted and rejected are finished review decisions -- the reviewer did the
+            # work either way -- so both count. "needs_changes" and "deferred" do not: the
+            # record comes back for another look, and counting it now and again on the second
+            # pass would bill the same review twice.
+            from .analytics_store import record_automation_event
+
+            record_automation_event(
+                session,
+                event_type="review_task_completed",
+                task_key="human_review_task_completion",
+                user_id=actor.user_id,
+                metadata={
+                    "knowledge_review_task_id": row.id,
+                    "previous_status": previous_status,
+                    "decision": row.status,
+                },
+            )
         _audit(
             session,
             actor=actor,

@@ -23,6 +23,8 @@ from .models import (
     RoiSnapshot,
     UsageEvent,
     UsageEventCreate,
+    UsageEventSource,
+    UsageEventStatus,
     UserFeedbackEvent,
     UserFeedbackEventCreate,
     WorkflowAnalyticsSummary,
@@ -35,6 +37,7 @@ from .orm import (
     RoiSnapshotORM,
     UsageEventORM,
     UserFeedbackEventORM,
+    UserORM,
     utcnow,
 )
 
@@ -186,6 +189,55 @@ DEFAULT_AUTOMATION_TASKS: tuple[dict[str, Any], ...] = (
         "description": "Assess readiness and warnings for files, artifacts, evidence, or sessions.",
     },
     {
+        "task_key": "spectracheck_analysis",
+        "name": "SpectraCheck analysis run",
+        "category": "nmr",
+        "default_minutes_saved": 20.0,
+        "description": "Track SpectraCheck analysis jobs and derived evidence review steps.",
+    },
+    {
+        "task_key": "regulatory_dossier_scaffolding",
+        "name": "Regulatory dossier scaffolding",
+        "category": "regulatory",
+        "default_minutes_saved": 45.0,
+        "description": "Create or expand regulatory dossier structures from controlled metadata.",
+    },
+    {
+        "task_key": "regulatory_readiness_assessment",
+        "name": "Regulatory readiness assessment",
+        "category": "regulatory",
+        "default_minutes_saved": 60.0,
+        "description": "Run readiness, compliance, surveillance, and review workflows for dossiers.",
+    },
+    {
+        "task_key": "reactioniq_project_setup",
+        "name": "ReactionIQ project setup",
+        "category": "reaction",
+        "default_minutes_saved": 20.0,
+        "description": "Create reaction projects, experiments, priors, and analytical links.",
+    },
+    {
+        "task_key": "reactioniq_optimization",
+        "name": "ReactionIQ optimization",
+        "category": "reaction",
+        "default_minutes_saved": 90.0,
+        "description": "Run optimization, Bayesian optimization, advisor, and benchmark loops.",
+    },
+    {
+        "task_key": "reactioniq_closed_loop_execution",
+        "name": "ReactionIQ closed-loop execution",
+        "category": "reaction",
+        "default_minutes_saved": 60.0,
+        "description": "Track recommendation conversion, execution batches, and confirmed outcomes.",
+    },
+    {
+        "task_key": "workflow_run_execution",
+        "name": "Workflow run execution",
+        "category": "workflow",
+        "default_minutes_saved": 30.0,
+        "description": "Run a multi-step workflow template to a terminal state for review.",
+    },
+    {
         "task_key": "human_review_task_completion",
         "name": "Human review task completion",
         "category": "review",
@@ -207,64 +259,133 @@ def create_usage_event(
     actor: AnalyticsActor,
 ) -> UsageEvent:
     with session_scope(session_factory) as session:
-        _ensure_default_tasks(session)
-        metadata, warnings = _sanitize_metadata(payload.metadata_json)
-        task_key = _resolve_task_key(payload.event_type, metadata)
-        minutes_saved = _resolve_minutes_saved(session, payload, task_key)
-        if minutes_saved is not None and minutes_saved > 0:
-            metadata.setdefault("task_key", task_key)
-        user_email = (payload.user_email or actor.email or "").strip().lower() or None
-        row = UsageEventORM(
-            event_type=payload.event_type,
+        return record_usage_event(session, payload, actor=actor)
+
+
+def record_usage_event(
+    session: Session,
+    payload: UsageEventCreate,
+    *,
+    actor: AnalyticsActor,
+) -> UsageEvent:
+    """Record a usage event inside a transaction the caller already owns.
+
+    Backend emitters use this rather than :func:`create_usage_event` so the event commits
+    with the work it describes. Emitting after the work's transaction closes would let the
+    work succeed while its event is lost, and ROI would then under-report permanently with
+    nothing in the product able to show that it had happened.
+    """
+    _ensure_default_tasks(session)
+    metadata, warnings = _sanitize_metadata(payload.metadata_json)
+    task_key = _resolve_task_key(payload.event_type, metadata)
+    minutes_saved = _resolve_minutes_saved(session, payload, task_key)
+    if minutes_saved is not None and minutes_saved > 0:
+        metadata.setdefault("task_key", task_key)
+    user_email = (payload.user_email or actor.email or "").strip().lower() or None
+    row = UsageEventORM(
+        event_type=payload.event_type,
+        project_id=payload.project_id,
+        sample_id=payload.sample_id,
+        session_id=payload.session_id,
+        workflow_run_id=payload.workflow_run_id,
+        job_id=payload.job_id,
+        artifact_id=payload.artifact_id,
+        report_id=payload.report_id,
+        user_email=user_email,
+        status=payload.status,
+        duration_seconds=payload.duration_seconds,
+        estimated_minutes_saved=minutes_saved,
+        event_source=payload.event_source,
+        metadata_json=_json_dump(metadata),
+    )
+    session.add(row)
+    session.flush()
+    if minutes_saved is not None and minutes_saved > 0:
+        metric = AutomationRunMetricORM(
+            task_key=task_key,
             project_id=payload.project_id,
-            sample_id=payload.sample_id,
             session_id=payload.session_id,
             workflow_run_id=payload.workflow_run_id,
             job_id=payload.job_id,
-            artifact_id=payload.artifact_id,
-            report_id=payload.report_id,
-            user_email=user_email,
-            status=payload.status,
-            duration_seconds=payload.duration_seconds,
-            estimated_minutes_saved=minutes_saved,
-            event_source=payload.event_source,
-            metadata_json=_json_dump(metadata),
+            status=payload.status or "succeeded",
+            minutes_saved=minutes_saved,
+            metadata_json=_json_dump(
+                {
+                    "usage_event_id": row.id,
+                    "event_type": payload.event_type,
+                    "source": payload.event_source,
+                }
+            ),
         )
-        session.add(row)
-        session.flush()
-        if minutes_saved is not None and minutes_saved > 0:
-            metric = AutomationRunMetricORM(
-                task_key=task_key,
-                project_id=payload.project_id,
-                session_id=payload.session_id,
-                workflow_run_id=payload.workflow_run_id,
-                job_id=payload.job_id,
-                status=payload.status or "succeeded",
-                minutes_saved=minutes_saved,
-                metadata_json=_json_dump(
-                    {
-                        "usage_event_id": row.id,
-                        "event_type": payload.event_type,
-                        "source": payload.event_source,
-                    }
-                ),
-            )
-            session.add(metric)
-        _audit(
-            session,
-            actor=actor,
-            event_type="analytics.usage_event.create",
-            message="Usage analytics event recorded.",
-            entity_type="usage_event",
-            entity_id=row.id,
-            metadata={
-                "event_type": row.event_type,
-                "project_id": row.project_id,
-                "session_id": row.session_id,
-                "minutes_saved": minutes_saved,
-            },
-        )
-        return _usage_event_to_record(row, warnings=warnings)
+        session.add(metric)
+    _audit(
+        session,
+        actor=actor,
+        event_type="analytics.usage_event.create",
+        message="Usage analytics event recorded.",
+        entity_type="usage_event",
+        entity_id=row.id,
+        metadata={
+            "event_type": row.event_type,
+            "project_id": row.project_id,
+            "session_id": row.session_id,
+            "minutes_saved": minutes_saved,
+        },
+    )
+    return _usage_event_to_record(row, warnings=warnings)
+
+
+def record_automation_event(
+    session: Session,
+    *,
+    event_type: str,
+    task_key: str,
+    status: UsageEventStatus = "succeeded",
+    user_id: int | None = None,
+    project_id: int | None = None,
+    sample_id: str | None = None,
+    session_id: int | None = None,
+    workflow_run_id: int | None = None,
+    job_id: int | None = None,
+    report_id: int | None = None,
+    duration_seconds: float | None = None,
+    metadata: dict[str, Any] | None = None,
+    event_source: UsageEventSource = "backend",
+) -> None:
+    """Emit the usage event for one completed unit of backend work.
+
+    There is deliberately no way to pass ``estimated_minutes_saved``. The minutes come from
+    the automation task definition that ``task_key`` names, so the baseline stays a single
+    version-controlled number per task rather than a literal scattered across call sites --
+    which is what makes the resulting figure answerable when a customer asks where it came
+    from. ``status`` must be ``"succeeded"`` for the row to reach the hours-saved figure;
+    failures are still worth emitting with their real status, and correctly count nothing.
+    """
+    payload_metadata: dict[str, Any] = dict(metadata or {})
+    payload_metadata["task_key"] = task_key
+    record_usage_event(
+        session,
+        UsageEventCreate(
+            event_type=event_type,
+            status=status,
+            project_id=project_id,
+            sample_id=sample_id,
+            session_id=session_id,
+            workflow_run_id=workflow_run_id,
+            job_id=job_id,
+            report_id=report_id,
+            duration_seconds=duration_seconds,
+            event_source=event_source,
+            metadata_json=payload_metadata,
+        ),
+        actor=AnalyticsActor(user_id=user_id, email=_user_email(session, user_id)),
+    )
+
+
+def _user_email(session: Session, user_id: int | None) -> str | None:
+    if user_id is None:
+        return None
+    return session.scalar(select(UserORM.email).where(UserORM.id == user_id))
 
 
 def list_usage_events(
@@ -605,26 +726,60 @@ def get_renewal_report(
 
 
 def _ensure_default_tasks(session: Session) -> None:
-    existing_count = int(session.scalar(select(func.count(AutomationTaskDefinitionORM.id))) or 0)
-    if existing_count:
+    # Seeded per missing key rather than only into an empty table. A catalogue entry added in
+    # a later release has to reach instances that were seeded by an earlier one; otherwise
+    # _resolve_minutes_saved finds no definition and every event resolving to that key is
+    # silently worth zero minutes. Existing rows are never touched, so an operator's edit to
+    # default_minutes_saved -- or a task they disabled -- survives.
+    existing = set(session.scalars(select(AutomationTaskDefinitionORM.task_key)).all())
+    missing = [task for task in DEFAULT_AUTOMATION_TASKS if task["task_key"] not in existing]
+    if not missing:
         return
-    for task in DEFAULT_AUTOMATION_TASKS:
-        session.add(
-            AutomationTaskDefinitionORM(
-                task_key=task["task_key"],
-                name=task["name"],
-                category=task["category"],
-                default_minutes_saved=task["default_minutes_saved"],
-                description=task["description"],
-                enabled=True,
-                metadata_json=_json_dump({"default_seed": True}),
-            )
-        )
+    for task in missing:
+        try:
+            with session.begin_nested():
+                session.add(
+                    AutomationTaskDefinitionORM(
+                        task_key=task["task_key"],
+                        name=task["name"],
+                        category=task["category"],
+                        default_minutes_saved=task["default_minutes_saved"],
+                        description=task["description"],
+                        enabled=True,
+                        metadata_json=_json_dump({"default_seed": True}),
+                    )
+                )
+        except IntegrityError:
+            # A concurrent writer seeded the same key. Contained in a savepoint because the
+            # caller's transaction may be carrying the work this event describes, and losing
+            # that work to a seeding race would be far worse than skipping a duplicate row.
+            continue
     session.flush()
 
 
 def _resolve_task_key(event_type: str, metadata: dict[str, Any]) -> str:
-    task_key = metadata.get("task_key") or event_type
+    task_key = metadata.get("task_key")
+    if not task_key:
+        lowered = event_type.lower()
+        module = str(metadata.get("core_module") or metadata.get("module") or "").lower()
+        if module in {"spectracheck", "spectra_check"} or lowered.startswith("spectracheck_"):
+            task_key = "spectracheck_analysis"
+        elif module in {"regulatory_hub", "regulatory"} or lowered.startswith("regulatory_"):
+            if any(token in lowered for token in ("readiness", "review", "assessment", "surveillance", "watch", "rule")):
+                task_key = "regulatory_readiness_assessment"
+            else:
+                task_key = "regulatory_dossier_scaffolding"
+        elif module in {"reactioniq", "reaction_iq", "reaction_optimization"} or lowered.startswith("reaction_"):
+            if any(token in lowered for token in ("execution", "outcome", "converted", "confirmed", "cycle")):
+                task_key = "reactioniq_closed_loop_execution"
+            elif any(token in lowered for token in ("optimization", "advisor", "benchmark", "bo_")):
+                task_key = "reactioniq_optimization"
+            else:
+                task_key = "reactioniq_project_setup"
+        elif lowered in {"job_started", "job_completed"} and metadata.get("job_type"):
+            task_key = "spectracheck_analysis"
+        else:
+            task_key = event_type
     return str(task_key).strip()[:120] or event_type[:120]
 
 
@@ -665,6 +820,25 @@ def _compute_roi(
     rows = session.scalars(stmt).all()
     minutes = sum(float(row.estimated_minutes_saved or 0.0) for row in rows)
     completed_rows = [row for row in rows if row.status in {None, "succeeded", "warning"}]
+    analysis_task_keys = {
+        "spectracheck_analysis",
+        "regulatory_readiness_assessment",
+        "reactioniq_optimization",
+        "reactioniq_closed_loop_execution",
+    }
+
+    def is_completed_analysis(row: UsageEventORM) -> bool:
+        if row.status != "succeeded":
+            return False
+        event_type = row.event_type.lower()
+        metadata = _json_dict(row.metadata_json)
+        task_key = str(metadata.get("task_key") or "").lower()
+        return (
+            row.job_id is not None
+            or "analysis" in event_type
+            or task_key in analysis_task_keys
+        )
+
     return {
         "tasks_automated": sum(
             1 for row in completed_rows if (row.estimated_minutes_saved or 0) > 0
@@ -684,10 +858,7 @@ def _compute_roi(
             and (row.workflow_run_id is not None or "workflow" in row.event_type.lower())
         ),
         "analyses_completed": sum(
-            1
-            for row in rows
-            if row.status == "succeeded"
-            and (row.job_id is not None or "analysis" in row.event_type.lower())
+            1 for row in rows if is_completed_analysis(row)
         ),
         "review_tasks_completed": sum(
             1

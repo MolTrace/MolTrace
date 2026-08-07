@@ -894,6 +894,24 @@ def update_job_progress(
             job.finished_at = utcnow()
         if error_message is not None:
             job.error_message = error_message
+        if status == "failed":
+            # Only the failure is emitted at job level. A successful batch is already
+            # represented by one analysis_completed event per item, each carrying this
+            # job_id, and _compute_roi counts any succeeded event with a job_id as an
+            # analysis -- so a "job succeeded" event here would inflate analyses_completed
+            # by one per job. This row feeds failed_jobs and, being failed, correctly
+            # contributes no minutes.
+            from .analytics_store import record_automation_event
+
+            record_automation_event(
+                session,
+                event_type="analysis_job_failed",
+                task_key="candidate_specific_nmr_matching",
+                status="failed",
+                user_id=job.user_id,
+                job_id=job_id,
+                metadata={"completed_items": completed_items},
+            )
 
 
 
@@ -905,6 +923,7 @@ def save_analysis(
     user_id: int | None = None,
     job_id: int | None = None,
     hours_saved_estimate: float | None = None,
+    automation_task_key: str = "candidate_specific_nmr_matching",
 ) -> int:
     with session_scope(session_factory) as session:
         row = AnalysisORM(
@@ -929,6 +948,21 @@ def save_analysis(
         session.add(row)
         session.flush()
         row_id = row.id
+        # Imported here rather than at module scope: analytics_store imports session_scope
+        # from this module, so a top-level import would be circular. Emitted inside this
+        # transaction so the analysis and its usage event commit or roll back together --
+        # an analysis that committed without its event would under-report ROI silently.
+        from .analytics_store import record_automation_event
+
+        record_automation_event(
+            session,
+            event_type="analysis_completed",
+            task_key=automation_task_key,
+            user_id=user_id,
+            job_id=job_id,
+            sample_id=payload.sample_id,
+            metadata={"analysis_id": row_id, "parsed_peak_count": report.parsed_peak_count},
+        )
     return int(row_id)
 
 
@@ -2503,6 +2537,20 @@ def create_report_from_analysis(
         )
         session.add(row)
         session.flush()
+        # Event type deliberately carries "report" and not "analysis": _compute_roi buckets
+        # by substring, so naming this one after both would count a single report as a
+        # report and as an extra analysis.
+        from .analytics_store import record_automation_event
+
+        record_automation_event(
+            session,
+            event_type="evidence_report_generated",
+            task_key="report_composer",
+            user_id=analysis.user_id,
+            report_id=row.id,
+            sample_id=analysis.sample_id,
+            metadata={"analysis_id": analysis_id, "version": row.version},
+        )
         session.refresh(row)
         return _report_to_record(row)
 

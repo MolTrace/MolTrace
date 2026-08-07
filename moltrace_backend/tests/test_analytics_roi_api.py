@@ -25,6 +25,9 @@ def test_analytics_roi_feedback_and_renewal_workflow(client, api_headers):
         task_keys = {task["task_key"] for task in seeded_tasks.json()}
         assert "report_composer" in task_keys
         assert "human_review_task_completion" in task_keys
+        assert "spectracheck_analysis" in task_keys
+        assert "regulatory_readiness_assessment" in task_keys
+        assert "reactioniq_closed_loop_execution" in task_keys
         assert len(task_keys) >= 15
 
         custom_task = client.post(
@@ -107,15 +110,67 @@ def test_analytics_roi_feedback_and_renewal_workflow(client, api_headers):
         )
         assert qc_event.status_code == 201, qc_event.text
 
+        spectracheck_event = client.post(
+            "/analytics/events",
+            headers=admin_headers,
+            json={
+                "event_type": "job_completed",
+                "project_id": 101,
+                "session_id": 202,
+                "status": "succeeded",
+                "event_source": "frontend",
+                "metadata_json": {
+                    "core_module": "spectracheck",
+                    "job_type": "spectracheck_analysis",
+                },
+            },
+        )
+        assert spectracheck_event.status_code == 201, spectracheck_event.text
+        assert spectracheck_event.json()["estimated_minutes_saved"] == 20
+        assert spectracheck_event.json()["metadata_json"]["task_key"] == "spectracheck_analysis"
+
+        regulatory_event = client.post(
+            "/analytics/events",
+            headers=admin_headers,
+            json={
+                "event_type": "regulatory_readiness_report_generated",
+                "project_id": 101,
+                "session_id": 202,
+                "status": "succeeded",
+                "event_source": "frontend",
+                "metadata_json": {"core_module": "regulatory_hub"},
+            },
+        )
+        assert regulatory_event.status_code == 201, regulatory_event.text
+        assert regulatory_event.json()["estimated_minutes_saved"] == 60
+        assert regulatory_event.json()["metadata_json"]["task_key"] == "regulatory_readiness_assessment"
+
+        reaction_event = client.post(
+            "/analytics/events",
+            headers=admin_headers,
+            json={
+                "event_type": "reaction_outcome_confirmed",
+                "project_id": 101,
+                "session_id": 202,
+                "status": "succeeded",
+                "event_source": "frontend",
+                "metadata_json": {"core_module": "reactioniq"},
+            },
+        )
+        assert reaction_event.status_code == 201, reaction_event.text
+        assert reaction_event.json()["estimated_minutes_saved"] == 60
+        assert reaction_event.json()["metadata_json"]["task_key"] == "reactioniq_closed_loop_execution"
+
         listed = client.get("/analytics/events", headers=admin_headers)
         assert listed.status_code == 200, listed.text
         assert len(listed.json()) >= 3
 
         summary = client.get("/analytics/summary", headers=admin_headers)
         assert summary.status_code == 200, summary.text
-        assert summary.json()["total_minutes_saved"] >= 105
+        assert summary.json()["total_minutes_saved"] >= 245
         assert summary.json()["reports_generated"] >= 1
         assert summary.json()["workflows_completed"] >= 1
+        assert summary.json()["analyses_completed"] >= 3
         assert summary.json()["qc_warnings"] >= 1
 
         global_roi = client.get("/analytics/roi", headers=admin_headers)

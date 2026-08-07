@@ -11,6 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
 from . import collaboration_subjects
+from .analytics_store import record_automation_event
 from .database import session_scope
 from .models import (
     ApprovalRecord,
@@ -746,6 +747,7 @@ def update_review_task(
         row = session.get(ReviewTaskORM, task_id)
         if row is None or row.session_id != session_id:
             return None
+        previous_status = row.status
         for field in ("title", "description", "assigned_to", "status", "priority"):
             value = getattr(payload, field)
             if value is not None or field in payload.model_fields_set:
@@ -753,6 +755,19 @@ def update_review_task(
         if payload.metadata_json is not None:
             row.metadata_json = _json_dump(payload.metadata_json)
         row.updated_at = utcnow()
+        if row.status == "resolved" and previous_status != "resolved":
+            # Only on the transition into "resolved". Emitting whenever the task is seen in
+            # that state would credit the work again on every later edit -- retitling a
+            # resolved task is not a second review. "dismissed" is excluded on purpose: the
+            # task was closed without the review being done, so nothing was saved.
+            record_automation_event(
+                session,
+                event_type="review_task_completed",
+                task_key="human_review_task_completion",
+                user_id=actor.user_id,
+                session_id=session_id,
+                metadata={"review_task_id": row.id, "previous_status": previous_status},
+            )
         _audit(
             session,
             event_type="collaboration.review_task.update",
@@ -1594,6 +1609,7 @@ def update_subject_review_task(
         if row is None or row.subject_type is None or row.subject_id is None:
             return None
         _require_subject_access(session, row.subject_type, row.subject_id, owner_scope_id)
+        previous_status = row.status
         for field in ("title", "description", "assigned_to", "status", "priority"):
             value = getattr(payload, field)
             if value is not None or field in payload.model_fields_set:
@@ -1601,6 +1617,18 @@ def update_subject_review_task(
         if payload.metadata_json is not None:
             row.metadata_json = _json_dump(payload.metadata_json)
         row.updated_at = utcnow()
+        if row.status == "resolved" and previous_status != "resolved":
+            # The subject surface writes the same review tasks as update_review_task above,
+            # so instrumenting only one of them would make a review completed here invisible
+            # to ROI while the identical action on the session surface counted.
+            record_automation_event(
+                session,
+                event_type="review_task_completed",
+                task_key="human_review_task_completion",
+                user_id=owner_scope_id,
+                session_id=row.session_id,
+                metadata={"review_task_id": row.id, "previous_status": previous_status},
+            )
         _audit(
             session,
             event_type="collaboration.review_task.update",
