@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { ArrowRight, Check } from "lucide-react"
 import dynamic from "next/dynamic"
 import Link from "next/link"
+import { useSlidingIndicator } from "@/components/app/use-sliding-indicator"
 
 // The three "Explore Module" overlays live in a separate chunk and are pulled in
 // only when a user opens one — keeping ~half of this module's original code (the
@@ -27,6 +28,9 @@ const ReactionExploreInterface = dynamic(
 const modules = [
   {
     tag: "Module 01",
+    /* Raw token as well as the Tailwind classes: the travelling indicator
+       needs a colour it can put in a style prop, not a class name. */
+    accent: "var(--mt-teal)",
     title: "Spectroscopy Intelligence",
     overviewHref: "/spectroscopy",
     overviewLabel: "How SpectraCheck works",
@@ -51,6 +55,9 @@ const modules = [
   },
   {
     tag: "Module 02",
+    /* Raw token as well as the Tailwind classes: the travelling indicator
+       needs a colour it can put in a style prop, not a class name. */
+    accent: "var(--mt-cyan)",
     title: "Regulatory Intelligence Hub",
     overviewHref: "/regulatory-hub",
     overviewLabel: "How Regentry works",
@@ -75,6 +82,9 @@ const modules = [
   },
   {
     tag: "Module 03",
+    /* Raw token as well as the Tailwind classes: the travelling indicator
+       needs a colour it can put in a style prop, not a class name. */
+    accent: "var(--mt-violet)",
     title: "Reaction Optimization",
     overviewHref: "/reaction-optimization",
     overviewLabel: "How Repho works",
@@ -101,6 +111,7 @@ const modules = [
 
 export function ModuleCards() {
   const [active, setActive] = useState(0)
+  const { containerRef: tabsRef, rect: indicator } = useSlidingIndicator<HTMLDivElement>(String(active))
   const [exploreOpen, setExploreOpen] = useState(false)
   const m = modules[active]
 
@@ -150,17 +161,44 @@ export function ModuleCards() {
           </div>
         </div>
 
-        {/* Tab selectors */}
-        <div className="mb-8 flex gap-1 rounded-xl border bg-muted/40 p-1">
+        {/* Tab selectors.
+
+            One indicator travels between the three instead of each button fading
+            its own background in and out — the same treatment the workspace tabs
+            use, so the marketing page and the product behave alike.
+
+            The indicator carries the ACTIVE module's accent on its lower edge, so
+            it shifts hue as it moves (teal to cyan to violet) rather than sliding
+            a single neutral pill. Each tab keeps the colour it already had; the
+            colour just travels with the selection now.
+
+            aria-pressed is new. These are buttons that swap a panel, and until now
+            they announced no state at all, so a screen-reader user had no way to
+            tell which module was selected. Not role="tab": that triad needs a
+            matching tabpanel, and claiming it without one is worse than the plain
+            toggle these actually are. */}
+        <div ref={tabsRef} className="relative mb-8 flex gap-1 rounded-xl border bg-muted/40 p-1">
+          {indicator ? (
+            <span
+              aria-hidden
+              className="pointer-events-none absolute bottom-1 left-0 top-1 rounded-lg border-b-2 bg-background shadow-sm transition-[transform,width] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none"
+              style={{
+                transform: `translateX(${indicator.left}px)`,
+                width: indicator.width,
+                borderBottomColor: modules[active]?.accent,
+              }}
+            />
+          ) : null}
           {modules.map((mod, i) => (
             <button
               key={i}
               onClick={() => setActive(i)}
+              aria-pressed={active === i}
+              data-active={active === i}
               className={[
-                "flex-1 rounded-lg border-b-2 px-4 py-2.5 text-xs font-bold uppercase tracking-widest transition-all",
-                active === i
-                  ? `bg-background shadow-sm ${mod.color.borderActive} text-foreground`
-                  : "border-transparent text-muted-foreground hover:text-foreground",
+                "relative z-10 flex-1 rounded-lg border-b-2 border-transparent px-4 py-2.5 text-xs font-bold uppercase tracking-widest",
+                "transition-colors duration-200 motion-reduce:transition-none",
+                active === i ? "text-foreground" : "text-muted-foreground hover:text-foreground",
               ].join(" ")}
             >
               {mod.tag.toUpperCase()}
