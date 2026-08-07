@@ -14,6 +14,64 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.64.0 — B0: switch the shift predictor on, and make its coverage visible (2026-08-07)
+
+Shift prediction had silently degraded to a **16-molecule curated seed table**. Measured on
+four drug-like molecules: 22.6–44.4 % of atoms resolved to a bare element prior and the
+**median ¹³C uncertainty was 35.0 ppm** — roughly fifteen times DP4's own 2.306 ppm error
+scale. Because `verification/scorer.py` derives each test's significance from prediction
+uncertainty, the verifier's ¹³C shift test was contributing **~16 % of its designed evidence
+weight** (odds ×1.39 against ×7.4 at the reference σ).
+
+Nothing was hidden — every fallback appended a per-atom warning. But **no caller aggregated
+them**, so a prediction that was mostly element averages was indistinguishable from a resolved
+one. That is the defect this release fixes; the honest-degradation machinery was working, and
+had been quietly standing in for a working predictor.
+
+- **Per-shift and per-prediction provenance.** `AtomShift.source` (`nmrnet` | `hose` |
+  `element_prior`), plus `ShiftPrediction.kb_source` / `kb_records` /
+  `prior_fallback_fraction` / `median_uncertainty_ppm`, and one aggregate coverage warning.
+  Gate on the fraction; do not parse warning strings.
+- **The GPU-sidecar route now exists at both ends.** `predict/nmrnet_client.py` (new;
+  stdlib-only, torch-free) plus a `_run_nmrnet_remote` hook tried **before** importing torch —
+  `MOLTRACE_NMRNET_SERVICE_URL` was documented in `nmrnet_service/README.md` but read by
+  nothing, and the only implemented path required local torch, which the production API host
+  does not have. Any service failure still degrades to HOSE with the method recorded; a broken
+  sidecar never becomes a fabricated shift.
+- **Knowledge base built from assignments, not peak lists.** `scripts/build_hose_kb.py` now
+  auto-detects and converts **NMReDATA**, whose `NMREDATA_ASSIGNMENT` block carries per-atom
+  identity. Records emit a `molblock` rather than SMILES so the atom numbering the source
+  asserts is the numbering indexed — rebuilding through `SMILES → AddHs` re-orders hydrogens
+  and would attach ¹H shifts to the wrong protons, producing a healthy-looking table that is
+  wrong everywhere and undetectable downstream. Guarded by an element-match assertion per
+  assignment.
+- **Measured result.** Built against the full NMRShiftDB2 NMReDATA export (64 723 records →
+  **49 618 molecules / 495 215 assignments** in 14 s): prior-fallback share **22.6–44.4 % → 0.0 %**
+  across the panel, pooled median ¹³C σ **35.00 → 1.88 ppm**, pooled median ¹H σ
+  **0.52 → 0.26 ppm**. Median-of-medians ¹³C is **1.67 ppm — below DP4's 2.306 ppm scale**, so the
+  predictor is now sharper than the error model consuming it. An 18.6× improvement in ¹³C
+  uncertainty with **no model, no GPU and no new dependency**: the fallback was always capable,
+  it had simply never been given assigned data.
+- **Claim integrity.** `predict_shifts` presented NMRNet's *published test-set* MAEs as
+  "Headline accuracy" for a function that runs the fallback in production; those figures are
+  now scoped to the `nmrnet` path with the fallback's real behaviour stated. The README's
+  "HOSE-code / NMRShiftDB2 fallback" was likewise untrue while the seed table was in use.
+  `components/spectracheck/shift-prediction-panel.tsx:286` still names NMRShiftDB2 and needs
+  the same correction (frontend session).
+- **33 tests**, written before the implementation. The coverage target was `xfail(strict=True)`
+  while only the seed table existed; it XPASSed the moment the real table landed, **failed the
+  suite**, and forced the baselines to be re-measured in the same change — which is what it was
+  for. It is now a live assertion when a knowledge base is configured and an explicit **skip**,
+  never a silent pass, when one is not.
+
+Remaining: the NMRNet forward pass (`nmrnet_service/app.py`) is still an unfilled integration
+point needing the upstream notebook and a GPU host, and the knowledge base must ship as **deployed
+state** — it is currently a local `MOLTRACE_HOSE_KB` pointing at a 184 MB generated table, which is
+gitignored and CC BY-SA (redistribution carries ShareAlike; see `NOTICE`). See
+`docs/structure_elucidation_program.md`.
+
+---
+
 ## v0.63.0 — Repho Phase C: heavy-ML engines + governed HTTP wiring (2026-07-23)
 
 Phase C (R12–R15) of the Repho build spec, delivered as **default-off governed
