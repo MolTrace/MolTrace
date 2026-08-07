@@ -1393,3 +1393,94 @@ just has to know where to look.
 > `POST /raw-fid/{id}/process`. If the verifier genuinely needs it, say so in
 > the 422; if a structure-free QC pass is wanted, that is a product decision to
 > take deliberately.
+
+---
+
+## B2 LOOP RESULT — Regentry end to end (2026-08-06)
+
+Security phase was completed earlier (five holes closed or correctly
+dispositioned). This is the loop: create → populate → assess → export.
+
+### The loop closes
+
+| step | result |
+|---|---|
+| create dossier | 201 |
+| action item on it | 201 |
+| **read it back** | 200, visible to the owner |
+| readiness-report | 200 |
+| impurity-risk-register | 200 |
+| batch-assessment | 200 |
+| nitrosamine-cumulative-risk | 200 |
+| submission-package | 201 |
+| ctd-module3-bundle | 201 |
+
+The "action items created 201 then permanently invisible to their creator"
+defect from the 2026-07-26 audit is **fixed** — the item came back on
+`GET /regulatory/action-items?dossier_id=…` immediately.
+
+### The export is a manifest of references, and that part is done well
+
+`POST /regulatory/dossiers/{id}/submission-package` does not bundle bytes. It
+writes a JSON manifest listing each included file with its **own** sha256, size
+and original filename, plus a package-level `package_sha256`. Verified with a
+real uploaded file: the manifest carried
+`{"file_id": 2, "file_size_bytes": 27, "original_filename": "coa_evidence.csv",
+"sha256": "7b374da5…"}`.
+
+That is defensible provenance — a reviewer can verify each referenced artefact
+independently. It carries an honest `language_notice`: *"Export package is for
+review and does not assert legal approval or guaranteed compliance."* Consistent
+with the "designed to support" framing.
+
+**The caller chooses the contents.** `create_submission_package` iterates
+`payload.file_ids_json` / `artifact_ids_json`; the endpoint does not discover the
+dossier's own evidence. Reasonable for a curated submission — but see below.
+
+### Finding — an EMPTY package is produced, hashed, and marked ready
+
+```
+POST .../submission-package  {}          -> 201
+  file_ids_json:     []
+  artifact_ids_json: []
+  status:            "ready_for_review"
+  warnings:          []
+  package_sha256:    "882564c4e0594a58cb931549200b2cb1dae087964e90b1ce2f68250daad5c0ce"
+```
+
+A submission package containing **nothing** comes back marked ready for review,
+with a valid-looking SHA-256 over an empty manifest and no warning.
+
+The asymmetry is the tell. Reference a file that does not exist and the manifest
+**does** warn:
+
+```
+POST .../submission-package  {"file_ids_json":[999999]}   -> 201
+  warnings: ['File 999999 was not found for the export package manifest.']
+```
+
+So the emptiness check is half applied: absent-referent is caught, absent-
+reference is not. And the empty case is the more dangerous of the two, because
+it looks complete — a status of `ready_for_review`, a real digest, an empty
+warnings array. A reviewer glancing at it has nothing to alert them.
+
+A caller that simply forgets `file_ids_json` — an FE bug, a mis-shaped request —
+gets a regulatory submission package with no evidence and no complaint.
+
+**Next prompt:**
+
+> Warn on an empty submission package, and do not let it reach
+> `ready_for_review`. The machinery is already there: the manifest's `warnings`
+> array is populated for a missing referent, so the same path should say when
+> nothing was referenced at all. `status` should reflect it — `draft` or
+> `empty`, not `ready_for_review`.
+>
+> Then decide whether the endpoint should DISCOVER the dossier's evidence rather
+> than requiring the caller to enumerate it. Curated selection is defensible, but
+> today nothing connects a dossier's own action items, assessments and linked
+> reports to its export, so "everything relevant" is the caller's problem to get
+> right and the server never checks.
+>
+> Not probed this pass: whether the CTD module-3 bundle has the same empty-case
+> behaviour (it returned 201 on a near-empty dossier and its fields were all
+> null), and whether `package_sha256` is stable across re-creation.
