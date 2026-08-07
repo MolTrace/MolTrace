@@ -1604,13 +1604,33 @@ def create_submission_package(
                     "derived_output": True,
                 }
             )
+        # A package with nothing in it must not present as a finished one. The
+        # missing-referent case above already warns; referencing NOTHING did
+        # not, and that is the more dangerous half -- an empty package looks
+        # complete (real digest, empty warnings, ready status) so a reviewer has
+        # nothing to alert them, and a caller that simply omits file_ids_json
+        # gets a regulatory submission with no evidence and no complaint.
+        #
+        # The status is downgraded rather than the request rejected: assembling
+        # a package incrementally is legitimate, and a 4xx would break it. What
+        # is not legitimate is calling the result ready for review.
+        package_status = payload.status
+        if not files and not artifacts:
+            warnings.append(
+                "This export package references no files and no artifacts, so it "
+                "contains no evidence. Add the records it should carry before "
+                "sending it for review."
+            )
+            if package_status == "ready_for_review":
+                package_status = "draft"
+
         manifest = {
             "schema_version": "phase62.ctd_package.v1",
             "package_type": payload.package_type,
-            "status": payload.status,
+            "status": package_status,
             "dossier_id": dossier_id,
             "report_id": payload.report_id,
-            "review_status": payload.status,
+            "review_status": package_status,
             "files": files,
             "artifact_ids": [artifact["artifact_id"] for artifact in artifacts],
             "artifacts": artifacts,
@@ -1624,7 +1644,7 @@ def create_submission_package(
             dossier_id=dossier_id,
             report_id=payload.report_id,
             package_type=payload.package_type,
-            status=payload.status,
+            status=package_status,
             file_ids_json=_json_dump(payload.file_ids_json, default=[]),
             artifact_ids_json=_json_dump(payload.artifact_ids_json, default=[]),
             package_manifest_json=serialized_manifest,
