@@ -16,6 +16,8 @@ length: "Methodology + fill-in template"
 
 The headline ROI numbers in the MolTrace white papers — *"5–10× compression of time-to-structure"*, *"$300K/year recouped FTE cost"*, *">98 % reproducibility rate"* — are order-of-magnitude estimates derived from internal validation runs and community-reported baselines. Procurement and finance teams reasonably ask: **"How do we measure this in our own environment?"**
 
+**One distinction this document exists to protect.** The platform also ships an in-product ROI readout (`/analytics/roi`). Its **event counts** — analyses completed, reports generated, workflows completed, review tasks closed — are real measurements of things that happened. Its **time-saved** figure is not: it is the sum of a per-task-type constant, configurable by an administrator, multiplied by those counts. The database column is honest about this and is named `estimated_minutes_saved`. Anything presented to a customer as *measured* hours must come from the protocol below, against their own baseline — not from that readout. Conflating the two would put a configurable assumption behind a number a buyer will treat as evidence, and a buyer who discovers that discounts every other figure on the page.
+
 This document defines:
 
 1. The four quantitative outcome metrics MolTrace tracks
