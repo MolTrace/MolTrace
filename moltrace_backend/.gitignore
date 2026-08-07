@@ -132,3 +132,10 @@ corpus_store/
 gold_set_data/
 *.gold_eval.json
 validation_fixtures/
+
+# Precomputed HOSE index baked into the image at build time (NMRShiftDB2
+# derivative, CC BY-SA — see NOTICE). Built by scripts/build_hose_kb.py --index.
+hose_index*.json
+hose_index*.json.gz
+data/hose/*
+!data/hose/README.md

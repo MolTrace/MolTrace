@@ -71,14 +71,23 @@ Attribution-ShareAlike).
 
 ShareAlike obligation: any redistributed knowledge-base table DERIVED from
 NMRShiftDB2 -- e.g. the HOSE-code -> shift table produced by
-scripts/build_hose_kb.py (and likewise a FAISS spectrum-similarity index or
-embedding table produced by scripts/build_similarity_index.py) -- is a
+scripts/build_hose_kb.py, in EITHER of its two output forms (the
+molecules+assignments input format, or the precomputed index emitted by
+--index / save_knowledge_base_index), and likewise a FAISS spectrum-similarity
+index or embedding table produced by scripts/build_similarity_index.py -- is a
 derivative work and must itself be distributed
 under CC BY-SA (with attribution to NMRShiftDB2). The raw NMRShiftDB2 database
 and any table derived from it are NOT committed to this repository; build them
 locally (see scripts/build_hose_kb.py). The small literature seed table embedded
 in nmrnet_wrapper.py is independently sourced from textbook reference shifts and
 is not derived from NMRShiftDB2.
+
+Aggregation does not remove the obligation: the precomputed index stores only
+per-environment summary statistics (count, mean, variance accumulator) rather
+than the individual reference shifts, but it is still built FROM NMRShiftDB2
+assignments and is still a derivative work. Baking it into a container image is
+a form of distribution -- if that image is shared outside the organization that
+built it, the CC BY-SA terms and NMRShiftDB2 attribution travel with it.
 
 NOTE: verify the exact current NMRShiftDB2 license and version terms before any
 external redistribution of a derived table.
