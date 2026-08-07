@@ -151,18 +151,6 @@ export function KnowledgeReviewWorkspace() {
             Knowledge Library
           </Link>
         </Button>
-        <Button variant="outline" size="sm" asChild>
-          <Link href="/knowledge/extractions">Extractions</Link>
-        </Button>
-        <Button variant="outline" size="sm" asChild>
-          <Link href="/knowledge/reactions">Reactions</Link>
-        </Button>
-        <Button variant="outline" size="sm" asChild>
-          <Link href="/knowledge/analytical">Analytical</Link>
-        </Button>
-        <Button variant="outline" size="sm" asChild>
-          <Link href="/knowledge/regulatory">Regulatory</Link>
-        </Button>
       </div>
 
       <div className="space-y-1">
