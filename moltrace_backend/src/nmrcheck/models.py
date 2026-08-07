@@ -13223,6 +13223,24 @@ class AuditChainVerification(BaseModel):
     key_id: str
 
 
+class AuditAnchorPublicKey(BaseModel):
+    """The public half of the anchor signing key — safe to publish; it cannot sign.
+
+    Handing this to an auditor is the point of signing anchors asymmetrically: with it they
+    can confirm a checkpoint is ours, which the HMAC scheme could never allow without also
+    handing them the ability to forge one.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    #: ``"ed25519"`` when asymmetric anchoring is configured, ``"hmac-sha256"`` otherwise.
+    algorithm: str
+    #: Raw 32-byte Ed25519 public key, hex. ``None`` under HMAC — there is no public half,
+    #: which is exactly why an outside party cannot verify those anchors.
+    public_key_hex: str | None = None
+    key_id: str
+
+
 class AuditChainEntry(BaseModel):
     """One chained audit entry, in the exact shape its ``entry_hash`` was computed over.
 
@@ -13324,6 +13342,13 @@ class AuditAnchorRecord(BaseModel):
     row_count: int
     signature: str
     key_id: str
+    #: The exact canonical JSON the signature covers, verbatim. Present so an outside
+    #: verifier checks the bytes that were actually signed instead of re-deriving them —
+    #: `anchored_at` above is a datetime, and a consumer's encoder renders it `Z` where the
+    #: signature covers `+00:00`, which silently fails every check. Same rule as
+    #: `AuditChainEntry`: a verifiable projection contains no field whose serialization is
+    #: up to whoever reads it.
+    signed_payload: str = ""
 
 
 class NMR2DEvidenceReportSection(BaseModel):

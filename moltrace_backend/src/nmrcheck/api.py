@@ -252,6 +252,7 @@ from .models import (
     ApprovalRecordCreate,
     ArtifactRecord,
     AsyncJobAccepted,
+    AuditAnchorPublicKey,
     AuditAnchorRecord,
     AuditChainEntry,
     AuditChainVerification,
@@ -3459,6 +3460,31 @@ def subject_audit_verify_route(
         # subject type are the same answer — anything else tells an outsider which filings
         # exist, or which subject types this deployment addresses.
         raise HTTPException(status_code=404, detail="Audit subject not found.") from exc
+
+
+@router.get(
+    "/audit/anchor-public-key",
+    response_model=AuditAnchorPublicKey,
+    dependencies=[Depends(require_access_context)],
+)
+def audit_anchor_public_key_route(request: Request) -> AuditAnchorPublicKey:
+    """The public half of the anchor signing key, for verifying checkpoints off-platform.
+
+    Declared before the ``/audit/{subject_type}/...`` routes so the literal path wins over the
+    parameterised one. When the deployment has not configured asymmetric anchoring this
+    reports ``hmac-sha256`` with no key, which is the honest answer: those anchors simply
+    cannot be verified by anyone who is not also able to forge them.
+    """
+    from .audit_chain import anchor_public_key_hex
+    from .audit_chain import key_id as _key_id
+
+    settings = _state(request).settings
+    public = anchor_public_key_hex(settings.audit_anchor_private_key)
+    return AuditAnchorPublicKey(
+        algorithm="ed25519" if public else "hmac-sha256",
+        public_key_hex=public,
+        key_id=_key_id(settings.audit_signing_key),
+    )
 
 
 @router.get(

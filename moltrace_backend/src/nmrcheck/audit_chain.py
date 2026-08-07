@@ -27,6 +27,7 @@ from sqlalchemy import event, select, text
 from .orm import AuditChainHeadORM, AuditEventORM
 
 if TYPE_CHECKING:
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
     from sqlalchemy.orm import Session, sessionmaker
 
 # Prefixed genesis (matches the DB-persisted "sha256:"+64 convention used elsewhere).
@@ -106,10 +107,115 @@ def anchor_payload(
     }
 
 
-def sign_anchor(payload: dict[str, object], key_material: str | None) -> str:
-    """HMAC-SHA256 seal over the canonical anchor payload."""
+#: Signature prefixes. Already present on every stored signature, which is what lets a
+#: deployment carry both schemes at once with no schema change and no migration: an anchor
+#: sealed before asymmetric signing was configured still verifies under its own algorithm.
+_HMAC_PREFIX = "hmac-sha256:"
+_ED25519_PREFIX = "ed25519:"
+
+
+class AnchorKeyError(ValueError):
+    """The configured anchor private key is not a usable Ed25519 seed."""
+
+
+def _anchor_private_key(seed_hex: str | None) -> Ed25519PrivateKey | None:
+    """Load the Ed25519 signing key from a hex-encoded 32-byte seed, or None if unset.
+
+    Hex rather than PEM because this arrives through an environment variable alongside the
+    other secrets, and a single-line value survives that path without quoting games.
+    """
+
+    if not seed_hex:
+        return None
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
+    try:
+        seed = bytes.fromhex(seed_hex.strip())
+    except ValueError as exc:
+        raise AnchorKeyError("anchor private key is not valid hex") from exc
+    if len(seed) != 32:
+        raise AnchorKeyError(
+            f"anchor private key must be a 32-byte seed, got {len(seed)} bytes"
+        )
+    return Ed25519PrivateKey.from_private_bytes(seed)
+
+
+def anchor_public_key_hex(seed_hex: str | None) -> str | None:
+    """The public half, for publishing. Safe to hand to anyone; it cannot sign."""
+
+    private = _anchor_private_key(seed_hex)
+    if private is None:
+        return None
+    from cryptography.hazmat.primitives import serialization
+
+    raw: bytes = private.public_key().public_bytes(
+        encoding=serialization.Encoding.Raw, format=serialization.PublicFormat.Raw
+    )
+    return raw.hex()
+
+
+def sign_anchor(
+    payload: dict[str, object], key_material: str | None, *, anchor_seed_hex: str | None = None
+) -> str:
+    """Seal the canonical anchor payload — Ed25519 when configured, HMAC otherwise.
+
+    Anchors are the one artifact a third party is asked to trust, so they are the one worth
+    signing asymmetrically: an outside auditor can verify an Ed25519 anchor with a published
+    public key, whereas verifying the HMAC form requires the org secret — and a key that
+    verifies is a key that forges. Per-entry hashing is unkeyed SHA-256 either way, so the
+    chain's own integrity was never gated on this.
+
+    With no seed configured the behaviour is byte-identical to before, so this is inert until
+    a deployment opts in. ``sign_head`` deliberately stays HMAC: the high-water mark is an
+    internal tamper check, never published, and nobody outside verifies it.
+    """
+
+    private = _anchor_private_key(anchor_seed_hex)
+    if private is not None:
+        sealed: bytes = private.sign(_canon(payload))
+        return _ED25519_PREFIX + sealed.hex()
     mac = hmac.new(_signing_material(key_material), _canon(payload), hashlib.sha256)
-    return "hmac-sha256:" + mac.hexdigest()
+    return _HMAC_PREFIX + mac.hexdigest()
+
+
+def verify_anchor(
+    payload: dict[str, object],
+    signature: str,
+    key_material: str | None,
+    *,
+    anchor_seed_hex: str | None = None,
+    public_key_hex: str | None = None,
+) -> bool:
+    """Check an anchor signature under whichever scheme sealed it.
+
+    Dispatching on the stored prefix rather than on current configuration is the point:
+    turning asymmetric signing on must not invalidate anchors already sealed with HMAC, and
+    turning it off must not silently start accepting forgeries.
+
+    ``public_key_hex`` lets a verifier with only the public half check an Ed25519 anchor —
+    the case this whole change exists to enable.
+    """
+
+    if signature.startswith(_ED25519_PREFIX):
+        from cryptography.exceptions import InvalidSignature
+        from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
+
+        raw = public_key_hex or anchor_public_key_hex(anchor_seed_hex)
+        if not raw:
+            return False  # cannot verify without the public half; never assume valid
+        try:
+            Ed25519PublicKey.from_public_bytes(bytes.fromhex(raw)).verify(
+                bytes.fromhex(signature[len(_ED25519_PREFIX):]), _canon(payload)
+            )
+        except (InvalidSignature, ValueError):
+            return False
+        return True
+    if signature.startswith(_HMAC_PREFIX):
+        expected = _HMAC_PREFIX + hmac.new(
+            _signing_material(key_material), _canon(payload), hashlib.sha256
+        ).hexdigest()
+        return hmac.compare_digest(expected, signature)
+    return False  # unknown scheme is not a pass
 
 
 def sign_head(max_seq: int, tip_hash: str, key_material: str | None) -> str:
