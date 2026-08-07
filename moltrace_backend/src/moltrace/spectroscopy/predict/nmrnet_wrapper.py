@@ -44,6 +44,7 @@ from __future__ import annotations
 
 import hashlib
 import importlib
+import math
 import os
 import statistics
 import urllib.request
@@ -69,6 +70,7 @@ __all__ = [
 ]
 
 _NUCLEUS_TO_ELEMENT: dict[str, str] = {"1H": "H", "13C": "C"}
+_ELEMENT_TO_NUCLEUS: dict[str, str] = {v: k for k, v in _NUCLEUS_TO_ELEMENT.items()}
 _MAX_SPHERE = 6
 _MIN_KB_MATCHES = 3  # a HOSE bucket must hold ≥ this many references to be used
 _DEFAULT_N_CONFORMERS = 8
@@ -96,6 +98,20 @@ class AtomShift:
     nucleus: str  # '1H' | '13C'
     predicted_ppm: float
     uncertainty_ppm: float  # ensemble std (NMRNet) or KB spread (fallback); NaN if n_conf==1
+    source: str = "unknown"
+    """Where this specific number came from — ``'nmrnet'`` | ``'hose'`` | ``'element_prior'``.
+
+    ``'element_prior'`` means *no environment was matched*: the value is the
+    knowledge base's element-wide average and the uncertainty is the width of
+    that element's whole shift range. It is an abstention wearing a number, and a
+    caller weighting evidence must be able to see that without parsing warnings.
+
+    The default is deliberately ``'unknown'`` rather than ``'nmrnet'``. Every
+    production site sets this explicitly; a site that forgets should not inherit
+    the *most* trusted label and silently claim to be a model prediction. Anything
+    reaching a real prediction as ``'unknown'`` is a bug, and
+    ``test_every_atom_shift_names_its_source`` fails on it.
+    """
 
 
 @dataclass
@@ -106,6 +122,50 @@ class ShiftPrediction:
     shifts: list[AtomShift]
     n_conformers: int
     warnings: list[str]
+    kb_source: str = "none"
+    """Which knowledge base backed the fallback — ``'nmrshiftdb2'`` | ``'seed'`` | ``'none'``.
+
+    ``'seed'`` is the bundled 16-molecule curated table. It covers common solvents
+    and simple functional groups and is *not* production coverage for drug-like
+    molecules; see :attr:`prior_fallback_fraction`.
+    """
+    kb_records: int = 0
+    """Reference atoms indexed in that knowledge base (0 when NMRNet answered)."""
+
+    @property
+    def prior_fallback_fraction(self) -> float:
+        """Share of atoms that matched nothing and fell back to the element prior.
+
+        This is the number that was missing. Each fallback already appended a
+        per-atom warning, but nothing aggregated them, so a prediction that was
+        70 % element-averages looked — to every caller — exactly like one that
+        was fully resolved. Gate on this before treating a prediction as evidence.
+        """
+
+        if not self.shifts:
+            return 0.0
+        return sum(1 for s in self.shifts if s.source == "element_prior") / len(self.shifts)
+
+    @property
+    def median_uncertainty_ppm(self) -> dict[str, float]:
+        """Median σ per nucleus, over atoms with a finite uncertainty.
+
+        Compare against the error model that consumes it: DP4's published scales
+        are 0.185 ppm (¹H) and 2.306 ppm (¹³C). A median σ far above those means
+        the prediction cannot discriminate between candidates, however confident
+        the surrounding pipeline looks.
+        """
+
+        out: dict[str, float] = {}
+        for nucleus in _NUCLEUS_TO_ELEMENT:
+            sigmas = [
+                float(s.uncertainty_ppm)
+                for s in self.shifts
+                if s.nucleus == nucleus and math.isfinite(s.uncertainty_ppm)
+            ]
+            if sigmas:
+                out[nucleus] = float(statistics.median(sigmas))
+        return out
 
 
 class NMRNetUnavailable(RuntimeError):
@@ -295,6 +355,8 @@ class KnowledgeBase:
     buckets: dict[tuple[str, int], dict[str, list[float]]]
     priors: dict[str, float]
     reference_count: int = 0
+    source: str = "none"
+    """Provenance of this table — ``'nmrshiftdb2'`` (built) | ``'seed'`` (bundled)."""
 
     def lookup(
         self, nucleus: str, code: tuple[str, ...]
@@ -400,6 +462,7 @@ def build_seed_knowledge_base() -> KnowledgeBase:
                     _index_reference_atom(kb, nucleus, hose_code(mol_h, atom_index), shift)
                     n_ref += 1
     kb.reference_count = n_ref
+    kb.source = "seed"
     _finalize_priors(kb)
     return kb
 
@@ -413,6 +476,14 @@ def load_knowledge_base(path: str | Path) -> KnowledgeBase:
             "nucleus": "1H"|"13C", "shift_ppm": float}, ...]}, ...]
 
     ``atom_index`` indexes the molecule with explicit hydrogens (``AddHs`` order).
+
+    A record may instead carry ``"molblock"``, which takes precedence. That is
+    the exact route for assignment formats such as NMReDATA, whose atom numbers
+    index the molfile's own atom block **including explicit hydrogens**. Rebuilding
+    those through ``SMILES → AddHs`` would silently re-order the hydrogens and
+    attach every ¹H shift to the wrong proton — a corruption that produces a
+    plausible-looking knowledge base and is nearly undetectable downstream. When a
+    source gives exact atom identity, keep it.
     """
 
     import json
@@ -421,10 +492,15 @@ def load_knowledge_base(path: str | Path) -> KnowledgeBase:
     kb = _new_kb()
     n_ref = 0
     for record in data:
-        mol = Chem.MolFromSmiles(record["smiles"])
-        if mol is None:
-            continue
-        mol_h = Chem.AddHs(mol)
+        if record.get("molblock"):
+            mol_h = Chem.MolFromMolBlock(record["molblock"], removeHs=False)
+            if mol_h is None:
+                continue
+        else:
+            mol = Chem.MolFromSmiles(record["smiles"])
+            if mol is None:
+                continue
+            mol_h = Chem.AddHs(mol)
         n_atoms = mol_h.GetNumAtoms()
         for assignment in record.get("assignments", []):
             nucleus = assignment["nucleus"]
@@ -438,6 +514,7 @@ def load_knowledge_base(path: str | Path) -> KnowledgeBase:
             )
             n_ref += 1
     kb.reference_count = n_ref
+    kb.source = "nmrshiftdb2"
     _finalize_priors(kb)
     return kb
 
@@ -495,6 +572,68 @@ def _embed_conformers(
 # --------------------------------------------------------------------------- #
 # NMRNet inference (optional; lazily loaded)
 # --------------------------------------------------------------------------- #
+def _run_nmrnet_remote(
+    mol_h: Chem.Mol,
+    conf_ids: list[int],
+    nuclei: Sequence[str],
+    warnings: list[str],
+) -> dict[tuple[int, str], list[float]]:
+    """Run NMRNet on the GPU sidecar, one call per conformer.
+
+    This is the production route: the API host has no GPU and stays torch-free,
+    so inference happens in ``nmrnet_service/``. Returns the same per-conformer
+    value lists as the local path, so the ensemble mean/std aggregation upstream
+    is identical either way.
+
+    Raises ``NMRNetUnavailable`` on any service failure — the caller then falls
+    back to HOSE *with the method recorded*. A partially-answered molecule is
+    treated as a failure, not patched up with priors: mixing model shifts and
+    element averages inside one result would make the uncertainty meaningless.
+    """
+
+    from moltrace.spectroscopy.predict import nmrnet_client
+
+    try:
+        base_url = nmrnet_client.service_url()
+    except nmrnet_client.NMRNetServiceError as exc:
+        raise NMRNetUnavailable(str(exc)) from exc
+    if not base_url:
+        raise NMRNetUnavailable("no NMRNet service configured")
+
+    symbols = [atom.GetSymbol() for atom in mol_h.GetAtoms()]
+    wanted = {n for n in nuclei}
+    per_atom: dict[tuple[int, str], list[float]] = defaultdict(list)
+
+    for conf_id in conf_ids:
+        conformer = mol_h.GetConformer(conf_id)
+        coordinates = [
+            [p.x, p.y, p.z]
+            for p in (conformer.GetAtomPosition(i) for i in range(mol_h.GetNumAtoms()))
+        ]
+        try:
+            result = nmrnet_client.predict(
+                symbols, coordinates, list(nuclei), base_url=base_url
+            )
+        except nmrnet_client.NMRNetServiceError as exc:
+            raise NMRNetUnavailable(f"NMRNet service call failed: {exc}") from exc
+
+        for atom_index, (ppm, _uncertainty) in result.items():
+            element = symbols[atom_index]
+            nucleus = _ELEMENT_TO_NUCLEUS.get(element)
+            if nucleus is None or nucleus not in wanted:
+                continue
+            per_atom[(atom_index, nucleus)].append(float(ppm))
+
+    if not per_atom:
+        raise NMRNetUnavailable(
+            "NMRNet service returned no shifts for the requested nuclei"
+        )
+    warnings.append(
+        f"NMRNet: {len(conf_ids)} conformer(s) inferred on the configured service."
+    )
+    return dict(per_atom)
+
+
 def _run_nmrnet(
     mol_h: Chem.Mol,
     conf_ids: list[int],
@@ -539,6 +678,15 @@ def _nmrnet_predict(
     device_pref: str | None,
     warnings: list[str],
 ) -> tuple[list[AtomShift], str]:
+    # Remote first, and *before* importing torch: the production API host has no
+    # GPU and no torch, so requiring torch to reach a remote GPU would rule out
+    # the only deployment where NMRNet can actually run.
+    from moltrace.spectroscopy.predict import nmrnet_client
+
+    if nmrnet_client.service_url():
+        per_atom = _run_nmrnet_remote(mol_h, conf_ids, nuclei, warnings)
+        return _shifts_from_per_atom(per_atom, warnings), "remote"
+
     try:
         import torch  # noqa: F401
     except ImportError as exc:
@@ -557,6 +705,18 @@ def _nmrnet_predict(
         else:
             raise
 
+    return _shifts_from_per_atom(per_atom, warnings), str(device)
+
+
+def _shifts_from_per_atom(
+    per_atom: dict[tuple[int, str], list[float]], warnings: list[str]
+) -> list[AtomShift]:
+    """Aggregate per-conformer values into one shift + ensemble spread per atom.
+
+    Shared by the local and remote paths so the uncertainty means the same thing
+    on both: the standard deviation across the conformer ensemble.
+    """
+
     shifts: list[AtomShift] = []
     for (atom_index, nucleus), values in sorted(per_atom.items()):
         mean = float(statistics.fmean(values))
@@ -565,8 +725,12 @@ def _nmrnet_predict(
         else:
             std = float("nan")
             warnings.append("n_conformers == 1: per-atom uncertainty is NaN (no ensemble spread).")
-        shifts.append(AtomShift(atom_index, _NUCLEUS_TO_ELEMENT[nucleus], nucleus, mean, std))
-    return shifts, str(device)
+        shifts.append(
+            AtomShift(
+                atom_index, _NUCLEUS_TO_ELEMENT[nucleus], nucleus, mean, std, source="nmrnet"
+            )
+        )
+    return shifts
 
 
 # --------------------------------------------------------------------------- #
@@ -586,13 +750,14 @@ def _hose_predict(
             hit = kb.lookup(nucleus, hose_code(mol_h, idx))
             if hit is not None:
                 mean, std, sphere, n = hit
-                shifts.append(AtomShift(idx, element, nucleus, mean, std))
+                shifts.append(AtomShift(idx, element, nucleus, mean, std, source="hose"))
                 warnings.append(f"atom {idx} {nucleus}: HOSE match at sphere {sphere} (n={n}).")
             else:
                 shifts.append(
                     AtomShift(
                         idx, element, nucleus,
                         kb.priors.get(nucleus, 0.0), _PRIOR_UNCERTAINTY[nucleus],
+                        source="element_prior",
                     )
                 )
                 warnings.append(
@@ -622,9 +787,21 @@ def predict_shifts(
     CPU) and ``allow_fallback`` is True, route to the HOSE-code / NMRShiftDB2
     fallback.
 
-    Headline accuracy (nmrshiftdb2, experimental): MAE 0.181 ppm (¹H),
-    1.098 ppm (¹³C). (On the QM9-NMR DFT set the paper reports far tighter MAEs,
-    0.020 / 0.262 ppm — see the QM9-NMR regression test.)
+    Accuracy — read the method before quoting a number
+    --------------------------------------------------
+    The figures below are **NMRNet's published test-set MAEs**, and they apply
+    only to a result with ``method == 'nmrnet'``: 0.181 ppm (¹H) / 1.098 ppm
+    (¹³C) on nmrshiftdb2 experimental data, 0.020 / 0.262 ppm on the QM9-NMR DFT
+    set. They are properties of that model on those benchmarks — **not** of this
+    function, and not of MolTrace.
+
+    On the ``'hose_fallback'`` path accuracy depends entirely on knowledge-base
+    coverage, which :attr:`ShiftPrediction.prior_fallback_fraction` and
+    :attr:`ShiftPrediction.median_uncertainty_ppm` report per call. With only the
+    bundled seed table, drug-like molecules resolve ~55-75 % of atoms and the
+    median ¹³C uncertainty is the 35 ppm element prior — an order of magnitude
+    wider than DP4's own 2.306 ppm error scale. Never present a fallback result
+    with the MAEs above.
 
     Raises ``ValueError`` if the SMILES cannot be parsed/sanitised.
     """
@@ -670,11 +847,30 @@ def predict_shifts(
             warnings.append(f"NMRNet inference failed ({exc!r}); using HOSE-code fallback.")
 
     shifts = _hose_predict(mol_h, active, warnings)
-    return ShiftPrediction(
+    kb = _fallback_kb()
+    prediction = ShiftPrediction(
         smiles=smiles,
         method="hose_fallback",
         device="cpu",
         shifts=shifts,
         n_conformers=0,
         warnings=warnings,
+        kb_source=kb.source,
+        kb_records=kb.reference_count,
     )
+
+    # Summarise the degradation once, here, rather than leaving every caller to
+    # sum per-atom warnings (which none of them did). A prediction that is mostly
+    # element averages must announce that in one line a human or a gate can read.
+    prior_fraction = prediction.prior_fallback_fraction
+    if prior_fraction > 0.0:
+        medians = ", ".join(
+            f"{nucleus} {sigma:.2f} ppm"
+            for nucleus, sigma in sorted(prediction.median_uncertainty_ppm.items())
+        )
+        warnings.append(
+            f"Coverage: {prior_fraction:.0%} of atoms matched no environment in the "
+            f"'{kb.source}' knowledge base ({kb.reference_count} reference atoms) and used "
+            f"the element prior. Median uncertainty: {medians}. Treat as low-confidence."
+        )
+    return prediction
