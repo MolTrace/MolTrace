@@ -19,7 +19,7 @@ from nmrcheck.database import (
     list_audit_events,
     session_scope,
 )
-from nmrcheck.orm import AuditCheckpointORM, AuditEventORM
+from nmrcheck.orm import AuditCheckpointORM, AuditEventORM, utcnow
 from nmrcheck.settings import Settings
 
 
@@ -446,3 +446,184 @@ def test_the_export_uses_the_same_access_rule_as_verification(tmp_path):
         )
     with pytest.raises(KeyError):
         ops.export_subject_audit_entries(sf, "not_a_subject", 1, owner_scope_id=None)
+
+
+# -------------------------------------------------- asymmetric anchor signatures (authenticity)
+#
+# Per-entry hashing is unkeyed SHA-256, so INTEGRITY was always externally checkable. AUTHENTICITY
+# was not: anchors were HMAC-sealed, and a key that verifies an HMAC is a key that forges one, so
+# handing it to an auditor proves nothing. Ed25519 anchors close that — the auditor gets the public
+# half, which cannot sign.
+
+
+_SEED = "11" * 32  # 32-byte hex seed
+
+
+def test_with_no_seed_configured_anchors_are_unchanged():
+    """Inert until a deployment opts in — the default path must be byte-identical."""
+    from nmrcheck.audit_chain import anchor_payload, sign_anchor
+
+    payload = anchor_payload(from_seq=1, tip_seq=3, tip_hash="sha256:aa", row_count=3,
+                             anchored_at=utcnow())
+    assert sign_anchor(payload, "k").startswith("hmac-sha256:")
+    assert sign_anchor(payload, "k", anchor_seed_hex=None).startswith("hmac-sha256:")
+
+
+def test_an_ed25519_anchor_verifies_from_the_public_key_alone(tmp_path):
+    """The whole point: verification without a secret that could also forge.
+
+    The auditor is given `public`, never the seed, and reaches a correct verdict.
+    """
+    from nmrcheck.audit_chain import (
+        anchor_payload,
+        anchor_public_key_hex,
+        sign_anchor,
+        verify_anchor,
+    )
+
+    payload = anchor_payload(from_seq=1, tip_seq=9, tip_hash="sha256:bb", row_count=9,
+                             anchored_at=utcnow())
+    signature = sign_anchor(payload, "org-secret", anchor_seed_hex=_SEED)
+    assert signature.startswith("ed25519:")
+
+    public = anchor_public_key_hex(_SEED)
+    assert public and len(public) == 64
+    # No seed, no org secret — only the public half.
+    assert verify_anchor(payload, signature, None, public_key_hex=public) is True
+
+    # A different payload under the same signature must not verify.
+    tampered = anchor_payload(from_seq=1, tip_seq=10, tip_hash="sha256:bb", row_count=9,
+                              anchored_at=payload["anchored_at"] and utcnow())
+    assert verify_anchor(tampered, signature, None, public_key_hex=public) is False
+
+
+def test_a_wrong_public_key_does_not_verify():
+    from nmrcheck.audit_chain import (
+        anchor_payload,
+        anchor_public_key_hex,
+        sign_anchor,
+        verify_anchor,
+    )
+
+    payload = anchor_payload(from_seq=1, tip_seq=2, tip_hash="sha256:cc", row_count=2,
+                             anchored_at=utcnow())
+    signature = sign_anchor(payload, "k", anchor_seed_hex=_SEED)
+    other = anchor_public_key_hex("22" * 32)
+    assert verify_anchor(payload, signature, None, public_key_hex=other) is False
+
+
+def test_an_ed25519_anchor_without_any_public_key_is_not_assumed_valid():
+    """Unverifiable must never mean verified."""
+    from nmrcheck.audit_chain import anchor_payload, sign_anchor, verify_anchor
+
+    payload = anchor_payload(from_seq=1, tip_seq=2, tip_hash="sha256:dd", row_count=2,
+                             anchored_at=utcnow())
+    signature = sign_anchor(payload, "k", anchor_seed_hex=_SEED)
+    assert verify_anchor(payload, signature, "k") is False
+
+
+def test_enabling_asymmetric_signing_does_not_invalidate_existing_hmac_anchors():
+    """Backward compatibility is the reason dispatch reads the signature, not the config.
+
+    A deployment that turns this on must not have every previously sealed anchor start
+    reporting as forged.
+    """
+    from nmrcheck.audit_chain import anchor_payload, sign_anchor, verify_anchor
+
+    payload = anchor_payload(from_seq=1, tip_seq=4, tip_hash="sha256:ee", row_count=4,
+                             anchored_at=utcnow())
+    old = sign_anchor(payload, "org-secret")  # sealed before the seed existed
+    assert old.startswith("hmac-sha256:")
+    # ...now the seed IS configured; the old anchor must still verify under its own scheme.
+    assert verify_anchor(payload, old, "org-secret", anchor_seed_hex=_SEED) is True
+
+
+def test_an_unknown_signature_scheme_is_rejected_not_ignored():
+    from nmrcheck.audit_chain import anchor_payload, verify_anchor
+
+    payload = anchor_payload(from_seq=1, tip_seq=1, tip_hash="sha256:ff", row_count=1,
+                             anchored_at=utcnow())
+    assert verify_anchor(payload, "rot13:abc", "k") is False
+
+
+def test_a_malformed_seed_fails_loudly_rather_than_falling_back_to_hmac():
+    """Silently downgrading to HMAC would leave an operator believing anchors are asymmetric."""
+    import pytest
+
+    from nmrcheck.audit_chain import AnchorKeyError, anchor_payload, sign_anchor
+
+    payload = anchor_payload(from_seq=1, tip_seq=1, tip_hash="sha256:00", row_count=1,
+                             anchored_at=utcnow())
+    with pytest.raises(AnchorKeyError):
+        sign_anchor(payload, "k", anchor_seed_hex="not-hex")
+    with pytest.raises(AnchorKeyError, match="32-byte"):
+        sign_anchor(payload, "k", anchor_seed_hex="aabb")
+
+
+def test_the_live_chain_verifies_end_to_end_with_asymmetric_anchors(tmp_path):
+    """The real path: anchor + full verification under a configured seed."""
+    url = f"sqlite:///{tmp_path / 'asym.sqlite3'}"
+    sf = create_session_factory(url)
+    settings = Settings(database_url=url, api_key="test-key", audit_anchor_private_key=_SEED)
+    init_db(sf, audit_signing_key=settings.audit_signing_key)
+    _seed(sf, 4)
+
+    anchor = ops.create_audit_anchor(sf, settings=settings)
+    assert anchor is not None
+    assert anchor.signature.startswith("ed25519:")
+
+    report = ops.verify_audit_chain(sf, settings=settings)
+    assert report.ok is True, report.detail
+    assert report.anchors_ok is True and report.anchor_count == 1
+
+
+def test_anchor_authenticity_survives_the_JSON_ROUND_TRIP(tmp_path):
+    """The gap that let a real bug through: the crypto tests never crossed the wire.
+
+    Signing and verifying an in-process payload dict passed happily while the shipped path
+    failed, because `anchored_at` is a datetime and Pydantic renders it `Z` where the
+    signature covers `+00:00`. Anything that verifies an anchor must therefore go through
+    `model_dump(mode="json")` — the shape an auditor is actually handed — and check the
+    bytes that were signed rather than re-deriving them.
+    """
+    import json
+
+    url = f"sqlite:///{tmp_path / 'rt.sqlite3'}"
+    sf = create_session_factory(url)
+    settings = Settings(database_url=url, api_key="test-key", audit_anchor_private_key=_SEED)
+    init_db(sf, audit_signing_key=settings.audit_signing_key)
+    _seed(sf, 3)
+
+    anchor = ops.create_audit_anchor(sf, settings=settings)
+    assert anchor is not None
+    wire = json.loads(json.dumps(anchor.model_dump(mode="json")))  # exactly what ships
+
+    assert wire["signed_payload"], "the exact signed bytes must reach the auditor"
+    # The displayed tip_hash must be the one inside the signed bytes, or a server could
+    # sign one checkpoint and show another.
+    assert json.loads(wire["signed_payload"])["tip_hash"] == wire["tip_hash"]
+
+    verifier = _offline_verifier()
+    from nmrcheck.audit_chain import anchor_public_key_hex
+
+    assert verifier.check_anchor(wire, anchor_public_key_hex(_SEED)) == "OK"
+    assert verifier.check_anchor(wire, anchor_public_key_hex("22" * 32)).startswith("FAILED")
+    # No public key is "could not establish", never a pass.
+    assert verifier.check_anchor(wire, None) != "OK"
+
+
+def test_a_server_cannot_display_one_tip_hash_and_sign_another():
+    """signed_payload is authoritative; the sibling fields are display."""
+    import json
+
+    verifier = _offline_verifier()
+    from nmrcheck.audit_chain import anchor_public_key_hex
+
+    payload = {"from_seq": 1, "tip_seq": 3, "tip_hash": "sha256:real",
+               "row_count": 3, "anchored_at": "2026-08-06T00:00:00+00:00"}
+    signed = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+    from nmrcheck.audit_chain import _anchor_private_key
+
+    signature = "ed25519:" + _anchor_private_key(_SEED).sign(signed.encode()).hex()
+    lying = {"tip_hash": "sha256:fake", "signed_payload": signed, "signature": signature}
+    assert verifier.check_anchor(lying, anchor_public_key_hex(_SEED)).startswith("FAILED")

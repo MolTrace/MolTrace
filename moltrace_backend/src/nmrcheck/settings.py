@@ -117,6 +117,11 @@ class Settings:
     # this key; default None falls back to a dev key (NOT for prod — set AUDIT_SIGNING_KEY).
     # audit_anchor_interval is the row count past which an anchor is suggested.
     audit_signing_key: str | None = None
+    #: Hex-encoded 32-byte Ed25519 seed. When set, audit ANCHORS are signed asymmetrically
+    #: so an outside auditor can verify them from the published public key alone. Unset =
+    #: anchors stay HMAC-sealed and behaviour is unchanged; already-sealed anchors keep
+    #: verifying under whichever scheme sealed them.
+    audit_anchor_private_key: str | None = None
     audit_anchor_interval: int = 1000
     email_from: str = "noreply@nmrcheck.local"
     email_backend: str = "database"
@@ -288,6 +293,7 @@ def get_settings() -> Settings:
         hsts_include_subdomains=_parse_bool(os.getenv("HSTS_INCLUDE_SUBDOMAINS"), True),
         hsts_preload=_parse_bool(os.getenv("HSTS_PRELOAD"), True),
         audit_signing_key=resolve_secret("AUDIT_SIGNING_KEY"),
+        audit_anchor_private_key=resolve_secret("AUDIT_ANCHOR_PRIVATE_KEY"),
         audit_anchor_interval=_parse_int(os.getenv("AUDIT_ANCHOR_INTERVAL"), 1000),
         email_from=os.getenv("EMAIL_FROM", "noreply@nmrcheck.local"),
         email_backend=(

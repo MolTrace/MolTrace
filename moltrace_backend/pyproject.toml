@@ -16,6 +16,11 @@ dependencies = [
     "alembic>=1.14,<2.0",
     "rq>=2.0,<3.0",
     "redis>=5.0,<6.0",
+    # Ed25519 anchor signatures. A runtime dependency rather than an extra because the
+    # alternative to signing an anchor asymmetrically is signing it with a secret that also
+    # forges it — an outside auditor then cannot verify a checkpoint at all. Already present
+    # transitively, so this pins what is in use rather than pulling anything new.
+    "cryptography>=42",
     "lttbc>=0.3.0",
     "lmfit>=1.3.4",
     # The surrogate behind Repho's Bayesian optimization. A runtime dependency rather than an

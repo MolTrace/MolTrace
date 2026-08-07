@@ -16,12 +16,14 @@ from sqlalchemy.orm import Session, sessionmaker
 from . import collaboration_subjects
 from .audit_chain import (
     GENESIS_HASH,
+    _canon,
     _iso_utc,
     anchor_payload,
     compute_entry_hash,
     key_id,
     sign_anchor,
     sign_head,
+    verify_anchor,
 )
 from .database import audit_event, session_scope
 from .models import (
@@ -159,7 +161,19 @@ def _chain_tip(session: Session) -> tuple[int, str] | None:
 
 
 def _anchor_to_record(chk: AuditCheckpointORM) -> AuditAnchorRecord:
+    # Rebuilt with the same helper that produced the signed bytes, so it is exact for rows
+    # written before this field existed as well as for new ones.
+    signed = _canon(
+        anchor_payload(
+            from_seq=chk.from_seq,
+            tip_seq=chk.tip_seq,
+            tip_hash=chk.tip_hash,
+            row_count=chk.row_count,
+            anchored_at=chk.anchored_at,
+        )
+    ).decode("utf-8")
     return AuditAnchorRecord(
+        signed_payload=signed,
         id=chk.id,
         created_at=chk.created_at,
         anchored_at=chk.anchored_at,
@@ -202,7 +216,11 @@ def create_audit_anchor(
             tip_seq=tip_seq,
             tip_hash=tip_hash,
             row_count=tip_seq - from_seq + 1,
-            signature=sign_anchor(payload, settings.audit_signing_key),
+            signature=sign_anchor(
+                payload,
+                settings.audit_signing_key,
+                anchor_seed_hex=settings.audit_anchor_private_key,
+            ),
             key_id=key_id(settings.audit_signing_key),
         )
         session.add(chk)
@@ -227,7 +245,14 @@ def _verify_anchors(session: Session, settings: Settings) -> tuple[bool, int, st
             row_count=chk.row_count,
             anchored_at=chk.anchored_at,
         )
-        if not hmac.compare_digest(sign_anchor(payload, settings.audit_signing_key), chk.signature):
+        # Dispatch on the signature's own prefix, not on current config: enabling
+        # asymmetric signing must not invalidate anchors already sealed with HMAC.
+        if not verify_anchor(
+            payload,
+            chk.signature,
+            settings.audit_signing_key,
+            anchor_seed_hex=settings.audit_anchor_private_key,
+        ):
             return False, len(anchors), f"anchor_signature_invalid@{chk.tip_seq}"
         row = session.execute(
             select(AuditEventORM.entry_hash).where(AuditEventORM.chain_seq == chk.tip_seq)

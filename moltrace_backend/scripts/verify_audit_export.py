@@ -24,10 +24,14 @@ Establishes, with no key and no trust in us:
 
 Does NOT establish:
 
-* **That MolTrace wrote these entries.** Anchors are signed with a symmetric HMAC key, so
-  authenticity cannot be checked without a secret that would also let its holder forge
-  entries. A clean result here means the export is internally consistent, not that it is
-  authentic. Anyone claiming otherwise from this tool's output is overstating it.
+* **That MolTrace wrote these entries** — unless you pass ``--anchor`` and
+  ``--public-key``. Anchors sealed with the older symmetric HMAC scheme cannot be verified
+  by an outsider at all, because the key that verifies is the key that forges; for those, a
+  clean result here means internally consistent, not authentic, and anyone claiming
+  otherwise from this output is overstating it. Anchors sealed with Ed25519 CAN be checked
+  from the published public key (``GET /audit/anchor-public-key``), and that check needs the
+  ``cryptography`` package — the only part of this tool that is not standard library. Run it
+  without those flags and everything above still works with no dependencies at all.
 
 Exit codes: 0 verified · 1 a break was found · 2 the file could not be read as an export.
 """
@@ -111,6 +115,46 @@ def verify(entries: list[dict[str, Any]], *, tip_hash: str | None = None) -> lis
     return findings
 
 
+def check_anchor(anchor: dict[str, Any], public_key_hex: str | None) -> str:
+    """Verify an Ed25519 anchor signature. Returns "OK" or a reason it could not be established.
+
+    Deliberately never raises and never returns OK on a scheme it cannot check: "I could not
+    verify this" and "this is valid" must not collapse into the same outcome.
+    """
+
+    signature = str(anchor.get("signature", ""))
+    if not signature.startswith("ed25519:"):
+        return "anchor is not Ed25519-signed; an outsider cannot verify it"
+    if not public_key_hex:
+        return "no --public-key supplied"
+    try:
+        from cryptography.exceptions import InvalidSignature
+        from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
+    except ImportError:
+        return "the `cryptography` package is not installed (pip install cryptography)"
+
+    # Verify the bytes that were actually signed. Re-deriving them here would reintroduce
+    # the encoder mismatch this field exists to avoid (`anchored_at` renders as `Z` through
+    # most JSON encoders, while the signature covers `+00:00`).
+    signed_payload = anchor.get("signed_payload")
+    if not signed_payload:
+        return "anchor record carries no signed_payload; cannot verify the exact signed bytes"
+    canonical = signed_payload.encode("utf-8")
+    try:
+        committed = json.loads(signed_payload)
+    except ValueError:
+        return "anchor signed_payload is not valid JSON"
+    if committed.get("tip_hash") != anchor.get("tip_hash"):
+        return "FAILED: the anchor's displayed tip_hash is not the one it signed"
+    try:
+        Ed25519PublicKey.from_public_bytes(bytes.fromhex(public_key_hex)).verify(
+            bytes.fromhex(signature[len("ed25519:"):]), canonical
+        )
+    except (InvalidSignature, ValueError):
+        return "FAILED: the anchor signature does not match this public key"
+    return "OK"
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("export", help="JSON file from /audit/{subject_type}/{id}/entries")
@@ -118,6 +162,18 @@ def main(argv: list[str] | None = None) -> int:
         "--tip-hash",
         default=None,
         help="an anchor's tip_hash, to confirm the export matches a published checkpoint",
+    )
+    parser.add_argument(
+        "--anchor",
+        default=None,
+        help="JSON file holding the anchor record (from_seq, tip_seq, tip_hash, row_count, "
+             "anchored_at, signature) — checked for authenticity with --public-key",
+    )
+    parser.add_argument(
+        "--public-key",
+        default=None,
+        help="hex Ed25519 public key from GET /audit/anchor-public-key; requires the "
+             "`cryptography` package. Without it the run is integrity-only.",
     )
     args = parser.parse_args(argv)
 
@@ -130,7 +186,21 @@ def main(argv: list[str] | None = None) -> int:
         print(f"could not read {args.export!r} as an audit export: {exc}", file=sys.stderr)
         return 2
 
+    anchor_verdict: str | None = None
+    if args.anchor:
+        try:
+            with open(args.anchor, encoding="utf-8") as handle:
+                anchor = json.load(handle)
+        except (OSError, ValueError) as exc:
+            print(f"could not read {args.anchor!r} as an anchor: {exc}", file=sys.stderr)
+            return 2
+        anchor_verdict = check_anchor(anchor, args.public_key)
+        if args.tip_hash is None:
+            args.tip_hash = anchor.get("tip_hash")
+
     findings = verify(entries, tip_hash=args.tip_hash)
+    if anchor_verdict is not None and anchor_verdict.startswith("FAILED"):
+        findings.append(anchor_verdict)
     first = min((e.get("chain_seq") for e in entries), default=None)
     last = max((e.get("chain_seq") for e in entries), default=None)
     print(f"{len(entries)} entries, chain_seq {first}..{last}")
@@ -140,12 +210,24 @@ def main(argv: list[str] | None = None) -> int:
             print(f"  - {finding}")
         return 1
 
-    print("\nVERIFIED — integrity only:")
+    authentic = anchor_verdict == "OK"
+    print(
+        "\nVERIFIED — integrity and authenticity:"
+        if authentic
+        else "\nVERIFIED — integrity only:"
+    )
     print("  no entry altered, none removed or reordered"
           + (", and the export matches the anchor" if args.tip_hash else ""))
-    print("  this does NOT establish that MolTrace authored these entries; anchor")
-    print("  signatures are symmetric (HMAC) and cannot be checked without a secret")
-    print("  that would also allow forging them.")
+    if authentic:
+        print("  the anchor's Ed25519 signature checks out against the public key you")
+        print("  supplied, so this checkpoint was sealed by the holder of the private key.")
+    else:
+        if anchor_verdict:
+            print(f"  anchor authenticity NOT established: {anchor_verdict}")
+        print("  this does NOT establish who authored these entries. Supply --anchor and")
+        print("  --public-key to check an Ed25519 checkpoint; anchors sealed with the older")
+        print("  symmetric HMAC scheme cannot be verified by an outsider at all, because the")
+        print("  key that verifies them is the key that forges them.")
     return 0
 
 
