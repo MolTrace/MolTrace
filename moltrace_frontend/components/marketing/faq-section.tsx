@@ -94,9 +94,10 @@ export function FaqSection({
             </p>
           </div>
 
-          {/* The list. Hairlines rather than cards: at this width a stack of
-              bordered boxes reads as heavier than the content inside them. */}
-          <div className="min-w-0">
+          {/* The list, as an overlapping deck of cards rather than hairline rows.
+              `relative` so each card's z-index is resolved against this stack and
+              not against whatever ancestor happens to be positioned. */}
+          <div className="relative min-w-0">
             {items.map((item, i) => (
               // The first few open by default: a collapsed <details> still ships its
               // answer in the server HTML, but an open one is unambiguously visible
@@ -107,19 +108,33 @@ export function FaqSection({
               <details
                 key={i}
                 open={i < OPEN_BY_DEFAULT}
-                className="group relative border-b border-border/70 first:border-t"
+                /* A vertical deck: each card's top edge tucks under the previous
+                   card's bottom, like a stack of papers.
+
+                   z-index DESCENDS with position, so earlier cards sit on top.
+                   That direction matters more here than on the hero row. These
+                   entries expand, and an open answer has to be able to extend
+                   over what follows it — with the stacking reversed, the next
+                   card would cover the bottom of the answer you just opened.
+
+                   The overlap is a constant negative margin, so it stays 12px at
+                   the card boundary no matter how tall an open answer grows: the
+                   following card is pushed down by normal flow along with it. No
+                   question is ever hidden behind the card above it. */
+                style={{ zIndex: items.length - i }}
+                className="group relative -mt-3 rounded-xl border bg-card shadow-sm transition-shadow duration-300 first:mt-0 hover:shadow-md open:shadow-lg motion-reduce:transition-none"
               >
                 {/* The rule that ignites. Sits flush to the left edge and scales
                     up from nothing when the entry opens, which is the one moment
                     of motion the native disclosure actually gives us. */}
                 <span
                   aria-hidden
-                  className="pointer-events-none absolute bottom-0 left-0 top-0 w-[2px] origin-top scale-y-0 transition-transform duration-300 group-open:scale-y-100 motion-reduce:transition-none"
+                  className="pointer-events-none absolute bottom-0 left-0 top-0 w-[3px] origin-top scale-y-0 rounded-l-xl transition-transform duration-300 group-open:scale-y-100 motion-reduce:transition-none"
                   style={{ backgroundColor: "var(--mt-teal)" }}
                 />
 
                 <summary
-                  className="flex cursor-pointer list-none items-start gap-4 py-5 pl-5 pr-2 transition-colors hover:bg-muted/40 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring motion-reduce:transition-none marker:hidden [&::-webkit-details-marker]:hidden"
+                  className="flex cursor-pointer list-none items-start gap-4 rounded-xl py-5 pl-6 pr-4 transition-colors hover:bg-muted/40 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring motion-reduce:transition-none marker:hidden [&::-webkit-details-marker]:hidden"
                 >
                   <span
                     className="mt-0.5 shrink-0 font-mono text-[11px] font-bold tabular-nums tracking-widest transition-colors motion-reduce:transition-none"
@@ -141,7 +156,7 @@ export function FaqSection({
                   />
                 </summary>
 
-                <div className="pb-6 pl-[3.6rem] pr-2">
+                <div className="pb-6 pl-[4.1rem] pr-6">
                   <p className="text-[15px] leading-relaxed text-muted-foreground">{item.a}</p>
                 </div>
               </details>
