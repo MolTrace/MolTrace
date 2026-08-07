@@ -1304,3 +1304,92 @@ looking for the *cause* of the error, and finding the stage-to-stage error was
 Corrected in `tests/test_processed_upload_accuracy.py`, which now measures the
 scaling step against the pipeline's own areas and names the window question as
 A4's rather than pretending to answer it.
+
+---
+
+## B1 LOOP RESULT — SpectraCheck end to end on a real FID (2026-08-06)
+
+Driven on `naw-1-244-54pt/10` (the fully relaxed half of the matched pair),
+auth enforced, as an ordinary non-admin user.
+
+### The loop closes, and produces real artefacts
+
+| step | route | result |
+|---|---|---|
+| upload | `POST /raw-fid/upload` | 200, Bruker detected, archive persisted |
+| process | `POST /raw-fid/{id}/process` | 200 in 8.9 s, 20 peaks |
+| run | `GET /fid/runs/{id}` | 200 |
+| report | `GET /fid/runs/{id}/report` | 200 — structured: `inferred_peak_list`, `processing_assumptions`, `qa_diagnostics`, `raw_fid_provenance`, `review_decisions`, `run` |
+| report (HTML) | `GET /fid/runs/{id}/report.html` | 200, **27 KB** |
+| **review** | `POST /fid/runs/{id}/review` | **403** |
+| package | `GET /fid/runs/{id}/package` | 200, **1.8 MB** evidence bundle |
+
+**Report production works.** The acquisition gating also read the real file
+correctly — `level=quantitative, recycle=30.0 s` — so the P2b work holds on
+instrument data, not just fixtures.
+
+### Finding 1 — scientific review is gated on the PLATFORM ADMIN role
+
+```
+POST /fid/runs/{id}/review           dependencies=[Depends(require_admin)]
+POST /fid/runs/{id}/approve          require_admin
+POST /fid/runs/{id}/reject           require_admin
+POST /fid/runs/{id}/request-changes  require_admin
+```
+
+versus, on the sibling surface:
+
+```
+POST /spectracheck/sessions/{id}/review    require_access_context
+```
+
+This is not segregation of duties — that would be "a second qualified person",
+not "an administrator". It conflates *can administer the system* with *is
+qualified to approve an analysis*. In a lab the reviewer is a senior chemist,
+not IT.
+
+The consequence is a dead end: a chemist runs an analysis, gets a report, and
+**cannot have it reviewed** unless a platform admin does it. Either every
+reviewer is over-privileged or the review step does not happen.
+
+Worse, the product already has the right model and does not use it here —
+`session_reviewers` (reviewer_email, assigned_by, status), `review_tasks`
+(assigned_to), `approval_records` (approver_email, decision, rationale). The FID
+run path bypasses all of it.
+
+The refusal is also uninformative: *"You do not have access to perform this
+action."* A chemist reading that concludes the feature is broken, which — from
+where they stand — it is.
+
+### Finding 2 — a raw FID cannot be processed without a declared structure
+
+`POST /raw-fid/{id}/process` has `smiles` in its **required** list; omitting it
+is a 422. So "process my spectrum and show me what is in it" is not reachable —
+every raw-FID analysis must begin with an asserted structure.
+
+That is defensible for the verifier (it needs an expectation to compare against)
+but it forecloses the QC workflow a chemist most often wants: *is this sample
+clean, and does the integral pattern look right*, asked before committing to a
+structure. Worth a deliberate decision rather than an implicit one.
+
+### Corrected: the run id IS returned
+
+Playbook obstacle #1 said analyze steps persist rows without returning their
+ids. Partly wrong — `fid_run_id` comes back, nested under `preview` rather than
+at the top level of the response. A client can chain without a list call; it
+just has to know where to look.
+
+**Next prompt:**
+
+> Move FID-run review off `require_admin` and onto the reviewer model that
+> already exists. A reviewer should be a second qualified user — assigned via
+> `session_reviewers` / `review_tasks`, recorded in `approval_records` — not a
+> platform administrator. Keep admin as an override, not the gate.
+>
+> While there, make the refusal say what is missing. "You do not have access to
+> perform this action" on a review route should name the reviewer requirement.
+>
+> Then decide whether `smiles` must stay required on
+> `POST /raw-fid/{id}/process`. If the verifier genuinely needs it, say so in
+> the 422; if a structure-free QC pass is wanted, that is a product decision to
+> take deliberately.
