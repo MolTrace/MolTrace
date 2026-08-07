@@ -19,7 +19,14 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react
  * tab semantics, and a layout-measuring hook should not be able to fail them.
  */
 
-export type IndicatorRect = { left: number; width: number }
+/**
+ * Both axes, not just the horizontal one. A strip that wraps onto a second row —
+ * which any of these will do once the labels are long enough or the column is
+ * narrow enough — puts the active item at a different `top`, and an indicator
+ * that only tracks `left` lands on the wrong row while looking confidently
+ * correct on the first.
+ */
+export type IndicatorRect = { left: number; top: number; width: number; height: number }
 
 export function useSlidingIndicator<T extends HTMLElement = HTMLDivElement>(
   /** Changing this re-measures — pass whatever identifies the active item. */
@@ -44,9 +51,18 @@ export function useSlidingIndicator<T extends HTMLElement = HTMLDivElement>(
       return
     }
     setRect((prev) =>
-      prev && prev.left === active.offsetLeft && prev.width === active.offsetWidth
+      prev &&
+      prev.left === active.offsetLeft &&
+      prev.top === active.offsetTop &&
+      prev.width === active.offsetWidth &&
+      prev.height === active.offsetHeight
         ? prev
-        : { left: active.offsetLeft, width: active.offsetWidth },
+        : {
+            left: active.offsetLeft,
+            top: active.offsetTop,
+            width: active.offsetWidth,
+            height: active.offsetHeight,
+          },
     )
   }, [activeSelector])
 
