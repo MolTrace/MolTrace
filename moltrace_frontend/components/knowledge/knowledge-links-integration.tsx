@@ -255,7 +255,7 @@ export function SpectraCheckKnowledgeLinksCard({ backendSessionId }: { backendSe
             <div className="flex items-center gap-2">
               <InfoTooltip content={INTEGRATION_TOOLTIP} label="Knowledge integration" />
               <Button type="button" variant="ghost" size="sm" className="h-7 text-xs" asChild>
-                <Link href="/knowledge/analytical">Knowledge Library</Link>
+                <Link href="/knowledge/analytical">Analytical records</Link>
               </Button>
             </div>
 
@@ -431,7 +431,7 @@ export function ReactionStudioKnowledgeLinksCard({ reactionProjectId }: { reacti
             <div className="flex items-center gap-2">
               <InfoTooltip content={INTEGRATION_TOOLTIP} label="Knowledge integration" />
               <Button type="button" variant="ghost" size="sm" className="h-7 text-xs" asChild>
-                <Link href="/knowledge/reactions">Knowledge Library</Link>
+                <Link href="/knowledge/reactions">Reaction records</Link>
               </Button>
             </div>
 
@@ -586,7 +586,7 @@ export function RegulatoryDossierKnowledgeLinksCard({ dossierId }: { dossierId: 
             <div className="flex items-center gap-2">
               <InfoTooltip content={INTEGRATION_TOOLTIP} label="Knowledge integration" />
               <Button type="button" variant="ghost" size="sm" className="h-7 text-xs" asChild>
-                <Link href="/knowledge/regulatory">Knowledge Library</Link>
+                <Link href="/knowledge/regulatory">Regulatory records</Link>
               </Button>
             </div>
 
