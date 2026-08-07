@@ -161,6 +161,365 @@ def read_fid(path: Path) -> NMRSpectrum:
         )
 
 
+# --------------------------------------------------------------------------- #
+# Processed-spectrum ingest (Bruker pdata / JCAMP-DX)
+# --------------------------------------------------------------------------- #
+#: Bruker ``procs.WDW`` window-function codes (Bruker TopSpin processing reference).
+_BRUKER_WDW = {
+    0: "none",
+    1: "exponential",
+    2: "gaussian",
+    3: "sine",
+    4: "sine-squared",
+    5: "trapezoid",
+    6: "user",
+    7: "sinc",
+    8: "sinc-squared",
+    9: "traficante",
+    10: "traficante-shifted",
+}
+#: Bruker ``procs.BC_mod`` baseline-correction codes.
+_BRUKER_BC = {0: "none", 1: "single-point", 2: "polynomial", 3: "sine", 4: "quadratic"}
+
+_JCAMP_SUFFIXES = {".jdx", ".dx", ".jcamp", ".jcm"}
+
+
+def read_processed_spectrum(path: Path) -> NMRSpectrum:
+    """Read an already-processed 1D spectrum: Bruker ``pdata/N`` or JCAMP-DX.
+
+    The counterpart to :func:`read_fid`, and deliberately *not* the same thing.
+    ``read_fid`` takes time-domain data and applies MolTrace's own apodization,
+    Fourier transform and phasing. This function takes data that a vendor or
+    operator **has already processed** — apodized, phased, baseline-corrected and
+    referenced — and loads it without re-processing it.
+
+    That difference is recorded, not glossed. The returned spectrum carries:
+
+    * ``metadata['domain'] = 'frequency'`` and ``metadata['processed_by'] =
+      'vendor'``, so nothing downstream can mistake someone else's processing for
+      ours;
+    * ``metadata['processing_provenance']`` — the window function, line
+      broadening, phase corrections and baseline mode the file says were applied;
+    * ``metadata['referencing']`` — the basis on which the ppm axis was
+      established, **read from the file**. A wrong reference moves every peak, so
+      it is never assumed; when it cannot be established that is stated
+      (``established: False``) rather than defaulted to zero.
+
+    A quantitation claim over a spectrum processed by an unknown operator sits in
+    a different evidentiary class from one over a FID we processed ourselves, and
+    a reviewer needs to be able to see which they are looking at.
+
+    Raises ``FIDReaderError``, naming the cause, when no processed data is found.
+    """
+
+    source = Path(path).expanduser()
+    if not source.exists():
+        raise FIDReaderError(f"Processed-spectrum path does not exist: {source}")
+
+    if source.is_file() and "".join(source.suffixes).lower().endswith(
+        tuple(_JCAMP_SUFFIXES)
+    ):
+        return _read_jcampdx_spectrum(source)
+
+    with _prepared_dataset_root(source) as root:
+        pdata_dir = _locate_pdata(root)
+        if pdata_dir is None:
+            if _has_marker(root, "fid") or _has_marker(root, "acqus"):
+                raise FIDReaderError(
+                    f"{root} holds raw time-domain data (a FID), not a processed "
+                    "spectrum. Use read_fid() for that, which applies MolTrace's own "
+                    "apodization and Fourier transform."
+                )
+            raise FIDReaderError(
+                f"No processed spectrum found under {root}: expected a Bruker "
+                "'pdata/N/1r' real-part file, or a JCAMP-DX (.jdx/.dx) file."
+            )
+        return _read_bruker_pdata_spectrum(pdata_dir, source)
+
+
+def _locate_pdata(root: Path) -> Path | None:
+    """The processing directory holding ``1r``, whether root *is* it or contains it."""
+
+    if (root / "1r").is_file():
+        return root
+    candidates = sorted(p.parent for p in root.rglob("pdata/*/1r") if p.is_file())
+    return candidates[0] if candidates else None
+
+
+def _read_bruker_pdata_spectrum(pdata_dir: Path, source: Path) -> NMRSpectrum:
+    ng = _require_nmrglue()
+    try:
+        dictionary, data = ng.bruker.read_pdata(str(pdata_dir))
+    except Exception as exc:
+        raise FIDReaderError(
+            f"nmrglue could not read the Bruker processed data at {pdata_dir}: {exc}"
+        ) from exc
+
+    real = np.asarray(data, dtype=np.float64).squeeze()
+    if real.ndim != 1 or real.size < 2:
+        raise FIDReaderError(
+            f"{pdata_dir} does not hold a 1D processed spectrum "
+            f"(got shape {np.asarray(data).shape}); 2D processed data is not supported here."
+        )
+
+    procs = dict(dictionary.get("procs", {}) or {})
+    acqus = dict(dictionary.get("acqus", {}) or {})
+    params = {**acqus, **{f"procs.{k}": v for k, v in procs.items()}}
+
+    ppm_axis, referencing = _pdata_ppm_axis(procs, real.size)
+    ppm_axis, real = _ensure_descending_axis(ppm_axis, real)
+
+    nucleus = _extract_nucleus(params)
+    solvent = _extract_solvent(params)
+    field_mhz = _pdata_field_mhz(procs, acqus)
+
+    metadata: dict[str, Any] = {
+        "vendor": "Bruker",
+        "domain": "frequency",
+        "processed_by": "vendor",
+        "moltrace_processing": "none",
+        "dataset_root": str(pdata_dir),
+        "source_path": str(source),
+        "input_points": int(real.size),
+        "processing_provenance": _bruker_processing_provenance(procs),
+        "referencing": referencing,
+        "estimated_peak_count": _estimate_peak_count(
+            real, ppm_axis, nucleus=nucleus, solvent=solvent
+        ),
+        "acquisition_params": _json_safe(params),
+    }
+    metadata["peak_count"] = metadata["estimated_peak_count"]
+    return _finalize_processed_spectrum(
+        data=real,
+        ppm_axis=ppm_axis,
+        metadata=metadata,
+        nucleus=nucleus,
+        solvent=solvent,
+        field_mhz=field_mhz,
+        acquisition_time=_extract_acquisition_time(params),
+    )
+
+
+def _pdata_ppm_axis(procs: dict[str, Any], size: int) -> tuple[np.ndarray, dict[str, Any]]:
+    """Derive the ppm axis from ``procs``, reporting how it was established.
+
+    Bruker defines ``OFFSET`` as the ppm of the **first (leftmost, highest-ppm)**
+    point and ``SW_p`` as the sweep width in Hz, so the axis descends from OFFSET
+    by ``SW_p / SF`` ppm. Both values are read; neither is invented.
+    """
+
+    offset = _float_param(procs, "OFFSET")
+    sf = _float_param(procs, "SF")
+    sw_hz = _float_param(procs, "SW_p")
+
+    if math.isfinite(offset) and math.isfinite(sf) and sf > 0 and math.isfinite(sw_hz):
+        width_ppm = sw_hz / sf
+        axis = offset - np.arange(size, dtype=np.float64) * (width_ppm / size)
+        return axis, {
+            "established": True,
+            "basis": "Bruker procs SF/OFFSET",
+            "offset_ppm": offset,
+            "spectrometer_frequency_mhz": sf,
+            "sweep_width_hz": sw_hz,
+        }
+
+    # No fabricated reference: an index axis is obviously not ppm, and the caller
+    # is told so explicitly rather than being handed a plausible-looking scale.
+    missing = [
+        name
+        for name, value in (("OFFSET", offset), ("SF", sf), ("SW_p", sw_hz))
+        if not math.isfinite(value)
+    ]
+    return np.arange(size, dtype=np.float64)[::-1], {
+        "established": False,
+        "basis": "unavailable",
+        "reason": (
+            "Bruker procs is missing "
+            + ", ".join(missing)
+            + "; the chemical-shift axis could not be established and the returned "
+            "axis is point index, not ppm."
+        ),
+    }
+
+
+def _bruker_processing_provenance(procs: dict[str, Any]) -> dict[str, Any]:
+    """What the vendor already applied — preserved so it is not attributed to us."""
+
+    wdw = _float_param(procs, "WDW")
+    bc = _float_param(procs, "BC_mod")
+    provenance: dict[str, Any] = {
+        "source": "Bruker procs",
+        "window_function": _BRUKER_WDW.get(int(wdw), f"code {int(wdw)}")
+        if math.isfinite(wdw)
+        else "unknown",
+        "line_broadening_hz": _float_or_none(procs, "LB"),
+        "phase_zero_order": _float_or_none(procs, "PHC0"),
+        "phase_first_order": _float_or_none(procs, "PHC1"),
+        "baseline_correction": _BRUKER_BC.get(int(bc), f"code {int(bc)}")
+        if math.isfinite(bc)
+        else "unknown",
+        "processed_size": _float_or_none(procs, "SI"),
+        "intensity_scale_exponent": _float_or_none(procs, "NC_proc"),
+    }
+    return provenance
+
+
+def _pdata_field_mhz(procs: dict[str, Any], acqus: dict[str, Any]) -> float:
+    for source, key in ((acqus, "BF1"), (procs, "SF"), (acqus, "SFO1")):
+        value = _float_param(source, key)
+        if math.isfinite(value) and value > 0:
+            return value
+    return 0.0
+
+
+def _read_jcampdx_spectrum(source: Path) -> NMRSpectrum:
+    ng = _require_nmrglue()
+    try:
+        dictionary, data = ng.jcampdx.read(str(source))
+    except Exception as exc:
+        raise FIDReaderError(f"nmrglue could not read the JCAMP-DX file {source}: {exc}") from exc
+
+    array = np.asarray(data[0] if isinstance(data, (list, tuple)) else data, dtype=np.float64)
+    array = array.squeeze()
+    if array.ndim != 1 or array.size < 2:
+        raise FIDReaderError(f"{source} does not hold a 1D JCAMP-DX spectrum.")
+
+    first_x = _jcamp_float(dictionary, "FIRSTX")
+    last_x = _jcamp_float(dictionary, "LASTX")
+    units = (_jcamp_str(dictionary, "XUNITS") or "").strip().upper()
+    observe_mhz = _jcamp_float(dictionary, ".OBSERVEFREQUENCY")
+    nucleus = _normalize_nucleus(_jcamp_str(dictionary, ".OBSERVENUCLEUS")) or "unknown"
+    solvent = _clean_solvent(_jcamp_str(dictionary, ".SOLVENTNAME"))
+
+    if not (math.isfinite(first_x) and math.isfinite(last_x)):
+        raise FIDReaderError(
+            f"{source} does not declare FIRSTX/LASTX, so its chemical-shift axis "
+            "cannot be established."
+        )
+
+    if units.startswith("HZ"):
+        if not (math.isfinite(observe_mhz) and observe_mhz > 0):
+            # Hz without a carrier frequency cannot become ppm. Refusing beats
+            # returning a Hz axis labelled ppm, which would put every 13C peak at
+            # ~190x its true shift with no visible error.
+            raise FIDReaderError(
+                f"{source} gives its axis in Hz but declares no .OBSERVEFREQUENCY, "
+                "so it cannot be converted to ppm."
+            )
+        axis = np.linspace(first_x / observe_mhz, last_x / observe_mhz, array.size)
+        basis = "JCAMP-DX FIRSTX/LASTX (Hz) / .OBSERVEFREQUENCY"
+    elif units.startswith("PPM"):
+        axis = np.linspace(first_x, last_x, array.size)
+        basis = "JCAMP-DX FIRSTX/LASTX (ppm)"
+    else:
+        raise FIDReaderError(
+            f"{source} declares XUNITS={units!r}, which is neither Hz nor PPM; "
+            "the chemical-shift axis cannot be established."
+        )
+
+    axis, array = _ensure_descending_axis(axis, array)
+    metadata: dict[str, Any] = {
+        "vendor": "JCAMP-DX",
+        "domain": "frequency",
+        "processed_by": "vendor",
+        "moltrace_processing": "none",
+        "dataset_root": str(source),
+        "source_path": str(source),
+        "input_points": int(array.size),
+        # JCAMP-DX carries no standard record of the processing that produced it,
+        # which is itself worth stating rather than leaving as an empty dict.
+        "processing_provenance": {
+            "source": "JCAMP-DX",
+            "note": (
+                "JCAMP-DX does not record the processing applied before export; "
+                "apodization, phasing and baseline correction are unknown."
+            ),
+        },
+        "referencing": {
+            "established": True,
+            "basis": basis,
+            "offset_ppm": float(axis[0]),
+            "spectrometer_frequency_mhz": observe_mhz if math.isfinite(observe_mhz) else None,
+        },
+        "estimated_peak_count": _estimate_peak_count(
+            array, axis, nucleus=nucleus, solvent=solvent
+        ),
+        "acquisition_params": _json_safe(
+            {k: v for k, v in dictionary.items() if not isinstance(v, (list, tuple)) or len(v) < 8}
+        ),
+    }
+    metadata["peak_count"] = metadata["estimated_peak_count"]
+    return _finalize_processed_spectrum(
+        data=array,
+        ppm_axis=axis,
+        metadata=metadata,
+        nucleus=nucleus,
+        solvent=solvent,
+        field_mhz=observe_mhz if math.isfinite(observe_mhz) else 0.0,
+        acquisition_time=_DEFAULT_ACQUISITION_TIME,
+    )
+
+
+def _finalize_processed_spectrum(
+    *,
+    data: np.ndarray,
+    ppm_axis: np.ndarray,
+    metadata: dict[str, Any],
+    nucleus: str,
+    solvent: str,
+    field_mhz: float,
+    acquisition_time: datetime,
+) -> NMRSpectrum:
+    fingerprint_hash = _fingerprint(
+        data=data,
+        ppm_axis=ppm_axis,
+        metadata={
+            "vendor": metadata["vendor"],
+            "domain": metadata["domain"],
+            "nucleus": nucleus,
+            "solvent": solvent,
+            "field_mhz": field_mhz,
+        },
+    )
+    metadata["fingerprint_hash"] = fingerprint_hash
+    return NMRSpectrum(
+        data=data,
+        ppm_axis=ppm_axis,
+        metadata=metadata,
+        nucleus=nucleus,
+        solvent=solvent,
+        field_mhz=field_mhz,
+        acquisition_time=acquisition_time,
+        fingerprint_hash=fingerprint_hash,
+    )
+
+
+def _float_param(params: dict[str, Any], key: str) -> float:
+    try:
+        return float(_unwrap_param_value(params.get(key)))
+    except (TypeError, ValueError):
+        return float("nan")
+
+
+def _float_or_none(params: dict[str, Any], key: str) -> float | None:
+    value = _float_param(params, key)
+    return value if math.isfinite(value) else None
+
+
+def _jcamp_str(dictionary: dict[str, Any], key: str) -> str:
+    value = dictionary.get(key)
+    if isinstance(value, (list, tuple)):
+        value = value[0] if value else ""
+    return str(value or "").strip().strip("<>")
+
+
+def _jcamp_float(dictionary: dict[str, Any], key: str) -> float:
+    try:
+        return float(_jcamp_str(dictionary, key))
+    except (TypeError, ValueError):
+        return float("nan")
+
+
 @contextmanager
 def _prepared_dataset_root(path: Path) -> Iterator[Path]:
     if not path.exists():
