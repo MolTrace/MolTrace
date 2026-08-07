@@ -237,6 +237,16 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "-o", "--out", type=Path, required=True, help="output JSON (gitignored)"
     )
+    parser.add_argument(
+        "--index",
+        action="store_true",
+        help=(
+            "emit a precomputed HOSE index instead of molecules+assignments. "
+            "THIS IS THE DEPLOYABLE ARTIFACT: 14 MB gzipped vs 193 MB, and ~1 s to "
+            "load vs ~47 s, because it needs no RDKit at startup. Give -o a .gz "
+            "suffix to compress."
+        ),
+    )
     args = parser.parse_args(argv)
 
     if not args.sdf.exists():
@@ -250,12 +260,49 @@ def main(argv: list[str] | None = None) -> int:
         records = build_from_nmredata(args.sdf)
     else:
         records = build(args.sdf)
+
+    n_assign = sum(len(r["assignments"]) for r in records)
+    licence_note = (
+        "NOTE: this table is a NMRShiftDB2 derivative — CC BY-SA (see NOTICE). "
+        "ShareAlike attaches on redistribution."
+    )
+
+    if args.index:
+        # Round-trip through the loader so the index is built by exactly the same
+        # code path the predictor uses — a separately-implemented indexer would be
+        # free to drift from it silently.
+        import tempfile
+
+        from moltrace.spectroscopy.predict.nmrnet_wrapper import (
+            load_knowledge_base,
+            save_knowledge_base_index,
+        )
+
+        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as tmp:
+            json.dump(records, tmp)
+            staged = Path(tmp.name)
+        try:
+            kb = load_knowledge_base(staged)
+            save_knowledge_base_index(kb, args.out)
+        finally:
+            staged.unlink(missing_ok=True)
+
+        print(
+            f"Wrote a precomputed index of {kb.reference_count} reference atoms "
+            f"({len(records)} molecules / {n_assign} assignments) to {args.out}\n"
+            f"{licence_note}\n"
+            f"Point the predictor at it with MOLTRACE_HOSE_KB={args.out}",
+            file=sys.stderr,
+        )
+        return 0
+
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(records))
-    n_assign = sum(len(r["assignments"]) for r in records)
     print(
         f"Wrote {len(records)} molecules / {n_assign} assignments to {args.out}\n"
-        f"NOTE: this table is a NMRShiftDB2 derivative — CC BY-SA (see NOTICE). "
+        f"{licence_note}\n"
+        f"This is the INPUT format: loading it re-parses every molecule with RDKit "
+        f"(~47 s for the full table). For deployment, re-run with --index.\n"
         f"Point the predictor at it with MOLTRACE_HOSE_KB={args.out}",
         file=sys.stderr,
     )

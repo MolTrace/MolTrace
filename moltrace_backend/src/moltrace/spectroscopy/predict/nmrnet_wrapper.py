@@ -44,6 +44,8 @@ from __future__ import annotations
 
 import hashlib
 import importlib
+import json
+import logging
 import math
 import os
 import statistics
@@ -67,6 +69,7 @@ __all__ = [
     "hose_code",
     "build_seed_knowledge_base",
     "load_knowledge_base",
+    "save_knowledge_base_index",
 ]
 
 _NUCLEUS_TO_ELEMENT: dict[str, str] = {"1H": "H", "13C": "C"}
@@ -353,6 +356,21 @@ class KnowledgeBase:
     """HOSE-code → shift index. ``buckets[(nucleus, sphere)][code] -> [shifts]``."""
 
     buckets: dict[tuple[str, int], dict[str, list[float]]]
+    """``buckets[(nucleus, sphere)][code] -> [n, mean, M2]`` — a Welford accumulator.
+
+    Deliberately **not** the raw shift list. ``lookup`` only ever returns the mean,
+    the population standard deviation and the count, so a running accumulator is
+    lossless for the entire public contract while being O(1) per bucket instead of
+    O(references). On the full NMRShiftDB2 table that is ~3 M stored floats
+    collapsed to ~1 M three-element records — and, more importantly, it is
+    serialisable without the molecules, which is what makes the table shippable
+    (see :func:`save_knowledge_base_index`).
+
+    Welford rather than (sum, sum-of-squares) because the latter loses precision
+    to catastrophic cancellation when the variance is small relative to the mean —
+    exactly the case here, where a tight bucket might hold shifts of 128.3, 128.4,
+    128.4 ppm.
+    """
     priors: dict[str, float]
     reference_count: int = 0
     source: str = "none"
@@ -368,12 +386,12 @@ class KnowledgeBase:
             table = self.buckets.get((nucleus, sphere))
             if not table:
                 continue
-            shifts = table.get(_truncate_code(code, sphere))
-            if shifts is None or len(shifts) < _MIN_KB_MATCHES:
+            acc = table.get(_truncate_code(code, sphere))
+            if acc is None or acc[0] < _MIN_KB_MATCHES:
                 continue
-            mean = float(statistics.fmean(shifts))
-            std = float(statistics.pstdev(shifts))
-            return mean, std, sphere, len(shifts)
+            n, mean, m2 = acc
+            # Population standard deviation, matching statistics.pstdev.
+            return float(mean), math.sqrt(max(m2, 0.0) / n), sphere, int(n)
         return None
 
 
@@ -384,21 +402,38 @@ def _new_kb() -> KnowledgeBase:
 def _index_reference_atom(
     kb: KnowledgeBase, nucleus: str, code: tuple[str, ...], shift: float
 ) -> None:
+    """Fold one reference shift into every sphere's accumulator (Welford)."""
+
     for sphere in range(1, _MAX_SPHERE + 1):
         table = kb.buckets[(nucleus, sphere)]
-        table.setdefault(_truncate_code(code, sphere), []).append(shift)
+        acc = table.get(_truncate_code(code, sphere))
+        if acc is None:
+            table[_truncate_code(code, sphere)] = [1, float(shift), 0.0]
+            continue
+        acc[0] += 1
+        delta = shift - acc[1]
+        acc[1] += delta / acc[0]
+        acc[2] += delta * (shift - acc[1])
 
 
 def _finalize_priors(kb: KnowledgeBase) -> None:
+    """Element-wide mean shift, used when no environment matches.
+
+    Computed as the count-weighted mean of the sphere-1 buckets, which is exactly
+    the mean over all their references — the accumulator loses nothing here.
+    """
+
     for nucleus in _NUCLEUS_TO_ELEMENT:
-        all_shifts: list[float] = []
+        total_n = 0
+        total = 0.0
         for (nuc, sphere), table in kb.buckets.items():
             if nuc != nucleus or sphere != 1:
                 continue
-            for shifts in table.values():
-                all_shifts.extend(shifts)
-        if all_shifts:
-            kb.priors[nucleus] = float(statistics.fmean(all_shifts))
+            for n, mean, _m2 in table.values():
+                total_n += n
+                total += n * mean
+        if total_n:
+            kb.priors[nucleus] = total / total_n
 
 
 # Curated literature ¹H / ¹³C shifts (ppm, CDCl3-ish) for common solvents and
@@ -467,6 +502,66 @@ def build_seed_knowledge_base() -> KnowledgeBase:
     return kb
 
 
+_INDEX_FORMAT = "hose-index-v1"
+
+
+def _open_maybe_gzip(path: Path, mode: str):
+    """Open ``path``, transparently gzipped when the name ends in ``.gz``."""
+
+    if path.suffix == ".gz":
+        import gzip
+
+        return gzip.open(path, mode + "t", encoding="utf-8")
+    return open(path, mode, encoding="utf-8")
+
+
+def save_knowledge_base_index(kb: KnowledgeBase, path: str | Path) -> Path:
+    """Serialise a built knowledge base as a **precomputed index**.
+
+    This is the deployable artifact. The molecule-and-assignment form is an
+    *input* format: loading it re-parses every molblock with RDKit and recomputes
+    every HOSE code, which on the full NMRShiftDB2 table costs **51 s and 193 MB**
+    — 83 % of it molblocks that are discarded as soon as the codes exist. A 51 s
+    cold start is incompatible with a scale-to-zero service, so the table was
+    effectively unshippable in that form.
+
+    The index stores only what :meth:`KnowledgeBase.lookup` can return, so it is
+    lossless for the public contract, and it loads with **no RDKit at all**.
+    Write to a ``.gz`` path to compress — the loader detects it either way.
+    """
+
+    path = Path(path)
+    payload = {
+        "format": _INDEX_FORMAT,
+        "source": kb.source,
+        "reference_count": kb.reference_count,
+        "priors": kb.priors,
+        # "nucleus|sphere" -> {code: [n, mean, M2]}; JSON has no tuple keys.
+        "buckets": {
+            f"{nucleus}|{sphere}": table
+            for (nucleus, sphere), table in kb.buckets.items()
+            if table
+        },
+    }
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with _open_maybe_gzip(path, "w") as handle:
+        json.dump(payload, handle, separators=(",", ":"))
+    return path
+
+
+def _load_index(payload: dict) -> KnowledgeBase:
+    """Rebuild a knowledge base from a precomputed index. No RDKit."""
+
+    kb = _new_kb()
+    for key, table in payload["buckets"].items():
+        nucleus, _, sphere = key.partition("|")
+        kb.buckets[(nucleus, int(sphere))] = table
+    kb.priors = dict(payload.get("priors", {}))
+    kb.reference_count = int(payload.get("reference_count", 0))
+    kb.source = str(payload.get("source", "none"))
+    return kb
+
+
 def load_knowledge_base(path: str | Path) -> KnowledgeBase:
     """Load a knowledge base from a NMRShiftDB2-style assignment export.
 
@@ -486,9 +581,22 @@ def load_knowledge_base(path: str | Path) -> KnowledgeBase:
     source gives exact atom identity, keep it.
     """
 
-    import json
+    path = Path(path)
+    with _open_maybe_gzip(path, "r") as handle:
+        data = json.load(handle)
 
-    data = json.loads(Path(path).read_text())
+    # A precomputed index is a mapping with a format tag; the input format is a
+    # list of molecules. Detect rather than switch on the filename, so a renamed
+    # artifact cannot silently take the slow path.
+    if isinstance(data, dict):
+        fmt = data.get("format")
+        if fmt != _INDEX_FORMAT:
+            raise ValueError(
+                f"{path}: unrecognised knowledge-base format {fmt!r} "
+                f"(expected {_INDEX_FORMAT!r} or a list of molecule records)"
+            )
+        return _load_index(data)
+
     kb = _new_kb()
     n_ref = 0
     for record in data:
@@ -523,7 +631,16 @@ _FALLBACK_KB: KnowledgeBase | None = None
 
 
 def _fallback_kb() -> KnowledgeBase:
-    """The fallback KB: a built NMRShiftDB2 table if configured, else the seed."""
+    """The fallback KB: a built NMRShiftDB2 table if configured, else the seed.
+
+    Unset ``MOLTRACE_HOSE_KB`` is a legitimate configuration — a dev checkout with
+    no table — and quietly uses the seed. But **set-and-missing is a
+    misconfiguration**, and it is logged at ERROR rather than absorbed: it is what
+    a deploy that forgot to stage the table looks like, and the resulting service
+    answers every request from a 16-molecule table with a ~35 ppm median ¹³C
+    uncertainty. Silently substituting a far worse predictor for the one that was
+    explicitly configured is the exact failure this module was fixed for.
+    """
 
     global _FALLBACK_KB
     if _FALLBACK_KB is None:
@@ -531,6 +648,15 @@ def _fallback_kb() -> KnowledgeBase:
         if kb_path and Path(kb_path).exists():
             _FALLBACK_KB = load_knowledge_base(kb_path)
         else:
+            if kb_path:
+                logging.getLogger(__name__).error(
+                    "MOLTRACE_HOSE_KB is set to %r but no such file exists. Falling back "
+                    "to the bundled 16-molecule seed table: shift predictions will be "
+                    "far less certain (median 13C uncertainty ~35 ppm vs ~1.9 ppm) and "
+                    "structure verification will discount its 13C evidence accordingly. "
+                    "Build the table with scripts/build_hose_kb.py --index.",
+                    kb_path,
+                )
             _FALLBACK_KB = build_seed_knowledge_base()
     return _FALLBACK_KB
 

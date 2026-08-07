@@ -47,9 +47,24 @@ RUN apt-get update \
 WORKDIR /app
 COPY --from=build --chown=app:app /app /app
 
+# HOSE-code knowledge base. `COPY . .` in the build stage already carried
+# data/hose/ across, so this only points the predictor at it.
+#
+# Present  -> full NMRShiftDB2 table: ~0% element-prior fallback, median 13C
+#             uncertainty 1.88 ppm (below DP4's 2.306 ppm scale). +14 MB image,
+#             ~1 s one-off load.
+# Absent   -> bundled 16-molecule seed table: ~23-44% of atoms fall to a bare
+#             element prior and median 13C uncertainty is ~35 ppm. The service
+#             still starts and every prediction reports its own coverage, so this
+#             degrades visibly — but it is not a production state.
+#
+# See data/hose/README.md to build it. The file is gitignored (NMRShiftDB2
+# derivative, CC BY-SA — see NOTICE), so it must be placed in the build context
+# before `gcloud builds submit`.
 ENV PATH="/app/.venv/bin:$PATH" \
     APP_ENV=production \
     PYTHONUNBUFFERED=1 \
+    MOLTRACE_HOSE_KB=/app/data/hose/hose_index.json.gz \
     PORT=8080
 
 USER app
