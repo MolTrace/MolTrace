@@ -1484,3 +1484,109 @@ gets a regulatory submission package with no evidence and no complaint.
 > Not probed this pass: whether the CTD module-3 bundle has the same empty-case
 > behaviour (it returned 201 on a near-empty dossier and its fields were all
 > null), and whether `package_sha256` is stable across re-creation.
+
+---
+
+## B3 LOOP RESULT — Repho end to end (2026-08-07)
+
+Project → design space → experiments → Bayesian optimization → recommendations,
+auth enforced.
+
+### Two earlier defects are fixed
+
+- **`model_type` is now `gaussian_process`**, not `rule_based_fallback`. The
+  "we ship k-NN labelled Gaussian process EI" item from the 2026-07-26 audit no
+  longer reproduces.
+- `human_review_required: true` on every run, with an honest note: *"advisory,
+  data-efficient proposals… do not guarantee an optimum and require human
+  review before scheduling."*
+
+### The optimizer is sound — when the design space is enumerable
+
+With a **discrete** design space (`{"temperature_c":[30,…,90],
+"catalyst_mol_pct":[1.0,…,5.0]}`) and 7 observations:
+
+```
+evaluated_candidate_count : 35          (7 x 5, the full grid)
+kernel                    : Matern(length_scale=0.757, nu=2.5)
+best observed             : 81.0
+rank1  T=80  cat=5.0   pred 82.8   EI 3.18     <- beats the incumbent
+rank2  T=90  cat=5.0   pred 81.1   EI 3.00
+rank3  T=70  cat=5.0   pred 82.7   EI 2.69
+```
+
+That is a working Bayesian optimizer: it searches the grid, fits a sensible
+length scale, and proposes points better than anything yet measured.
+
+### Finding 1 — a CONTINUOUS design space is accepted and then not searched
+
+```
+POST .../design-space  {"numeric_variables_json":
+                        {"temperature_c":{"low":20,"high":100},
+                         "catalyst_mol_pct":{"low":0.5,"high":5.0}}}   -> 201
+```
+
+Accepted without complaint. But `_generate_candidate_conditions`
+(`reaction_bo.py:1464`) builds candidates as the **Cartesian product of discrete
+value lists**, so a `{low, high}` range contributes no enumerable values. The
+consequence, with 14 well-spread observations and a healthy kernel:
+
+```
+evaluated_candidate_count : 1
+recommendations           : 1  (batch_size was 5)
+  rank1  T=40.0  cat=1.0   pred 50.2   EI 0.0
+best observed             : 81.2  at T=70, cat=4.5
+```
+
+**It recommends the worst region of the space, with zero expected improvement,
+and reports `status: succeeded`.** No warning fires — the module has one for the
+empty case (*"No enumerated design-space candidates were available; using a
+fallback shell"*) but exactly-one-candidate slips past it.
+
+Continuous variables are the normal case in reaction optimization: temperature,
+loading, equivalents, time. So the default way a chemist would describe a design
+space produces an optimizer that does not optimize, silently.
+
+### Finding 2 — small-sample GP degeneracy is not flagged
+
+At 6 observations the fit collapsed to the bound:
+
+```
+Matern(length_scale=1e-05, nu=2.5)      <- scikit-learn's lower bound
+```
+
+A length scale at the bound means the GP has learned that nothing correlates
+with anything; it interpolates its training points and predicts the prior
+elsewhere. It still reported `status: succeeded`, `model_type: gaussian_process`.
+At 14 observations it recovered (`length_scale 0.378`), so this is a
+small-sample problem rather than a permanent one — but nothing tells the caller
+the fit is degenerate, and the run looks identical to a healthy one.
+
+### Finding 3 — an unmappable outcome key is accepted silently at create time
+
+```
+POST .../experiments  {"outcome_json":{"completely_made_up_metric":99.9}}  -> 201
+  warnings: []          typed outcome fields: all null
+```
+
+The value is stored verbatim, every typed field stays null, and nothing warns.
+`yield_percent` maps correctly; `yield_pct` — a plausible variant — does not.
+
+The BO **does** catch it later (*"Experiment B3-40-1.0 has no usable objective
+outcome"*), so the data is not silently used. But the warning is deferred to
+consumption: a chemist can enter twenty experiments, see twenty 201s, and only
+discover the problem when an optimization run tells them none of it counted.
+
+**Next prompt:**
+
+> 1. Either discretise a continuous design space when generating candidates
+>    (a grid or Sobol sample over `{low, high}`), or reject the range form at
+>    `POST .../design-space` with a message naming what is required. Accepting a
+>    shape that produces a non-searching optimizer is the worst of the three.
+> 2. Warn when `evaluated_candidate_count <= 1`. The empty case already warns;
+>    the one-candidate case is the same failure wearing a success status.
+> 3. Warn when the fitted length scale sits at its optimiser bound, and say the
+>    surrogate is degenerate rather than reporting a clean success.
+> 4. Warn at experiment-create time when `outcome_json` contains no key that
+>    maps to a typed outcome field. The mapping already exists; only the
+>    complaint is missing.
