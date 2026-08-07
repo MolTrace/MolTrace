@@ -25,6 +25,38 @@ const ReactionExploreInterface = dynamic(
   { ssr: false, loading: exploreLoading },
 )
 
+/**
+ * CLAIM PROVENANCE. Every bullet below was traced to backend source, and — the
+ * harder test — to source a customer request actually reaches. Four claims on
+ * Module 01 failed the second test and were replaced:
+ *
+ *   "Unknown compound structure elucidation" and "Peak-to-structure mapping with
+ *   confidence scores" both ride `propose_structures`, which lives only in
+ *   spectroscopy/ai/ and is reached solely via POST /spectrum/reason. That route
+ *   is gated on `find_spec("anthropic")` — checked before the API key — and
+ *   `anthropic` sits in the optional `rag` extra while the production Dockerfile
+ *   installs `--extra fid --extra gcs`. The engine is real and never executes for
+ *   a customer. Same finding that took these claims off the evidence section in
+ *   760e4d8.
+ *
+ *   "AI-assisted" in the description: the only spectroscopy.ai import anywhere in
+ *   api.py is inside that same gated handler, so no AI reaches a user on this
+ *   path at all.
+ *
+ *   "designed to support USP <761>": qNMR purity is real and computes a genuine
+ *   combined standard uncertainty, but the only "USP" strings in the whole
+ *   backend are "USPTO" — the patent office, from reaction extraction. Nothing
+ *   references the pharmacopoeial chapter. The bullet now states the uncertainty
+ *   the module actually computes, which is the stronger claim anyway.
+ *
+ * The other fourteen hold. Notably "Gaussian process surrogate modelling" is
+ * genuine — sklearn is a CORE dependency, made so deliberately, with a comment in
+ * pyproject.toml explaining that as an extra it would let the product ship "a
+ * k-NN heuristic under the name of a Gaussian process".
+ *
+ * Before adding a bullet here: find the code, then find the route that reaches it,
+ * then check the shipped image satisfies that route's gate.
+ */
 const modules = [
   {
     tag: "Module 01",
@@ -34,7 +66,7 @@ const modules = [
     title: "Spectroscopy Intelligence",
     overviewHref: "/spectroscopy",
     overviewLabel: "How SpectraCheck works",
-    desc: "Interpret raw FID files, elucidate molecular structures from 1H/13C/2D NMR, and annotate unknown compounds from LC-MS/MS. AI-assisted, human-verified.",
+    desc: "Interpret raw FID files, resolve multiplets and integrals from 1H/13C/2D NMR, and build fragmentation trees from LC-MS/MS. Deterministic methods, human-verified.",
     badge: "Start Here",
     color: {
       text: "text-teal-500 dark:text-teal-400",
@@ -47,10 +79,10 @@ const modules = [
     features: [
       "1D & 2D NMR interpretation (COSY, HSQC, HMBC)",
       "LC-MS/MS fragmentation annotation",
-      "Unknown compound structure elucidation",
-      "Peak-to-structure mapping with confidence scores",
+      "Automated peak detection and multiplet analysis",
+      "Deterministic signal integration",
       "Residual solvent & impurity detection",
-      "qNMR quantification designed to support USP <761>",
+      "qNMR purity with combined standard uncertainty",
     ],
   },
   {
