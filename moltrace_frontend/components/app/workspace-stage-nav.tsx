@@ -3,6 +3,7 @@
 import Link from "next/link"
 import { useCallback, useEffect, useRef, type KeyboardEvent, type ReactNode } from "react"
 import { cn } from "@/lib/utils"
+import { useSlidingIndicator } from "./use-sliding-indicator"
 
 export type WorkspaceStageAccent = "teal" | "cyan" | "violet"
 
@@ -86,6 +87,10 @@ export function WorkspaceStageNav({
   const activeSection =
     activeGroup?.sections.find((s) => s.value === activeValue) ?? activeGroup?.sections[0]
 
+  // One indicator per tier, each travelling between its own items.
+  const primaryNav = useSlidingIndicator(activeGroup?.id)
+  const secondaryNav = useSlidingIndicator(activeValue)
+
   // Remembers where the reader was in each stage, so returning to a primary tab
   // reopens the section they left rather than resetting to the first one.
   const lastSectionByGroup = useRef<Record<string, string>>({})
@@ -135,11 +140,26 @@ export function WorkspaceStageNav({
     <div className="space-y-3">
       <div className="min-w-0 overflow-x-auto [-webkit-overflow-scrolling:touch]">
         <div
+          ref={primaryNav.containerRef}
           {...(routeMode ? {} : ({ role: "tablist" } as const))}
           aria-label={`${label} stages`}
           onKeyDown={onPrimaryKeyDown}
-          className="inline-flex w-max items-end gap-1 border-b border-border"
+          className="relative inline-flex w-max items-end gap-1 border-b border-border"
         >
+          {/* One bar that travels, rather than a bar per tab fading in and out.
+              Width animates with position so it takes the shape of whichever tab
+              it lands on. */}
+          {primaryNav.rect ? (
+            <span
+              aria-hidden
+              className="pointer-events-none absolute -bottom-px left-0 h-[3px] rounded-full transition-[transform,width] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none"
+              style={{
+                transform: `translateX(${primaryNav.rect.left}px)`,
+                width: primaryNav.rect.width,
+                backgroundColor: accentBg,
+              }}
+            />
+          ) : null}
           {groups.map((group) => {
             const on = group.id === activeGroup.id
             const remembered = lastSectionByGroup.current[group.id]
@@ -150,28 +170,18 @@ export function WorkspaceStageNav({
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
               on ? "text-foreground" : "text-muted-foreground hover:bg-muted/50 hover:text-foreground",
             )
-            const contents = (
-              <>
-                {group.label}
-                {/* Deliberately no section count. A number on a tab reads as a
-                    notification badge — items waiting on you — so "Evidence
-                    Inputs 5" implied five outstanding tasks rather than five
-                    sections. The sections are listed directly below anyway. */}
-                {/* The selected stage is marked by a bar that sits ON the shared
-                    bottom border, so the tier reads as one connected surface. */}
-                <span
-                  aria-hidden
-                  className={cn("absolute inset-x-1 -bottom-px h-0.5 rounded-full", !on && "opacity-0")}
-                  style={{ backgroundColor: accentBg }}
-                />
-              </>
-            )
+            {/* Deliberately no section count. A number on a tab reads as a
+                notification badge — items waiting on you — so "Evidence Inputs 5"
+                implied five outstanding tasks rather than five sections. The
+                sections are listed directly below anyway. */}
+            const contents = group.label
             if (routeMode) {
               return (
                 <Link
                   key={group.id}
                   href={target.href ?? "#"}
                   aria-current={on ? "page" : undefined}
+                  data-active={on}
                   data-testid={`stage-${group.id}`}
                   className={className}
                 >
@@ -186,6 +196,7 @@ export function WorkspaceStageNav({
                 role="tab"
                 aria-selected={on}
                 tabIndex={on ? 0 : -1}
+                data-active={on}
                 data-testid={`stage-${group.id}`}
                 onClick={() => onSelect?.(target.value)}
                 className={className}
@@ -201,26 +212,47 @@ export function WorkspaceStageNav({
         <div className="min-w-0 overflow-x-auto pb-1 [-webkit-overflow-scrolling:touch]">
           <div
             {...(routeMode ? {} : ({ role: "tablist" } as const))}
+            ref={secondaryNav.containerRef}
             aria-label={`${activeGroup.label} sections`}
             onKeyDown={onSecondaryKeyDown}
-            className="inline-flex w-max items-center gap-1.5"
+            className="relative inline-flex w-max items-center gap-2"
           >
+            {/* The fill itself, travelling. The pills above it stay transparent
+                and only change text colour, so the selection reads as one object
+                moving rather than two backgrounds cross-fading. */}
+            {secondaryNav.rect ? (
+              <span
+                aria-hidden
+                className="pointer-events-none absolute bottom-0 left-0 top-0 rounded-xl transition-[transform,width] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none"
+                style={{
+                  transform: `translateX(${secondaryNav.rect.left}px)`,
+                  width: secondaryNav.rect.width,
+                  backgroundColor: accentBg,
+                }}
+              />
+            ) : null}
             {activeGroup.sections.map((section) => {
               const on = section.value === activeValue
+              // border-2 on BOTH states, transparent when active: the fill is the
+              // travelling indicator behind the pill, so if the active pill
+              // dropped its border every neighbour would shift 4px sideways the
+              // moment the selection moved.
               const className = cn(
-                "inline-flex min-h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-3.5 py-1.5 font-mono text-[13px] transition-colors",
-                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
+                "relative z-10 inline-flex min-h-10 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl border-2 px-4 py-2 font-mono text-[13px] font-medium",
+                "transition-colors duration-200 ease-[cubic-bezier(0.4,0,0.2,1)] motion-reduce:transition-none",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
                 on
-                  ? "border-transparent font-bold shadow-sm"
-                  : "border-border bg-background text-muted-foreground hover:border-foreground/40 hover:bg-muted hover:text-foreground",
+                  ? "border-transparent font-bold"
+                  : "border-border bg-card text-muted-foreground hover:border-foreground/40 hover:text-foreground",
               )
-              const style = on ? { backgroundColor: accentBg, color: accentFg } : undefined
+              const style = on ? { color: accentFg } : undefined
               if (routeMode) {
                 return (
                   <Link
                     key={section.value}
                     href={section.href ?? "#"}
                     aria-current={on ? "page" : undefined}
+                    data-active={on}
                     data-testid={`stage-section-${section.value}`}
                     className={className}
                     style={style}
@@ -237,6 +269,7 @@ export function WorkspaceStageNav({
                   role="tab"
                   aria-selected={on}
                   tabIndex={on ? 0 : -1}
+                  data-active={on}
                   data-testid={`stage-section-${section.value}`}
                   onClick={() => onSelect?.(section.value)}
                   className={className}
