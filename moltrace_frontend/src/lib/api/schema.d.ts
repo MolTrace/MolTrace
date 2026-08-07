@@ -314,6 +314,36 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/audit/{subject_type}/{subject_id}/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Subject Audit Verify Route
+         * @description Verify the audit trail behind one filing or campaign the caller can already open.
+         *
+         *     The whole-chain walk above is admin-only and answers a compliance question. This answers
+         *     the scientist's question — can I trust the trail behind *this* number? Access is the
+         *     subject's own rule, so a subject the caller cannot reach is the same 404 as one that does
+         *     not exist. Spectroscopy sessions keep their own review surface.
+         *
+         *     The response separates what was actually established: whether every entry about this
+         *     subject is unaltered, and whether the chain those entries sit in still re-walks (which is
+         *     what would reveal one having been removed). Read ``ok`` for the bottom line and
+         *     ``break_kind`` / ``chain_break_kind`` for the cause — never parse ``detail``.
+         */
+        get: operations["subject_audit_verify_route_audit__subject_type___subject_id__verify_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/admin/audit/anchor": {
         parameters: {
             query?: never;
@@ -12093,6 +12123,102 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/regulatory/spectral-impurities": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Spectral Impurities
+         * @description List recorded spectral impurity observations the caller owns.
+         */
+        get: operations["list_spectral_impurities_regulatory_spectral_impurities_get"];
+        put?: never;
+        /**
+         * Record Spectral Impurity
+         * @description Record the ICH Q3C clause that applies to a contaminant observed in a stored spectrum.
+         *
+         *     The substance is re-derived server-side from the analysis rather than named by the caller —
+         *     a supplied compound name would let anyone fabricate a regulatory identity and its citation.
+         *     A substance the guidance does not cover is returned **unresolved** with the reason named,
+         *     never with a guessed limit.
+         *
+         *     Returns the applicable limit and its provenance. It does **not** return compliance: no
+         *     measured level is attributable to a named contaminant, so a pass/fail cannot be formed.
+         */
+        post: operations["record_spectral_impurity_regulatory_spectral_impurities_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/spectrum/series": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create Series
+         * @description Create a spectrum series — the ordered set of spectra a rate is fitted over.
+         */
+        post: operations["create_series_spectrum_series_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/spectrum/series/{series_id}/points": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Add Series Observation
+         * @description Append one timed observation, together with the analysis it was read from.
+         */
+        post: operations["add_series_observation_spectrum_series__series_id__points_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/spectrum/series/{series_id}/kinetics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Series Kinetics
+         * @description Fit a rate constant over the series, or return why no rate could be fitted.
+         *
+         *     A refusal is a 200 carrying ``outcome: "refusal"`` and the reason, not an error — "this
+         *     series cannot support a rate, and here is why" is the answer, not a failure. The two outcomes
+         *     are separate fields so a refusal can never be read as a rate of zero.
+         */
+        get: operations["series_kinetics_spectrum_series__series_id__kinetics_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/scim/v2/ServiceProviderConfig": {
         parameters: {
             query?: never;
@@ -22742,6 +22868,36 @@ export interface components {
             metadata_json?: {
                 [key: string]: unknown;
             };
+        };
+        /** KineticFitOut */
+        KineticFitOut: {
+            /**
+             * Order
+             * @enum {string}
+             */
+            order: "first" | "second";
+            /** Rate Constant */
+            rate_constant: number;
+            /** Standard Error */
+            standard_error: number;
+            /** R Squared */
+            r_squared: number;
+            /** Half Life */
+            half_life?: number | null;
+            /** Point Count */
+            point_count: number;
+        };
+        /** KineticRefusalOut */
+        KineticRefusalOut: {
+            /**
+             * Reason
+             * @enum {string}
+             */
+            reason: "length_mismatch" | "too_few_points" | "duplicate_timestamps" | "non_positive_value" | "no_change_over_time" | "degenerate_fit" | "order_not_identifiable";
+            /** Detail */
+            detail: string;
+            /** Point Count */
+            point_count: number;
         };
         /** KnowledgeExtractionRun */
         KnowledgeExtractionRun: {
@@ -38034,6 +38190,116 @@ export interface components {
                 [key: string]: unknown;
             } | string | null;
         };
+        /** SpectralImpurityObservationCreate */
+        SpectralImpurityObservationCreate: {
+            /** Analysis Id */
+            analysis_id: number;
+            /** Shift Ppm */
+            shift_ppm: number;
+            /**
+             * Nucleus
+             * @default 1H
+             * @enum {string}
+             */
+            nucleus: "1H" | "13C";
+            /** Solvent */
+            solvent?: string | null;
+            /**
+             * Route
+             * @default oral
+             * @enum {string}
+             */
+            route: "oral" | "parenteral" | "inhalation";
+            /** Reaction Project Id */
+            reaction_project_id?: number | null;
+        };
+        /** SpectralImpurityObservationListResult */
+        SpectralImpurityObservationListResult: {
+            /** Observations */
+            observations?: components["schemas"]["SpectralImpurityObservationOut"][];
+            /** Disclaimer */
+            disclaimer: string;
+            /**
+             * Human Review Required
+             * @default true
+             */
+            human_review_required: boolean;
+        };
+        /** SpectralImpurityObservationOut */
+        SpectralImpurityObservationOut: {
+            /** Id */
+            id: number;
+            /** Analysis Id */
+            analysis_id?: number | null;
+            /** Reaction Project Id */
+            reaction_project_id?: number | null;
+            /** Observed Shift Ppm */
+            observed_shift_ppm: number;
+            /** Solvent */
+            solvent?: string | null;
+            /** Observed Label */
+            observed_label?: string | null;
+            /** Compound */
+            compound?: string | null;
+            /** Expected Ppm */
+            expected_ppm?: number | null;
+            /** Delta Ppm */
+            delta_ppm?: number | null;
+            /** Match Kind */
+            match_kind?: string | null;
+            /**
+             * Identity Status
+             * @enum {string}
+             */
+            identity_status: "resolved" | "unresolved";
+            /** Unresolved Reason */
+            unresolved_reason?: ("no_library_match" | "label_only_no_compound" | "not_in_q3c_subset") | null;
+            /** Unresolved Detail */
+            unresolved_detail?: string | null;
+            /** Q3C Class Number */
+            q3c_class_number?: number | null;
+            /** Q3C Class Description */
+            q3c_class_description?: string | null;
+            /** Concentration Limit Ppm */
+            concentration_limit_ppm?: number | null;
+            /** Pde Mg Per Day */
+            pde_mg_per_day?: number | null;
+            /** Regulatory Basis */
+            regulatory_basis?: string | null;
+            /** Table Reference */
+            table_reference?: string | null;
+            /** Rule Set Version */
+            rule_set_version?: string | null;
+            /**
+             * Quantitation Available
+             * @default false
+             */
+            quantitation_available: boolean;
+            /** Observed Level Ppm */
+            observed_level_ppm?: number | null;
+            /** Compliance Note */
+            compliance_note: string;
+            /**
+             * Human Review Required
+             * @default true
+             */
+            human_review_required: boolean;
+        };
+        /** SpectralImpurityObservationResult */
+        SpectralImpurityObservationResult: {
+            observation: components["schemas"]["SpectralImpurityObservationOut"];
+            /** Rule Set Versions */
+            rule_set_versions?: {
+                [key: string]: string;
+            };
+            /** Disclaimer */
+            disclaimer: string;
+            /**
+             * Human Review Required
+             * @default true
+             */
+            human_review_required: boolean;
+        };
         /** SpectralSimilarityLayerResult */
         SpectralSimilarityLayerResult: {
             /**
@@ -38573,6 +38839,26 @@ export interface components {
                 [key: string]: unknown;
             };
         };
+        /**
+         * SpectrumKineticsResult
+         * @description Either a fit or a refusal, discriminated so a refusal cannot be read as a rate.
+         */
+        SpectrumKineticsResult: {
+            /**
+             * Outcome
+             * @enum {string}
+             */
+            outcome: "fit" | "refusal";
+            fit?: components["schemas"]["KineticFitOut"] | null;
+            refusal?: components["schemas"]["KineticRefusalOut"] | null;
+            /** Disclaimer */
+            disclaimer: string;
+            /**
+             * Human Review Required
+             * @default true
+             */
+            human_review_required: boolean;
+        };
         /** SpectrumMissingReferencePeak */
         SpectrumMissingReferencePeak: {
             reference_peak: components["schemas"]["Peak"];
@@ -39021,6 +39307,52 @@ export interface components {
             results?: components["schemas"]["SpectrumRetrieveHit"][];
             /** Warnings */
             warnings?: string[];
+        };
+        /** SpectrumSeriesCreate */
+        SpectrumSeriesCreate: {
+            /**
+             * Name
+             * @default
+             */
+            name: string;
+            /**
+             * Tracked Quantity
+             * @default
+             */
+            tracked_quantity: string;
+        };
+        /** SpectrumSeriesOut */
+        SpectrumSeriesOut: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Tracked Quantity */
+            tracked_quantity: string;
+            /** Point Count */
+            point_count: number;
+        };
+        /** SpectrumSeriesPointCreate */
+        SpectrumSeriesPointCreate: {
+            /** Elapsed Seconds */
+            elapsed_seconds: number;
+            /** Observed Value */
+            observed_value: number;
+            /** Analysis Id */
+            analysis_id?: number | null;
+        };
+        /** SpectrumSeriesPointOut */
+        SpectrumSeriesPointOut: {
+            /** Id */
+            id: number;
+            /** Series Id */
+            series_id: number;
+            /** Analysis Id */
+            analysis_id?: number | null;
+            /** Elapsed Seconds */
+            elapsed_seconds: number;
+            /** Observed Value */
+            observed_value: number;
         };
         /**
          * SpectrumSolventCatalog
@@ -39575,6 +39907,52 @@ export interface components {
             metadata_json?: {
                 [key: string]: unknown;
             };
+        };
+        /**
+         * SubjectAuditChainVerification
+         * @description Integrity of the audit entries recorded about ONE subject (a filing or a campaign).
+         *
+         *     Scoped to what the caller can already open, so it answers the question a scientist
+         *     actually asks — "can I trust the trail behind *this* number?" — rather than the
+         *     admin-only whole-chain question.
+         *
+         *     Two different things are established, and they are reported separately because the
+         *     subject's own slice cannot establish both:
+         *
+         *     * ``content_ok`` — every chained entry about this subject still hashes to the digest
+         *       recorded with it, so none has been **altered**. Provable from the slice alone.
+         *     * ``chain_ok`` — the global hash chain re-walks cleanly. Needed to rule out an entry
+         *       about this subject having been **removed or reordered**, which the slice by itself
+         *       cannot detect: entries carry no per-subject sequence, so a deletion leaves no gap
+         *       inside the subject's own view.
+         *
+         *     ``ok`` is both together, and is the only field a summary UI should reduce to.
+         */
+        SubjectAuditChainVerification: {
+            /** Subject Type */
+            subject_type: string;
+            /** Subject Id */
+            subject_id: number;
+            /** Entry Count */
+            entry_count: number;
+            /** Verified Count */
+            verified_count: number;
+            /** Ok */
+            ok: boolean;
+            /** Content Ok */
+            content_ok: boolean;
+            /** Chain Ok */
+            chain_ok: boolean;
+            /** First Break Seq */
+            first_break_seq?: number | null;
+            /** Break Kind */
+            break_kind?: string | null;
+            /** Chain Break Kind */
+            chain_break_kind?: string | null;
+            /** Key Id */
+            key_id: string;
+            /** Detail */
+            detail: string;
         };
         /**
          * SubjectCommentCreate
@@ -43351,6 +43729,42 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AuditChainVerification"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    subject_audit_verify_route_audit__subject_type___subject_id__verify_get: {
+        parameters: {
+            query?: {
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path: {
+                subject_type: string;
+                subject_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubjectAuditChainVerification"];
                 };
             };
             /** @description Validation Error */
@@ -75281,6 +75695,188 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Carbon13AnalysisReport"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_spectral_impurities_regulatory_spectral_impurities_get: {
+        parameters: {
+            query?: {
+                analysis_id?: number | null;
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SpectralImpurityObservationListResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    record_spectral_impurity_regulatory_spectral_impurities_post: {
+        parameters: {
+            query?: {
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SpectralImpurityObservationCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SpectralImpurityObservationResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_series_spectrum_series_post: {
+        parameters: {
+            query?: {
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SpectrumSeriesCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SpectrumSeriesOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_series_observation_spectrum_series__series_id__points_post: {
+        parameters: {
+            query?: {
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path: {
+                series_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SpectrumSeriesPointCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SpectrumSeriesPointOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    series_kinetics_spectrum_series__series_id__kinetics_get: {
+        parameters: {
+            query?: {
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path: {
+                series_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SpectrumKineticsResult"];
                 };
             };
             /** @description Validation Error */
