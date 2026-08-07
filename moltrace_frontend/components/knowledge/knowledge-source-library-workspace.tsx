@@ -315,9 +315,6 @@ export function KnowledgeSourceLibraryWorkspace() {
             Knowledge Library
           </Link>
         </Button>
-        <Button variant="outline" size="sm" asChild>
-          <Link href="/knowledge/extractions">Extractions</Link>
-        </Button>
       </div>
 
       <div className="space-y-1">

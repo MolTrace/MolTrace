@@ -326,12 +326,14 @@ export function KnowledgeExtractionRecordsWorkspace({ recordKind }: { recordKind
             Knowledge Library
           </Link>
         </Button>
-        <Button variant="outline" size="sm" asChild>
-          <Link href="/knowledge/extractions">Extractions</Link>
-        </Button>
-        <Button variant="outline" size="sm" asChild>
-          <Link href="/knowledge/review">Review tasks</Link>
-        </Button>
+        {/* These three are NOT sibling navigation and must not be removed with it.
+            This component serves /knowledge/reactions, /knowledge/analytical and
+            /knowledge/regulatory from one file, switched by the `recordKind`
+            prop, so this row is the page's only control for changing which kind
+            of record you are looking at. The `secondary` variant marks the
+            current one. The plain links that used to sit beside them — pointing
+            back at Extractions and Review tasks — were duplicating the Knowledge
+            Library landing nav and have gone. */}
         <Button variant={recordKind === "reaction" ? "secondary" : "outline"} size="sm" asChild>
           <Link href="/knowledge/reactions">Reactions</Link>
         </Button>
