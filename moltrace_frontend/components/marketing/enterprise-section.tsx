@@ -38,10 +38,15 @@ const features = [
     desc: "Five roles across eight actions, resolved per project and per team. A reviewer can approve but cannot upload a run; a scientist can upload but cannot approve.",
   },
   {
+    // "HMAC-chained" was wrong, and the truth is the better claim. Per-entry
+    // linkage is unkeyed SHA-256 (`compute_entry_hash` in audit_chain.py returns
+    // "sha256:"), so the chain re-walks with no secret; HMAC is used only to sign
+    // the periodic anchor. Saying HMAC implied a key is needed to check the trail,
+    // which would have undercut the point of having one.
     icon: FileCheck,
     title: "Tamper-evident audit trail",
     pill: "Audit",
-    desc: "Actions are written to an HMAC-chained ledger that can be re-verified on demand and exported as an inspection package.",
+    desc: "Analyses, reviews and approvals are hash-chained with SHA-256 and server-timestamped, so the trail re-verifies without a secret and exports as an inspection package.",
   },
   {
     // "Customer-managed keys available for enterprise deployments" came out:
