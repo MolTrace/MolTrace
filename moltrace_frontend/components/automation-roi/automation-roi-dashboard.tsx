@@ -30,7 +30,6 @@ import { RenewalValueReportSection } from "@/components/automation-roi/renewal-v
 import { FeedbackButton } from "@/src/components/analytics/FeedbackButton"
 import { AlertCard } from "@/components/dashboard/alert-card"
 import { ModuleCard } from "@/components/dashboard/module-card"
-import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   Empty,
@@ -63,17 +62,6 @@ const HOURS_SAVED_TOOLTIP =
 const TASKS_AUTOMATED_TOOLTIP =
   "Count of workflow and analysis tasks completed by MolTrace instead of manual execution."
 
-/** Clearly labeled synthetic series — not live metrics. */
-const DEMO_TREND_DATA = [
-  { label: "W1", hours_saved: 42, tasks_automated: 120 },
-  { label: "W2", hours_saved: 48, tasks_automated: 132 },
-  { label: "W3", hours_saved: 51, tasks_automated: 141 },
-  { label: "W4", hours_saved: 55, tasks_automated: 148 },
-  { label: "W5", hours_saved: 53, tasks_automated: 145 },
-  { label: "W6", hours_saved: 58, tasks_automated: 156 },
-  { label: "W7", hours_saved: 61, tasks_automated: 162 },
-  { label: "W8", hours_saved: 59, tasks_automated: 158 },
-] as const
 
 function fmtNum(n: number | null | undefined, digits = 1): string {
   if (n == null || Number.isNaN(n)) return "—"
@@ -183,7 +171,7 @@ export default function AutomationRoiDashboard() {
         <AlertCard
           variant="info"
           title="Live analytics unavailable"
-          description="Metrics below are blank; illustrative trends appear only in the labeled Demo data section."
+          description="Figures below are blank because none could be read just now. Nothing here is estimated in their place."
         />
       ) : null}
 
@@ -411,36 +399,37 @@ export default function AutomationRoiDashboard() {
 
       {liveTrend && liveTrend.length > 0 ? (
         <RoiTrendCharts
-          title="Hours & tasks trend (live)"
-          description="Shown only when your recorded ROI snapshot includes a weekly trend series."
+          title="Hours & tasks trend"
+          description="Recorded weekly trend for your organization."
           data={liveTrend}
         />
-      ) : null}
 
-      <ModuleCard
-        accent="violet"
-        eyebrow="Demo"
-        title="Illustrative trends"
-        icon={BarChart3}
-        description="Synthetic weekly series for layout validation only — not derived from your data unless a matching weekly trend has been recorded for your organization."
-        badge={
-          <Badge variant="secondary" className="font-normal">
-            Demo data
-          </Badge>
-        }
-      >
-        <div>
-          <RoiTrendCharts
-            title=""
-            description=""
-            data={DEMO_TREND_DATA.map((r) => ({
-              label: r.label,
-              hours_saved: r.hours_saved,
-              tasks_automated: r.tasks_automated,
-            }))}
-          />
-        </div>
-      </ModuleCard>
+      ) : (
+        /* Where a hardcoded eight-week series used to sit.
+
+           It was labelled "Demo data" and described honestly, so it was not
+           deceptive — but this is the page whose entire job is to report measured
+           value, and a synthetic chart occupying the spot the real one will take
+           is the last thing that should be here. It also made an empty ROI look
+           populated, which is exactly how a gap goes unnoticed: the page appeared
+           to be working, so nobody asked why the numbers never moved.
+
+           The honest version says there is nothing recorded yet and what would
+           change that. No backend vocabulary in the copy — a reader gets told
+           what has to happen, not which table it lands in. */
+        <ModuleCard
+          accent="violet"
+          eyebrow="Trend"
+          title="No trend recorded yet"
+          icon={BarChart3}
+          description="Hours saved are counted from completed analyses, workflow runs and reports. Once that activity is being recorded for your organization, the weekly trend appears here."
+        >
+          <p className="text-sm leading-relaxed text-muted-foreground">
+            This panel stays empty rather than showing an example series, so an empty result is
+            never mistaken for a measured one.
+          </p>
+        </ModuleCard>
+      )}
     </div>
   )
 }
