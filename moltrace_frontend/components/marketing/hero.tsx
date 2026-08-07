@@ -2,6 +2,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { ArrowRight, ArrowUpRight, FileSignature, FlaskConical, ShieldCheck, Waves } from "lucide-react"
 import Link from "next/link"
+import { cn } from "@/lib/utils"
 import { HeroMoleculeLayer } from "./hero-molecule-layer"
 import { EvidenceCard } from "./evidence-card"
 
@@ -149,27 +150,56 @@ export function Hero() {
             on purpose: nested in the column it stacked ABOVE the card on a phone,
             which put the one artifact worth showing about two and a half screens
             down and undid the reason for the rewrite. */}
-        <div className="hero-stat-grid mt-16 grid grid-cols-1 gap-5 border-t pt-10 sm:grid-cols-2 lg:mt-20 lg:grid-cols-4">
-          {HERO_MODULES.map((m) => (
+        {/* A fanned deck at desktop width, a plain grid below it.
+
+            Cards overlap left-to-right with the LATER card on top, never the
+            other way round. That direction is the whole trick: each card's own
+            left edge — where its 3px accent rule lives — stays clear of its
+            neighbour, so all four module colours read at once even though the
+            cards are stacked. Reversing the order would bury three of them.
+
+            The overlap is lg-only. On a phone these are already one per row, and
+            overlapping a 343px card would hide the thing it is trying to show. */}
+        <div className="hero-stat-grid mt-16 grid grid-cols-1 gap-5 border-t pt-10 sm:grid-cols-2 lg:mt-20 lg:flex lg:gap-0">
+          {HERO_MODULES.map((m, i) => (
             <Link
               key={m.name}
+              data-deck-index={i}
               href={m.href}
-              className="group relative block h-full min-w-0 rounded-xl border bg-card p-6 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring motion-reduce:transition-none motion-reduce:hover:translate-y-0"
-              /* The 3px left rule is the whole signature of this card: it is what
-                 carries the module's colour without tinting any text. The `border`
-                 class sets 1px on all four sides and this overrides the left. */
-              style={{ borderLeftWidth: "3px", borderLeftColor: m.accent }}
+              className={cn(
+                "group relative block h-full min-w-0 rounded-xl border bg-card p-6",
+                "transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none",
+                "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
+                // Deck behaviour, desktop only.
+                "lg:flex-1 lg:-ml-8 lg:first:ml-0 lg:shadow-xl",
+                // Lift out of the deck on hover OR keyboard focus — a deck you can
+                // only open with a mouse is a deck a keyboard user cannot read.
+                // Lift and scale only. Changing the margin on hover would reflow
+                // every sibling and make the row twitch under the cursor.
+                "lg:hover:z-50 lg:focus-visible:z-50",
+                "lg:hover:-translate-y-2 lg:focus-visible:-translate-y-2",
+                "lg:hover:scale-[1.02] lg:focus-visible:scale-[1.02] lg:hover:shadow-2xl",
+                "motion-reduce:hover:translate-y-0 motion-reduce:focus-visible:translate-y-0",
+              )}
+              /* One style prop, not two — JSX keeps only the last one, so a
+                 second would silently drop the z-index that stacks the deck.
+                 The 3px left rule is the card's signature: it carries the
+                 module's colour without tinting any text. */
+              style={{ zIndex: i + 1, borderLeftWidth: "3px", borderLeftColor: m.accent }}
             >
-              <div className="flex items-start justify-between gap-2">
-                <div className="flex min-w-0 items-center gap-2">
-                  {/* Icons keep the vivid accent — they are shapes, not type, so
-                      the AA rule that pushes text to the ink tokens does not
-                      apply to them. */}
-                  <m.icon className="h-6 w-6 shrink-0" style={{ color: m.accent }} aria-hidden />
-                  <h3 className="truncate text-base font-semibold" style={{ color: m.ink }}>
-                    {m.name}
-                  </h3>
-                </div>
+              {/* The arrow sits beside the title, NOT pinned to the card's right
+                  edge. In the deck the next card overlaps this one's right edge by
+                  32px, which is precisely where a pinned arrow lives — three of
+                  the four were being sliced in half. Anything that must stay
+                  readable belongs left of the overlap zone. */}
+              <div className="flex min-w-0 items-center gap-2">
+                {/* Icons keep the vivid accent — they are shapes, not type, so
+                    the AA rule that pushes text to the ink tokens does not
+                    apply to them. */}
+                <m.icon className="h-6 w-6 shrink-0" style={{ color: m.accent }} aria-hidden />
+                <h3 className="truncate text-base font-semibold" style={{ color: m.ink }}>
+                  {m.name}
+                </h3>
                 <ArrowUpRight
                   className="h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform duration-200 group-hover:-translate-y-0.5 group-hover:translate-x-0.5 motion-reduce:transition-none"
                   aria-hidden
