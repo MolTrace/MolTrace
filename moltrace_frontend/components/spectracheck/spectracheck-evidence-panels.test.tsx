@@ -167,6 +167,70 @@ describe("InferredNmrTextPanel", () => {
   })
 })
 
+describe("relative integrals — the ungrounded proton scale", () => {
+  // Verbatim ``nmrcheck.integration_scale.RELATIVE_INTEGRAL_DISCLOSURE``.
+  const DISCLOSURE =
+    "These integrals are relative. With no structure to set a proton budget, the " +
+    "smallest resolved signal is set to 1 H and every other signal is reported as " +
+    "a multiple of it, so the values are ratios between signals rather than proton " +
+    "counts. Supply a valid structure to scale them to its proton budget."
+
+  const UNGROUNDED = {
+    ...ENRICHED_PAYLOAD,
+    inferred_nmr_text: "7.25 (m, 123.5H), 1.25 (t, J = 7.0 Hz, 84.5H)",
+    warnings: ["Residual CDCl3 detected at 7.26 ppm.", DISCLOSURE],
+  }
+
+  it("qualifies the NMR string where it is rendered, not only in the warnings list", () => {
+    render(<InferredNmrTextPanel payload={UNGROUNDED} />)
+    expect(screen.getByTestId("relative-integral-notice")).toBeInTheDocument()
+    expect(screen.getByText(DISCLOSURE)).toBeInTheDocument()
+  })
+
+  it("stops printing the H suffix on an ungrounded NMR string", () => {
+    render(<InferredNmrTextPanel payload={UNGROUNDED} />)
+    const body = screen.getByTestId("inferred-nmr-text-body").textContent ?? ""
+    expect(body).toContain("123.5 rel.")
+    expect(body).not.toContain("123.5H")
+    // The coupling constant is not an integral and must survive untouched.
+    expect(body).toContain("J = 7.0 Hz")
+  })
+
+  it("relabels the picked-peaks integral column and warns above the table", () => {
+    render(<EnrichedPickedPeaksPanel payload={UNGROUNDED} />)
+    expect(screen.getByTestId("relative-integral-notice")).toBeInTheDocument()
+    expect(screen.getByText("∫ rel.")).toBeInTheDocument()
+    expect(screen.queryByText("∫ H")).not.toBeInTheDocument()
+  })
+
+  it("finds the disclosure when it arrives nested under preview or analysis", () => {
+    render(
+      <InferredNmrTextPanel
+        payload={{ analysis: { inferred_nmr_text: "7.25 (m, 123.5H)", warnings: [DISCLOSURE] } }}
+      />,
+    )
+    expect(screen.getByTestId("relative-integral-notice")).toBeInTheDocument()
+    expect(screen.getByTestId("inferred-nmr-text-body").textContent).toContain("123.5 rel.")
+  })
+
+  it("leaves a structure-grounded response completely alone", () => {
+    const grounded = {
+      ...ENRICHED_PAYLOAD,
+      inferred_nmr_text: "7.25 (m, 5H), 1.25 (t, J = 7.0 Hz, 3H)",
+      warnings: ["Residual CDCl3 detected at 7.26 ppm."],
+    }
+    render(<InferredNmrTextPanel payload={grounded} />)
+    expect(screen.queryByTestId("relative-integral-notice")).not.toBeInTheDocument()
+    // With a proton budget the H is a real count and must not be relabelled.
+    expect(screen.getByTestId("inferred-nmr-text-body").textContent).toBe(
+      "7.25 (m, 5H), 1.25 (t, J = 7.0 Hz, 3H)",
+    )
+
+    render(<EnrichedPickedPeaksPanel payload={grounded} />)
+    expect(screen.getByText("∫ H")).toBeInTheDocument()
+  })
+})
+
 describe("PeakCategorySummaryPanel", () => {
   it("renders chips ordered by count", () => {
     render(<PeakCategorySummaryPanel payload={ENRICHED_PAYLOAD} />)
@@ -256,6 +320,10 @@ describe("SpectraCheckEvidencePanels (composite)", () => {
 })
 
 describe("DP4RankingPanel", () => {
+  // Mirrors the row shape the backend emits since the DP4 coverage change:
+  // ``matched_peaks`` now travels with its denominator (``observed_peak_count``)
+  // because MAE/RMSE are computed over matched peaks only, and a badly predicted
+  // peak leaves the pairing window rather than inflating the error.
   const DP4_PAYLOAD = {
     dp4_ranking: [
       {
@@ -263,6 +331,13 @@ describe("DP4RankingPanel", () => {
         candidate_label: "CCO",
         dp4_probability: 0.72,
         matched_peaks: 3,
+        observed_peak_count: 3,
+        matched_fraction: 1.0,
+        low_coverage: false,
+        error_basis: "matched_peaks_only",
+        probability_is_calibrated: false,
+        probability_basis:
+          "Relative ranking across the candidates supplied; not a calibrated probability.",
         mean_abs_error_ppm: 0.05,
         rms_error_ppm: 0.07,
         scaling_slope: 1.02,
@@ -274,22 +349,86 @@ describe("DP4RankingPanel", () => {
         candidate_label: "CO",
         dp4_probability: 0.18,
         matched_peaks: 2,
+        observed_peak_count: 12,
+        matched_fraction: 2 / 12,
+        low_coverage: true,
+        error_basis: "matched_peaks_only",
+        probability_is_calibrated: false,
+        probability_basis:
+          "Relative ranking across the candidates supplied; not a calibrated probability.",
         mean_abs_error_ppm: 0.21,
         rms_error_ppm: 0.25,
         scaling_slope: 1.0,
         scaling_intercept: 0.0,
-        notes: ["Fewer than 3 paired peaks — linear scaling skipped."],
+        notes: [
+          "Fewer than 3 paired peaks — linear scaling skipped.",
+          "Only 2 of 12 observed peaks paired; the error figures describe those peaks only.",
+        ],
       },
     ],
   }
 
-  it("renders a row per candidate with the DP4 probability badge", () => {
+  it("renders a row per candidate with the relative ranking value", () => {
     render(<DP4RankingPanel payload={DP4_PAYLOAD} />)
     expect(screen.getByTestId("dp4-ranking")).toBeInTheDocument()
     const rows = screen.getAllByTestId("dp4-ranking-row")
     expect(rows).toHaveLength(2)
     expect(screen.getByText("72%")).toBeInTheDocument()
     expect(screen.getByText("18%")).toBeInTheDocument()
+  })
+
+  it("shows matched peaks over their denominator beside the error columns", () => {
+    render(<DP4RankingPanel payload={DP4_PAYLOAD} />)
+    const coverage = screen.getAllByTestId("dp4-ranking-coverage")
+    expect(coverage).toHaveLength(2)
+    expect(coverage[0]).toHaveTextContent("3 / 3")
+    expect(coverage[1]).toHaveTextContent("2 / 12")
+    // The fraction is what distinguishes "2 matched" from "2 of 2 matched".
+    expect(coverage[1]).toHaveTextContent("17%")
+  })
+
+  it("marks a low-coverage row and surfaces its coverage note", () => {
+    render(<DP4RankingPanel payload={DP4_PAYLOAD} />)
+    const badges = screen.getAllByTestId("dp4-low-coverage")
+    expect(badges).toHaveLength(1)
+    expect(screen.getByText(/Only 2 of 12 observed peaks paired/)).toBeInTheDocument()
+  })
+
+  it("labels the ranking column as relative while the value is uncalibrated", () => {
+    render(<DP4RankingPanel payload={DP4_PAYLOAD} />)
+    expect(screen.getByText("Match rank (relative)")).toBeInTheDocument()
+    expect(screen.queryByText("DP4 prob.")).not.toBeInTheDocument()
+  })
+
+  it("calls the value a probability only when the backend says it is calibrated", () => {
+    const calibrated = {
+      dp4_ranking: DP4_PAYLOAD.dp4_ranking.map((row) => ({
+        ...row,
+        probability_is_calibrated: true,
+      })),
+    }
+    render(<DP4RankingPanel payload={calibrated} />)
+    expect(screen.getByText("DP4 prob.")).toBeInTheDocument()
+    expect(screen.queryByText("Match rank (relative)")).not.toBeInTheDocument()
+  })
+
+  it("still renders rows from responses predating the coverage keys", () => {
+    const legacy = {
+      dp4_ranking: [
+        {
+          candidate_label: "CCO",
+          dp4_probability: 0.72,
+          matched_peaks: 3,
+          mean_abs_error_ppm: 0.05,
+          rms_error_ppm: 0.07,
+        },
+      ],
+    }
+    render(<DP4RankingPanel payload={legacy} />)
+    // No denominator was sent, so the panel says the denominator is unknown
+    // rather than implying the match was complete.
+    expect(screen.getByTestId("dp4-ranking-coverage")).toHaveTextContent("3 / ?")
+    expect(screen.queryByTestId("dp4-low-coverage")).not.toBeInTheDocument()
   })
 
   it("renders nothing when the ranking is empty", () => {
