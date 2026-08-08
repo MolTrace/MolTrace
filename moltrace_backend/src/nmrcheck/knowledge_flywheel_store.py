@@ -599,13 +599,62 @@ def link_record(
         return _link_to_record(row)
 
 
+#: Review states an extracted record can hold. ``accepted`` is the only one a reviewer has
+#: affirmed; ``rejected`` is one a reviewer looked at and refused.
+REVIEW_ACCEPTED = "accepted"
+REVIEW_REJECTED = "rejected"
+REVIEW_UNREVIEWED = "unreviewed"
+
+#: What search returns when the caller does not say otherwise. Deliberately excludes
+#: ``rejected``: a reviewer already decided that record is wrong, and returning it beside an
+#: accepted one throws that decision away. ``unreviewed`` is included because excluding it
+#: would make a young corpus look empty, but it is LABELLED (see ``review_status`` on every
+#: hit) so a caller can never mistake "nobody has checked this" for "someone approved it".
+DEFAULT_SEARCH_REVIEW_STATES: frozenset[str] = frozenset({REVIEW_ACCEPTED, REVIEW_UNREVIEWED})
+
+
+def _review_state_filter(column: Any, states: frozenset[str] | None) -> Any:
+    """SQL predicate restricting a record set to the requested review states.
+
+    ``None`` means no filter at all — the explicit "show me everything including rejected"
+    escape hatch, which a caller must ask for by name.
+    """
+
+    if states is None:
+        return None
+    # A NULL review_status predates the column and has been reviewed by nobody, so it
+    # belongs with `unreviewed` rather than being silently dropped.
+    predicate = column.in_(tuple(states))
+    if REVIEW_UNREVIEWED in states:
+        predicate = or_(predicate, column.is_(None))
+    return predicate
+
+
 def search_knowledge(
     session_factory: sessionmaker[Session],
     *,
     query: str | None,
     record_type: str | None = None,
     limit: int = 50,
+    review_states: frozenset[str] | None = DEFAULT_SEARCH_REVIEW_STATES,
 ) -> KnowledgeSearchResult:
+    """Search the corpus, honouring the review decisions already made about it.
+
+    Search used to filter on text alone. A record a reviewer had explicitly **rejected** came
+    back beside an accepted one, indistinguishable in the result — the review step ran, a
+    human did the work of refusing a bad extraction, and this surface discarded it. For a
+    corpus whose entire value is that the curation is load-bearing, that is not an incomplete
+    feature; it is the feature inverted.
+
+    Rejected records are therefore excluded by default. Pass ``review_states=None`` to see
+    everything, or an explicit set to narrow further — the escape hatch exists, but a caller
+    has to ask for it rather than receive it by accident.
+
+    LIMIT, stated because a partial guarantee presented as a whole one is worse than none:
+    this covers reaction, analytical and regulatory records. **Citations are not filtered**,
+    because `extracted_citations` has no review state to filter on.
+    """
+
     tokens = _query_tokens(query or "")
     with session_scope(session_factory) as session:
         sources: list[KnowledgeSource] = []
@@ -617,16 +666,43 @@ def search_knowledge(
             rows = session.scalars(select(KnowledgeSourceORM).order_by(KnowledgeSourceORM.id.desc()).limit(500)).all()
             sources = [_source_to_record(row) for row in rows if _matches(tokens, row.title, row.doi, row.patent_number)][:limit]
         if record_type in {None, "reaction"}:
-            rows = session.scalars(select(ExtractedReactionRecordORM).order_by(ExtractedReactionRecordORM.id.desc()).limit(500)).all()
+            stmt = select(ExtractedReactionRecordORM).order_by(ExtractedReactionRecordORM.id.desc()).limit(500)
+            governance = _review_state_filter(
+                ExtractedReactionRecordORM.review_status, review_states
+            )
+            if governance is not None:
+                stmt = stmt.where(governance)
+            rows = session.scalars(stmt).all()
             reactions = [_reaction_to_record(row) for row in rows if _matches(tokens, row.reaction_name, row.reaction_type, row.product_summary, row.substrate_summary)][:limit]
         if record_type in {None, "analytical"}:
-            rows = session.scalars(select(ExtractedAnalyticalRecordORM).order_by(ExtractedAnalyticalRecordORM.id.desc()).limit(500)).all()
+            stmt = select(ExtractedAnalyticalRecordORM).order_by(ExtractedAnalyticalRecordORM.id.desc()).limit(500)
+            governance = _review_state_filter(
+                ExtractedAnalyticalRecordORM.review_status, review_states
+            )
+            if governance is not None:
+                stmt = stmt.where(governance)
+            rows = session.scalars(stmt).all()
             analytical = [_analytical_to_record(row) for row in rows if _matches(tokens, row.compound_name, row.formula, row.hrms_text, row.nmr_1h_text)][:limit]
         if record_type in {None, "regulatory"}:
-            rows = session.scalars(select(ExtractedRegulatoryRecordORM).order_by(ExtractedRegulatoryRecordORM.id.desc()).limit(500)).all()
+            stmt = select(ExtractedRegulatoryRecordORM).order_by(ExtractedRegulatoryRecordORM.id.desc()).limit(500)
+            governance = _review_state_filter(
+                ExtractedRegulatoryRecordORM.review_status, review_states
+            )
+            if governance is not None:
+                stmt = stmt.where(governance)
+            rows = session.scalars(stmt).all()
             regulatory = [_regulatory_to_record(row) for row in rows if _matches(tokens, row.topic, row.requirement_text)][:limit]
         if record_type in {None, "citation"}:
-            rows = session.scalars(select(ExtractedCitationORM).order_by(ExtractedCitationORM.id.desc()).limit(500)).all()
+            # Citations carry NO review state of their own — `extracted_citations` has
+            # source_id, the locator fields and a confidence score, and nothing else. So they
+            # cannot be governance-filtered here and are returned unfiltered. That is a real
+            # gap, not a decision: a citation lifted from a record a reviewer later rejected
+            # still surfaces. Closing it means either giving citations their own review state
+            # or filtering them by the state of the record they support; both are schema
+            # changes and neither belongs in this one.
+            rows = session.scalars(
+                select(ExtractedCitationORM).order_by(ExtractedCitationORM.id.desc()).limit(500)
+            ).all()
             citations = [_citation_to_record(row) for row in rows if _matches(tokens, row.citation_label, row.quote_excerpt, row.summary)][:limit]
         return KnowledgeSearchResult(
             query=query,
