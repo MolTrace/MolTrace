@@ -38,6 +38,11 @@ import {
   Target,
 } from "lucide-react"
 import { isRecord } from "@/components/spectracheck/spectracheck-nmr-result-parse"
+import {
+  RELATIVE_INTEGRAL_UNIT_HINT,
+  findRelativeIntegralDisclosure,
+  relabelRelativeIntegrals,
+} from "@/components/spectracheck/spectracheck-relative-integrals"
 import { InfoTooltip } from "@/components/ui/info-tooltip"
 
 type RawPeak = Record<string, unknown>
@@ -150,6 +155,57 @@ function asString(value: unknown): string | null {
   return typeof value === "string" && value.length > 0 ? value : null
 }
 
+/**
+ * The "these integrals are relative" disclosure, rendered against the numbers
+ * it qualifies.
+ *
+ * Deliberately not left to the warnings drawer. A reader looking at ``123.5H``
+ * has been told nothing by a sentence three panels away — the disclosure only
+ * does its job where the integral itself is on screen.
+ */
+export function RelativeIntegralNotice({
+  disclosure,
+  showUnitHint = false,
+}: {
+  disclosure: string | null
+  showUnitHint?: boolean
+}) {
+  if (!disclosure) return null
+  return (
+    <div
+      className="flex gap-2 rounded-md border px-2.5 py-2"
+      style={{ borderColor: "var(--mt-amber-ink)", backgroundColor: "rgba(217, 119, 6, 0.08)" }}
+      data-testid="relative-integral-notice"
+    >
+      <AlertTriangle
+        className="mt-0.5 h-3.5 w-3.5 shrink-0"
+        style={{ color: "var(--mt-amber-ink)" }}
+        aria-hidden
+      />
+      <div className="space-y-1">
+        <p className="text-[11px] font-semibold leading-snug" style={{ color: "var(--mt-amber-ink)" }}>
+          Relative integrals — these are ratios, not proton counts
+        </p>
+        <p className="text-[11px] leading-snug text-muted-foreground">{disclosure}</p>
+        {showUnitHint ? (
+          <p className="text-[11px] leading-snug text-muted-foreground">
+            {RELATIVE_INTEGRAL_UNIT_HINT}
+          </p>
+        ) : null}
+        {/* Names the remedy's location, not just the remedy. Both the raw-FID
+            and processed paths take their structure from the same Step 2
+            field, so one sentence is correct on either. Deliberately prose
+            rather than an anchor — the panels also render outside the
+            workspace, where that anchor would be dead. */}
+        <p className="text-[11px] leading-snug text-muted-foreground">
+          Add one under <span className="font-medium text-foreground">Step 2 · Candidate
+          structures</span> and re-run to scale these to its proton budget.
+        </p>
+      </div>
+    </div>
+  )
+}
+
 function extractRawPeaks(payload: unknown): RawPeak[] {
   if (!isRecord(payload)) return []
   const peaks = payload.peaks
@@ -169,6 +225,7 @@ function EnrichedPickedPeaksPanelImpl({
   fallbackTitle?: string
 }) {
   const peaks = useMemo(() => extractRawPeaks(payload), [payload])
+  const relativeIntegrals = useMemo(() => findRelativeIntegralDisclosure(payload), [payload])
   if (peaks.length === 0) {
     return null
   }
@@ -191,13 +248,31 @@ function EnrichedPickedPeaksPanelImpl({
             {peaks.length > 200 ? `${peaks.length} (showing 200)` : peaks.length}
           </span>
         </div>
+        {/* Above the table, not below it — the qualification has to be read
+            before the column, not discovered after it. */}
+        <RelativeIntegralNotice disclosure={relativeIntegrals} />
         <div className="overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead className="text-[10px] uppercase tracking-wide">δ (ppm)</TableHead>
                 <TableHead className="text-[10px] uppercase tracking-wide">Mult</TableHead>
-                <TableHead className="text-[10px] uppercase tracking-wide">∫ H</TableHead>
+                {/* The column header is the unit. With no proton budget these
+                    values are multiples of the smallest resolved signal, so an
+                    "H" here would assert a measurement that was never made. */}
+                <TableHead className="text-[10px] uppercase tracking-wide">
+                  {relativeIntegrals ? (
+                    <span className="inline-flex items-center gap-1">
+                      ∫ rel.
+                      <InfoTooltip
+                        label="What this integral is"
+                        content={RELATIVE_INTEGRAL_UNIT_HINT}
+                      />
+                    </span>
+                  ) : (
+                    "∫ H"
+                  )}
+                </TableHead>
                 <TableHead className="text-[10px] uppercase tracking-wide">J (Hz)</TableHead>
                 {hasEvidenceSource ? (
                   <TableHead className="text-[10px] uppercase tracking-wide">Evidence</TableHead>
@@ -329,7 +404,15 @@ function InferredNmrTextPanelImpl({
   payload: unknown
   title?: string
 }) {
-  const text = useMemo(() => readInferredNmrText(payload), [payload])
+  const raw = useMemo(() => readInferredNmrText(payload), [payload])
+  const relativeIntegrals = useMemo(() => findRelativeIntegralDisclosure(payload), [payload])
+  // The only client-side rewrite this panel performs, and only when the backend
+  // has said the scale is ungrounded: the string's "123.5H" is a multiple of the
+  // smallest resolved signal, and the producer cannot yet label it at source.
+  const text = useMemo(
+    () => (raw !== null && relativeIntegrals ? relabelRelativeIntegrals(raw) : raw),
+    [raw, relativeIntegrals],
+  )
   if (text === null) {
     // Silent when missing so the panel can be dropped into legacy result
     // layouts without forcing every backend response to populate it.
@@ -351,10 +434,10 @@ function InferredNmrTextPanelImpl({
             backend-generated
           </span>
         </div>
-        {/* Wrap so long multiplet strings stay readable on narrow cards. The
-            text is the user-visible product of the deconvolution + reference-
-            guided multiplicity pipeline, so render it verbatim — no
-            truncation, no client-side reformatting. */}
+        <RelativeIntegralNotice disclosure={relativeIntegrals} showUnitHint />
+        {/* Wrap so long multiplet strings stay readable on narrow cards. Other
+            than the relative-integral relabelling above, the text is rendered
+            verbatim — no truncation, no client-side reformatting. */}
         <p
           className="whitespace-pre-wrap break-words font-mono text-xs leading-relaxed text-foreground"
           data-testid="inferred-nmr-text-body"
@@ -1117,6 +1200,28 @@ export function PredictedVsObservedPanel({ payload }: { payload: unknown }) {
 // DP4 candidate ranking
 // ────────────────────────────────────────────────────────────────────────────
 
+/**
+ * Fallback wording for the ranking column's help text.
+ *
+ * Rows carry ``probability_basis`` — a sentence written by the backend saying
+ * what the number actually is. Prefer it; this stands in only for responses
+ * predating that key, and says the same thing in the same direction (a relative
+ * ordering, not a calibrated posterior).
+ */
+const DP4_RANKING_BASIS_FALLBACK =
+  "A relative ranking across the candidates supplied, not a calibrated probability that the structure is correct. " +
+  "The DP4 error model was fitted to DFT-computed shifts; the shifts ranked here come from an empirical predictor with a wider measured error."
+
+/** Wording for the error columns, keyed on the backend's ``error_basis`` token. */
+const DP4_ERROR_BASIS_LABELS: Record<string, string> = {
+  matched_peaks_only: "over matched peaks only",
+}
+
+function dp4ErrorBasisLabel(token: string | null): string {
+  if (!token) return DP4_ERROR_BASIS_LABELS.matched_peaks_only
+  return DP4_ERROR_BASIS_LABELS[token] ?? token.replace(/_/g, " ")
+}
+
 export function DP4RankingPanel({ payload }: { payload: unknown }) {
   if (!isRecord(payload)) return null
   const raw = payload.dp4_ranking
@@ -1124,14 +1229,29 @@ export function DP4RankingPanel({ payload }: { payload: unknown }) {
   const rows = raw.filter((r): r is RawPeak => isRecord(r))
   if (rows.length === 0) return null
 
+  // Only call the number a probability when the backend says it was calibrated.
+  // Today it never is, so the column reads as a ranking — but the claim tracks
+  // the flag rather than being hard-coded against a future calibration.
+  const calibrated = rows.every((row) => row.probability_is_calibrated === true)
+  const rankingBasis = asString(rows[0]?.probability_basis) ?? DP4_RANKING_BASIS_FALLBACK
+  const errorBasis = dp4ErrorBasisLabel(asString(rows[0]?.error_basis))
+
   return (
     <div data-testid="dp4-ranking">
     <ModuleCard
       accent="teal"
-      eyebrow="Evidence · DP4 candidate ranking"
-      title="Smith & Goodman 2010 DP4 posterior probability"
+      eyebrow="Evidence · Candidate ranking"
+      title={
+        calibrated
+          ? "Smith & Goodman 2010 DP4 posterior probability"
+          : "Candidate ranking by shift agreement (Smith & Goodman 2010 DP4)"
+      }
       icon={Target}
-      description={`Bayesian ranking under a Student's t error model with σ_1H=0.185 ppm (ν=14.18) / σ_13C=2.306 ppm (ν=11.38). Probabilities sum to 1.0 across the candidate list.`}
+      description={
+        calibrated
+          ? "Bayesian ranking under a Student's t error model with σ_1H=0.185 ppm (ν=14.18) / σ_13C=2.306 ppm (ν=11.38)."
+          : `Orders the candidates supplied by how well their predicted shifts agree with the spectrum. ${rankingBasis} Errors are computed ${errorBasis}, so read every error figure against the coverage beside it.`
+      }
     >
       <div className="overflow-x-auto">
         <Table>
@@ -1139,8 +1259,18 @@ export function DP4RankingPanel({ payload }: { payload: unknown }) {
             <TableRow>
               <TableHead className="text-[10px] uppercase tracking-wide">#</TableHead>
               <TableHead className="text-[10px] uppercase tracking-wide">Candidate</TableHead>
-              <TableHead className="text-[10px] uppercase tracking-wide">DP4 prob.</TableHead>
-              <TableHead className="text-[10px] uppercase tracking-wide">Matched</TableHead>
+              <TableHead className="text-[10px] uppercase tracking-wide">
+                <span className="inline-flex items-center gap-1">
+                  {calibrated ? "DP4 prob." : "Match rank (relative)"}
+                  <InfoTooltip label="What this ranking is" content={rankingBasis} />
+                </span>
+              </TableHead>
+              {/* Coverage sits immediately left of the two error columns, in the
+                  table itself rather than a tooltip: an MAE computed over 6 of
+                  12 observed peaks is measuring a different, smaller thing than
+                  the same figure over 12 of 12, and the reader cannot tell the
+                  two apart from the error alone. */}
+              <TableHead className="text-[10px] uppercase tracking-wide">Peaks matched</TableHead>
               <TableHead className="text-[10px] uppercase tracking-wide">MAE (ppm)</TableHead>
               <TableHead className="text-[10px] uppercase tracking-wide">RMSE (ppm)</TableHead>
               <TableHead className="text-[10px] uppercase tracking-wide">Scaling</TableHead>
@@ -1151,19 +1281,42 @@ export function DP4RankingPanel({ payload }: { payload: unknown }) {
               const label = asString(row.candidate_label) ?? `candidate ${idx + 1}`
               const prob = asNumber(row.dp4_probability) ?? 0
               const matched = asNumber(row.matched_peaks)
+              const observed = asNumber(row.observed_peak_count)
+              const fraction =
+                asNumber(row.matched_fraction) ??
+                (matched != null && observed != null && observed > 0 ? matched / observed : null)
+              const lowCoverage = row.low_coverage === true
               const mae = asNumber(row.mean_abs_error_ppm)
               const rmse = asNumber(row.rms_error_ppm)
               const slope = asNumber(row.scaling_slope)
               const intercept = asNumber(row.scaling_intercept)
+              const notes = Array.isArray(row.notes)
+                ? row.notes.filter((n): n is string => typeof n === "string" && n.length > 0)
+                : []
               const isWinner = idx === 0 && prob > 0
               const tint = isWinner ? "var(--mt-teal-ink)" : "var(--muted-foreground, #888)"
+              // A low-coverage row's error figures are dimmed rather than
+              // hidden — they are still the best available fit statistic, they
+              // just describe fewer peaks than the reader would assume.
+              const errorTint = lowCoverage ? "var(--mt-amber-ink)" : undefined
               return (
                 <TableRow key={idx} data-testid="dp4-ranking-row">
                   <TableCell className="font-mono text-xs" style={{ color: tint }}>
                     {idx + 1}
                   </TableCell>
-                  <TableCell className="font-mono text-xs" style={{ color: isWinner ? tint : undefined, fontWeight: isWinner ? 700 : 400 }}>
+                  <TableCell
+                    className="font-mono text-xs"
+                    style={{ color: isWinner ? tint : undefined, fontWeight: isWinner ? 700 : 400 }}
+                  >
                     {label}
+                    {notes.length > 0 ? (
+                      <span
+                        className="mt-1 block font-sans text-[10px] font-normal leading-snug text-muted-foreground"
+                        data-testid="dp4-ranking-note"
+                      >
+                        {notes.join(" ")}
+                      </span>
+                    ) : null}
                   </TableCell>
                   <TableCell>
                     <div className="space-y-1">
@@ -1181,9 +1334,36 @@ export function DP4RankingPanel({ payload }: { payload: unknown }) {
                       </div>
                     </div>
                   </TableCell>
-                  <TableCell className="font-mono text-xs">{matched != null ? matched : "—"}</TableCell>
-                  <TableCell className="font-mono text-xs">{mae != null ? mae.toFixed(3) : "—"}</TableCell>
-                  <TableCell className="font-mono text-xs">{rmse != null ? rmse.toFixed(3) : "—"}</TableCell>
+                  <TableCell data-testid="dp4-ranking-coverage">
+                    <span className="font-mono text-xs tabular-nums" style={{ color: errorTint }}>
+                      {matched != null && observed != null
+                        ? `${matched} / ${observed}`
+                        : matched != null
+                          ? `${matched} / ?`
+                          : "—"}
+                    </span>
+                    {fraction != null ? (
+                      <span className="ml-1 font-mono text-[10px] text-muted-foreground tabular-nums">
+                        ({Math.round(fraction * 100)}%)
+                      </span>
+                    ) : null}
+                    {lowCoverage ? (
+                      <Badge
+                        variant="outline"
+                        className="ml-1 border-current px-1 py-0 text-[9px] uppercase tracking-wide"
+                        style={{ color: "var(--mt-amber-ink)" }}
+                        data-testid="dp4-low-coverage"
+                      >
+                        Low coverage
+                      </Badge>
+                    ) : null}
+                  </TableCell>
+                  <TableCell className="font-mono text-xs" style={{ color: errorTint }}>
+                    {mae != null ? mae.toFixed(3) : "—"}
+                  </TableCell>
+                  <TableCell className="font-mono text-xs" style={{ color: errorTint }}>
+                    {rmse != null ? rmse.toFixed(3) : "—"}
+                  </TableCell>
                   <TableCell className="font-mono text-[10px] text-muted-foreground">
                     {slope != null && intercept != null
                       ? `δ_obs = ${slope.toFixed(3)}·δ_pred ${intercept >= 0 ? "+" : "−"} ${Math.abs(intercept).toFixed(3)}`
