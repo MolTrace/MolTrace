@@ -14,6 +14,65 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.68.0 — A prediction interval MolTrace can guarantee (2026-08-08)
+
+The predictor reports a per-atom σ. B5 measured that σ as optimistic by roughly 3× in its tightest
+¹³C band — the band the verifier's significance mapping weights highest. Platt and temperature
+scaling calibrate a *classifier's* probabilities; neither gives a regression predictor a coverage
+guarantee.
+
+`spectroscopy/eval/conformal.py` fits **Mondrian split-conformal** bands (nucleus × reported-σ
+decile) whose guarantee is distribution-free and finite-sample: a 90 % interval covers the truth at
+least 90 % of the time, whatever the model is and however wrong σ happens to be. It assumes only
+exchangeability between calibration and evaluation, which the molecule-level split provides.
+
+**Measured on held-out NMRShiftDB2** — 39,628 train / 5,040 calibration / 4,950 evaluation
+molecules, 393,760 reference atoms, reproducible via `scripts/measure_conformal_calibration.py`:
+
+| target | nucleus | n | coverage | mean half-width |
+|---|---|---|---|---|
+| 90 % | ¹³C | 36,844 | **90.03 %** | 6.95 ppm |
+| 90 % | ¹H | 12,508 | **90.61 %** | 0.714 ppm |
+| 95 % | ¹³C | 36,844 | 94.72 % | 9.18 ppm |
+| 95 % | ¹H | 12,508 | 94.93 % | 0.951 ppm |
+
+At 90 % both nuclei meet target (worst deficit 0.0000). At 95 % there is a **0.28 pp shortfall on
+¹³C**, reported rather than rounded away.
+
+### The finding: σ is differentially mis-scaled, not merely mis-scaled
+
+The ratio of conformal half-width to mean reported σ runs **8.66× in the tightest ¹³C band down to
+1.77× in the widest** — a 4.90× spread, monotone (3.81× on ¹H). Under a correctly-scaled σ that
+ratio is a *constant*: it is the error distribution's 90th percentile in units of σ, whatever that
+distribution is. So this is worse news than "3× optimistic". A constant mis-scaling could be
+repaired by multiplying σ by one number; this cannot. And it is worst precisely where the arbiter
+leans hardest, because `_significance_from_sigma` scores a tight σ highest.
+
+It extends rather than contradicts B5's "¹H is well calibrated throughout": at B5's bin resolution
+that still holds (ratios 2.10× / 1.85× / 1.90×). The defect lives below it — ¹H's two tightest
+bands need 7.22× and 4.33× their claimed σ, and B5's coarse bins averaged over exactly that region.
+
+### Also
+
+`split_records_three_way` — conformal needs a calibration split disjoint from both training and
+evaluation, and the obvious way to get one (call `split_records` twice) **silently returns an empty
+calibration set**: the split is a deterministic function of the molecule hash, so every held-out
+record already sits below any larger second threshold. The three bands are now cut from one hash in
+a single pass, and a test asserts the trap still behaves as documented.
+
+`min_calibration_size` is solved by searching the same expression that computes the conformal rank,
+not by the closed form `ceil(1/α) − 1`. The two disagree under floating point — `1 − 0.90` is
+`0.09999…`, so the closed form returns 10 for a bound that is really 9. A guard computed by a
+different route than the one that enforces it will eventually contradict it.
+
+### Not in this release
+
+`_significance_from_sigma` still consumes σ, not the interval. Switching it changes every posterior
+in the system, so it gets its own change with an invariant test and a visible re-baseline — with
+this measurement in hand first.
+
+---
+
 ## v0.67.1 — Approving a model now changes what the router serves (2026-08-08)
 
 `InferenceRouter` resolves what to serve from `moltrace.spectroscopy.ai.registry`, keyed by
