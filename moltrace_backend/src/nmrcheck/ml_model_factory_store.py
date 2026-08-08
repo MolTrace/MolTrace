@@ -11,6 +11,7 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
 
+from . import ai_engine_adapter
 from .database import session_scope
 from .models import (
     CalibrationAssessment,
@@ -1067,6 +1068,11 @@ def approve_deployment_candidate(
             raise MLModelFactoryError(
                 "Deployment candidate approval requires a succeeded evaluation run."
             )
+        promotion = _promotion_check(session, artifact)
+        if promotion.applicable and not promotion.passed:
+            raise MLModelFactoryError(
+                f"Deployment candidate approval refused: {promotion.reason}."
+            )
         row.status = payload.status
         row.reviewer_name = payload.reviewer_name
         row.reviewer_comment = payload.reviewer_comment
@@ -1076,6 +1082,12 @@ def approve_deployment_candidate(
                 **_json_dict(row.metadata_json),
                 **payload.metadata_json,
                 "human_approval_recorded": True,
+                "promotion_check": {
+                    "applied": promotion.applicable,
+                    "compared_metrics": list(promotion.compared_metrics),
+                    "improvements": list(promotion.improvements),
+                    "reason": promotion.reason,
+                },
             }
         )
         artifact.status = "approved"
@@ -1329,6 +1341,64 @@ def _artifact_for_training_run(session: Session, training_run_id: int) -> ModelA
         .where(ModelArtifactORM.training_run_id == training_run_id)
         .order_by(ModelArtifactORM.id.desc())
         .limit(1)
+    )
+
+
+def _latest_succeeded_evaluation(session: Session, artifact_id: int) -> MLEvaluationRunORM | None:
+    return session.scalar(
+        select(MLEvaluationRunORM)
+        .where(
+            MLEvaluationRunORM.model_artifact_id == artifact_id,
+            MLEvaluationRunORM.status == "succeeded",
+        )
+        .order_by(MLEvaluationRunORM.id.desc())
+        .limit(1)
+    )
+
+
+def _deployed_incumbent(session: Session, artifact: ModelArtifactORM) -> ModelArtifactORM | None:
+    """The most recently approved artifact for the same task, excluding ``artifact``."""
+
+    return session.scalar(
+        select(ModelArtifactORM)
+        .where(
+            ModelArtifactORM.task_key == artifact.task_key,
+            ModelArtifactORM.id != artifact.id,
+            ModelArtifactORM.status == "approved",
+        )
+        .order_by(ModelArtifactORM.id.desc())
+        .limit(1)
+    )
+
+
+def _promotion_check(
+    session: Session, artifact: ModelArtifactORM
+) -> ai_engine_adapter.DominanceVerdict:
+    """Apply the evaluation harness's promotion rule before a model is approved.
+
+    The rule only binds when there is a deployed incumbent for the same task with a
+    succeeded evaluation to compare against; the first evaluated model for a task is
+    a baseline decision, not a promotion. Whenever an incumbent *does* exist, a
+    candidate that regresses on a safety-critical metric -- a mis-calibrated
+    confidence, or a higher rate of confirming a wrong structure -- is refused here
+    rather than reviewed on a summary that does not show it.
+
+    The verdict is recorded either way, so a reviewer can tell an approval the gate
+    endorsed from one it had no opinion on.
+    """
+
+    incumbent = _deployed_incumbent(session, artifact)
+    incumbent_eval = (
+        _latest_succeeded_evaluation(session, incumbent.id) if incumbent is not None else None
+    )
+    candidate_eval = _latest_succeeded_evaluation(session, artifact.id)
+    if incumbent_eval is None or candidate_eval is None:
+        return ai_engine_adapter.dominance_verdict(
+            _json_dict(candidate_eval.metrics_json) if candidate_eval is not None else {}, None
+        )
+    return ai_engine_adapter.dominance_verdict(
+        _json_dict(candidate_eval.metrics_json),
+        _json_dict(incumbent_eval.metrics_json),
     )
 
 
@@ -1802,6 +1872,13 @@ def _deployment_response(row: DeploymentCandidateORM) -> DeploymentCandidateResp
     notes = [_REVIEW_NOTE]
     if row.status in {"proposed", "in_review"}:
         warnings.append("Deployment candidate requires review and human approval before any use.")
+    # Surface the promotion check on the approval itself: a reviewer should be able
+    # to see whether the metric comparison endorsed this model or simply had no
+    # opinion on it, without going to look for the record.
+    promotion = _json_dict(row.metadata_json).get("promotion_check")
+    if isinstance(promotion, dict) and promotion.get("reason"):
+        prefix = "Metric comparison" if promotion.get("applied") else "Metric comparison skipped"
+        notes.append(f"{prefix}: {promotion['reason']}.")
     return DeploymentCandidateResponse(
         candidate_id=row.id,
         model_artifact_id=row.model_artifact_id,

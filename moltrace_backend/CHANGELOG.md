@@ -14,6 +14,79 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.67.0 — The AI/ML layer is now wired to the product (2026-08-08)
+
+MolTrace had two AI/ML layers and they did not touch each other.
+
+One is 15,721 lines of science: a provenance-complete inference router, an append-only model
+registry with artifact hashes and training-data lineage, a dominance-gated evaluation harness,
+LoRA fine-tuning, active learning, an RLHF reward model constrained to reorder only within a
+verifier verdict class. The API layer imported **four** symbols from all of it — one RAG route
+and three ops-monitoring calls.
+
+The other is 76 REST routes of AI governance — model cards, training runs, calibration
+assessments, drift alerts, canary deployments — in which every number arrived from the caller.
+`grep -c moltrace ai_inference_store.py ml_model_factory_store.py` returned 0 and 0.
+`POST /ai/predictions` read `confidence_score` out of the request body and, when it was absent,
+recorded a hard-coded **0.82**. Downstream — the calibration record, the review queue, the drift
+alert — that number was indistinguishable from a measured one.
+
+The governance layer was not wrong; it was a correct, audit-grade system of record built before
+the engine it was meant to record. This release is the wire between them.
+
+### The seam
+
+`nmrcheck/ai_engine_adapter.py` is now the single import boundary. The stores keep zero
+`moltrace` imports — they receive results, never engines — and a test asserts it, because a store
+that reaches past the adapter is a store whose numbers have no guaranteed provenance.
+
+Three rules it enforces:
+
+* **Fail loud, degrade recorded.** An engine that cannot run raises; the route answers 503. It
+  never substitutes a caller-supplied number for a computed one.
+* **Provenance is mandatory.** Every result carries `model_versions` (artifact id → SHA-256).
+  A result with an empty map is refused inside the adapter rather than stored with a gap.
+* **Lazy import**, so the ~800-route app still builds without the ML extras.
+
+`nmr_shift_prediction` now routes through `InferenceRouter` (LoRA → NMRNet → HOSE, with the
+per-atom layer and reason recorded), and `nmr_candidate_ranking` through the validated in-house
+DP4 implementation. Requests for these services may no longer supply `confidence_score`,
+`uncertainty_json`, `ood_status` or `model_versions` — the engine derives them, and a submitted
+value would be recorded as if a model had produced it.
+
+### Confidence is now on the arbiter's scale
+
+`spectroscopy/ai/confidence.py` derives a prediction's confidence from the verifier's own
+uncertainty→significance mapping (`8·σ_ref/(σ_ref+σ)`, then `tanh(significance/3)`) rather than
+inventing a second notion of certainty. Two consequences are deliberate: a prediction at exactly
+the reference σ scores **0.870**, not 1.0; and the 35 ppm median ¹³C σ that reached production
+before the HOSE knowledge base landed scores **0.143** and reports `out_of_domain`.
+
+That is the defect this closes. The uncertainty was always honest and always reported — it was
+simply never *aggregated*, so a per-atom warning nobody read let an abstention stand in for a
+prediction indefinitely. It is now a single number, with the σ distribution, the fallback share
+and the per-layer atom counts underneath it.
+
+### The promotion gate binds
+
+`POST /ml/deployment-candidates/{id}/approve` now applies the evaluation harness's `dominates`
+rule before a human sees the summary. A candidate that improves top-1 accuracy from 0.80 to 0.95
+while ECE drifts 0.030 → 0.041 is **refused**: safety-critical metrics carry tolerance 0, and an
+accuracy gain does not buy a worse calibration.
+
+Three outcomes, not two, because a gate that refuses everything it cannot score is a gate teams
+route around. A reaction-yield surrogate reporting `mae`/`r2` is *not applicable* and passes with
+the reviewer told the comparison was skipped and why. Both sides of the metric-asymmetry hole are
+closed: dropping `ece` from the new evaluation is refused as loudly as regressing on it, in
+either direction.
+
+### Removed
+
+The `0.82` default. A service with no engine wired yet now records **no** confidence rather than
+a plausible-looking one, and says so in the warnings.
+
+---
+
 ## v0.66.0 — Processed-spectrum ingest, and MolTrace's first measured error bar (2026-08-07)
 
 Two halves of the same goal: get real spectra *in*, then be able to say how accurate we are on
