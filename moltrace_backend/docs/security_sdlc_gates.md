@@ -59,8 +59,15 @@ the code:
   suppressed. Each suppression should be reachability-assessed and adversarially re-checked before
   it is added, and revisited whenever the component moves into a deployed install path.
 - **Semgrep** — inline `# nosemgrep: <full-rule-id>` on (or immediately above) the flagged line,
-  with a justification comment. Used only for true false-positives (e.g. static, no-user-input SQL
-  in an admin-only migration).
+  with a justification comment. Used only for true false-positives — and only after checking
+  whether the finding can be removed outright, which is usually cheaper than it looks.
+  `avoid-sqlalchemy-text` is the one that recurs: it is an *audit* rule, so it fires on the
+  **shape** `sa.text(f"…")` without claiming user input reaches it. In a migration the
+  interpolated names are module constants, so writing the table and column names out literally
+  produces byte-identical SQL and the rule stops matching — no suppression, and nothing for a
+  reviewer to re-assess later. Migration SQL is a frozen historical record, so there is nothing
+  for the literals to drift away from. Nine migrations call `sa.text`; only the one that
+  interpolated ever tripped the gate.
 
 ## Making the gates block merge
 

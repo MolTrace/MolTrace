@@ -117,32 +117,39 @@ def upgrade() -> None:
 
     # Revision 1 for every source that predates revisions: what it says today, recorded
     # so the next change has a predecessor to supersede instead of overwriting it.
+    #
+    # The table and column names are written out rather than interpolated from the constants
+    # above. They are compile-time constants either way, so the SQL is identical — but an
+    # f-string inside sa.text() is indistinguishable, to a reader and to SAST, from one that
+    # splices in a caller's value, and Semgrep's avoid-sqlalchemy-text audit rule blocks the
+    # build on exactly that shape. A migration's SQL is a frozen historical record, so there
+    # is nothing for the literals to drift away from.
     op.execute(
         sa.text(
-            f"""
-            INSERT INTO {_REVISIONS} (
+            """
+            INSERT INTO knowledge_source_revisions (
                 source_id, revision_number, supersedes_revision_id, title, source_type,
                 source_url, doi, patent_number, jurisdiction_id, publisher, publication_date,
                 status, reliability_label, metadata_json, changed_fields_json, change_reason
             )
             SELECT id, 1, NULL, title, source_type, source_url, doi, patent_number,
                    jurisdiction_id, publisher, publication_date, status, reliability_label,
-                   COALESCE(metadata_json, '{{}}'), '[]',
+                   COALESCE(metadata_json, '{}'), '[]',
                    'Recorded when source revisions were introduced.'
-            FROM {_SOURCES}
-            WHERE {_CURRENT} IS NULL
+            FROM knowledge_sources
+            WHERE current_revision_id IS NULL
             """
         )
     )
     op.execute(
         sa.text(
-            f"""
-            UPDATE {_SOURCES}
-               SET {_CURRENT} = (
-                   SELECT r.id FROM {_REVISIONS} r
-                    WHERE r.source_id = {_SOURCES}.id AND r.revision_number = 1
+            """
+            UPDATE knowledge_sources
+               SET current_revision_id = (
+                   SELECT r.id FROM knowledge_source_revisions r
+                    WHERE r.source_id = knowledge_sources.id AND r.revision_number = 1
                )
-             WHERE {_CURRENT} IS NULL
+             WHERE current_revision_id IS NULL
             """
         )
     )
