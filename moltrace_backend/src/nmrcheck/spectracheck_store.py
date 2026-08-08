@@ -7,6 +7,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
+from .analytics_store import record_automation_event
 from .database import session_scope
 from .models import (
     SpectraCheckAuditEventRecord,
@@ -832,6 +833,15 @@ def save_spectracheck_unified_evidence(
             message="Unified evidence snapshot saved to SpectraCheck session.",
             actor_id=actor_id,
             metadata={"status": row.status},
+        )
+        record_automation_event(
+            session,
+            event_type="unified_evidence_synthesized",
+            task_key="unified_evidence_synthesis",
+            user_id=actor_id,
+            session_id=row.id,
+            project_id=row.project_id,
+            metadata={"session_status": row.status},
         )
         session.flush()
         session.refresh(row)

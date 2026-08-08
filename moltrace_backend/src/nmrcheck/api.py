@@ -347,6 +347,8 @@ from .models import (
     DataIntegrityAssessmentCreate,
     DatasetVersion,
     DatasetVersionCreate,
+    DatasetVersionApprovalCreate,
+    DatasetVersionApprovalState,
     DatasetVersionUpdate,
     DebugBundle,
     DebugBundleCreate,
@@ -2460,6 +2462,36 @@ def _analytics_actor(context: AccessContext) -> analytics_store.AnalyticsActor:
         user_id=context.user_id,
         email=context.user.email if context.user is not None else None,
         system_api_key=context.system_api_key,
+    )
+
+
+def _record_automation_event(
+    request: Request,
+    context: AccessContext,
+    *,
+    event_type: str,
+    task_key: str,
+    project_id: int | None = None,
+    sample_id: str | None = None,
+    session_id: int | None = None,
+    metadata: dict[str, Any] | None = None,
+) -> None:
+    """Record that a stateless computation route completed a unit of automated work.
+
+    These routes compute a result and persist nothing, so there is no transaction to join
+    and the usage event is the only record that the work happened. Routes that *do* write
+    their result emit from inside their own store function instead, so the event cannot
+    outlive a rolled-back write.
+    """
+    analytics_store.record_automation_event(
+        _state(request).session_factory,
+        event_type=event_type,
+        task_key=task_key,
+        user_id=context.user_id,
+        project_id=project_id,
+        sample_id=sample_id,
+        session_id=session_id,
+        metadata=metadata,
     )
 
 
@@ -10860,6 +10892,12 @@ async def nmr_processed_preview_route(
             "point_count": point_count,
         },
     )
+    _record_automation_event(
+        request,
+        context,
+        event_type="nmr_processed_preview_completed",
+        task_key="nmr_processed_preview",
+    )
     return NMRProcessedPreviewResponse(
         sample_id=sample_id,
         nucleus=nucleus,
@@ -11570,6 +11608,12 @@ async def nmr_raw_fid_preview_route(
             "inline_spectrum_generated": spectrum_generated,
             "point_count": point_count,
         },
+    )
+    _record_automation_event(
+        request,
+        context,
+        event_type="nmr_raw_fid_metadata_preview_completed",
+        task_key="nmr_raw_fid_metadata_preview",
     )
     _acq_meta = dict(provenance.get("acquisition_metadata") or {})
     # Normalize vendor-specific spectrometer-frequency keys
@@ -12320,6 +12364,12 @@ def raw_fid_archive_preview(
         processing_run_id=preview.fid_run_id,
         extra={"save_run": save_run},
     )
+    _record_automation_event(
+        request,
+        context,
+        event_type="nmr_raw_fid_metadata_preview_completed",
+        task_key="nmr_raw_fid_metadata_preview",
+    )
     return preview
 
 
@@ -12656,6 +12706,12 @@ async def fid_preview(
             "legacy_endpoint": "/fid/preview",
             "recommended_workflow": "POST /raw-fid/upload then POST /raw-fid/{archive_id}/process",
         },
+    )
+    _record_automation_event(
+        request,
+        context,
+        event_type="nmr_raw_fid_metadata_preview_completed",
+        task_key="nmr_raw_fid_metadata_preview",
     )
     return preview
 
@@ -19394,6 +19450,57 @@ def update_knowledge_source_route(
     if record is None:
         raise HTTPException(status_code=404, detail="Knowledge source not found.")
     return record
+
+
+@router.post(
+    "/knowledge/dataset-versions/{dataset_version_id}/approvals",
+    response_model=DatasetVersionApprovalState,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_access_context)],
+)
+def approve_knowledge_dataset_version_route(
+    dataset_version_id: int,
+    payload: DatasetVersionApprovalCreate,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> DatasetVersionApprovalState:
+    """Record your approval of a dataset version.
+
+    Promotion is the point where curated records start training something, so it takes two
+    separate people. Who you are is taken from your signed-in identity, not from the
+    request, and approving twice yourself does not count twice.
+    """
+    try:
+        state = knowledge_store.approve_dataset_version(
+            _state(request).session_factory,
+            dataset_version_id,
+            payload,
+            actor=_knowledge_actor(context),
+        )
+    except Exception as exc:
+        _raise_knowledge_http_error(exc)
+        raise
+    if state is None:
+        raise HTTPException(status_code=404, detail="Dataset version not found.")
+    return state
+
+
+@router.get(
+    "/knowledge/dataset-versions/{dataset_version_id}/approvals",
+    response_model=DatasetVersionApprovalState,
+    dependencies=[Depends(require_access_context)],
+)
+def list_knowledge_dataset_version_approvals_route(
+    dataset_version_id: int,
+    request: Request,
+) -> DatasetVersionApprovalState:
+    """Who has approved this dataset version, and how many more are needed."""
+    state = knowledge_store.get_dataset_version_approvals(
+        _state(request).session_factory, dataset_version_id
+    )
+    if state is None:
+        raise HTTPException(status_code=404, detail="Dataset version not found.")
+    return state
 
 
 @router.get(
@@ -28787,6 +28894,12 @@ def hrms_candidate_match_route(
             "human_review_required": True,
         },
     )
+    _record_automation_event(
+        request,
+        context,
+        event_type="hrms_exact_mass_matching_completed",
+        task_key="hrms_exact_mass_matching",
+    )
     return result
 
 
@@ -28840,6 +28953,12 @@ def hrms_candidate_match_evidence_route(
             "human_review_required": True,
         },
     )
+    _record_automation_event(
+        request,
+        context,
+        event_type="hrms_exact_mass_matching_completed",
+        task_key="hrms_exact_mass_matching",
+    )
     return result
 
 
@@ -28868,6 +28987,12 @@ def hrms_formula_search_route(
             "formula_count": result.formula_count,
             "human_review_required": True,
         },
+    )
+    _record_automation_event(
+        request,
+        context,
+        event_type="hrms_exact_mass_matching_completed",
+        task_key="hrms_exact_mass_matching",
     )
     return result
 
@@ -29016,6 +29141,12 @@ def msms_annotate_route(
             "human_review_required": True,
         },
     )
+    _record_automation_event(
+        request,
+        context,
+        event_type="msms_annotation_completed",
+        task_key="msms_annotation",
+    )
     return result
 
 
@@ -29074,6 +29205,12 @@ def msms_annotate_evidence_route(
             "human_review_required": True,
         },
     )
+    _record_automation_event(
+        request,
+        context,
+        event_type="msms_annotation_completed",
+        task_key="msms_annotation",
+    )
     return result
 
 
@@ -29105,6 +29242,12 @@ def msms_fragmentation_tree_route(
             "best_score": result.best_candidate.tree_score if result.best_candidate else None,
             "human_review_required": True,
         },
+    )
+    _record_automation_event(
+        request,
+        context,
+        event_type="fragmentation_tree_reasoning_completed",
+        task_key="fragmentation_tree_reasoning",
     )
     return result
 
@@ -29171,6 +29314,12 @@ def msms_fragmentation_tree_evidence_route(
             "compound_class": normalized_compound_class,
             "human_review_required": True,
         },
+    )
+    _record_automation_event(
+        request,
+        context,
+        event_type="fragmentation_tree_reasoning_completed",
+        task_key="fragmentation_tree_reasoning",
     )
     return result
 
@@ -29430,6 +29579,12 @@ def lcms_import_bridge_route(
             "human_review_required": True,
         },
     )
+    _record_automation_event(
+        request,
+        context,
+        event_type="lcms_import_bridge_completed",
+        task_key="lcms_import_bridge",
+    )
     return result
 
 
@@ -29491,6 +29646,12 @@ def lcms_import_bridge_evidence_route(
             "compound_class": normalized_compound_class,
             "human_review_required": True,
         },
+    )
+    _record_automation_event(
+        request,
+        context,
+        event_type="lcms_import_bridge_completed",
+        task_key="lcms_import_bridge",
     )
     return result
 
@@ -29555,6 +29716,12 @@ async def lcms_import_bridge_upload_route(
             "human_review_required": True,
         },
     )
+    _record_automation_event(
+        request,
+        context,
+        event_type="lcms_import_bridge_completed",
+        task_key="lcms_import_bridge",
+    )
     return result
 
 
@@ -29589,6 +29756,12 @@ def lcms_feature_detection_route(
             "compound_class": payload.compound_class,
             "human_review_required": True,
         },
+    )
+    _record_automation_event(
+        request,
+        context,
+        event_type="lcms_feature_detection_completed",
+        task_key="lcms_feature_detection",
     )
     return result
 
@@ -29661,6 +29834,12 @@ def lcms_feature_detection_evidence_route(
             "human_review_required": True,
         },
     )
+    _record_automation_event(
+        request,
+        context,
+        event_type="lcms_feature_detection_completed",
+        task_key="lcms_feature_detection",
+    )
     return result
 
 
@@ -29732,6 +29911,12 @@ async def lcms_feature_detection_upload_route(
             "human_review_required": True,
         },
     )
+    _record_automation_event(
+        request,
+        context,
+        event_type="lcms_feature_detection_completed",
+        task_key="lcms_feature_detection",
+    )
     return result
 
 
@@ -29763,6 +29948,12 @@ def lcms_feature_grouping_route(
             "label": result.label,
             "human_review_required": True,
         },
+    )
+    _record_automation_event(
+        request,
+        context,
+        event_type="lcms_feature_grouping_completed",
+        task_key="lcms_feature_grouping_blank_subtraction",
     )
     return result
 
@@ -29867,6 +30058,12 @@ def lcms_feature_grouping_evidence_route(
             "human_review_required": True,
         },
     )
+    _record_automation_event(
+        request,
+        context,
+        event_type="lcms_feature_grouping_completed",
+        task_key="lcms_feature_grouping_blank_subtraction",
+    )
     return result
 
 
@@ -29969,6 +30166,12 @@ async def lcms_feature_grouping_upload_route(
             "human_review_required": True,
         },
     )
+    _record_automation_event(
+        request,
+        context,
+        event_type="lcms_feature_grouping_completed",
+        task_key="lcms_feature_grouping_blank_subtraction",
+    )
     return result
 
 
@@ -29999,6 +30202,12 @@ def lcms_feature_family_consensus_route(
             "label": result.label,
             "human_review_required": True,
         },
+    )
+    _record_automation_event(
+        request,
+        context,
+        event_type="lcms_feature_consensus_completed",
+        task_key="lcms_feature_family_consensus",
     )
     return result
 
@@ -30113,6 +30322,12 @@ def lcms_feature_family_consensus_evidence_route(
             "human_review_required": True,
         },
     )
+    _record_automation_event(
+        request,
+        context,
+        event_type="lcms_feature_consensus_completed",
+        task_key="lcms_feature_family_consensus",
+    )
     return result
 
 
@@ -30209,6 +30424,12 @@ async def lcms_feature_family_consensus_upload_route(
             "compound_class": normalized_compound_class,
             "human_review_required": True,
         },
+    )
+    _record_automation_event(
+        request,
+        context,
+        event_type="lcms_feature_consensus_completed",
+        task_key="lcms_feature_family_consensus",
     )
     return result
 

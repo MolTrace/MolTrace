@@ -235,7 +235,13 @@ DEFAULT_AUTOMATION_TASKS: tuple[dict[str, Any], ...] = (
         "name": "Workflow run execution",
         "category": "workflow",
         "default_minutes_saved": 30.0,
-        "description": "Run a multi-step workflow template to a terminal state for review.",
+        # Scoped to the orchestration itself -- sequencing the steps, carrying state between
+        # them and driving the run to a terminal state. The work each step performs is
+        # credited by that step's own task, so the two compose instead of double-counting.
+        "description": (
+            "Orchestrate a multi-step workflow template to a terminal state, excluding the "
+            "work of the individual steps."
+        ),
     },
     {
         "task_key": "human_review_task_completion",
@@ -336,7 +342,7 @@ def record_usage_event(
 
 
 def record_automation_event(
-    session: Session,
+    session: Session | sessionmaker[Session],
     *,
     event_type: str,
     task_key: str,
@@ -360,26 +366,39 @@ def record_automation_event(
     which is what makes the resulting figure answerable when a customer asks where it came
     from. ``status`` must be ``"succeeded"`` for the row to reach the hours-saved figure;
     failures are still worth emitting with their real status, and correctly count nothing.
+
+    Pass an open ``Session`` whenever the work itself is being written, so the event commits
+    with it. A ``sessionmaker`` is for stateless routes that compute a result and persist
+    nothing: there is no transaction to join, and the event is then the only record that the
+    work happened.
     """
     payload_metadata: dict[str, Any] = dict(metadata or {})
     payload_metadata["task_key"] = task_key
-    record_usage_event(
-        session,
-        UsageEventCreate(
-            event_type=event_type,
-            status=status,
-            project_id=project_id,
-            sample_id=sample_id,
-            session_id=session_id,
-            workflow_run_id=workflow_run_id,
-            job_id=job_id,
-            report_id=report_id,
-            duration_seconds=duration_seconds,
-            event_source=event_source,
-            metadata_json=payload_metadata,
-        ),
-        actor=AnalyticsActor(user_id=user_id, email=_user_email(session, user_id)),
-    )
+
+    def _emit(open_session: Session) -> None:
+        record_usage_event(
+            open_session,
+            UsageEventCreate(
+                event_type=event_type,
+                status=status,
+                project_id=project_id,
+                sample_id=sample_id,
+                session_id=session_id,
+                workflow_run_id=workflow_run_id,
+                job_id=job_id,
+                report_id=report_id,
+                duration_seconds=duration_seconds,
+                event_source=event_source,
+                metadata_json=payload_metadata,
+            ),
+            actor=AnalyticsActor(user_id=user_id, email=_user_email(open_session, user_id)),
+        )
+
+    if isinstance(session, Session):
+        _emit(session)
+    else:
+        with session_scope(session) as owned_session:
+            _emit(owned_session)
 
 
 def _user_email(session: Session, user_id: int | None) -> str | None:

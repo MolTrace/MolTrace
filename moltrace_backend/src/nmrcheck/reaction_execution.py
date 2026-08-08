@@ -9,6 +9,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
 
 from . import reaction_bo, reaction_loop, reaction_safety
+from .analytics_store import record_automation_event
 from .database import session_scope
 from .models import (
     ReactionAnalyticalResult,
@@ -736,6 +737,20 @@ def confirm_outcome(
             entity_type="reaction_experiment",
             entity_id=experiment.id,
             metadata={"execution_item_id": item.id, "field_count": len(confirmed)},
+        )
+        # The loop closes here, and only here. Recommendation conversion and batch creation
+        # are steps toward this same cycle, so emitting on those too would bill one
+        # closed loop three times.
+        record_automation_event(
+            session,
+            event_type="reaction_outcome_confirmed",
+            task_key="reactioniq_closed_loop_execution",
+            user_id=actor.user_id,
+            metadata={
+                "reaction_project_id": experiment.reaction_project_id,
+                "experiment_id": experiment.id,
+                "execution_item_id": item.id,
+            },
         )
         return _experiment_to_record(experiment)
 

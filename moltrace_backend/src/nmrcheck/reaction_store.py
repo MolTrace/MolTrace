@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from . import org_membership
 from . import reaction_access
+from .analytics_store import record_automation_event
 from .database import session_scope
 from .models import (
     ReactionExperiment,
@@ -123,6 +124,16 @@ def create_project(
             entity_type="reaction_project",
             entity_id=row.id,
             metadata={"objective": row.objective, "status": row.status},
+        )
+        record_automation_event(
+            session,
+            event_type="reaction_project_created",
+            task_key="reactioniq_project_setup",
+            user_id=actor.user_id,
+            # Reaction project ids live in a different id space from the SpectraCheck project
+            # ids that scope=project filters on, so this one goes in metadata rather than
+            # into project_id, where it would collide with an unrelated project of that id.
+            metadata={"reaction_project_id": row.id, "objective": row.objective},
         )
         return _project_to_record(row)
 
@@ -455,6 +466,22 @@ def run_optimization(
             metadata={
                 "project_id": project_id,
                 "model_type": payload.model_type,
+                "recommendation_count": len(recommendations),
+            },
+        )
+        # "requires_review" still produced recommendations a chemist can act on, so it is a
+        # warning rather than a failure and keeps its minutes; only the status gate on
+        # analyses_completed distinguishes it from a clean run.
+        record_automation_event(
+            session,
+            event_type="reaction_optimization_run_completed",
+            task_key="reactioniq_optimization",
+            status="succeeded" if status == "succeeded" else "warning",
+            user_id=actor.user_id,
+            metadata={
+                "reaction_project_id": project_id,
+                "optimization_run_id": run.id,
+                "run_status": status,
                 "recommendation_count": len(recommendations),
             },
         )
