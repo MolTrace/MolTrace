@@ -17,6 +17,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import {
+  DialogDescription,
   Dialog,
   DialogContent,
   DialogFooter,
@@ -787,6 +788,13 @@ export function RegulatoryActionQueue({ dossierId, compact }: RegulatoryActionQu
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Assign owner</DialogTitle>
+            {/* Radix warns when a dialog has no description, and it is right to:
+                a screen reader announces the title and then nothing about what
+                the dialog is for. Surfaced by the console gate. */}
+            <DialogDescription>
+              Choose who is responsible for this action item. They keep it until it is
+              reassigned or resolved.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-2">
             <Label htmlFor="assign-to">Owner</Label>
@@ -814,6 +822,10 @@ export function RegulatoryActionQueue({ dossierId, compact }: RegulatoryActionQu
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>New regulatory action item</DialogTitle>
+            <DialogDescription>
+              Raise an item for someone to act on. It joins the queue and stays there until it
+              is resolved.
+            </DialogDescription>
           </DialogHeader>
           {createErr ? (
             <Alert variant="destructive">

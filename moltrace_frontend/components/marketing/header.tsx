@@ -24,7 +24,7 @@ import {
   type LucideIcon,
 } from "lucide-react"
 import { useEffect, useState } from "react"
-import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet"
+import { Sheet, SheetContent, SheetDescription, SheetTrigger, SheetTitle } from "@/components/ui/sheet"
 
 const navItems = [
   { label: "Platform", href: "/platform#platform" },
@@ -198,6 +198,13 @@ export function Header() {
                 className="flex w-full max-w-[360px] flex-col gap-0 border-l border-l-[color:var(--mt-teal)]/15 bg-gradient-to-b from-background via-background to-background/95 p-0 backdrop-blur supports-[backdrop-filter]:bg-background/85"
               >
                 <SheetTitle className="sr-only">Navigation Menu</SheetTitle>
+                {/* Radix warns when a dialog/sheet has no description, and it is
+                    right to: a screen reader announces the title and then nothing
+                    about what the panel contains. sr-only because sighted users
+                    already see the sections. Surfaced by the console gate. */}
+                <SheetDescription className="sr-only">
+                  Platform, solutions, company and resources links, and sign-in options.
+                </SheetDescription>
 
                 {/* Brand block */}
                 <div

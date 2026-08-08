@@ -1,3 +1,4 @@
+import { afterEach, beforeEach } from "vitest"
 import "@testing-library/jest-dom/vitest"
 
 class ResizeObserverStub {
@@ -87,3 +88,82 @@ if (typeof window !== "undefined" && typeof window.localStorage?.getItem !== "fu
     value: createMemoryStorage(),
   })
 }
+
+// ---------------------------------------------------------------- console gate
+
+/**
+ * Fail a test that logs an unexpected console.error or console.warn.
+ *
+ * Without this a component can log an error on every render and the suite stays
+ * green, so the noise accumulates until the console is useless for finding the
+ * real failure. The gate is cheap and it protects everything built after it.
+ *
+ * Opt a test out with `allowConsole()` — no arguments allows both levels, or
+ * name the ones you expect. That is deliberately per-test and must be called
+ * INSIDE the test: a suite that asserts on an error path has a real reason to
+ * log, and should say so at the point where it does, not once at the top of a
+ * file where it also covers thirty tests that have no such reason.
+ */
+type ConsoleLevel = "error" | "warn"
+
+/**
+ * MIGRATION CARVE-OUT, to be deleted.
+ *
+ * Turning the gate on surfaced 37 violations. Exactly one was a product defect —
+ * two dialogs in the regulatory action queue with no accessible description,
+ * fixed in the same change. The other 36 are React's "not wrapped in act(...)"
+ * warning across 12 test files, which says the TEST is racing the component, not
+ * that the component is broken.
+ *
+ * Those 36 are ignored here rather than silenced with `allowConsole()` scattered
+ * through a dozen files, for one reason: an opt-out inside a test disables the
+ * gate for that whole test, so a real error logged beside the act warning would
+ * go with it. One narrow pattern match keeps every other message failing
+ * everywhere, and keeps the backlog countable — grep this constant to find it.
+ *
+ * Fixing them means awaiting the state update the test triggers. Delete this
+ * once that is done; nothing else should ever be added to it.
+ */
+const MIGRATION_IGNORED = [/not wrapped in act\(/]
+
+const consoleGate = {
+  captured: [] as { level: ConsoleLevel; text: string }[],
+  allowed: new Set<ConsoleLevel>(),
+  original: {} as Partial<Record<ConsoleLevel, (...args: unknown[]) => void>>,
+}
+
+export function allowConsole(...levels: ConsoleLevel[]): void {
+  const chosen = levels.length > 0 ? levels : (["error", "warn"] as ConsoleLevel[])
+  for (const level of chosen) consoleGate.allowed.add(level)
+}
+
+beforeEach(() => {
+  consoleGate.captured.length = 0
+  consoleGate.allowed.clear()
+  for (const level of ["error", "warn"] as ConsoleLevel[]) {
+    consoleGate.original[level] = console[level] as (...args: unknown[]) => void
+    console[level] = (...args: unknown[]) => {
+      consoleGate.captured.push({ level, text: args.map((a) => String(a)).join(" ") })
+      // Still print it. Swallowing the message would make a failing gate harder
+      // to diagnose than the noise it exists to prevent.
+      consoleGate.original[level]?.(...args)
+    }
+  }
+})
+
+afterEach(() => {
+  for (const level of ["error", "warn"] as ConsoleLevel[]) {
+    const original = consoleGate.original[level]
+    if (original) console[level] = original
+  }
+  const unexpected = consoleGate.captured.filter(
+    (c) => !consoleGate.allowed.has(c.level) && !MIGRATION_IGNORED.some((re) => re.test(c.text)),
+  )
+  if (unexpected.length === 0) return
+  const lines = unexpected.slice(0, 5).map((c) => `  ${c.level}: ${c.text.slice(0, 200)}`)
+  const more = unexpected.length > 5 ? `\n  …and ${unexpected.length - 5} more` : ""
+  throw new Error(
+    `Unexpected console output (${unexpected.length}).\n${lines.join("\n")}${more}\n` +
+      `If this test asserts on an error path, call allowConsole("error") inside it.`,
+  )
+})
