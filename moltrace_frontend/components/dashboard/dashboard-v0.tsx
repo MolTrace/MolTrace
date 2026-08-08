@@ -221,153 +221,45 @@ type CustomerDeploymentSummary = {
   nextOnboardingTask: string
 }
 
-const DEMO_STATS = {
-  active: 23,
-  activeSub: (
-    <p className="text-xs text-muted-foreground">
-      <span style={{ color: "var(--mt-green)" }}>+4</span> from yesterday
-    </p>
-  ),
-  review: 7,
-  reviewSub: <p className="text-xs text-muted-foreground">2 with contradictions</p>,
-  reports: 12,
-  reportsSub: <p className="text-xs text-muted-foreground">Ready for export</p>,
-  hours: 156,
-  hoursSub: (
-    <p className="text-xs text-muted-foreground">
-      <span style={{ color: "var(--mt-green)" }}>+12%</span> this week
-    </p>
-  ),
-  modelPct: 94.2,
+/* No demo statistics.
+ *
+ * This block used to hold DEMO_STATS (23 active, 7 in review, 12 reports, 156
+ * hours, 94.2 % model confidence) and DEMO_RECENT (five activity rows reviewed
+ * by "Dr. Chen", "Dr. Patel" and "Dr. Kim" against sample "API-Q4-BATCH-12").
+ * They rendered whenever live data was unavailable -- which is exactly the
+ * state a new deployment is in at first login, and the moment a regulated buyer
+ * decides whether the numbers on this screen can be trusted. Nothing on the
+ * card distinguished them from measurements.
+ *
+ * The replacement is not a blank screen. Hiding a tile is its own dishonesty:
+ * a reader cannot tell a metric that is genuinely zero from one that failed to
+ * load. The card stays, the number becomes UNAVAILABLE_VALUE, and the subtext
+ * says why.
+ */
+
+/* Stable empty collections, and they are load-bearing.
+ *
+ * `setState` bails out of a re-render when the new value is reference-equal to
+ * the old one. The demo constants these replace were module-level, so setting
+ * them repeatedly was a no-op. A fresh `[]` in their place has a new identity
+ * every time, so each call is a real state change.
+ *
+ * That matters because the QC effect depends on `overview.sessions`, which is a
+ * new array on every render from the overview context. The effect therefore
+ * re-runs each render, and with a fresh `[]` it would set new state each time
+ * and re-render forever. The fabricated constants were masking that: they held
+ * the loop shut by accident, and removing them exposed it.
+ */
+const NO_ACTIVITY_ROWS: DashboardActivityRow[] = []
+const NO_JOB_ROWS: DashboardJobRow[] = []
+const NO_QC_ROWS: DashboardRecentFailedQcRow[] = []
+
+/** Shown in place of a number that could not be loaded. Not zero -- unknown. */
+const UNAVAILABLE_VALUE = "—"
+
+function UnavailableSub({ what }: { what: string }) {
+  return <p className="text-xs text-muted-foreground">Live {what} isn't available right now.</p>
 }
-
-const DEMO_RECENT: DashboardActivityRow[] = [
-  {
-    id: "NMR-2024-0847",
-    sampleId: "API-Q4-BATCH-12",
-    module: "Spectroscopy",
-    status: "review",
-    confidence: 87,
-    reviewer: "Dr. Chen",
-    reportStatus: "pending",
-  },
-  {
-    id: "MSMS-2024-1293",
-    sampleId: "MET-STUDY-089",
-    module: "Spectroscopy",
-    status: "approved",
-    confidence: 94,
-    reviewer: "Dr. Patel",
-    reportStatus: "ready",
-  },
-  {
-    id: "REG-2024-0445",
-    sampleId: "API-Q4-BATCH-12",
-    module: "Regulatory",
-    status: "approved",
-    confidence: 96,
-    reviewer: "Dr. Kim",
-    reportStatus: "ready",
-  },
-  {
-    id: "RXN-OPT-2024-156",
-    sampleId: "PROC-DEV-022",
-    module: "Reactions",
-    status: "running",
-    confidence: 78,
-    reviewer: "—",
-    reportStatus: "pending",
-  },
-  {
-    id: "NMR-2024-0842",
-    sampleId: "IMP-PROF-017",
-    module: "Spectroscopy",
-    status: "contradiction",
-    confidence: 72,
-    reviewer: "Dr. Chen",
-    reportStatus: "pending",
-  },
-]
-
-/** Illustrative QC alert values when session list or QC endpoints are unavailable (v0 dashboard preview). */
-const DEMO_QC_ALERTS = {
-  warnings: 4,
-  failures: 1,
-  sessionsReview: 2,
-  recentFailed: [
-    {
-      session_id: "demo-sc-01",
-      session_label: "API-Q4-BATCH-12",
-      title: "QC threshold exceeded",
-      message: "Illustrative failed QC item when live data is unavailable.",
-    },
-  ] satisfies DashboardRecentFailedQcRow[],
-}
-
-/** Illustrative workflow run counts when GET /workflow-runs is unavailable (v0 dashboard preview). */
-const DEMO_WORKFLOW_SUMMARY = {
-  active: 2,
-  reviewRequired: 1,
-  failed: 0,
-  completed: 9,
-}
-
-/** Illustrative collaboration counts when session list or collaboration endpoints are unavailable. */
-const DEMO_COLLAB_ROLLUP = {
-  openReviewTasks: 3,
-  commentsUnresolved: 4,
-  reportsPendingApproval: 2,
-  releasedReports: 6,
-  assignedToMe: 1,
-}
-
-/** Illustrative method health when GET /model-health or drift-alerts is unavailable. */
-const DEMO_METHOD_HEALTH = {
-  activeMethods: 12,
-  experimentalMethods: 3,
-  deprecatedMethods: 1,
-  openDriftAlerts: 2,
-  latestValidationRunStatus: "succeeded",
-}
-
-/** Illustrative operations metrics when system / jobs / security / drift endpoints are all unavailable. */
-const DEMO_OPERATIONS = {
-  systemHealthStatus: "healthy",
-  activeJobs: 3,
-  failedJobs: 0,
-  securityWarnings: 1,
-  openDriftAlerts: 2,
-}
-
-const DEMO_RECENT_JOBS: DashboardJobRow[] = [
-  {
-    id: "job-demo-1",
-    jobType: "nmr_processed_analyze",
-    status: "running",
-    progressPercent: 62,
-    sessionLabel: "sc-sess-01",
-    sampleLabel: "BATCH-12-A",
-    updatedAt: null,
-  },
-  {
-    id: "job-demo-2",
-    jobType: "lcms_import",
-    status: "queued",
-    progressPercent: 0,
-    sessionLabel: "sc-sess-02",
-    sampleLabel: "MET-089",
-    updatedAt: null,
-  },
-  {
-    id: "job-demo-3",
-    jobType: "nmr_raw_fid_process",
-    status: "succeeded",
-    progressPercent: 100,
-    sessionLabel: "sc-sess-01",
-    sampleLabel: "PROC-022",
-    updatedAt: null,
-  },
-]
 
 export function DashboardV0() {
   const overview = useOverviewData()
@@ -395,21 +287,21 @@ export function DashboardV0() {
     overview.recentActivityMerged != null && overview.recentActivityMerged.length > 0
       ? overview.recentActivityMerged
       : overview.sessionsDataAvailable
-        ? overview.recentActivity ?? []
-        : DEMO_RECENT
-  const jobRows = overview.jobsDataAvailable ? overview.recentJobs ?? [] : DEMO_RECENT_JOBS
+        ? overview.recentActivity ?? NO_ACTIVITY_ROWS
+        : NO_ACTIVITY_ROWS
+  const jobRows = overview.jobsDataAvailable ? overview.recentJobs ?? NO_JOB_ROWS : NO_JOB_ROWS
 
   const wfSummaryDisplay =
     overview.workflowRunsDataAvailable && overview.workflowStatusSummary
       ? overview.workflowStatusSummary
-      : DEMO_WORKFLOW_SUMMARY
+      : { active: null, reviewRequired: null, failed: null, completed: null }
 
   const [qcLoading, setQcLoading] = useState(false)
   const [qcBackendAvailable, setQcBackendAvailable] = useState(false)
-  const [qcWarnings, setQcWarnings] = useState(DEMO_QC_ALERTS.warnings)
-  const [qcFailures, setQcFailures] = useState(DEMO_QC_ALERTS.failures)
-  const [qcSessionsReview, setQcSessionsReview] = useState(DEMO_QC_ALERTS.sessionsReview)
-  const [qcRecentFailed, setQcRecentFailed] = useState<DashboardRecentFailedQcRow[]>(DEMO_QC_ALERTS.recentFailed)
+  const [qcWarnings, setQcWarnings] = useState<number | null>(null)
+  const [qcFailures, setQcFailures] = useState<number | null>(null)
+  const [qcSessionsReview, setQcSessionsReview] = useState<number | null>(null)
+  const [qcRecentFailed, setQcRecentFailed] = useState<DashboardRecentFailedQcRow[]>(NO_QC_ROWS)
 
   const [viewerEmail, setViewerEmail] = useState<string | null>(null)
   const [collabLoading, setCollabLoading] = useState(false)
@@ -791,10 +683,10 @@ export function DashboardV0() {
     if (!overview.sessionsDataAvailable) {
       setQcLoading(false)
       setQcBackendAvailable(false)
-      setQcWarnings(DEMO_QC_ALERTS.warnings)
-      setQcFailures(DEMO_QC_ALERTS.failures)
-      setQcSessionsReview(DEMO_QC_ALERTS.sessionsReview)
-      setQcRecentFailed(DEMO_QC_ALERTS.recentFailed)
+      setQcWarnings(null)
+      setQcFailures(null)
+      setQcSessionsReview(null)
+      setQcRecentFailed(NO_QC_ROWS)
       return
     }
     if (overview.sessions.length === 0) {
@@ -803,7 +695,7 @@ export function DashboardV0() {
       setQcWarnings(0)
       setQcFailures(0)
       setQcSessionsReview(0)
-      setQcRecentFailed([])
+      setQcRecentFailed(NO_QC_ROWS)
       return
     }
     let cancelled = false
@@ -818,10 +710,10 @@ export function DashboardV0() {
         setQcSessionsReview(res.aggregate.sessions_requiring_qc_review)
         setQcRecentFailed(res.aggregate.recent_failed_qc_items)
       } else {
-        setQcWarnings(DEMO_QC_ALERTS.warnings)
-        setQcFailures(DEMO_QC_ALERTS.failures)
-        setQcSessionsReview(DEMO_QC_ALERTS.sessionsReview)
-        setQcRecentFailed(DEMO_QC_ALERTS.recentFailed)
+        setQcWarnings(null)
+        setQcFailures(null)
+        setQcSessionsReview(null)
+        setQcRecentFailed(NO_QC_ROWS)
       }
     })
     return () => {
@@ -985,7 +877,7 @@ export function DashboardV0() {
 
   const activeSub =
     !live || !metrics
-      ? DEMO_STATS.activeSub
+      ? <UnavailableSub what="analysis data" />
       : overview.jobsDataAvailable
         ? (
             <>
@@ -1009,13 +901,40 @@ export function DashboardV0() {
           : "None pending"}
       </p>
     ) : (
-      DEMO_STATS.reviewSub
+      <UnavailableSub what="review data" />
     )
+
+  /* The mean confidence of the sessions actually on screen, or null.
+   *
+   * `confidenceFromSession` yields 0 for a session that reports no confidence
+   * at all, so averaging the raw column would silently drag the mean toward
+   * zero in proportion to how much data is MISSING -- a number that responds to
+   * coverage while looking like it responds to quality. Sessions without a
+   * score are excluded and the denominator is reported instead. */
+  /* The mean confidence of the sessions actually on screen, or null.
+   *
+   * `confidenceFromSession` yields 0 for a session that reports no confidence at
+   * all, so averaging the raw column would drag the mean toward zero in
+   * proportion to how much data is MISSING -- a number that responds to coverage
+   * while looking like it responds to quality. Sessions without a score are
+   * excluded and the denominator is reported instead. */
+  const meanConfidence = useMemo(() => {
+    const scored = recentRows.filter(
+      (row) => typeof row.confidence === "number" && row.confidence > 0,
+    )
+    if (scored.length === 0) return null
+    const total = scored.reduce((acc, row) => acc + row.confidence, 0)
+    return {
+      value: Math.round(total / scored.length),
+      count: scored.length,
+      total: recentRows.length,
+    }
+  }, [recentRows])
 
   const reportsSub = live ? (
     <p className="text-xs text-muted-foreground">Approved or saved reports</p>
   ) : (
-    DEMO_STATS.reportsSub
+    <UnavailableSub what="report data" />
   )
 
   const collabUseDemoRest =
@@ -1023,19 +942,30 @@ export function DashboardV0() {
     collabLoading ||
     (overview.sessions.length > 0 && collabRollup != null && !collabRollup.available)
 
+  const NO_COLLAB_ROLLUP = {
+    openReviewTasks: null,
+    commentsUnresolved: null,
+    reportsPendingApproval: null,
+    releasedReports: null,
+    assignedToMe: null,
+  }
   const collabRestDisplay = collabUseDemoRest
-    ? DEMO_COLLAB_ROLLUP
-    : collabRollup ?? DEMO_COLLAB_ROLLUP
+    ? NO_COLLAB_ROLLUP
+    : collabRollup ?? NO_COLLAB_ROLLUP
 
-  const reviewRequiredCount = live && metrics ? metrics.reviewRequired : DEMO_STATS.review
+  // null, not 0: "no sessions need review" and "we could not find out" are
+  // different answers, and only one of them should colour the card.
+  const reviewRequiredCount = live && metrics ? metrics.reviewRequired : null
   const reviewRequiredForCollabCard = reviewRequiredCount
 
-  const methodHealthUseDemo =
+  /* No demo branch. The shape below already yields null for every field when
+     the rollup is missing, which is the truthful answer; the demo object simply
+     sat on top of it claiming 12 active methods and a validation run that had
+     "succeeded". */
+  const methodHealthUnavailable =
     !methodHealthLoading && (methodHealthRollup == null || !methodHealthRollup.available)
 
-  const methodHealthDisplay = methodHealthUseDemo
-    ? DEMO_METHOD_HEALTH
-    : {
+  const methodHealthDisplay = {
         activeMethods: methodHealthRollup?.activeMethods ?? null,
         experimentalMethods: methodHealthRollup?.experimentalMethods ?? null,
         deprecatedMethods: methodHealthRollup?.deprecatedMethods ?? null,
@@ -1043,17 +973,13 @@ export function DashboardV0() {
         latestValidationRunStatus: methodHealthRollup?.latestValidationRunStatus ?? null,
       }
 
-  const opsUseDemo = !opsLoading && (opsRollup == null || !opsRollup.available)
+  /* Likewise, and this one mattered most: the demo object reported
+     systemHealthStatus "healthy" precisely when the health endpoint could not be
+     reached. A fabricated count is wrong; a fabricated green light is wrong in
+     the reassuring direction, on the signal a reviewer would act on. */
+  const opsUnavailable = !opsLoading && (opsRollup == null || !opsRollup.available)
 
-  const opsDisplay = opsUseDemo
-    ? {
-        systemHealthStatus: DEMO_OPERATIONS.systemHealthStatus,
-        activeJobs: DEMO_OPERATIONS.activeJobs,
-        failedJobs: DEMO_OPERATIONS.failedJobs,
-        securityWarnings: DEMO_OPERATIONS.securityWarnings,
-        openDriftAlerts: DEMO_OPERATIONS.openDriftAlerts,
-      }
-    : {
+  const opsDisplay = {
         systemHealthStatus: opsRollup?.systemHealthStatus ?? null,
         activeJobs: opsRollup?.activeJobs ?? null,
         failedJobs: opsRollup?.failedJobs ?? null,
@@ -1150,7 +1076,7 @@ export function DashboardV0() {
     ? "…"
     : roiLive
       ? roiSnapshot.total_hours_saved.toLocaleString(undefined, { maximumFractionDigits: 1, minimumFractionDigits: 0 })
-      : String(DEMO_STATS.hours)
+      : UNAVAILABLE_VALUE
 
   function fmtRoiInt(n: number | null | undefined): string {
     if (roiLoading) return "…"
@@ -1218,7 +1144,7 @@ export function DashboardV0() {
       })
     }
 
-    if (qcBackendAvailable && qcFailures > 0) {
+    if (qcBackendAvailable && qcFailures != null && qcFailures > 0) {
       items.push({
         severity: "warning",
         text: `${qcFailures} QC ${qcFailures === 1 ? "failure" : "failures"} across recent sessions`,
@@ -1253,9 +1179,9 @@ export function DashboardV0() {
   /* Header pills, so a section that a reader has collapsed still reports what is
      happening inside it — on a phone that is often the only thing on screen. */
   const overviewSignals = compactSignals([
-    countSignal(live && metrics ? metrics.activeAnalyses : DEMO_STATS.active, "active"),
+    countSignal(live && metrics ? metrics.activeAnalyses : null, "active"),
     countSignal(reviewRequiredCount, "to review", "warning"),
-    countSignal(live && metrics ? metrics.reportsReady : DEMO_STATS.reports, "reports ready", "info"),
+    countSignal(live && metrics ? metrics.reportsReady : null, "reports ready", "info"),
   ])
 
   const scienceSignals = compactSignals([
@@ -1349,7 +1275,7 @@ export function DashboardV0() {
           icon={Activity}
           href="/spectracheck"
           accent="teal"
-          value={live && metrics ? metrics.activeAnalyses : DEMO_STATS.active}
+          value={live && metrics ? metrics.activeAnalyses : UNAVAILABLE_VALUE}
           sub={
             <>
               {activeSub}
@@ -1367,8 +1293,8 @@ export function DashboardV0() {
           icon={AlertCircle}
           href="/review"
           accent="cyan"
-          severity={reviewRequiredCount > 0 ? "warning" : "neutral"}
-          value={reviewRequiredCount}
+          severity={reviewRequiredCount != null && reviewRequiredCount > 0 ? "warning" : "neutral"}
+          value={reviewRequiredCount ?? UNAVAILABLE_VALUE}
           sub={
             <>
               {reviewSub}
@@ -1386,7 +1312,7 @@ export function DashboardV0() {
           icon={FileText}
           href="/reports"
           accent="cyan"
-          value={live && metrics ? metrics.reportsReady : DEMO_STATS.reports}
+          value={live && metrics ? metrics.reportsReady : UNAVAILABLE_VALUE}
           sub={reportsSub}
         />
 
@@ -1408,21 +1334,39 @@ export function DashboardV0() {
                 Estimated from your per-task time-saved assumptions, not measured.
               </p>
             ) : (
-              <>
-                {DEMO_STATS.hoursSub}
-                <p className="mt-1 text-xs text-muted-foreground">Live ROI data couldn't load — showing an example total.</p>
-              </>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Live ROI data couldn&apos;t load, so there is no total to show.
+              </p>
             )
           }
         />
 
+        {/* Was "Model Confidence", hard-coded to 94.2 % with no live branch at
+            all -- not a fallback, a permanent fiction, and an overclaim twice
+            over: no model-confidence metric exists anywhere in the product, and
+            a mean of per-session scores would not be model accuracy if it did.
+            Now the mean of the confidence the sessions in view actually report,
+            named for what it is and carrying its denominator, because a mean
+            over an unstated subset is the defect this codebase keeps finding. */}
         <KpiCard
-          title="Model Confidence"
+          title="Mean Session Confidence"
           icon={TrendingUp}
           href="/ml"
           accent="teal"
-          value={`${DEMO_STATS.modelPct}%`}
-          sub={<Progress value={DEMO_STATS.modelPct} className="mt-2 h-1.5" />}
+          value={meanConfidence == null ? UNAVAILABLE_VALUE : `${meanConfidence.value}%`}
+          sub={
+            meanConfidence == null ? (
+              <UnavailableSub what="session confidence" />
+            ) : (
+              <>
+                <Progress value={meanConfidence.value} className="mt-2 h-1.5" />
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Across {meanConfidence.count} of {meanConfidence.total} recent sessions that
+                  report one
+                </p>
+              </>
+            )
+          }
         />
       </div>
 
@@ -2086,10 +2030,9 @@ export function DashboardV0() {
         {opsLoading ? (
           <p className="text-xs text-muted-foreground">Loading operations summary…</p>
         ) : null}
-        {!opsLoading && opsUseDemo ? (
+        {!opsLoading && opsUnavailable ? (
           <p className="text-xs text-muted-foreground">
-            Live operations data couldn't load — showing example values. QC failures are the
-            exception: that tile matches the Quality Alerts card.
+            Live operations data isn&apos;t available right now, so these values are not shown.
           </p>
         ) : null}
         {!opsLoading && opsRollup?.available && opsRollup.partial ? (
@@ -2247,9 +2190,9 @@ export function DashboardV0() {
           {methodHealthLoading ? (
             <p className="text-xs text-muted-foreground">Loading method health…</p>
           ) : null}
-          {!methodHealthLoading && methodHealthUseDemo ? (
+          {!methodHealthLoading && methodHealthUnavailable ? (
             <p className="text-xs text-muted-foreground">
-              Method health data couldn't load — showing example values.
+              Method health data isn&apos;t available right now, so these values are not shown.
             </p>
           ) : null}
           {!methodHealthLoading &&
