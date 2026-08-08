@@ -182,6 +182,7 @@ from .database import (
     list_sample_reports,
     mark_user_verified,
     queue_email,
+    reap_stale_jobs,
     revoke_all_user_tokens,
     revoke_token,
     save_analysis,
@@ -346,11 +347,9 @@ from .models import (
     DataIntegrityAssessment,
     DataIntegrityAssessmentCreate,
     DatasetVersion,
-    DatasetVersionCreate,
     DatasetVersionApprovalCreate,
-    KnowledgeDeploymentCandidate,
-    KnowledgeDeploymentCandidateCreate,
     DatasetVersionApprovalState,
+    DatasetVersionCreate,
     DatasetVersionUpdate,
     DebugBundle,
     DebugBundleCreate,
@@ -458,6 +457,8 @@ from .models import (
     JurisdictionalRequirementMapCreate,
     KineticFitOut,
     KineticRefusalOut,
+    KnowledgeDeploymentCandidate,
+    KnowledgeDeploymentCandidateCreate,
     KnowledgeExtractionRun,
     KnowledgeExtractionRunCreate,
     KnowledgeGraphLink,
@@ -27511,6 +27512,13 @@ def jobs(
     limit: int = Query(default=20, ge=1, le=200),
     context: AccessContext = Depends(require_access_context),
 ) -> list[JobRecord | AnalysisJobRecord]:
+    # Reap before listing. A reviewer must never be shown a job that is
+    # secretly dead: on this deployment the runner is an in-process background
+    # task on a service that scales to zero, so "processing" is not evidence
+    # that anything is running. A cron would need an always-on process this
+    # deployment deliberately does not have; doing it on the read costs one
+    # bounded UPDATE and needs no infrastructure.
+    reap_stale_jobs(_state(request).session_factory)
     user_id = None if context.system_api_key else context.user_id
     legacy_jobs = list_jobs(_state(request).session_factory, limit=limit, user_id=user_id)
     analysis_jobs = orch_store.list_analysis_jobs(
@@ -27529,6 +27537,7 @@ def jobs(
 def job_detail(
     job_id: int, request: Request, context: AccessContext = Depends(require_access_context)
 ) -> JobRecord | AnalysisJobRecord:
+    reap_stale_jobs(_state(request).session_factory)
     user_id = None if context.system_api_key else context.user_id
     record = get_job_by_id(_state(request).session_factory, job_id=job_id, user_id=user_id)
     if record is not None:
