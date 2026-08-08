@@ -120,7 +120,7 @@ SCIM bearer).
 ## R7 — External vulnerability report · SEV varies
 
 **Trigger:** a report via the [VDP](vulnerability_disclosure_policy.md) (GitHub advisory /
-security@moltrace.co / security.txt).
+moltrace.co@gmail.com / security.txt).
 
 1. **Triage** per the VDP severity rubric; if it evidences an *active* compromise, branch to
    the matching runbook above and treat as an incident, not just a finding.
