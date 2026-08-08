@@ -24,14 +24,19 @@ import { cn } from "@/lib/utils"
  *  - Privacy consent is required (GDPR / pharma-tenant expectation).
  */
 
+// One deliverable mailbox rather than seven that bounce — see the note in
+// contact-page.tsx. The reason is still sent with the message, so routing can
+// be restored per-alias once mail is configured on the domain.
+const SHARED_INBOX = "moltrace.co@gmail.com"
+
 const REASONS = [
-  { value: "demo", label: "Request a demo", inbox: "sales@moltrace.co" },
-  { value: "sales", label: "Sales question", inbox: "sales@moltrace.co" },
-  { value: "support", label: "Customer support", inbox: "support@moltrace.co" },
-  { value: "partnership", label: "Partnership / Integration", inbox: "partnerships@moltrace.co" },
-  { value: "press", label: "Press / Analyst inquiry", inbox: "press@moltrace.co" },
-  { value: "security", label: "Security / Vulnerability report", inbox: "security@moltrace.co" },
-  { value: "other", label: "Other", inbox: "hello@moltrace.co" },
+  { value: "demo", label: "Request a demo", inbox: SHARED_INBOX },
+  { value: "sales", label: "Sales question", inbox: SHARED_INBOX },
+  { value: "support", label: "Customer support", inbox: SHARED_INBOX },
+  { value: "partnership", label: "Partnership / Integration", inbox: SHARED_INBOX },
+  { value: "press", label: "Press / Analyst inquiry", inbox: SHARED_INBOX },
+  { value: "security", label: "Security / Vulnerability report", inbox: SHARED_INBOX },
+  { value: "other", label: "Other", inbox: SHARED_INBOX },
 ] as const
 type ReasonValue = (typeof REASONS)[number]["value"]
 
@@ -134,10 +139,10 @@ export function ContactForm() {
           Your mail client should have opened with everything prefilled. If it didn't, you can write
           us directly at{" "}
           <a
-            href={`mailto:${REASONS.find((r) => r.value === state.reason)?.inbox ?? "hello@moltrace.co"}`}
+            href={`mailto:${REASONS.find((r) => r.value === state.reason)?.inbox ?? SHARED_INBOX}`}
             className="font-medium text-foreground underline-offset-4 hover:underline"
           >
-            {REASONS.find((r) => r.value === state.reason)?.inbox ?? "hello@moltrace.co"}
+            {REASONS.find((r) => r.value === state.reason)?.inbox ?? SHARED_INBOX}
           </a>
           .
         </p>
