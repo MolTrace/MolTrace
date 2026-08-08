@@ -4451,6 +4451,26 @@ class KnowledgeSourceRevision(BaseModel):
     human_review_required: bool = True
 
 
+class RecordLocator(BaseModel):
+    """Where in a source a fact actually came from -- page, section, paragraph, quote.
+
+    Resolved from the citations a record was extracted with rather than copied onto the
+    record, so there is one locator shape in the product and no second copy to drift.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    citation_id: int
+    citation_label: str
+    source_id: int
+    source_revision_id: int | None = None
+    source_file_id: int | None = None
+    page_number: int | None = None
+    section_title: str | None = None
+    paragraph_number: int | None = None
+    quote_excerpt: str | None = None
+
+
 class ExtractedCitation(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -4478,6 +4498,7 @@ class ExtractedReactionRecord(BaseModel):
     source_id: int
     source_revision_id: int | None = None
     citation_ids_json: list[int] = Field(default_factory=list)
+    locators: list[RecordLocator] = Field(default_factory=list)
     reaction_name: str | None = None
     reaction_type: str | None = None
     substrate_summary: str | None = None
@@ -4517,6 +4538,7 @@ class ExtractedAnalyticalRecord(BaseModel):
     source_id: int
     source_revision_id: int | None = None
     citation_ids_json: list[int] = Field(default_factory=list)
+    locators: list[RecordLocator] = Field(default_factory=list)
     compound_name: str | None = None
     structure_input: str | None = None
     structure_format: str | None = None
@@ -4547,6 +4569,7 @@ class ExtractedRegulatoryRecord(BaseModel):
     source_id: int
     source_revision_id: int | None = None
     citation_ids_json: list[int] = Field(default_factory=list)
+    locators: list[RecordLocator] = Field(default_factory=list)
     jurisdiction_id: int | None = None
     topic: KnowledgeRegulatoryTopic
     requirement_text: str | None = None
@@ -4831,6 +4854,89 @@ class DatasetVersionUpdate(BaseModel):
     leakage_warnings_json: list[str] | None = None
     status: DatasetVersionStatus | None = None
     metadata_json: dict[str, Any] | None = None
+
+
+KnowledgeDeploymentStatus = Literal[
+    "draft", "gate_passed", "gate_failed", "canary", "promoted"
+]
+
+
+class KnowledgeDeploymentCandidateCreate(BaseModel):
+    """Propose a trained artifact, built from an approved dataset version, for deployment."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    dataset_version_id: int = Field(ge=1)
+    model_artifact_id: int | None = Field(default=None, ge=1)
+    model_version: str = Field(default="", max_length=120)
+    metrics_json: dict[str, float] = Field(default_factory=dict)
+    incumbent_metrics_json: dict[str, float] = Field(default_factory=dict)
+    metric_directions_json: dict[str, str] = Field(default_factory=dict)
+    blocking_metric_name: str | None = Field(default=None, max_length=120)
+    blocking_metric_value: float | None = None
+    incumbent_blocking_metric_value: float | None = None
+    metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+class KnowledgeDeploymentCandidate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: int
+    dataset_version_id: int
+    model_artifact_id: int | None = None
+    model_version: str = ""
+    metrics_json: dict[str, float] = Field(default_factory=dict)
+    incumbent_metrics_json: dict[str, float] = Field(default_factory=dict)
+    metric_directions_json: dict[str, str] = Field(default_factory=dict)
+    blocking_metric_name: str | None = None
+    blocking_metric_value: float | None = None
+    incumbent_blocking_metric_value: float | None = None
+    status: KnowledgeDeploymentStatus = "draft"
+    gate_verdict_json: dict[str, Any] = Field(default_factory=dict)
+    canary_started_at: datetime | None = None
+    promoted_at: datetime | None = None
+    created_by: str | None = None
+    created_at: datetime
+    warnings: list[str] = Field(default_factory=list)
+    notes: list[str] = Field(default_factory=list)
+    human_review_required: bool = True
+
+
+class DatasetVersionApprovalCreate(BaseModel):
+    """A request to approve. It carries no approver identity on purpose.
+
+    Who approved is taken from the authenticated principal; accepting it from the caller
+    would let one person nominate another as the second approver.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    comment: str | None = Field(default=None, max_length=1_000)
+
+
+class DatasetVersionApproval(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: int
+    dataset_version_id: int
+    approver_user_id: int | None = None
+    approver_email: str | None = None
+    comment: str | None = None
+    created_at: datetime
+
+
+class DatasetVersionApprovalState(BaseModel):
+    """Where a dataset version stands against the two-person rule."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    dataset_version_id: int
+    status: str
+    approvals: list[DatasetVersionApproval] = Field(default_factory=list)
+    distinct_approvers: int = 0
+    approvals_required: int = 2
+    promoted: bool = False
+    human_review_required: bool = True
 
 
 class DatasetVersion(BaseModel):

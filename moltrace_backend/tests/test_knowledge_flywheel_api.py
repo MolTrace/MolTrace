@@ -494,3 +494,255 @@ def test_resaving_a_source_unchanged_does_not_manufacture_a_revision(client, api
         "a save that changed nothing should leave no revision behind; an empty entry is "
         "noise in the one chain that is supposed to mean something"
     )
+
+
+def test_a_record_can_show_which_passage_it_came_from(client, api_headers):
+    headers = api_headers
+    record = _extracted_reaction(client, headers)
+    listing = client.get(
+        f"/knowledge/extractions/{record['extraction_run_id']}/reactions", headers=headers
+    )
+    assert listing.status_code == 200, listing.text
+    found = next(r for r in listing.json() if r["id"] == record["id"])
+
+    assert found["locators"], "a record extracted from cited text should say where it came from"
+    locator = found["locators"][0]
+    assert locator["citation_id"] in found["citation_ids_json"]
+    assert locator["source_id"] == found["source_id"]
+    assert locator["quote_excerpt"], "the locator should carry the passage, not just an id"
+    assert locator["paragraph_number"] is not None
+    # Locators are resolved from the citation rather than copied onto the record, so
+    # there is no second copy that could drift out of step with it.
+    assert locator["source_revision_id"] == found["source_revision_id"], (
+        "the passage and the record must agree on which revision of the source they came from"
+    )
+
+
+def _person(client: TestClient, email: str) -> dict[str, str]:
+    client.post("/auth/register", json={"email": email, "password": "StrongPassword123!"})
+    login = client.post("/auth/login", json={"email": email, "password": "StrongPassword123!"})
+    assert login.status_code == 200, login.text
+    return {"Authorization": f"Bearer {login.json()['access_token']}"}
+
+
+def _dataset_version(client: TestClient, headers: dict[str, str]) -> dict:
+    res = client.post(
+        "/knowledge/dataset-versions",
+        headers=headers,
+        json={"dataset_type": "reaction", "name": "Two-person promotion set", "version": "v1"},
+    )
+    assert res.status_code == 201, res.text
+    return res.json()
+
+
+def test_promoting_a_dataset_version_takes_two_different_people(client, api_headers):
+    first = _person(client, "approver-one@example.com")
+    second = _person(client, "approver-two@example.com")
+    version = _dataset_version(client, api_headers)
+
+    one = client.post(
+        f"/knowledge/dataset-versions/{version['id']}/approvals",
+        headers=first, json={"comment": "records look right"},
+    )
+    assert one.status_code == 201, one.text
+    assert one.json()["distinct_approvers"] == 1
+    assert one.json()["promoted"] is False, "one person is not two"
+    assert one.json()["status"] != "approved"
+
+    # The same human with a second session is still one principal.
+    again = client.post(
+        f"/knowledge/dataset-versions/{version['id']}/approvals",
+        headers=_person(client, "approver-one@example.com"), json={"comment": "still me"},
+    )
+    assert again.status_code == 400, again.text
+    assert "someone else" in again.text
+    state = client.get(f"/knowledge/dataset-versions/{version['id']}/approvals", headers=api_headers)
+    assert state.json()["distinct_approvers"] == 1, "a repeat approval must not count twice"
+    assert state.json()["promoted"] is False
+
+    two = client.post(
+        f"/knowledge/dataset-versions/{version['id']}/approvals",
+        headers=second, json={"comment": "checked independently"},
+    )
+    assert two.status_code == 201, two.text
+    assert two.json()["distinct_approvers"] == 2
+    assert two.json()["promoted"] is True
+    assert two.json()["status"] == "approved"
+
+
+def test_a_dataset_version_cannot_be_promoted_by_editing_its_status(client, api_headers):
+    version = _dataset_version(client, api_headers)
+    bypass = client.patch(
+        f"/knowledge/dataset-versions/{version['id']}",
+        headers=api_headers, json={"status": "approved"},
+    )
+    assert bypass.status_code == 400, bypass.text
+    assert "two separate approvals" in bypass.text
+
+    after = client.get(f"/knowledge/dataset-versions/{version['id']}", headers=api_headers)
+    assert after.json()["status"] != "approved", (
+        "if a single edit can promote, the two-person rule is decoration"
+    )
+    # A non-promoting status change is still allowed.
+    ok = client.patch(
+        f"/knowledge/dataset-versions/{version['id']}",
+        headers=api_headers, json={"status": "ready_for_review"},
+    )
+    assert ok.status_code == 200, ok.text
+
+
+def test_a_machine_credential_cannot_stand_in_for_a_person(client, api_headers):
+    version = _dataset_version(client, api_headers)
+    res = client.post(
+        f"/knowledge/dataset-versions/{version['id']}/approvals",
+        headers=api_headers, json={"comment": "automation"},
+    )
+    assert res.status_code == 400, res.text
+    assert "signed-in person" in res.text
+
+
+def _approved_dataset_version(client: TestClient, api_headers: dict[str, str]) -> dict:
+    version = _dataset_version(client, api_headers)
+    for email in ("deploy-approver-one@example.com", "deploy-approver-two@example.com"):
+        res = client.post(
+            f"/knowledge/dataset-versions/{version['id']}/approvals",
+            headers=_person(client, email), json={"comment": "ok"},
+        )
+        assert res.status_code == 201, res.text
+    return version
+
+
+def test_a_deployment_candidate_needs_a_dataset_version_two_people_approved(client, api_headers):
+    unapproved = _dataset_version(client, api_headers)
+    res = client.post(
+        "/knowledge/deployment-candidates",
+        headers=api_headers,
+        json={"dataset_version_id": unapproved["id"], "model_version": "v1"},
+    )
+    assert res.status_code == 400, res.text
+    assert "approved by two people" in res.text
+
+
+def test_the_conveyor_refuses_to_skip_the_gate_or_the_canary(client, api_headers):
+    version = _approved_dataset_version(client, api_headers)
+    made = client.post(
+        "/knowledge/deployment-candidates",
+        headers=api_headers,
+        json={
+            "dataset_version_id": version["id"], "model_version": "v2",
+            "metrics_json": {"accuracy": 0.91}, "incumbent_metrics_json": {"accuracy": 0.80},
+            "metric_directions_json": {"accuracy": "higher"},
+            "blocking_metric_name": "citation_support_recall",
+            "blocking_metric_value": 0.95, "incumbent_blocking_metric_value": 0.90,
+        },
+    )
+    assert made.status_code == 201, made.text
+    candidate = made.json()
+    assert candidate["status"] == "draft"
+
+    early_canary = client.post(
+        f"/knowledge/deployment-candidates/{candidate['id']}/canary", headers=api_headers
+    )
+    assert early_canary.status_code == 400, early_canary.text
+    assert "passed the promotion gate" in early_canary.text
+
+    early_promote = client.post(
+        f"/knowledge/deployment-candidates/{candidate['id']}/promote", headers=api_headers
+    )
+    assert early_promote.status_code == 400, early_promote.text
+    assert "run a canary" in early_promote.text
+
+    gated = client.post(
+        f"/knowledge/deployment-candidates/{candidate['id']}/gate", headers=api_headers
+    )
+    assert gated.status_code == 200, gated.text
+    assert gated.json()["status"] == "gate_passed"
+    assert gated.json()["gate_verdict_json"]["promotable"] is True
+    assert gated.json()["gate_verdict_json"]["requires_human_signoff"] is True
+    assert gated.json()["gate_verdict_json"]["blocking_metric_name"] == "citation_support_recall"
+
+    # Promotion still cannot jump the canary just because the gate passed.
+    skip = client.post(
+        f"/knowledge/deployment-candidates/{candidate['id']}/promote", headers=api_headers
+    )
+    assert skip.status_code == 400, skip.text
+
+    canary = client.post(
+        f"/knowledge/deployment-candidates/{candidate['id']}/canary", headers=api_headers
+    )
+    assert canary.status_code == 200, canary.text
+    assert canary.json()["status"] == "canary"
+    assert canary.json()["canary_started_at"]
+
+    promoted = client.post(
+        f"/knowledge/deployment-candidates/{candidate['id']}/promote", headers=api_headers
+    )
+    assert promoted.status_code == 200, promoted.text
+    assert promoted.json()["status"] == "promoted"
+    assert promoted.json()["human_review_required"] is True
+
+
+def test_the_gate_blocks_when_the_blocking_measure_is_missing(client, api_headers):
+    version = _approved_dataset_version(client, api_headers)
+    made = client.post(
+        "/knowledge/deployment-candidates",
+        headers=api_headers,
+        json={
+            "dataset_version_id": version["id"], "model_version": "v3",
+            "metrics_json": {"accuracy": 0.99}, "incumbent_metrics_json": {"accuracy": 0.10},
+            "metric_directions_json": {"accuracy": "higher"},
+        },
+    )
+    assert made.status_code == 201, made.text
+    gated = client.post(
+        f"/knowledge/deployment-candidates/{made.json()['id']}/gate", headers=api_headers
+    )
+    assert gated.status_code == 200, gated.text
+    assert gated.json()["status"] == "gate_failed", (
+        "a missing blocking measure must block; an absent number is not a passing one, "
+        "however good the rest of the vector looks"
+    )
+    assert gated.json()["gate_verdict_json"]["promotable"] is False
+
+
+def test_a_dataset_version_cannot_be_born_already_approved(client, api_headers):
+    res = client.post(
+        "/knowledge/dataset-versions",
+        headers=api_headers,
+        json={
+            "dataset_type": "reaction", "name": "Born approved", "version": "v1",
+            "status": "approved",
+        },
+    )
+    # Guarding only the edit path would leave creation as an open door to the same place.
+    assert res.status_code == 400, res.text
+    assert "two separate approvals" in res.text
+
+
+def test_re_running_the_gate_cannot_rewind_a_candidate_that_already_shipped(client, api_headers):
+    version = _approved_dataset_version(client, api_headers)
+    made = client.post(
+        "/knowledge/deployment-candidates",
+        headers=api_headers,
+        json={
+            "dataset_version_id": version["id"], "model_version": "v4",
+            "metrics_json": {"accuracy": 0.91}, "incumbent_metrics_json": {"accuracy": 0.80},
+            "metric_directions_json": {"accuracy": "higher"},
+            "blocking_metric_name": "citation_support_recall",
+            "blocking_metric_value": 0.95, "incumbent_blocking_metric_value": 0.90,
+        },
+    )
+    cid = made.json()["id"]
+    assert client.post(f"/knowledge/deployment-candidates/{cid}/gate", headers=api_headers).status_code == 200
+    assert client.post(f"/knowledge/deployment-candidates/{cid}/canary", headers=api_headers).status_code == 200
+    assert client.post(f"/knowledge/deployment-candidates/{cid}/promote", headers=api_headers).status_code == 200
+
+    regate = client.post(f"/knowledge/deployment-candidates/{cid}/gate", headers=api_headers)
+    assert regate.status_code == 400, regate.text
+
+    after = client.get(f"/knowledge/deployment-candidates/{cid}", headers=api_headers)
+    assert after.json()["status"] == "promoted", (
+        "a candidate that shipped must not be silently rewound to a pre-gate state while "
+        "keeping the timestamps that say it shipped"
+    )
+    assert after.json()["promoted_at"]

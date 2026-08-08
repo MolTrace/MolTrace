@@ -425,6 +425,47 @@ pipeline's defect.
 
 ---
 
+## v0.68.10 — The corpus conveyor stops being a word for two unrelated states (2026-08-08)
+
+Three changes finish the knowledge-flywheel governance work.
+
+**A record can show which passage it came from.** Every extracted record now carries
+`locators` — citation label, page, section, paragraph, and the quoted passage. They are
+*resolved from* the record's citations rather than copied onto it, so "show me where this
+came from" is one mechanism in the product instead of two that drift, and one query serves
+a whole list rather than an N+1.
+
+**Promoting a dataset version takes two different people.** Promotion is the point where
+curated records start training something, and one actor could previously do it by setting a
+status field. Approval now comes from the authenticated principal — never a value the caller
+supplies, the same rule e-signature applies to a signer identity — and a unique constraint
+on `(dataset_version_id, approver_user_id)` makes the rule unbypassable rather than
+conventional: one human with two sessions still has one user id. A machine credential is
+refused outright, because it is not a person and two calls carrying it are the same
+principal. `PATCH`ing status straight to `approved` now fails; if a single edit can promote,
+the rule was decoration. Scoped to promotion deliberately — two-person on every extracted
+record would not survive a 10,000-record corpus.
+
+**The conveyor reaches a canary.** `knowledge_deployment_candidates` binds an approved
+dataset version to a trained artifact and its eval result — the object there was previously
+nothing to promote *from*. Each step is gated on the one before: a candidate needs a
+two-person approved version, a canary needs a passed gate, and promotion needs a canary even
+when the gate passed. A canary with no gate behind it would be a deployment mechanism
+wearing a governance label.
+
+The gate is **not a second dominance rule**. It calls `reaction_feedback.evaluate_ab_promotion`
+— the platform's existing fail-closed gate, where the blocking dimension must not regress at
+all and a missing or non-finite measure blocks rather than being skipped. What differs by
+model is *which* measure is blocking, so `blocking_metric_name` is recorded rather than
+assumed; for an extraction model it may be citation-support recall, not safety-flag recall.
+This is a different conveyor from the Repho benchmark gate and from `/ml/deployment-candidates`;
+neither covered the knowledge corpus.
+
+Migrations `0046` and `0047`. New routes under `/knowledge/dataset-versions/{id}/approvals`
+and `/knowledge/deployment-candidates`.
+
+---
+
 ## v0.68.4 — Sources are superseded, never edited (2026-08-08)
 
 `update_source` wrote over the existing row. But `publication_date`, `doi` and

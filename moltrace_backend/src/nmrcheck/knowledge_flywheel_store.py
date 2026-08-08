@@ -11,12 +11,16 @@ from sqlalchemy import and_, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
 
+from . import reaction_feedback
 from .database import session_scope
 from .models import (
     BenchmarkDatasetCandidate,
     BenchmarkDatasetCandidateCreate,
     BenchmarkDatasetCandidateUpdate,
     DatasetVersion,
+    DatasetVersionApproval,
+    DatasetVersionApprovalCreate,
+    DatasetVersionApprovalState,
     DatasetVersionCreate,
     DatasetVersionUpdate,
     ExtractedAnalyticalRecord,
@@ -25,6 +29,8 @@ from .models import (
     ExtractedRegulatoryRecord,
     FeatureRecord,
     FeatureRecordCreate,
+    KnowledgeDeploymentCandidate,
+    KnowledgeDeploymentCandidateCreate,
     KnowledgeExtractionRun,
     KnowledgeExtractionRunCreate,
     KnowledgeGraphLink,
@@ -43,6 +49,7 @@ from .models import (
     ModelImprovementQueueItem,
     ModelImprovementQueueItemCreate,
     ModelImprovementQueueItemUpdate,
+    RecordLocator,
     TrainingDatasetCandidate,
     TrainingDatasetCandidateCreate,
     TrainingDatasetCandidateUpdate,
@@ -50,12 +57,14 @@ from .models import (
 from .orm import (
     AuditEventORM,
     BenchmarkDatasetCandidateORM,
+    DatasetVersionApprovalORM,
     DatasetVersionORM,
     ExtractedAnalyticalRecordORM,
     ExtractedCitationORM,
     ExtractedReactionRecordORM,
     ExtractedRegulatoryRecordORM,
     FeatureRecordORM,
+    KnowledgeDeploymentCandidateORM,
     KnowledgeExtractionRunORM,
     KnowledgeGraphLinkORM,
     KnowledgeReviewTaskORM,
@@ -657,7 +666,8 @@ def list_reaction_records(session_factory: sessionmaker[Session], run_id: int) -
             .where(ExtractedReactionRecordORM.extraction_run_id == run_id)
             .order_by(ExtractedReactionRecordORM.id.asc())
         ).all()
-        return [_reaction_to_record(row) for row in rows]
+        found = _locators_for(session, rows)
+        return [_reaction_to_record(row, found.get(row.id)) for row in rows]
 
 
 def list_analytical_records(session_factory: sessionmaker[Session], run_id: int) -> list[ExtractedAnalyticalRecord]:
@@ -668,7 +678,8 @@ def list_analytical_records(session_factory: sessionmaker[Session], run_id: int)
             .where(ExtractedAnalyticalRecordORM.extraction_run_id == run_id)
             .order_by(ExtractedAnalyticalRecordORM.id.asc())
         ).all()
-        return [_analytical_to_record(row) for row in rows]
+        found = _locators_for(session, rows)
+        return [_analytical_to_record(row, found.get(row.id)) for row in rows]
 
 
 def list_regulatory_records(session_factory: sessionmaker[Session], run_id: int) -> list[ExtractedRegulatoryRecord]:
@@ -679,7 +690,8 @@ def list_regulatory_records(session_factory: sessionmaker[Session], run_id: int)
             .where(ExtractedRegulatoryRecordORM.extraction_run_id == run_id)
             .order_by(ExtractedRegulatoryRecordORM.id.asc())
         ).all()
-        return [_regulatory_to_record(row) for row in rows]
+        found = _locators_for(session, rows)
+        return [_regulatory_to_record(row, found.get(row.id)) for row in rows]
 
 
 def create_review_task(
@@ -909,7 +921,9 @@ def search_knowledge(
             if governance is not None:
                 stmt = stmt.where(governance)
             rows = session.scalars(stmt).all()
-            reactions = [_reaction_to_record(row) for row in rows if _matches(tokens, row.reaction_name, row.reaction_type, row.product_summary, row.substrate_summary)][:limit]
+            matched = [row for row in rows if _matches(tokens, row.reaction_name, row.reaction_type, row.product_summary, row.substrate_summary)][:limit]
+            found = _locators_for(session, matched)
+            reactions = [_reaction_to_record(row, found.get(row.id)) for row in matched]
         if record_type in {None, "analytical"}:
             stmt = select(ExtractedAnalyticalRecordORM).order_by(ExtractedAnalyticalRecordORM.id.desc()).limit(500)
             governance = _review_state_filter(
@@ -918,7 +932,9 @@ def search_knowledge(
             if governance is not None:
                 stmt = stmt.where(governance)
             rows = session.scalars(stmt).all()
-            analytical = [_analytical_to_record(row) for row in rows if _matches(tokens, row.compound_name, row.formula, row.hrms_text, row.nmr_1h_text)][:limit]
+            matched = [row for row in rows if _matches(tokens, row.compound_name, row.formula, row.hrms_text, row.nmr_1h_text)][:limit]
+            found = _locators_for(session, matched)
+            analytical = [_analytical_to_record(row, found.get(row.id)) for row in matched]
         if record_type in {None, "regulatory"}:
             stmt = select(ExtractedRegulatoryRecordORM).order_by(ExtractedRegulatoryRecordORM.id.desc()).limit(500)
             governance = _review_state_filter(
@@ -927,7 +943,9 @@ def search_knowledge(
             if governance is not None:
                 stmt = stmt.where(governance)
             rows = session.scalars(stmt).all()
-            regulatory = [_regulatory_to_record(row) for row in rows if _matches(tokens, row.topic, row.requirement_text)][:limit]
+            matched = [row for row in rows if _matches(tokens, row.topic, row.requirement_text)][:limit]
+            found = _locators_for(session, matched)
+            regulatory = [_regulatory_to_record(row, found.get(row.id)) for row in matched]
         if record_type in {None, "citation"}:
             # Citations carry NO review state of their own — `extracted_citations` has
             # source_id, the locator fields and a confidence score, and nothing else. So they
@@ -1223,6 +1241,19 @@ def list_feature_records(session_factory: sessionmaker[Session], record_type: st
         return [_feature_to_record(row) for row in rows]
 
 
+def _refuse_unearned_promotion(requested_status: str | None) -> None:
+    """Promotion happens by two approvals, on every path that can set a status.
+
+    Guarding only the edit path would leave creation as an open door to the same place --
+    the version would simply be born promoted.
+    """
+    if requested_status == DATASET_VERSION_APPROVED:
+        raise KnowledgeFlywheelError(
+            "A dataset version is promoted by two separate approvals, not by setting "
+            "its status directly."
+        )
+
+
 def create_dataset_version(
     session_factory: sessionmaker[Session],
     payload: DatasetVersionCreate,
@@ -1230,6 +1261,7 @@ def create_dataset_version(
     actor: KnowledgeFlywheelActor,
 ) -> DatasetVersion:
     with session_scope(session_factory) as session:
+        _refuse_unearned_promotion(payload.status)
         row = DatasetVersionORM(
             dataset_type=payload.dataset_type,
             name=payload.name,
@@ -1284,6 +1316,10 @@ def update_dataset_version(
         if row is None:
             return None
         update = payload.model_dump(exclude_unset=True)
+        if row.status != DATASET_VERSION_APPROVED:
+            # Promotion is the point where records start training something, so it is the
+            # one transition that needs two people.
+            _refuse_unearned_promotion(update.get("status"))
         for field in ("name", "version", "status"):
             if field in update:
                 setattr(row, field, update[field])
@@ -1302,6 +1338,355 @@ def update_dataset_version(
         )
         return _dataset_version_to_record(row)
 
+
+
+DATASET_VERSION_APPROVED = "approved"
+DATASET_VERSION_APPROVALS_REQUIRED = 2
+
+
+def _approval_to_record(row: DatasetVersionApprovalORM) -> DatasetVersionApproval:
+    return DatasetVersionApproval(
+        id=row.id,
+        dataset_version_id=row.dataset_version_id,
+        approver_user_id=row.approver_user_id,
+        approver_email=row.approver_email,
+        comment=row.comment,
+        created_at=row.created_at,
+    )
+
+
+def _approval_state(
+    session: Session, row: DatasetVersionORM
+) -> DatasetVersionApprovalState:
+    approvals = session.scalars(
+        select(DatasetVersionApprovalORM)
+        .where(DatasetVersionApprovalORM.dataset_version_id == row.id)
+        .order_by(DatasetVersionApprovalORM.id)
+    ).all()
+    return DatasetVersionApprovalState(
+        dataset_version_id=row.id,
+        status=row.status,
+        approvals=[_approval_to_record(approval) for approval in approvals],
+        distinct_approvers=len({approval.approver_user_id for approval in approvals}),
+        approvals_required=DATASET_VERSION_APPROVALS_REQUIRED,
+        promoted=row.status == DATASET_VERSION_APPROVED,
+        human_review_required=True,
+    )
+
+
+def approve_dataset_version(
+    session_factory: sessionmaker[Session],
+    dataset_version_id: int,
+    payload: DatasetVersionApprovalCreate,
+    *,
+    actor: KnowledgeFlywheelActor,
+) -> DatasetVersionApprovalState | None:
+    """Record one person's approval, and promote once two separate people have approved."""
+    with session_scope(session_factory) as session:
+        row = session.get(DatasetVersionORM, dataset_version_id)
+        if row is None:
+            return None
+        if actor.user_id is None:
+            # A machine credential is not a person, and two calls carrying it are the same
+            # principal -- it can never be the second of two.
+            raise KnowledgeFlywheelError(
+                "Approving a dataset version requires a signed-in person."
+            )
+        if row.status == DATASET_VERSION_APPROVED:
+            return _approval_state(session, row)
+        already = session.scalars(
+            select(DatasetVersionApprovalORM).where(
+                DatasetVersionApprovalORM.dataset_version_id == row.id,
+                DatasetVersionApprovalORM.approver_user_id == actor.user_id,
+            )
+        ).first()
+        if already is not None:
+            raise KnowledgeFlywheelError(
+                "You have already approved this dataset version; the second approval must "
+                "come from someone else."
+            )
+        session.add(
+            DatasetVersionApprovalORM(
+                dataset_version_id=row.id,
+                approver_user_id=actor.user_id,
+                approver_email=actor.email,
+                comment=payload.comment,
+            )
+        )
+        session.flush()
+        state = _approval_state(session, row)
+        _audit(
+            session,
+            actor=actor,
+            event_type="knowledge.dataset_version.approval",
+            message="Dataset version approval recorded.",
+            entity_type="dataset_version",
+            entity_id=row.id,
+            metadata={
+                "distinct_approvers": state.distinct_approvers,
+                "approvals_required": DATASET_VERSION_APPROVALS_REQUIRED,
+            },
+        )
+        if state.distinct_approvers >= DATASET_VERSION_APPROVALS_REQUIRED:
+            row.status = DATASET_VERSION_APPROVED
+            _audit(
+                session,
+                actor=actor,
+                event_type="knowledge.dataset_version.promote",
+                message="Dataset version promoted by two-person approval.",
+                entity_type="dataset_version",
+                entity_id=row.id,
+                metadata={"approver_user_ids": sorted(
+                    {a.approver_user_id for a in state.approvals if a.approver_user_id is not None}
+                )},
+            )
+            state = _approval_state(session, row)
+        return state
+
+
+def get_dataset_version_approvals(
+    session_factory: sessionmaker[Session], dataset_version_id: int
+) -> DatasetVersionApprovalState | None:
+    with session_scope(session_factory) as session:
+        row = session.get(DatasetVersionORM, dataset_version_id)
+        if row is None:
+            return None
+        return _approval_state(session, row)
+
+
+_DEPLOYMENT_NOTE = (
+    "A promoted candidate still requires human sign-off; the champion pointer stays "
+    "rollback-able."
+)
+
+
+def _deployment_to_record(row: KnowledgeDeploymentCandidateORM) -> KnowledgeDeploymentCandidate:
+    return KnowledgeDeploymentCandidate(
+        id=row.id,
+        dataset_version_id=row.dataset_version_id,
+        model_artifact_id=row.model_artifact_id,
+        model_version=row.model_version,
+        metrics_json={k: float(v) for k, v in _json_dict(row.metrics_json).items()},
+        incumbent_metrics_json={
+            k: float(v) for k, v in _json_dict(row.incumbent_metrics_json).items()
+        },
+        metric_directions_json={
+            k: str(v) for k, v in _json_dict(row.metric_directions_json).items()
+        },
+        blocking_metric_name=row.blocking_metric_name,
+        blocking_metric_value=row.blocking_metric_value,
+        incumbent_blocking_metric_value=row.incumbent_blocking_metric_value,
+        status=row.status,  # type: ignore[arg-type]
+        gate_verdict_json=_json_dict(row.gate_verdict_json),
+        canary_started_at=row.canary_started_at,
+        promoted_at=row.promoted_at,
+        created_by=row.created_by,
+        created_at=row.created_at,
+        warnings=[],
+        notes=[_DEPLOYMENT_NOTE],
+        human_review_required=True,
+    )
+
+
+def create_deployment_candidate(
+    session_factory: sessionmaker[Session],
+    payload: KnowledgeDeploymentCandidateCreate,
+    *,
+    actor: KnowledgeFlywheelActor,
+) -> KnowledgeDeploymentCandidate:
+    """Bind an approved dataset version to a trained artifact and its eval result."""
+    with session_scope(session_factory) as session:
+        version = session.get(DatasetVersionORM, payload.dataset_version_id)
+        if version is None:
+            raise KnowledgeFlywheelNotFoundError("Dataset version not found.")
+        if version.status != DATASET_VERSION_APPROVED:
+            # Closing the conveyor: a candidate built from a version two people never
+            # approved would let training start from an unreviewed corpus, which is the
+            # gap the approval rule exists to close.
+            raise KnowledgeFlywheelError(
+                "This dataset version has not been approved by two people yet, so it "
+                "cannot be proposed for deployment."
+            )
+        row = KnowledgeDeploymentCandidateORM(
+            dataset_version_id=version.id,
+            model_artifact_id=payload.model_artifact_id,
+            model_version=payload.model_version,
+            metrics_json=_json_dump(payload.metrics_json),
+            incumbent_metrics_json=_json_dump(payload.incumbent_metrics_json),
+            metric_directions_json=_json_dump(payload.metric_directions_json),
+            blocking_metric_name=payload.blocking_metric_name,
+            blocking_metric_value=payload.blocking_metric_value,
+            incumbent_blocking_metric_value=payload.incumbent_blocking_metric_value,
+            status="draft",
+            created_by=actor.email,
+            metadata_json=_json_dump(_metadata_with_review(payload.metadata_json)),
+        )
+        session.add(row)
+        session.flush()
+        _audit(
+            session,
+            actor=actor,
+            event_type="knowledge.deployment_candidate.create",
+            message="Deployment candidate proposed from an approved dataset version.",
+            entity_type="knowledge_deployment_candidate",
+            entity_id=row.id,
+            metadata={"dataset_version_id": version.id},
+        )
+        return _deployment_to_record(row)
+
+
+def evaluate_deployment_candidate(
+    session_factory: sessionmaker[Session],
+    candidate_id: int,
+    *,
+    actor: KnowledgeFlywheelActor,
+    tolerance: float = 0.0,
+) -> KnowledgeDeploymentCandidate | None:
+    """Run the promotion gate. Same dominance rule as Repho, not a second one.
+
+    ``evaluate_ab_promotion`` is the platform's gate: the blocking dimension must not
+    regress at all, the rest of the metric vector must dominate, and a missing or
+    non-finite value blocks rather than being skipped. The blocking metric's *name* is
+    recorded because it differs by model; the rule applied to it does not.
+    """
+    with session_scope(session_factory) as session:
+        row = session.get(KnowledgeDeploymentCandidateORM, candidate_id)
+        if row is None:
+            return None
+        if row.status in {"canary", "promoted"}:
+            # Re-judging something already rolling out would rewind its status while the
+            # canary and promotion timestamps still say it shipped -- a record that
+            # contradicts itself. Propose a new candidate instead.
+            raise KnowledgeFlywheelError(
+                "This candidate has already moved past the gate; propose a new one rather "
+                "than re-judging it."
+            )
+        candidate_metrics = {k: float(v) for k, v in _json_dict(row.metrics_json).items()}
+        incumbent_metrics = {
+            k: float(v) for k, v in _json_dict(row.incumbent_metrics_json).items()
+        }
+        directions = {k: str(v) for k, v in _json_dict(row.metric_directions_json).items()}
+        verdict = reaction_feedback.evaluate_ab_promotion(
+            reaction_feedback.ModelMetrics(
+                model_version="incumbent",
+                metrics=incumbent_metrics,
+                safety_flag_recall=(
+                    row.incumbent_blocking_metric_value
+                    if row.incumbent_blocking_metric_value is not None
+                    else float("nan")
+                ),
+            ),
+            reaction_feedback.ModelMetrics(
+                model_version=row.model_version or "candidate",
+                metrics=candidate_metrics,
+                safety_flag_recall=(
+                    row.blocking_metric_value
+                    if row.blocking_metric_value is not None
+                    else float("nan")
+                ),
+            ),
+            directions=directions or None,
+            tolerance=tolerance,
+        )
+        payload = verdict.as_dict()
+        payload["blocking_metric_name"] = row.blocking_metric_name
+        row.gate_verdict_json = _json_dump(payload)
+        row.status = "gate_passed" if verdict.promotable else "gate_failed"
+        _audit(
+            session,
+            actor=actor,
+            event_type="knowledge.deployment_candidate.gate",
+            message="Deployment candidate evaluated against the promotion gate.",
+            entity_type="knowledge_deployment_candidate",
+            entity_id=row.id,
+            metadata={"status": row.status, "promotable": verdict.promotable},
+        )
+        return _deployment_to_record(row)
+
+
+def start_deployment_canary(
+    session_factory: sessionmaker[Session],
+    candidate_id: int,
+    *,
+    actor: KnowledgeFlywheelActor,
+) -> KnowledgeDeploymentCandidate | None:
+    """Begin a canary. Only a candidate that passed the gate is eligible."""
+    with session_scope(session_factory) as session:
+        row = session.get(KnowledgeDeploymentCandidateORM, candidate_id)
+        if row is None:
+            return None
+        if row.status != "gate_passed":
+            # A canary with no gate behind it is a deployment mechanism wearing a
+            # governance label.
+            raise KnowledgeFlywheelError(
+                "Only a candidate that has passed the promotion gate can start a canary."
+            )
+        row.status = "canary"
+        row.canary_started_at = utcnow()
+        _audit(
+            session,
+            actor=actor,
+            event_type="knowledge.deployment_candidate.canary",
+            message="Deployment candidate entered canary.",
+            entity_type="knowledge_deployment_candidate",
+            entity_id=row.id,
+            metadata={"dataset_version_id": row.dataset_version_id},
+        )
+        return _deployment_to_record(row)
+
+
+def promote_deployment_candidate(
+    session_factory: sessionmaker[Session],
+    candidate_id: int,
+    *,
+    actor: KnowledgeFlywheelActor,
+) -> KnowledgeDeploymentCandidate | None:
+    """Promote a candidate that has actually been through a canary."""
+    with session_scope(session_factory) as session:
+        row = session.get(KnowledgeDeploymentCandidateORM, candidate_id)
+        if row is None:
+            return None
+        if row.status != "canary":
+            raise KnowledgeFlywheelError(
+                "Only a candidate that has run a canary can be promoted."
+            )
+        row.status = "promoted"
+        row.promoted_at = utcnow()
+        _audit(
+            session,
+            actor=actor,
+            event_type="knowledge.deployment_candidate.promote",
+            message="Deployment candidate promoted after canary.",
+            entity_type="knowledge_deployment_candidate",
+            entity_id=row.id,
+            metadata={"dataset_version_id": row.dataset_version_id},
+        )
+        return _deployment_to_record(row)
+
+
+def list_deployment_candidates(
+    session_factory: sessionmaker[Session],
+    *,
+    status: str | None = None,
+    limit: int = 200,
+) -> list[KnowledgeDeploymentCandidate]:
+    with session_scope(session_factory) as session:
+        stmt = (
+            select(KnowledgeDeploymentCandidateORM)
+            .order_by(KnowledgeDeploymentCandidateORM.id.desc())
+            .limit(limit)
+        )
+        if status:
+            stmt = stmt.where(KnowledgeDeploymentCandidateORM.status == status)
+        return [_deployment_to_record(row) for row in session.scalars(stmt).all()]
+
+
+def get_deployment_candidate(
+    session_factory: sessionmaker[Session], candidate_id: int
+) -> KnowledgeDeploymentCandidate | None:
+    with session_scope(session_factory) as session:
+        row = session.get(KnowledgeDeploymentCandidateORM, candidate_id)
+        return _deployment_to_record(row) if row is not None else None
 
 def _extract_reaction(
     session: Session,
@@ -1751,6 +2136,43 @@ def _extract_requirement_text(text: str) -> str | None:
     return _truncate(text, _MAX_FIELD_TEXT)
 
 
+
+def _locators_for(session: Session, rows: Sequence[Any]) -> dict[int, list[RecordLocator]]:
+    """Resolve every row's citations in one query, so a list of records is not an N+1.
+
+    A record whose citation has since been deleted simply carries fewer locators; a
+    missing locator is reported as absent rather than invented.
+    """
+    wanted: dict[int, list[int]] = {row.id: _json_int_list(row.citation_ids_json) for row in rows}
+    all_ids = {citation_id for ids in wanted.values() for citation_id in ids}
+    if not all_ids:
+        return {}
+    citations = {
+        citation.id: citation
+        for citation in session.scalars(
+            select(ExtractedCitationORM).where(ExtractedCitationORM.id.in_(tuple(all_ids)))
+        ).all()
+    }
+    resolved: dict[int, list[RecordLocator]] = {}
+    for record_id, ids in wanted.items():
+        found = [citations[cid] for cid in ids if cid in citations]
+        if found:
+            resolved[record_id] = [
+                RecordLocator(
+                    citation_id=c.id,
+                    citation_label=c.citation_label,
+                    source_id=c.source_id,
+                    source_revision_id=c.source_revision_id,
+                    source_file_id=c.source_file_id,
+                    page_number=c.page_number,
+                    section_title=c.section_title,
+                    paragraph_number=c.paragraph_number,
+                    quote_excerpt=c.quote_excerpt,
+                )
+                for c in found
+            ]
+    return resolved
+
 def _source_to_record(row: KnowledgeSourceORM) -> KnowledgeSource:
     return KnowledgeSource(
         id=row.id,
@@ -1830,13 +2252,16 @@ def _citation_to_record(row: ExtractedCitationORM) -> ExtractedCitation:
     )
 
 
-def _reaction_to_record(row: ExtractedReactionRecordORM) -> ExtractedReactionRecord:
+def _reaction_to_record(
+    row: ExtractedReactionRecordORM, locators: list[RecordLocator] | None = None
+) -> ExtractedReactionRecord:
     return ExtractedReactionRecord(
         id=row.id,
         extraction_run_id=row.extraction_run_id,
         source_id=row.source_id,
         source_revision_id=row.source_revision_id,
         citation_ids_json=_json_int_list(row.citation_ids_json),
+        locators=locators or [],
         reaction_name=row.reaction_name,
         reaction_type=row.reaction_type,
         substrate_summary=row.substrate_summary,
@@ -1869,13 +2294,16 @@ def _reaction_to_record(row: ExtractedReactionRecordORM) -> ExtractedReactionRec
     )
 
 
-def _analytical_to_record(row: ExtractedAnalyticalRecordORM) -> ExtractedAnalyticalRecord:
+def _analytical_to_record(
+    row: ExtractedAnalyticalRecordORM, locators: list[RecordLocator] | None = None
+) -> ExtractedAnalyticalRecord:
     return ExtractedAnalyticalRecord(
         id=row.id,
         extraction_run_id=row.extraction_run_id,
         source_id=row.source_id,
         source_revision_id=row.source_revision_id,
         citation_ids_json=_json_int_list(row.citation_ids_json),
+        locators=locators or [],
         compound_name=row.compound_name,
         structure_input=row.structure_input,
         structure_format=row.structure_format,
@@ -1899,13 +2327,16 @@ def _analytical_to_record(row: ExtractedAnalyticalRecordORM) -> ExtractedAnalyti
     )
 
 
-def _regulatory_to_record(row: ExtractedRegulatoryRecordORM) -> ExtractedRegulatoryRecord:
+def _regulatory_to_record(
+    row: ExtractedRegulatoryRecordORM, locators: list[RecordLocator] | None = None
+) -> ExtractedRegulatoryRecord:
     return ExtractedRegulatoryRecord(
         id=row.id,
         extraction_run_id=row.extraction_run_id,
         source_id=row.source_id,
         source_revision_id=row.source_revision_id,
         citation_ids_json=_json_int_list(row.citation_ids_json),
+        locators=locators or [],
         jurisdiction_id=row.jurisdiction_id,
         topic=row.topic,
         requirement_text=row.requirement_text,

@@ -5966,6 +5966,70 @@ class FeatureRecordORM(Base):
     metadata_json: Mapped[str] = mapped_column(Text, default="{}")
 
 
+class KnowledgeDeploymentCandidateORM(Base):
+    """A dataset version, trained into an artifact, proposed for deployment.
+
+    The conveyor ran candidates -> dataset version -> nothing. Without a row that binds a
+    version to a trained artifact and its eval result there is no object to promote *from*,
+    so "approved for training" and "serving traffic" were the same word for two unrelated
+    states. Each step here is gated on the one before it: a candidate needs a two-person
+    approved dataset version, a canary needs a passed gate, and promotion needs a canary.
+    """
+
+    __tablename__ = "knowledge_deployment_candidates"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    dataset_version_id: Mapped[int] = mapped_column(
+        ForeignKey("dataset_versions.id", ondelete="CASCADE"), index=True
+    )
+    model_artifact_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    model_version: Mapped[str] = mapped_column(String(120), default="")
+    metrics_json: Mapped[str] = mapped_column(Text, default="{}")
+    incumbent_metrics_json: Mapped[str] = mapped_column(Text, default="{}")
+    metric_directions_json: Mapped[str] = mapped_column(Text, default="{}")
+    # Which metric played the hard, fail-closed role, recorded rather than assumed -- the
+    # underlying rule calls it safety-flag recall, and this says what it actually was here.
+    blocking_metric_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    blocking_metric_value: Mapped[float | None] = mapped_column(Float, nullable=True)
+    incumbent_blocking_metric_value: Mapped[float | None] = mapped_column(Float, nullable=True)
+    status: Mapped[str] = mapped_column(String(32), default="draft", index=True)
+    gate_verdict_json: Mapped[str] = mapped_column(Text, default="{}")
+    canary_started_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    promoted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_by: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    metadata_json: Mapped[str] = mapped_column(Text, default="{}")
+
+
+class DatasetVersionApprovalORM(Base):
+    """One person's approval of a dataset version. Two distinct people promote it.
+
+    The approver is the authenticated principal, never a value the caller supplied -- the
+    same rule e-signature already applies to a signer identity. The unique constraint is
+    what makes the two-person rule unbypassable rather than merely conventional: one human
+    with two sessions still has one user id, so their second approval is rejected by the
+    database, not by a check someone could forget to call.
+    """
+
+    __tablename__ = "dataset_version_approvals"
+    __table_args__ = (
+        UniqueConstraint(
+            "dataset_version_id", "approver_user_id", name="uq_dataset_version_approver"
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    dataset_version_id: Mapped[int] = mapped_column(
+        ForeignKey("dataset_versions.id", ondelete="CASCADE"), index=True
+    )
+    approver_user_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    approver_email: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    comment: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
 class DatasetVersionORM(Base):
     __tablename__ = "dataset_versions"
     __table_args__ = (
