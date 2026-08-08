@@ -445,10 +445,39 @@ B0 items 1–4 stand as written and are not restated. The additions:
 >
 > Strictly dominated means there is no trade-off to argue about: the σ-adaptive rule already in the
 > file achieves *higher* retention at *lower* exposure, on both nuclei. This is the mechanism-backed
-> version of "too permissive", it is in a different test from the one the original claim named, and
-> it is **open**. It needs its own invariant test and visible re-baseline; it changes which
-> resonances get assigned, so it moves the merit function and the impurity estimate, not just a
-> weight.
+> version of "too permissive", and it is in a different test from the one the original claim named.
+>
+> **Fixed 2026-08-08 — and the second σ-blind use was the worse one.** `AssignmentsTest` used the
+> flat constant *twice*: as the candidate radius, and as the width of the merit Gaussian
+> `exp(-0.5·(d/base_tol)²)`. The merit scale is the more consequential. On a fixed 4.0 ppm ruler an
+> atom predicted to ±1.5 ppm scores **0.88** for a 2 ppm miss that is well *outside* its interval,
+> while an atom predicted to ±22 ppm scores **0.32** for a 6 ppm hit well *inside* its own — the
+> same inversion the significance mapping had, one test over.
+>
+> Both now scale by the resonance's own conformal interval, with the flat constant as the fallback
+> when no calibration is supplied. Re-baselined on the same held-out split
+> (`scripts/measure_assignments_window.py`, 32,708 ¹³C / 10,662 ¹H resonances):
+>
+> | candidate radius | ¹³C retention | ¹³C candidates | ¹H retention | ¹H candidates |
+> |---|---|---|---|---|
+> | flat `3×base` (before) | 95.06 % | 3.274 | 90.96 % | 3.501 |
+> | **`3×` conformal (now)** | **99.07 %** | 4.089 | **99.25 %** | 4.898 |
+> | `max(flat, conformal)` | 99.59 % | 4.481 | 99.48 % | 5.111 |
+>
+> The flat radius was losing the true pairing for **5.0 % of ¹³C and 9.0 % of ¹H resonances**, and
+> each loss is penalised *twice* — merit 0.0, **and** the resonance's integral counted as
+> unexplained impurity, which lowers this test's own significance. A correct structure was being
+> marked down for the predictor's uncertainty.
+>
+> `max(flat, conformal)` was rejected despite scoring marginally higher: its extra 0.5 pp costs 10 %
+> more candidates and reintroduces the flat floor that is the thing being removed. Note the adaptive
+> rule is **not** a superset — for confident atoms it is *narrower* than 12.0 ppm — and retention
+> still rises, because the loss was concentrated in high-σ resonances the flat radius truncated.
+>
+> A pairing one scale away now scores `exp(-0.5)` for every atom on every nucleus, which is what
+> makes merits comparable across a molecule at all. Without a calibration the behaviour is
+> byte-identical to before, asserted by a test, and `details.window_basis` records which ruler
+> priced each resonance plus the calibration fingerprint.
 >
 > ### And the finding that neither window can fix
 >
