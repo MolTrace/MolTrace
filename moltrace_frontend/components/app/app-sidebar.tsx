@@ -89,7 +89,13 @@ const navGroups: SidebarGroup[] = [
   {
     label: "AI / ML",
     items: [
-      { name: "AI / ML Governance", href: "/ai", icon: Bot },
+      // "AI Services", matching the page it opens. The page's own <h1> and
+      // breadcrumb say AI Services, as do the topbar, the dashboard's "Open AI
+      // Services" card, the evidence card and all six AI workspaces — the
+      // sidebar was the only surface calling it Governance, so it was the
+      // outlier rather than the source of truth. It also repeated its own
+      // section header, which already reads "AI / ML".
+      { name: "AI Services", href: "/ai", icon: Bot },
       { name: "Model Factory", href: "/ml", icon: Cpu },
     ],
   },

@@ -95,3 +95,31 @@ describe("upgradeCopy", () => {
     expect(copy.title).not.toContain("undefined")
   })
 })
+
+describe("formatApiError integration", () => {
+  it("stops telling a signed-in user to sign in when a product is simply closed", async () => {
+    const { formatApiError } = await import("@/components/spectracheck/spectracheck-helpers")
+
+    // This formatter has ~104 call sites and used to collapse every 401/403 into
+    // one auth message, so all four closed-product states told the reader to sign
+    // in — advice that cannot help someone already signed in.
+    for (const code of [
+      "product_not_in_plan",
+      "product_not_enabled",
+      "product_not_provisioned",
+      "role_required",
+    ]) {
+      const message = formatApiError(refusal(code), "fallback")
+      expect(message.toLowerCase()).not.toContain("sign in")
+    }
+  })
+
+  it("still treats an ordinary auth failure as one", async () => {
+    const { formatApiError } = await import("@/components/spectracheck/spectracheck-helpers")
+    expect(formatApiError(new ApiError(401, { detail: "nope" }, "m"), "fallback").toLowerCase()).toContain(
+      "sign in",
+    )
+    // module_not_licensed is the deployment-wide gate, not one of the four.
+    expect(formatApiError(refusal("module_not_licensed"), "fallback").toLowerCase()).toContain("sign in")
+  })
+})
