@@ -13,6 +13,24 @@ import { NextRequest, NextResponse } from "next/server"
 // --force`). Vercel reuses `.next/cache` across deploys keyed on file content,
 // so a folder move can leave a stale/missing function output that normal pushes
 // will not refresh until this file's content changes.
+/**
+ * Mirrors `error_codes.PUBLIC_CODES` in the backend — the codes deemed safe to
+ * survive 401/403 sanitization. Anything not listed here is stripped, so adding a
+ * public code on the backend without adding it here fails CLOSED (the client sees
+ * a generic denial) rather than leaking.
+ */
+const PUBLIC_ERROR_CODES: ReadonlySet<string> = new Set([
+  "module_not_licensed",
+  "step_up_required",
+  "token_expired",
+  "token_invalid",
+  "token_reuse_detected",
+  "product_not_in_plan",
+  "product_not_enabled",
+  "product_not_provisioned",
+  "role_required",
+])
+
 export const dynamic = "force-dynamic"
 
 type RouteContext = {
@@ -102,19 +120,41 @@ async function proxy(request: NextRequest, context: RouteContext) {
 
   if (response.status === 401 || response.status === 403) {
     responseHeaders.set("content-type", "application/json")
-    // Preserve deliberate, non-sensitive 401 machine codes the SPA MUST act on:
-    // `step_up_required` (run the re-auth ceremony, then retry) and the rotating-
-    // refresh codes (`token_expired` / `token_invalid` / `token_reuse_detected`).
-    // Every other 401/403 body is still sanitized so internal auth details don't leak.
-    if (response.status === 401) {
-      const raw = await response.text()
-      if (/"detail"\s*:\s*"(step_up_required|token_expired|token_invalid|token_reuse_detected)"/.test(raw)) {
-        return new Response(raw, {
-          status: 401,
-          statusText: response.statusText,
-          headers: responseHeaders,
-        })
+    // Preserve the machine-readable `code` for errors the backend marks public,
+    // and sanitize everything else so internal auth detail cannot leak.
+    //
+    // THIS USED TO MATCH ON `detail`. It regex-tested the body for four literal
+    // detail strings, which was wrong twice over. `detail` is prose written for a
+    // human and changes whenever someone improves the wording — matching it makes
+    // a copy edit a breaking API change. And it only ran for 401, so a 403
+    // carrying `module_not_licensed` or any of the four upgrade states had its
+    // body replaced and arrived at the client indistinguishable from a plain
+    // "access denied".
+    //
+    // The list below mirrors error_codes.PUBLIC_CODES on the backend. It is still
+    // a second copy — the proxy cannot import Python — but a copy of stable
+    // identifiers rather than of prose, and one that fails safe: an unknown code
+    // is sanitized, never passed through.
+    const raw = await response.text()
+    let publicCode: string | null = null
+    try {
+      const body: unknown = JSON.parse(raw)
+      if (body && typeof body === "object") {
+        const code = (body as { code?: unknown }).code
+        if (typeof code === "string" && PUBLIC_ERROR_CODES.has(code)) publicCode = code
       }
+    } catch {
+      // Not JSON, or malformed. Fall through to the sanitized body.
+    }
+
+    if (publicCode) {
+      // Pass the code through, but still replace `detail` with our own copy: the
+      // client should branch on the code, and the backend's prose is not written
+      // for this surface.
+      return new Response(
+        JSON.stringify({ code: publicCode, detail: authFailureMessage(response.status) }),
+        { status: response.status, statusText: response.statusText, headers: responseHeaders },
+      )
     }
     return new Response(JSON.stringify({ detail: authFailureMessage(response.status) }), {
       status: response.status,

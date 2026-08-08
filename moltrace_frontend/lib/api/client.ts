@@ -38,9 +38,10 @@ export function readRefusedModule(response: Response, data: unknown): string | n
   if (response.status !== 403) return null
   const header = response.headers.get("X-MolTrace-Module")
   if (header && header.trim()) return header.trim()
-  const detail =
-    typeof data === "object" && data !== null ? (data as { detail?: unknown }).detail : undefined
-  return detail === "module_not_licensed" ? "" : null
+  // Body `code`, not `detail`. The proxy now replaces `detail` with its own copy
+  // even when it passes a public code through, so matching prose here would
+  // silently stop working the moment that copy changed.
+  return codeOf(data) === "module_not_licensed" ? "" : null
 }
 
 const DEFAULT_API_BASE = "/api/backend"
@@ -299,6 +300,23 @@ export function sanitizePublicApiErrorMessage(
   return candidate
 }
 
+/**
+ * The stable, machine-readable error code.
+ *
+ * Prefers `code` and falls back to `detail`, because `detail` is prose written
+ * for a human: it changes whenever someone improves the wording, so branching on
+ * it makes a copy edit a breaking API change. The fallback keeps this working
+ * against a backend that predates the code taxonomy, where the two happened to
+ * carry the same token — remove it once no such deployment is in the field.
+ */
+function codeOf(data: unknown): string {
+  if (data && typeof data === "object") {
+    const code = (data as { code?: unknown }).code
+    if (typeof code === "string" && code) return code
+  }
+  return detailOf(data)
+}
+
 function detailOf(data: unknown): string {
   if (data && typeof data === "object" && typeof (data as { detail?: unknown }).detail === "string") {
     return (data as { detail: string }).detail
@@ -347,7 +365,7 @@ async function doRefresh(): Promise<string | null> {
   // Any refresh failure ends the session (expired / invalid / reuse) — clear the
   // whole family and never retry. reuse is the same outcome plus a louder signal.
   const data = await readResponseData(response)
-  const reason = detailOf(data) || "expired"
+  const reason = codeOf(data) || "expired"
   clearStoredTokens()
   if (typeof window !== "undefined") {
     try {
@@ -414,7 +432,7 @@ export async function apiFetch<T>(path: string, init: ApiRequestInit = {}): Prom
   // helped by another rotation, and re-refreshing would burn a token needlessly).
   if (response.status === 401 && !callerSetAuth && !isStreamBody && !refreshed && eligibleForRefresh(path)) {
     const data = await readResponseData(response)
-    if (detailOf(data) === "step_up_required") {
+    if (codeOf(data) === "step_up_required") {
       // re-auth signal handled by withStepUp, not a stale access token
       throw new ApiError(401, data, sanitizePublicApiErrorMessage(messageFromErrorData(data, response.statusText), 401))
     }

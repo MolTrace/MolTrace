@@ -344,6 +344,60 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/audit/anchor-public-key": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Audit Anchor Public Key Route
+         * @description The public half of the anchor signing key, for verifying checkpoints off-platform.
+         *
+         *     Declared before the ``/audit/{subject_type}/...`` routes so the literal path wins over the
+         *     parameterised one. When the deployment has not configured asymmetric anchoring this
+         *     reports ``hmac-sha256`` with no key, which is the honest answer: those anchors simply
+         *     cannot be verified by anyone who is not also able to forge them.
+         */
+        get: operations["audit_anchor_public_key_route_audit_anchor_public_key_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/audit/{subject_type}/{subject_id}/entries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Subject Audit Entries Route
+         * @description The chained entries behind this subject, in the shape their digests cover.
+         *
+         *     The sibling ``/verify`` route answers "is it intact?". This one exists so nobody has to
+         *     take that on trust: it returns each entry exactly as its ``entry_hash`` was computed,
+         *     so an auditor can recompute the chain offline with a JSON encoder and SHA-256 and reach
+         *     their own verdict. ``scripts/verify_audit_export.py`` does precisely that and imports
+         *     nothing from this package.
+         *
+         *     Same access rule and same non-leaking 404 as ``/verify``. No payload here is absent from
+         *     ``GET /audit/events`` for the same entity; what is added is the integrity metadata.
+         */
+        get: operations["subject_audit_entries_route_audit__subject_type___subject_id__entries_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/admin/audit/anchor": {
         parameters: {
             query?: never;
@@ -13464,6 +13518,22 @@ export interface components {
             uncertainty_ppm?: number | null;
         };
         /**
+         * AuditAnchorPublicKey
+         * @description The public half of the anchor signing key — safe to publish; it cannot sign.
+         *
+         *     Handing this to an auditor is the point of signing anchors asymmetrically: with it they
+         *     can confirm a checkpoint is ours, which the HMAC scheme could never allow without also
+         *     handing them the ability to forge one.
+         */
+        AuditAnchorPublicKey: {
+            /** Algorithm */
+            algorithm: string;
+            /** Public Key Hex */
+            public_key_hex?: string | null;
+            /** Key Id */
+            key_id: string;
+        };
+        /**
          * AuditAnchorRecord
          * @description A signed checkpoint over the audit chain (Prompt 10).
          */
@@ -13492,6 +13562,62 @@ export interface components {
             signature: string;
             /** Key Id */
             key_id: string;
+            /**
+             * Signed Payload
+             * @default
+             */
+            signed_payload: string;
+        };
+        /**
+         * AuditChainEntry
+         * @description One chained audit entry, in the exact shape its ``entry_hash`` was computed over.
+         *
+         *     This is the *verifiable* projection: it exists so a third party can recompute the hash
+         *     chain themselves rather than take the server's word for it. Every field below is an
+         *     input to ``entry_hash``, which is why ``metadata_json`` is the **raw stored string**
+         *     and not the parsed dict :class:`AuditEventRecord` exposes — the digest covers the raw
+         *     text specifically to avoid projection drift, so a re-projected dict would not reproduce
+         *     it.
+         *
+         *     Discloses no payload that ``GET /audit/events`` does not already return for the same
+         *     entity; the addition is the integrity metadata (``chain_seq``, ``chain_ts``,
+         *     ``prev_hash``, ``entry_hash``).
+         *
+         *     To verify offline, for each entry in ``chain_seq`` order::
+         *
+         *         payload = {chain_seq, chain_ts, created_at, event_type, message, actor_user_id,
+         *                    actor_email, entity_type, entity_id, metadata_json, prev_hash}
+         *         canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"),
+         *                                ensure_ascii=True, allow_nan=False).encode()
+         *         assert "sha256:" + hashlib.sha256(canonical).hexdigest() == entry_hash
+         *
+         *     and confirm each entry's ``prev_hash`` equals the previous entry's ``entry_hash``.
+         */
+        AuditChainEntry: {
+            /** Chain Seq */
+            chain_seq: number;
+            /** Chain Ts */
+            chain_ts: string;
+            /** Created At */
+            created_at: string;
+            /** Event Type */
+            event_type: string;
+            /** Message */
+            message: string;
+            /** Actor User Id */
+            actor_user_id?: number | null;
+            /** Actor Email */
+            actor_email?: string | null;
+            /** Entity Type */
+            entity_type?: string | null;
+            /** Entity Id */
+            entity_id?: number | null;
+            /** Metadata Json */
+            metadata_json?: string | null;
+            /** Prev Hash */
+            prev_hash: string;
+            /** Entry Hash */
+            entry_hash: string;
         };
         /**
          * AuditChainVerification
@@ -36345,6 +36471,16 @@ export interface components {
             total_minutes_saved: number;
             /** Total Hours Saved */
             total_hours_saved: number;
+            /**
+             * Time Saved Is Estimated
+             * @default true
+             */
+            time_saved_is_estimated: boolean;
+            /**
+             * Time Saved Basis
+             * @default per_task_type_constants
+             */
+            time_saved_basis: string;
             /** Reports Generated */
             reports_generated: number;
             /** Workflows Completed */
@@ -39069,6 +39205,11 @@ export interface components {
             multiplet_summary?: string | null;
             /** Source */
             source?: string | null;
+            /**
+             * Structure Withheld
+             * @default false
+             */
+            structure_withheld: boolean;
         };
         /**
          * SpectrumReasonAudit
@@ -43765,6 +43906,75 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SubjectAuditChainVerification"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    audit_anchor_public_key_route_audit_anchor_public_key_get: {
+        parameters: {
+            query?: {
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuditAnchorPublicKey"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    subject_audit_entries_route_audit__subject_type___subject_id__entries_get: {
+        parameters: {
+            query?: {
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path: {
+                subject_type: string;
+                subject_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuditChainEntry"][];
                 };
             };
             /** @description Validation Error */
