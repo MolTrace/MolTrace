@@ -1050,10 +1050,21 @@ def get_artifact_download(
     artifact_id: int,
     *,
     storage_root: Path,
+    owner_scope_id: int | None = None,
 ) -> tuple[ArtifactRecord, bytes, str] | None:
+    """The artifact record and its bytes, or None when the caller may not see it.
+
+    ``get_artifact_record`` was scoped in migration 0043's change without this
+    being scoped alongside it, which left the metadata gated and the BYTES open
+    -- the same half-applied shape the managed-file leak had, reintroduced one
+    function away from the fix for it. Whoever adds a reader here must scope it;
+    the download is the one that matters most.
+    """
     with session_scope(session_factory) as session:
         row = session.get(ArtifactRecordORM, artifact_id)
         if row is None:
+            return None
+        if owner_scope_id is not None and row.created_by_user_id != owner_scope_id:
             return None
         record = _artifact_to_record(row)
         if row.storage_key:
