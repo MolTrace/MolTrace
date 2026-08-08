@@ -14,7 +14,7 @@ Report privately through either of these channels:
 1. **GitHub private vulnerability reporting** — use the repository's
    **Security → Report a vulnerability** tab (GitHub Security Advisories). This
    is the preferred channel.
-2. **Email** — <security@moltrace.co>. If you would like to encrypt your report,
+2. **Email** — <moltrace.co@gmail.com>. If you would like to encrypt your report,
    ask in an initial low-detail email and we will provide a key.
 
 These contacts are also published, machine-readable, at
@@ -68,7 +68,7 @@ faith:
   demonstrate the issue.
 
 If in doubt about whether an action is authorized, contact
-<security@moltrace.co> first.
+<moltrace.co@gmail.com> first.
 
 ## A note on compliance framing
 

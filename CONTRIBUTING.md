@@ -63,5 +63,5 @@ or abusive behavior is not tolerated.
 ## Questions
 
 For licensing or commercial-use questions, contact
-[licensing@moltrace.co](mailto:licensing@moltrace.co). For security, see
+[moltrace.co@gmail.com](mailto:moltrace.co@gmail.com). For security, see
 [`SECURITY.md`](SECURITY.md).

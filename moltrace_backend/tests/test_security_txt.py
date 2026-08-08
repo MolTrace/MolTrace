@@ -52,7 +52,7 @@ def _fields(body: str) -> dict[str, list[str]]:
 def test_builder_emits_mandatory_contact_and_expires():
     body = wellknown.build_security_txt(_settings(), now=_FIXED_NOW)
     fields = _fields(body)
-    assert fields["Contact"] == ["mailto:security@moltrace.co"]
+    assert fields["Contact"] == ["mailto:moltrace.co@gmail.com"]
     assert len(fields["Expires"]) == 1
     expires = datetime.strptime(fields["Expires"][0], "%Y-%m-%dT%H:%M:%SZ").replace(
         tzinfo=UTC
@@ -75,7 +75,7 @@ def test_builder_includes_configured_optional_fields_and_multiple_contacts():
         _settings(
             security_txt_contacts=(
                 "https://github.com/example/MolTrace/security/advisories/new,"
-                "mailto:security@moltrace.co"
+                "mailto:moltrace.co@gmail.com"
             ),
             security_txt_policy_url="https://moltrace.co/security-policy",
             security_txt_canonical_url="https://moltrace.co/.well-known/security.txt",
@@ -84,7 +84,7 @@ def test_builder_includes_configured_optional_fields_and_multiple_contacts():
     )
     fields = _fields(body)
     assert fields["Contact"][0].startswith("https://github.com/")
-    assert fields["Contact"][1] == "mailto:security@moltrace.co"
+    assert fields["Contact"][1] == "mailto:moltrace.co@gmail.com"
     assert fields["Policy"] == ["https://moltrace.co/security-policy"]
     assert fields["Canonical"] == ["https://moltrace.co/.well-known/security.txt"]
 
@@ -112,7 +112,7 @@ def test_builder_blank_contacts_falls_back_to_default():
     body = wellknown.build_security_txt(
         _settings(security_txt_contacts="  ,  "), now=_FIXED_NOW
     )
-    assert _fields(body)["Contact"] == ["mailto:security@moltrace.co"]
+    assert _fields(body)["Contact"] == ["mailto:moltrace.co@gmail.com"]
 
 
 def test_builder_uses_crlf_line_endings():

@@ -38,7 +38,7 @@ _MAX_EXPIRES_DAYS = 364
 
 # Conservative fallback if a deployment blanks the contact: the address published
 # in the repo SECURITY.md. ``Contact`` is mandatory, so we never emit zero of them.
-_DEFAULT_CONTACT = "mailto:security@moltrace.co"
+_DEFAULT_CONTACT = "mailto:moltrace.co@gmail.com"
 
 
 def _expires_value(now: datetime, days: int) -> str:

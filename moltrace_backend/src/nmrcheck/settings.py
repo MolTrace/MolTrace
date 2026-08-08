@@ -191,7 +191,7 @@ class Settings:
     # ``security_txt_contacts`` is comma-separated, highest-priority first; ``Expires`` is computed
     # at request time so it never goes stale.
     security_txt_enabled: bool = True
-    security_txt_contacts: str = "mailto:security@moltrace.co"
+    security_txt_contacts: str = "mailto:moltrace.co@gmail.com"
     security_txt_expires_days: int = 180
     security_txt_policy_url: str = ""
     security_txt_canonical_url: str = ""
@@ -368,7 +368,7 @@ def get_settings() -> Settings:
         max_request_body_bytes=_parse_int(os.getenv("MAX_REQUEST_BODY_BYTES"), 0),
         security_txt_enabled=_parse_bool(os.getenv("SECURITY_TXT_ENABLED"), True),
         security_txt_contacts=os.getenv(
-            "SECURITY_TXT_CONTACTS", "mailto:security@moltrace.co"
+            "SECURITY_TXT_CONTACTS", "mailto:moltrace.co@gmail.com"
         ),
         security_txt_expires_days=_parse_int(
             os.getenv("SECURITY_TXT_EXPIRES_DAYS"), 180
