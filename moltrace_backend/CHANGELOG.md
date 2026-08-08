@@ -14,6 +14,47 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.68.7 — A match five lines could have explained is no longer worth five-sixths of a match (2026-08-08)
+
+`PredictionBoundsTest` counted a matched resonance as corroboration regardless of how many other
+experimental lines fell inside the same window. Measured on held-out NMRShiftDB2, replicating the
+grouping the test actually uses: **26.5 % of in-window ¹³C resonances and 32.5 % of ¹H resonances
+have a rival line strictly closer to the prediction than their own**, and narrowing the window cuts
+exposure 33 % while moving misassignment only 2.3 pp. The ambiguity is intrinsic at this predictor's
+accuracy — you cannot tune it away — so it belongs in the scoring model.
+
+`_ambiguity_weight` is a **normalised likelihood**, not a penalty invented to fit: under the same
+Gaussian the merit function already uses, it is the posterior that the line the matcher chose is the
+right one given the alternatives it could have chosen. Consequences worth stating:
+
+* one candidate ⇒ **exactly 1.0**, so an unambiguous match is untouched — this is the guarantee that
+  makes it safe to land;
+* `k` equidistant candidates ⇒ **exactly 1/k**;
+* a rival far outside the scale barely dilutes anything;
+* it depends only on the distances, so it is **order-independent** — ambiguity is a property of the
+  spectrum and the prediction, not of the order the greedy matcher happened to run. Rivals are
+  counted over *all* in-window units, including ones an earlier resonance already took.
+
+### It attenuates significance, never score
+
+Five candidate lines do not mean the structure is wrong; they mean the observation says little
+either way. Score is the direction channel (corroborate vs refute) and ambiguity is not refutation.
+Significance is what the module docstring defines as "how much the verdict should count", so that is
+where the discount belongs — and it can only attenuate, never flip a sign.
+
+The scale is the resonance's own conformal interval where one exists, the claimed σ otherwise.
+Without a usable scale it degrades to the uniform `1/k` rather than returning a NaN, which would
+have propagated silently through the mean and into the posterior.
+
+`details.mean_ambiguity_weight` and a per-resonance `ambiguity_weight` / `candidate_lines` are
+recorded for audit, so a verdict reached on diluted evidence is visible as such.
+
+**Not measured:** the aggregate distribution of ambiguity weights across the held-out corpus. The
+per-resonance rival statistics above are measured; how much the mean posterior moves in production
+is not, and this release does not claim it.
+
+---
+
 ## v0.68.6 — AssignmentsTest stops pricing every atom on the same ruler (2026-08-08)
 
 v0.68.5 found `_SHIFT_TOL_PPM`'s second consumer strictly dominated. Fixing it turned up a worse
