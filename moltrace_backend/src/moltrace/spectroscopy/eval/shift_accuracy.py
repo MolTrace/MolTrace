@@ -48,8 +48,10 @@ from moltrace.spectroscopy.predict.nmrnet_wrapper import (
 
 __all__ = [
     "ShiftAccuracyReport",
+    "ErrorModelFit",
     "split_records",
     "evaluate_shift_accuracy",
+    "fit_error_model",
 ]
 
 #: σ bin edges (ppm) for the calibration table. Chosen to straddle DP4's own
@@ -97,6 +99,8 @@ class ShiftAccuracyReport:
     n_train_molecules: int
     n_test_molecules: int
     n_train_references: int
+    signed_errors: dict[str, list[float]] = field(default_factory=dict)
+    """Matched-only ``predicted − observed`` per nucleus; the input to :func:`fit_error_model`."""
     notes: list[str] = field(default_factory=list)
 
     def as_dict(self) -> dict[str, Any]:
@@ -106,6 +110,7 @@ class ShiftAccuracyReport:
             "n_train_molecules": self.n_train_molecules,
             "n_test_molecules": self.n_test_molecules,
             "n_train_references": self.n_train_references,
+            "n_signed_errors": {k: len(v) for k, v in self.signed_errors.items()},
             "notes": list(self.notes),
         }
 
@@ -140,6 +145,7 @@ def evaluate_shift_accuracy(
 
     # nucleus -> lists of (abs_error, sigma, matched)
     errors: dict[str, list[tuple[float, float, bool]]] = {}
+    signed: dict[str, list[float]] = {}
     skipped = 0
 
     for record in test:
@@ -171,6 +177,10 @@ def evaluate_shift_accuracy(
             errors.setdefault(nucleus, []).append(
                 (abs(predicted - observed), sigma, matched)
             )
+            if matched:
+                # Signed, matched-only — the input fit_error_model needs. An
+                # element-prior atom is an abstention, not a prediction.
+                signed.setdefault(nucleus, []).append(predicted - observed)
 
     per_nucleus: dict[str, dict[str, float]] = {}
     for nucleus, rows in sorted(errors.items()):
@@ -207,11 +217,113 @@ def evaluate_shift_accuracy(
     return ShiftAccuracyReport(
         per_nucleus=per_nucleus,
         calibration=calibration,
+        signed_errors=signed,
         n_train_molecules=len(train),
         n_test_molecules=len(test),
         n_train_references=kb.reference_count,
         notes=notes,
     )
+
+
+@dataclass(frozen=True)
+class ErrorModelFit:
+    """A Student's-t fit to a predictor's *signed* shift errors, per nucleus.
+
+    Why this matters, mechanically
+    ------------------------------
+    DP4 (``nmrcheck.dp4_scoring``) scores a candidate as
+    ``∏_k (1 − T_ν(|Δ_k| / σ))`` using the **published** Smith & Goodman scale and
+    degrees of freedom — σ = 2.306 ppm / ν = 11.38 for ¹³C. Those constants were
+    fit to **GIAO-DFT** shift errors. Applying them to a *different* predictor
+    assumes the two share an error distribution, and that assumption is testable.
+
+    ν is the load-bearing parameter. It sets how surprising a large deviation is:
+    ν ≈ 12 is near-Gaussian, so a big outlier is treated as near-impossible and
+    drives that candidate's probability toward zero; ν ≈ 1 is Cauchy-like, where
+    large deviations are an ordinary occurrence. Score a heavy-tailed predictor
+    with a thin-tailed model and a **single** badly-predicted atom annihilates the
+    *correct* candidate — a false rejection, produced confidently.
+
+    A caveat this fit cannot separate on its own
+    --------------------------------------------
+    A heavy tail measured against NMRShiftDB2 is part genuine prediction failure
+    and part **label noise**: the reference data is community-submitted and
+    contains mis-assignments, and a 146 ppm ¹³C "error" is far more likely a bad
+    database record than a real prediction. Both inflate the tail. So this is
+    evidence that the published ν is wrong *for this predictor on this data* — not
+    a finished replacement constant. Treat it as a measurement, not a patch.
+    """
+
+    nucleus: str
+    n: int
+    scale: float
+    """Fitted Student's-t scale (ppm) — the analogue of DP4's σ."""
+    dof: float
+    """Fitted degrees of freedom — the analogue of DP4's ν. Low = heavy tails."""
+    loc: float
+    mae: float
+    rmse: float
+    published_scale: float
+    published_dof: float
+
+    @property
+    def rmse_over_mae(self) -> float:
+        """Tail indicator: ≈1.25 for a Gaussian, higher as tails fatten."""
+
+        return self.rmse / self.mae if self.mae else float("nan")
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "nucleus": self.nucleus,
+            "n": self.n,
+            "fitted_scale_ppm": self.scale,
+            "fitted_dof": self.dof,
+            "fitted_loc_ppm": self.loc,
+            "mae_ppm": self.mae,
+            "rmse_ppm": self.rmse,
+            "rmse_over_mae": self.rmse_over_mae,
+            "published_scale_ppm": self.published_scale,
+            "published_dof": self.published_dof,
+            "scale_ratio": self.scale / self.published_scale
+            if self.published_scale
+            else float("nan"),
+            "dof_ratio": self.dof / self.published_dof if self.published_dof else float("nan"),
+        }
+
+
+def fit_error_model(
+    signed_errors: Mapping[str, Sequence[float]],
+) -> dict[str, ErrorModelFit]:
+    """Fit a Student's t to each nucleus's signed errors and compare to DP4's.
+
+    ``signed_errors`` maps a nucleus to ``predicted − observed`` values, matched
+    atoms only: an element-prior atom is an abstention, not a prediction, and
+    folding it in would measure coverage rather than the error model.
+    """
+
+    from scipy import stats  # SciPy is already a core dependency.
+
+    from nmrcheck.literature_data import dp4_nu, dp4_sigma
+
+    fits: dict[str, ErrorModelFit] = {}
+    for nucleus, values in sorted(signed_errors.items()):
+        errors = [float(v) for v in values if math.isfinite(v)]
+        if len(errors) < 50:
+            continue
+        dof, loc, scale = stats.t.fit(errors)
+        abs_errors = [abs(e) for e in errors]
+        fits[nucleus] = ErrorModelFit(
+            nucleus=nucleus,
+            n=len(errors),
+            scale=float(scale),
+            dof=float(dof),
+            loc=float(loc),
+            mae=statistics.fmean(abs_errors),
+            rmse=math.sqrt(statistics.fmean(e * e for e in errors)),
+            published_scale=float(dp4_sigma(nucleus)),  # type: ignore[arg-type]
+            published_dof=float(dp4_nu(nucleus)),  # type: ignore[arg-type]
+        )
+    return fits
 
 
 def _calibration_table(
