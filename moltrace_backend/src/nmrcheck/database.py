@@ -922,6 +922,98 @@ def mark_job_started(session_factory: sessionmaker[Session], job_id: int) -> Non
 
 
 
+# --------------------------------------------------------------------------- #
+# Abandoned batch jobs
+# --------------------------------------------------------------------------- #
+
+# Seconds of patience per promised item, and the floor for the whole job.
+#
+# NOT an estimate of how long an item takes. Measured locally, one batch item
+# runs 0.9 ms (ethanol) to 50 ms (an erythromycin-sized structure); the budget
+# below is some 600x the worst of those. The margin is deliberate because the
+# two directions of error are not symmetric:
+#
+#   too generous -> a dead job lingers a little longer, which costs nothing;
+#   too tight    -> a batch that is still working gets killed, destroying it.
+#
+# And on Cloud Run the work runs in FastAPI BackgroundTasks *after* the response,
+# where CPU is throttled, so real throughput is not merely slower than local but
+# effectively unbounded. No measured multiple of local speed would be a safe
+# ceiling. Treat this as a floor on patience rather than a duration model.
+JOB_ITEM_TIME_BUDGET_SECONDS = 30.0
+
+# Covers a job whose items are few but whose container was cold-starting, and
+# gives a queued job time to be picked up at all.
+JOB_MINIMUM_TIME_BUDGET_SECONDS = 900.0
+
+# The statuses that mean "somebody is supposed to still be working on this".
+_UNSETTLED_JOB_STATUSES = ("pending", "queued", "processing")
+
+
+def stale_job_cutoff_seconds(total_items: int) -> float:
+    """How long a job of this size may go without finishing before it is abandoned.
+
+    Scales with the work the job actually promised: a one-item job and a
+    hundred-item job are not equally suspicious at the same age.
+    """
+    return max(
+        JOB_MINIMUM_TIME_BUDGET_SECONDS,
+        max(0, int(total_items)) * JOB_ITEM_TIME_BUDGET_SECONDS,
+    )
+
+
+def reap_stale_jobs(
+    session_factory: sessionmaker[Session],
+    *,
+    now: datetime | None = None,
+) -> list[int]:
+    """Mark batch jobs whose runner died as failed. Returns the ids reaped.
+
+    ``process_job_items`` marks a job failed inside an ``except``, which handles a
+    Python exception and nothing else. On Cloud Run the expected end of a batch is
+    not an exception: with no ``REDIS_URL`` the work runs in FastAPI
+    ``BackgroundTasks`` after the response is sent, the service runs with
+    ``--min-instances 0``, and CPU is throttled once the request completes. The
+    process is killed, no exception is raised, and the row stays ``processing``
+    with partial results saved -- forever, because nothing swept for it.
+
+    Progress is preserved. The analyses that completed are real, they remain
+    attributable to the job, and the message says how far it got, because a
+    reviewer's next question is always "how much of this can I use".
+
+    Idempotent: a reaped job is ``failed`` and therefore settled, so a second
+    sweep returns nothing.
+    """
+    moment = now or utcnow()
+    reaped: list[int] = []
+    with session_scope(session_factory) as session:
+        rows = session.scalars(
+            select(JobORM).where(JobORM.status.in_(_UNSETTLED_JOB_STATUSES))
+        ).all()
+        for job in rows:
+            # started_at for work that began; created_at for a job killed before
+            # anything picked it up, which has no started_at to measure from.
+            anchor = job.started_at or job.created_at
+            if anchor is None:
+                continue
+            if anchor.tzinfo is None:
+                anchor = anchor.replace(tzinfo=UTC)
+            age_seconds = (moment - anchor).total_seconds()
+            if age_seconds <= stale_job_cutoff_seconds(job.total_items):
+                continue
+            completed = int(job.completed_items or 0)
+            total = int(job.total_items or 0)
+            job.status = "failed"
+            job.finished_at = moment
+            job.error_message = (
+                f"This batch stopped before it finished. {completed} of {total} "
+                "items completed and were saved; the rest were not run. "
+                "Submit the remaining items again to continue."
+            )
+            reaped.append(job.id)
+    return reaped
+
+
 def update_job_progress(
     session_factory: sessionmaker[Session],
     job_id: int,
