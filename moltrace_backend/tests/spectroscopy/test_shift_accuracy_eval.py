@@ -228,6 +228,70 @@ def test_matched_beats_element_prior_on_a_mixed_coverage_split():
     )
 
 
+# --------------------------------------------------------------------------- #
+# The error model DP4 assumes vs the one this predictor actually has
+# --------------------------------------------------------------------------- #
+def test_error_model_fit_recovers_a_known_distribution():
+    """Fit a t-distribution we generated, and check it comes back.
+
+    Pins the machinery, not the science: if this cannot recover parameters from
+    data it was handed, the measured 13C fit means nothing either.
+    """
+
+    from scipy import stats
+
+    from moltrace.spectroscopy.eval.shift_accuracy import fit_error_model
+
+    # Fixed seed via a frozen distribution's rvs with an explicit random_state —
+    # the module itself stays randomness-free; only this test generates data.
+    sample = stats.t.rvs(df=3.0, loc=0.0, scale=2.0, size=4000, random_state=1234)
+    fits = fit_error_model({"13C": sample.tolist()})
+
+    fit = fits["13C"]
+    assert fit.n == 4000
+    assert fit.scale == pytest.approx(2.0, rel=0.25)
+    assert fit.dof == pytest.approx(3.0, rel=0.6)
+    assert fit.published_scale == pytest.approx(2.306)
+    assert fit.published_dof == pytest.approx(11.38)
+
+
+def test_heavy_tails_are_visible_in_rmse_over_mae():
+    """The tail indicator must actually distinguish heavy from light tails.
+
+    Gaussian gives ~1.25. A materially higher ratio is what says "one bad atom is
+    ordinary here", which is exactly what DP4's degrees-of-freedom encodes.
+    """
+
+    from scipy import stats
+
+    from moltrace.spectroscopy.eval.shift_accuracy import fit_error_model
+
+    gaussian = stats.norm.rvs(scale=2.0, size=4000, random_state=7)
+    heavy = stats.t.rvs(df=1.5, scale=2.0, size=4000, random_state=7)
+
+    light_fit = fit_error_model({"13C": gaussian.tolist()})["13C"]
+    heavy_fit = fit_error_model({"13C": heavy.tolist()})["13C"]
+
+    assert light_fit.rmse_over_mae == pytest.approx(1.25, abs=0.15)
+    assert heavy_fit.rmse_over_mae > light_fit.rmse_over_mae
+    assert heavy_fit.dof < light_fit.dof
+
+
+def test_fit_declines_on_too_few_points():
+    """A fit on a handful of atoms would be noise presented as a parameter."""
+
+    from moltrace.spectroscopy.eval.shift_accuracy import fit_error_model
+
+    assert fit_error_model({"13C": [0.1, -0.2, 0.3]}) == {}
+
+
+def test_report_exposes_matched_only_signed_errors(report):
+    """The fit's input must exclude abstentions, or it measures coverage."""
+
+    stats_13c = report.per_nucleus["13C"]
+    assert len(report.signed_errors["13C"]) == int(stats_13c["n_matched"])
+
+
 def test_evaluation_does_not_consult_the_test_molecules_own_shifts(report):
     """Sanity: a perfect score would mean the test data leaked into the table."""
 
