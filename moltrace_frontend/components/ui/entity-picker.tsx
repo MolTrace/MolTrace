@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react"
 import { Check, ChevronsUpDown, Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { ApiError } from "@/lib/api/client"
+import { readUpgradeRefusal, upgradeCopy } from "@/lib/api/upgrade-state"
 import { Button } from "@/components/ui/button"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import {
@@ -42,9 +43,17 @@ type EntityPickerProps = {
 
 /** Turns a failed load into something a reader can act on. */
 function describeLoadFailure(err: unknown): string {
+  // The four closed-product states each have their own next action, and each
+  // says something different about WHOSE problem it is. Prefer them over the
+  // generic licensing line below, which could only ever say "you do not have
+  // this" — true for all four, useful for none.
+  const refusal = readUpgradeRefusal(err)
+  if (refusal) return upgradeCopy(refusal).title
+
   if (err instanceof ApiError) {
     // A licensing refusal is not a permission failure — one is an upgrade path,
-    // the other is an access error, and they must not read the same.
+    // the other is an access error, and they must not read the same. This is the
+    // deployment-wide gate, which is not one of the four.
     if (err.moduleNotIncluded) return "This list belongs to a product this workspace does not include."
     if (err.status === 401 || err.status === 403) return "Sign in to load these options."
     if (err.status === 404) return "That list is not available here."
