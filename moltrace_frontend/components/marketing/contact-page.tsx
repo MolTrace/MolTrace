@@ -85,26 +85,34 @@ type Office = {
   region: string
   address: string
   hours: string
+  /** False where we have no presence yet. The row still renders — it says where
+   *  we are going — but it must not imply coverage we cannot provide. */
+  available?: boolean
 }
 
+// The team is based in the United States. EMEA and APAC previously advertised
+// local business hours, which read as staffed regional coverage and promised a
+// response window nobody could honour in those time zones. They are marked as
+// planned instead, and their hours line says so rather than naming a schedule.
 const OFFICES: Office[] = [
   {
     city: "Americas",
-    region: "Remote-first team",
+    region: "United States · Remote-first team",
     address: `Reach us anytime at ${SHARED_INBOX}`,
     hours: "Mon–Fri · ET business hours",
+    available: true,
   },
   {
     city: "EMEA",
-    region: "Remote-first team",
-    address: `Reach us anytime at ${SHARED_INBOX}`,
-    hours: "Mon–Fri · GMT business hours",
+    region: "Planned coverage",
+    address: `In the meantime, reach us at ${SHARED_INBOX}`,
+    hours: "Handled from ET business hours today",
   },
   {
     city: "APAC",
-    region: "Remote-first team",
-    address: `Reach us anytime at ${SHARED_INBOX}`,
-    hours: "Mon–Fri · SGT business hours",
+    region: "Planned coverage",
+    address: `In the meantime, reach us at ${SHARED_INBOX}`,
+    hours: "Handled from ET business hours today",
   },
 ]
 
@@ -237,7 +245,14 @@ export function ContactPage() {
                         aria-hidden
                       />
                       <div className="text-sm">
-                        <p className="font-semibold tracking-tight">{office.city}</p>
+                        <p className="flex flex-wrap items-center gap-2 font-semibold tracking-tight">
+                          {office.city}
+                          {office.available ? null : (
+                            <span className="rounded-full border border-dashed px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground">
+                              Coming soon
+                            </span>
+                          )}
+                        </p>
                         <p className="text-xs uppercase tracking-[0.12em] text-muted-foreground">
                           {office.region}
                         </p>

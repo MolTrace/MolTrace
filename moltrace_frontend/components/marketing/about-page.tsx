@@ -660,14 +660,17 @@ export function AboutPage() {
                 className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
                 style={{ color: "var(--mt-teal-ink)" }}
               >
-                Where we work
+                Where we focus
               </p>
               <h2 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">
                 Focused on the science.
               </h2>
+              {/* "Where we work" implied a presence in all three. The team is in
+                  the United States; the other two are markets we are building
+                  toward, and the copy has to say which is which. */}
               <p className="mt-4 text-base text-muted-foreground">
-                Three regions we focus on, each chosen for its proximity to the pharma R&amp;D +
-                regulatory community.
+                The team is US-based today. These are the three regions we build toward, each
+                chosen for its proximity to the pharma R&amp;D + regulatory community.
               </p>
             </div>
             <div className="mt-12 grid gap-6 lg:grid-cols-3">
