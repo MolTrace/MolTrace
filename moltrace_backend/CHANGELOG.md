@@ -14,59 +14,51 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
-## v0.68.2 — How often a wrong structure wins: 38.1 % (2026-08-08)
+## v0.68.6 — AssignmentsTest stops pricing every atom on the same ruler (2026-08-08)
 
-The eval harness has always treated `false_confirmation_rate` as a **zero-regression** safety
-metric. It had no source of wrong answers to compute it from, so it had never been computed.
-Accuracy on correct structures says nothing about the failure that matters.
+v0.68.5 found `_SHIFT_TOL_PPM`'s second consumer strictly dominated. Fixing it turned up a worse
+use of the same constant sitting beside it: `AssignmentsTest` used the flat value **twice** — as
+the candidate radius, and as the width of the merit Gaussian `exp(-0.5·(d/base_tol)²)`.
 
-`spectroscopy/eval/decoys.py` generates plausibly-wrong structures — the mistakes a chemist
-actually makes (heteroatom misread, homologue off by one CH₂, misplaced methyl, regioisomer,
-inverted stereocentre). A randomly drawn molecule is rejected trivially and measures nothing.
-`spectroscopy/eval/false_confirmation.py` scores them, so the number is reproducible on demand
-rather than living in a terminal.
+**The merit scale was the more consequential.** On a fixed 4.0 ppm ruler an atom predicted to
+±1.5 ppm scores **0.88** for a 2 ppm miss that is well *outside* its interval, while an atom
+predicted to ±22 ppm scores **0.32** for a 6 ppm hit well *inside* its own. That is the same
+inversion the significance mapping had in v0.68.1, one test over, and it was never measured because
+nothing had looked past the first consumer.
 
-**1,657 held-out molecules / 5,639 decoy pairs**, ¹³C shift lists through DP4:
+Both now scale by the resonance's own conformal interval. A pairing one scale away scores
+`exp(-0.5)` for every atom on every nucleus, which is what makes merits comparable across a
+molecule at all.
 
-| bucket | pairs |
-|---|---|
-| scored by DP4 | 3,073 |
-| rejected on carbon count (formula, not NMR) | 2,287 |
-| **indistinguishable to the predictor** | 279 |
-| unscorable | 0 |
+Re-baselined on the same held-out split (`scripts/measure_assignments_window.py`, 32,708 ¹³C /
+10,662 ¹H resonances):
 
-**False-confirmation rate: 38.1 %** (1,172 / 3,073).
+| candidate radius | ¹³C retention | ¹³C candidates | ¹H retention | ¹H candidates |
+|---|---|---|---|---|
+| flat `3×base` (before) | 95.06 % | 3.274 | 90.96 % | 3.501 |
+| **`3×` conformal (now)** | **99.07 %** | 4.089 | **99.25 %** | 4.898 |
+| `max(flat, conformal)` | 99.59 % | 4.481 | 99.48 % | 5.111 |
 
-| decoy kind | FC rate |
-|---|---|
-| heteroatom swap | 38.5 % — changes the formula; HRMS catches these upstream |
-| **ring substitution (regioisomer)** | **37.7 % — same formula, nothing upstream catches it** |
-| homologue / methyl added | all rejected on carbon count |
-| stereo inversion | 279 of 282 indistinguishable |
+The flat radius lost the true pairing for **5.0 % of ¹³C and 9.0 % of ¹H resonances**, and each
+loss is penalised **twice** — merit 0.0, *and* the resonance's integral counted as unexplained
+impurity, which lowers this test's own significance. A correct structure was being marked down for
+the predictor's uncertainty.
 
-**Read it precisely.** This is *not* "MolTrace confirms wrong structures 38 % of the time". It is
-the ¹³C-shift-list layer alone, through DP4 — no 2-D, no MS, no multiplicity, and **not** the
-multi-test `verify_structure` arbiter. What it establishes is that this one evidence layer
-discriminates barely better than chance once a formula check has done its work, and that the
-formula check is doing most of the real filtering (2,287 of 5,639 pairs).
+`max(flat, conformal)` was rejected despite scoring marginally higher: the extra 0.5 pp costs 10 %
+more candidates and reintroduces the flat floor that is the thing being removed. Worth noting the
+adaptive rule is **not** a superset — for confident atoms it is *narrower* than 12.0 ppm — and
+retention still rises, because the loss was concentrated in the high-σ resonances the flat radius
+truncated.
 
-The load-bearing row is the regioisomer: it survives every upstream filter and ¹³C shifts resolve
-it at 37.7 % error. Chemically unsurprising — regiochemistry is what HMBC and HSQC are for — and
-direct evidence that candidate generation must be driven by 2-D correlations rather than shift
-lists.
-
-**Stereochemistry is now a demonstrated bound.** 279 of 282 stereo decoys are *literally*
-indistinguishable: identical connectivity → identical HOSE code → identical prediction. Recorded
-in the claim-integrity register as a hard capability boundary.
-
-The accounting is the design: every decoy lands in exactly one bucket, the buckets sum to the
-total, and the rate is `None` rather than `0.0` when nothing was scored — zero evidence is not a
-perfect score. Formula-rejected and indistinguishable pairs never enter the denominator, because
-crediting either to shift evidence would overstate what the spectrum contributed.
+Invariant tests were written first, and the load-bearing one is the no-regression guarantee: with
+no calibration supplied the behaviour is byte-identical to before. `details.window_basis` records
+which ruler priced each resonance and the calibration fingerprint, so a run scored on the flat
+fallback is tellable from a calibrated one. `_shift_merit` returns 0.0 rather than NaN for an
+unusable scale — a NaN would have propagated silently through the mean and voided the test.
 
 ---
 
-## v0.68.3 — A retracted defect, a real one found in the next test over (2026-08-08)
+## v0.68.5 — A retracted defect, a real one found in the next test over (2026-08-08)
 
 v0.68.1 recorded an adjacent defect: `PredictionBoundsTest`'s match tolerance `max(base, 3σ)` was
 "too permissive everywhere and worst for confident atoms — 2.74× at σ = 0.169". **That claim is
@@ -122,6 +114,112 @@ per-resonance ambiguity rate, not end-to-end accuracy — the matcher's sequenti
 bookkeeping is order-dependent and this does not model it. The raw per-atom figure before grouping
 was 36.0 % / 42.2 %; quoting that would have reported the measuring method's artefact as the
 pipeline's defect.
+
+---
+
+## v0.68.4 — Sources are superseded, never edited (2026-08-08)
+
+`update_source` wrote over the existing row. But `publication_date`, `doi` and
+`reliability_label` are exactly the fields a downstream extraction was *justified by*, so
+editing them in place left records citing a source that now said something else — with
+nothing anywhere to reveal the change had happened. A corpus that cannot show what a fact
+was justified by at the time is not a provenance system.
+
+Sources now carry **revisions**. Every change appends an immutable snapshot and the
+predecessor stays readable forever; `supersede_source` replaces `update_source`. Each
+extracted record and citation binds to the revision it was actually read from, so a
+divergence between a record's revision and the source's current one is what makes the
+change detectable at all. The source id keeps meaning what it always meant — the living
+source — so anything holding one across a change still resolves.
+
+Superseding **flags, never rewrites**. Records derived from the superseded revision get a
+review task naming what moved; they keep their own review decisions and stay bound to their
+own revision. Auto-re-pointing them would quietly rewrite what they were justified by,
+which is the failure the audit-chain work spent this week eliminating elsewhere. Records
+that predate revisions carry no binding, and are flagged too: "we cannot tell which revision
+this came from" is not a reason to skip a record, it is the reason it needs a human most.
+
+A `reliability_label` change also emits **its own** audit event, because how far a source is
+trusted can invalidate every conclusion already drawn from it, and that should not be
+findable only by reading a field list inside some other entry.
+
+Migration `0045` backfills revision 1 for existing sources — true today, and without it the
+first supersede would have no predecessor to point at. It deliberately does **not** backfill
+`source_revision_id` on existing records: asserting they came from what the source says now
+is unknowable, and most likely false precisely where in-place editing already happened.
+
+New: `GET /knowledge/sources/{source_id}/revisions`.
+
+---
+
+## v0.68.3 — Search stops returning facts a reviewer rejected (2026-08-08)
+
+`search_knowledge` filtered on text match and nothing else, so a record someone had
+explicitly **rejected** came back beside an accepted one, indistinguishable in the result.
+The review step existed and a human did the work of rejecting a bad extraction; the search
+surface then discarded that judgement. Anyone using the corpus to answer a regulatory
+question was handed refused material as though it were curated.
+
+Results now default to accepted-or-unreviewed. Unreviewed still returns — a young corpus
+would otherwise look empty — but every hit carries its own `review_status`, so "nobody has
+checked this" is never presentable as "someone approved it". Seeing rejected material takes
+an explicit `include_rejected`, rather than being the convenient default.
+
+Citations are deliberately left unfiltered and the code says so: they have no
+`review_status` column at all, and inventing a default would be guessing at a governance
+state that was never recorded.
+
+---
+
+## v0.68.2 — How often a wrong structure wins: 38.1 % (2026-08-08)
+
+The eval harness has always treated `false_confirmation_rate` as a **zero-regression** safety
+metric. It had no source of wrong answers to compute it from, so it had never been computed.
+Accuracy on correct structures says nothing about the failure that matters.
+
+`spectroscopy/eval/decoys.py` generates plausibly-wrong structures — the mistakes a chemist
+actually makes (heteroatom misread, homologue off by one CH₂, misplaced methyl, regioisomer,
+inverted stereocentre). A randomly drawn molecule is rejected trivially and measures nothing.
+`spectroscopy/eval/false_confirmation.py` scores them, so the number is reproducible on demand
+rather than living in a terminal.
+
+**1,657 held-out molecules / 5,639 decoy pairs**, ¹³C shift lists through DP4:
+
+| bucket | pairs |
+|---|---|
+| scored by DP4 | 3,073 |
+| rejected on carbon count (formula, not NMR) | 2,287 |
+| **indistinguishable to the predictor** | 279 |
+| unscorable | 0 |
+
+**False-confirmation rate: 38.1 %** (1,172 / 3,073).
+
+| decoy kind | FC rate |
+|---|---|
+| heteroatom swap | 38.5 % — changes the formula; HRMS catches these upstream |
+| **ring substitution (regioisomer)** | **37.7 % — same formula, nothing upstream catches it** |
+| homologue / methyl added | all rejected on carbon count |
+| stereo inversion | 279 of 282 indistinguishable |
+
+**Read it precisely.** This is *not* "MolTrace confirms wrong structures 38 % of the time". It is
+the ¹³C-shift-list layer alone, through DP4 — no 2-D, no MS, no multiplicity, and **not** the
+multi-test `verify_structure` arbiter. What it establishes is that this one evidence layer
+discriminates barely better than chance once a formula check has done its work, and that the
+formula check is doing most of the real filtering (2,287 of 5,639 pairs).
+
+The load-bearing row is the regioisomer: it survives every upstream filter and ¹³C shifts resolve
+it at 37.7 % error. Chemically unsurprising — regiochemistry is what HMBC and HSQC are for — and
+direct evidence that candidate generation must be driven by 2-D correlations rather than shift
+lists.
+
+**Stereochemistry is now a demonstrated bound.** 279 of 282 stereo decoys are *literally*
+indistinguishable: identical connectivity → identical HOSE code → identical prediction. Recorded
+in the claim-integrity register as a hard capability boundary.
+
+The accounting is the design: every decoy lands in exactly one bucket, the buckets sum to the
+total, and the rate is `None` rather than `0.0` when nothing was scored — zero evidence is not a
+perfect score. Formula-rejected and indistinguishable pairs never enter the denominator, because
+crediting either to shift evidence would overstate what the spectrum contributed.
 
 ---
 

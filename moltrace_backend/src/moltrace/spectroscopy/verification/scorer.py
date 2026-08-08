@@ -164,6 +164,26 @@ def _significance_from_sigma(sigma: float, nucleus: str) -> float:
     return _SIG_MAX * ref / (ref + float(sigma))
 
 
+def _shift_merit(distance_ppm: float, scale_ppm: float) -> float:
+    """Gaussian agreement between a predicted and an observed shift.
+
+    ``scale_ppm`` sets what "close" means. It used to be a flat per-nucleus constant,
+    which priced the same physical agreement differently depending on nothing: an atom
+    predicted to ±1.5 ppm scored 0.88 for a 2 ppm miss well outside its interval, while
+    an atom predicted to ±22 ppm scored 0.32 for a 6 ppm hit well inside its own. Scaled
+    by the atom's own interval, a pairing one scale away is ``exp(-0.5)`` for every atom.
+
+    Returns 0.0 for a non-usable scale rather than NaN: a NaN merit would propagate
+    silently through the mean and void the whole test.
+    """
+
+    if not math.isfinite(scale_ppm) or scale_ppm <= 0.0:
+        return 0.0
+    if not math.isfinite(distance_ppm):
+        return 0.0
+    return math.exp(-0.5 * (float(distance_ppm) / float(scale_ppm)) ** 2)
+
+
 def _significance_from_half_width(
     half_width: float | None, *, reference_half_width: float | None
 ) -> float:
@@ -629,6 +649,7 @@ class AssignmentsTest:
         nucleus: str,
         total_h: int,
         prior_confidence: float,
+        calibration: ConformalCalibration | None = None,
     ) -> TestResult:
         resonances = _group_resonances(prediction, nucleus)
         if not resonances or not units:
@@ -640,12 +661,35 @@ class AssignmentsTest:
         total_area = _units_area(units) or 1.0
         base_tol = _SHIFT_TOL_PPM.get(nucleus, 0.30)
 
+        # Per-resonance scale: the atom's own conformal interval where one exists,
+        # otherwise the flat per-nucleus constant. Held-out measurement: the flat
+        # radius loses the true pairing for 5.0 % of 13C and 9.0 % of 1H resonances,
+        # and a lost pairing is penalised twice -- merit 0.0, *and* its integral
+        # counted as unexplained impurity, which lowers this test's own significance.
+        # The adaptive radius raises retention to 99.1 % / 99.3 %.
+        scales: list[float] = []
+        conformal_scaled = 0
+        flat_scaled = 0
+        for r in resonances:
+            half_width = (
+                calibration.interval(nucleus, r["sigma_ppm"]).half_width_ppm
+                if calibration is not None
+                else None
+            )
+            if half_width is not None and math.isfinite(half_width) and half_width > 0.0:
+                scales.append(float(half_width))
+                conformal_scaled += 1
+            else:
+                scales.append(base_tol)
+                flat_scaled += 1
+
         # Greedy optimal-by-distance bipartite assignment (deterministic).
         candidates: list[tuple[float, int, int]] = []
         for i, r in enumerate(resonances):
+            radius = 3.0 * scales[i]
             for j, u in enumerate(units):
                 d = abs(u["center_ppm"] - r["delta_ppm"])
-                if d <= 3.0 * base_tol:
+                if d <= radius:
                     candidates.append((d, i, j))
         candidates.sort()
         assign: dict[int, int] = {}
@@ -665,7 +709,7 @@ class AssignmentsTest:
                 continue
             u = units[assign[i]]
             d = abs(u["center_ppm"] - r["delta_ppm"])
-            shift_merit = math.exp(-0.5 * (d / base_tol) ** 2)
+            shift_merit = _shift_merit(d, scales[i])
             integ_merit = 1.0
             if nucleus == "1H" and total_h > 0:
                 obs = total_h * u["area"] / total_area
@@ -676,11 +720,18 @@ class AssignmentsTest:
         score = 2.0 * merit - 1.0
         impurity_pct = 100.0 * (total_area - explained_area) / total_area
         significance = _SIG_MAX * _clip(1.0 - impurity_pct / _IMPURITY_REF_PCT, 0.0, 1.0)
+        window = (
+            "conformal interval"
+            if conformal_scaled and not flat_scaled
+            else "flat per-nucleus tolerance"
+            if flat_scaled and not conformal_scaled
+            else f"conformal interval on {conformal_scaled}, flat on {flat_scaled}"
+        )
         diagnostic = (
             f"Assigned {len(assign)}/{len(resonances)} predicted {nucleus} resonances "
             f"(merit {merit:.2f}, multiplicity consistency {mult_consistency:.2f}); "
             f"unexplained integral {impurity_pct:.0f}% -> significance "
-            f"{significance:.1f} ({_sig_band(significance)})."
+            f"{significance:.1f} ({_sig_band(significance)}); scaled by {window}."
         )
         return TestResult.create(
             name=self.name,
@@ -694,6 +745,17 @@ class AssignmentsTest:
                 "merit": round(merit, 3),
                 "impurity_pct": round(impurity_pct, 1),
                 "multiplicity_consistency": round(mult_consistency, 3),
+                # Which ruler priced each resonance, and which calibration set it.
+                # A run scored on the flat fallback must be tellable from a
+                # calibrated one in the audit record.
+                "window_basis": {
+                    "conformal": conformal_scaled,
+                    "flat": flat_scaled,
+                    "flat_scale_ppm": base_tol,
+                    "calibration_fingerprint": (
+                        calibration.fingerprint() if calibration is not None else None
+                    ),
+                },
             },
         )
 
@@ -1095,6 +1157,7 @@ def verify_structure(
                         nucleus=nucleus,
                         total_h=total_h,
                         prior_confidence=prior_confidence,
+                        calibration=options.shift_calibration,
                     )
                     if prediction is not None
                     else TestResult.abstain(
