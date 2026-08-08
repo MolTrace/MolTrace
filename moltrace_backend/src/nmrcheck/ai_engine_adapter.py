@@ -27,7 +27,8 @@ This module owns no science — the confidence scale lives in
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+import weakref
+from collections.abc import Mapping, MutableMapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -37,10 +38,14 @@ __all__ = [
     "EngineInputError",
     "EngineResult",
     "EngineUnavailable",
+    "PromotionRecord",
+    "RegistryView",
     "assert_no_model_derived_inputs",
     "dominance_verdict",
     "engine_backed_services",
     "is_engine_backed",
+    "promote_to_serving",
+    "registry_views",
     "run_prediction",
 ]
 
@@ -352,7 +357,168 @@ def _run_candidate_ranking(
 # --------------------------------------------------------------------------- #
 # Registry
 # --------------------------------------------------------------------------- #
-_REGISTRY_STORES: dict[int, Any] = {}
+# Keyed by the engine *object*, not its id(): the test suite swaps a fresh engine onto
+# the app per test, and an id() key can be handed out again after the old engine is
+# collected — which would return a store bound to a dead engine.
+_REGISTRY_STORES: MutableMapping[Any, Any] = weakref.WeakKeyDictionary()
+
+
+@dataclass(frozen=True)
+class PromotionRecord:
+    """The outcome of promoting an artifact to serving in the science registry."""
+
+    model_id: str
+    role: str
+    nucleus: str | None
+    semantic_version: str
+    artifact_sha256: str
+    superseded_model_id: str | None
+    registered: bool  # False when the entry already existed and was only promoted
+
+
+@dataclass(frozen=True)
+class RegistryView:
+    """A registry entry's product-facing facts, for one artifact."""
+
+    model_id: str
+    status: str
+    role: str
+    nucleus: str | None
+
+
+def promote_to_serving(
+    *,
+    session_factory: Any,
+    role: str,
+    semantic_version: str,
+    artifact_sha256: str,
+    dataset_snapshot_hash: str,
+    dataset_row_count: int,
+    nucleus: str | None = None,
+    dataset_tag: str | None = None,
+    dataset_source: str | None = None,
+    confidence_band_ppm: float | None = None,
+    reason: str | None = None,
+) -> PromotionRecord:
+    """Register (if needed) and promote an artifact to ``production`` in the registry.
+
+    This is what makes the inference router resolve the artifact: it resolves on
+    (role, nucleus) among entries whose *current* status is production, and promoting
+    one auto-retires the incumbent as an appended event. Re-promoting an entry that is
+    already production is refused by the registry's transition rules, and that refusal
+    is surfaced rather than swallowed — silently accepting it would report a promotion
+    that did not happen.
+
+    A durable store is required. Promoting into an in-memory registry would report
+    success and change nothing about what serves traffic, which is the exact class of
+    defect this whole seam exists to remove.
+    """
+
+    from moltrace.spectroscopy.ai.registry import (
+        InMemoryRegistryStore,
+        ModelRegistry,
+        ModelRole,
+        ModelStatus,
+        RegistryError,
+        TrainingDataLineage,
+        build_model_entry,
+    )
+
+    store = _registry_store(session_factory)
+    if isinstance(store, InMemoryRegistryStore):
+        raise EngineUnavailable(
+            "the model registry has no durable store on this deployment, so promoting "
+            "an artifact would not change what serves predictions"
+        )
+
+    try:
+        model_role = ModelRole(role)
+    except ValueError as exc:
+        raise EngineInputError(f"{role!r} is not a model role the router resolves") from exc
+
+    registry = ModelRegistry(store)
+    entry = build_model_entry(
+        role=model_role,
+        semantic_version=semantic_version,
+        artifact_sha256=artifact_sha256,
+        training_data_lineage=TrainingDataLineage(
+            dataset_snapshot_hash=dataset_snapshot_hash,
+            row_count=int(dataset_row_count),
+            dataset_tag=dataset_tag,
+            source=dataset_source,
+        ),
+        nucleus=nucleus,
+        confidence_band_ppm=confidence_band_ppm,
+    )
+
+    incumbent = registry.resolve(model_role, nucleus)
+    existing = store.get_entry(entry.model_id)
+    registered = False
+    if existing is None:
+        registry.register(entry)
+        registered = True
+    elif existing.artifact_sha256 != artifact_sha256:
+        # The registry is append-only precisely so this cannot be papered over: the
+        # same version pointing at different bytes means one of the two is not what
+        # was reviewed.
+        raise EngineInputError(
+            f"{entry.model_id!r} is already registered against a different artifact "
+            "hash; register a new semantic version rather than reusing this one"
+        )
+
+    try:
+        registry.promote(entry.model_id, reason=reason)
+    except RegistryError as exc:
+        raise EngineInputError(str(exc)) from exc
+
+    superseded = (
+        incumbent.model_id
+        if incumbent is not None and incumbent.model_id != entry.model_id
+        else None
+    )
+    assert registry.current_status(entry.model_id) is ModelStatus.PRODUCTION
+    return PromotionRecord(
+        model_id=entry.model_id,
+        role=model_role.value,
+        nucleus=nucleus,
+        semantic_version=semantic_version,
+        artifact_sha256=artifact_sha256,
+        superseded_model_id=superseded,
+        registered=registered,
+    )
+
+
+def registry_views(session_factory: Any, model_ids: Sequence[str]) -> dict[str, RegistryView]:
+    """Look up the live registry facts for ``model_ids``, skipping unknown ids.
+
+    Used to render the product's artifact listing from the registry rather than from a
+    stale copy, so what a reviewer sees as deployed is what the router would resolve.
+    Returns an empty mapping when the registry is unavailable: a read path must not
+    fail because an enrichment could not be computed.
+    """
+
+    wanted = {mid for mid in model_ids if mid}
+    if not wanted:
+        return {}
+    try:
+        from moltrace.spectroscopy.ai.registry import InMemoryRegistryStore, ModelRegistry
+
+        store = _registry_store(session_factory)
+        if isinstance(store, InMemoryRegistryStore):
+            return {}
+        registry = ModelRegistry(store)
+        return {
+            entry.model_id: RegistryView(
+                model_id=entry.model_id,
+                status=registry.current_status(entry.model_id).value,
+                role=entry.role.value,
+                nucleus=entry.nucleus,
+            )
+            for entry in store.all_entries()
+            if entry.model_id in wanted
+        }
+    except Exception:  # noqa: BLE001 - enrichment is best-effort by design
+        return {}
 
 
 def _registry_store(session_factory: Any = None) -> Any:
@@ -369,10 +535,11 @@ def _registry_store(session_factory: Any = None) -> Any:
     engine = getattr(session_factory, "kw", {}).get("bind") if session_factory else None
     if engine is None:
         return InMemoryRegistryStore()
-    key = id(engine)
-    if key not in _REGISTRY_STORES:
-        _REGISTRY_STORES[key] = SqlAlchemyRegistryStore(engine)
-    return _REGISTRY_STORES[key]
+    store = _REGISTRY_STORES.get(engine)
+    if store is None:
+        store = SqlAlchemyRegistryStore(engine)
+        _REGISTRY_STORES[engine] = store
+    return store
 
 
 # --------------------------------------------------------------------------- #

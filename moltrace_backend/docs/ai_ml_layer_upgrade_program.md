@@ -188,10 +188,34 @@ with it. Combined order:
 > 0.143 and reports `out_of_domain` instead of leaving an abstention indistinguishable from a
 > prediction.
 >
-> **Still open in L0:** C2 (registry unification — `ModelRegistry` currently self-creates its own
-> two append-only tables beside `model_artifacts` rather than projecting onto it; needs a migration
-> plus its `_ensure_sqlite_schema` counterpart) and C4 (the two regulatory intelligence routes).
-> Both are additive and neither blocks L1.
+> **C2 shipped 2026-08-08, with one deliberate deviation from the specification below.** The spec
+> said "point `SqlAlchemyRegistryStore` at the existing `model_artifacts` table … rather than a
+> parallel table." That was wrong, and the reason is worth recording: the registry's entries are
+> **immutable** with lifecycle changes *appended* to a separate status log, while
+> `model_artifacts.status` is a mutable column. Merging them would either destroy the append-only
+> guarantee — the property that makes a promotion reconstructable and a retirement un-editable —
+> or force a rewrite of a table 35 routes read. So C2 shipped as a **link, not a merge**:
+> migration `0044` adds `model_artifacts.registry_model_id` (nullable, unique, not backfilled),
+> and each side keeps its own semantics.
+>
+> What that closed is the hole the spec was groping at: `InferenceRouter` resolves what to serve
+> from the registry, and **nothing in the product ever wrote it** — so approving a deployment
+> candidate flipped a row and changed nothing about which artifact answered a prediction.
+> Approval is now the single writer of `ModelStatus.PRODUCTION`, `GET /ml/model-artifacts` reports
+> the registry's *live* status (so a superseded artifact reads `retired`, not `approved`), and
+> promotion is refused — approval standing, router unchanged — when the artifact carries no
+> content hash or when a semantic version is reused against different bytes.
+>
+> Ordering is deliberate: the approval commits *before* the promotion is attempted. A failed
+> promotion then leaves the router serving the incumbent, which is the safe direction; the reverse
+> order could leave the registry serving a model whose approval never recorded.
+>
+> **C4 stays deferred, precondition named.** There is no regulatory guidance index on disk. The
+> spectral RAG has a real one (`spectrum_similarity_index/spectra.faiss`); `regulatory/data/` holds
+> only `corpus_pipeline.py`, and nothing in `api.py` references `regulatory_search`. Shipping the
+> two routes now would give a search over nothing, which reads as a capability rather than a gap.
+> **Unblocks when:** the licence-partitioned corpus is built and indexed — FDA text redistributable,
+> ICH/EMA/WHO internal-only with cited excerpts — which is its own change.
 
 **Goal.** Every one of the 76 governance routes becomes a *record of something the science layer
 did*, rather than a record of something a caller claimed. No new endpoints. No contract breakage.

@@ -6037,6 +6037,15 @@ class ModelArtifactORM(Base):
     status: Mapped[str] = mapped_column(String(32), default="trained", index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     metadata_json: Mapped[str] = mapped_column(Text, default="{}")
+    # The bridge to `moltrace.spectroscopy.ai.registry`, which is what the inference
+    # router actually resolves at prediction time. Set when a reviewer promotes this
+    # artifact to serving; NULL means approved for the product surface but not
+    # serving traffic. The two stores are deliberately not merged: the science
+    # registry is append-only with a separate status log (a GxP property), while
+    # this row's `status` is mutable.
+    registry_model_id: Mapped[str | None] = mapped_column(
+        String(512), nullable=True, unique=True, index=True
+    )
 
 
 class MLEvaluationRunORM(Base):
