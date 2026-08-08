@@ -14,6 +14,100 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.65.0 — ROI read zero because nothing recorded that work had happened (2026-08-07)
+
+`/analytics/roi` derives **every** figure from `usage_events` rows, and `create_usage_event`
+had exactly one caller in the whole backend: the HTTP route that exists to be called from
+outside (`api.py:3606`, `POST /analytics/events`). No analysis, job, workflow, report or
+review path emitted anything, so an instance could run analyses indefinitely and the
+Automation ROI page correctly rendered `—` forever. No frontend change could fix that — the
+only way to populate the page without this work was to fabricate the numbers.
+
+- **Eight emit sites, each inside the transaction that records the work.** `save_analysis`
+  (one call covering `/analyze`, `/analyze/batch`, `/analyze/upload` and every job item),
+  `create_report_from_analysis`, `update_job_progress` on failure, `start_workflow_run` at
+  **both** of its terminal states — the step-loop exit and the early return for missing
+  required inputs, which returns before the other one is reached — and the review-task update
+  on all three surfaces. `record_usage_event` was split out of `create_usage_event` to make
+  this possible: emitting after the work's transaction closed would let an analysis commit
+  without its event, and ROI would then under-report permanently with nothing in the product
+  able to show that it had happened.
+- **`record_automation_event` offers no parameter for `estimated_minutes_saved`.** The minutes
+  are resolved from the automation task definition that `task_key` names, so the baseline stays
+  one version-controlled number per task rather than a literal copied across call sites — which
+  is what makes the figure answerable when a customer asks where it came from.
+- **Catalogue seeding now runs per missing key rather than only into an empty table.** It
+  previously returned early if *any* definition existed, so `workflow_run_execution` — and the
+  five task types added alongside it — would never have reached an instance seeded by an
+  earlier release. `_resolve_minutes_saved` finds no definition, and every event resolving to
+  that key is then silently worth zero minutes. Existing rows are untouched, so an operator's
+  edit to `default_minutes_saved`, or a task they disabled, survives.
+- **Double-counting was the failure mode to design against**, because on a page showing `—` it
+  is indistinguishable from no-counting. `_compute_roi` buckets by substring and treats *any*
+  succeeded event carrying a `job_id` as an analysis, so a successful batch emits one event per
+  item and none for the job wrapping them; the report event is named for "report" and not
+  "analysis"; and a review task emits only on the transition **into** its resolved state, since
+  retitling an already-resolved task is not a second review.
+- **Three review surfaces write the same tasks**, not one — the session surface, the subject
+  surface (`PATCH /review-tasks/{id}`, a different store function), and the knowledge flywheel.
+  Instrumenting one would have made the identical action invisible depending on where it was
+  performed.
+- **9 tests**, each asserting a direction *and* an exact magnitude: one analysis moves
+  `total_minutes_saved` by exactly that task's `default_minutes_saved`, a failed job records a
+  row and moves nothing, and running the same analysis twice moves ROI twice.
+
+Not done, deliberately: **no backfill.** Synthesising events for work completed before this
+existed would put invented history behind a number a customer may quote. ROI legitimately
+starts from the day this ships.
+
+---
+
+## v0.64.1 — Make the knowledge base deployable: 193 MB / 47 s → 14 MB / 1 s (2026-08-07)
+
+v0.64.0 proved the HOSE table fixes the accuracy gap. It could not actually be **shipped**:
+loading it re-parsed 49 618 molblocks with RDKit on every process start — **51 s and 193 MB**,
+83 % of which was molblocks discarded the moment the HOSE codes were computed. A 51 s cold
+start is incompatible with a scale-to-zero service, and that — not the accuracy — was the real
+reason a GPU sidecar looked necessary. The cheap path only *appeared* unshippable because it
+was unoptimised.
+
+`lookup` never sees the raw shift list; it returns mean, population stdev and count. So a
+per-bucket `(n, mean, M2)` **Welford accumulator is lossless for the entire public contract**
+and serialises without the molecules.
+
+- **Bucket storage is now the accumulator**, not the shift list — O(1) per bucket instead of
+  O(references), collapsing ~3 M stored floats to ~1 M three-element records. Welford rather
+  than (sum, sum-of-squares): the latter loses precision to catastrophic cancellation exactly
+  where it matters here, a tight bucket of 128.3 / 128.4 / 128.4 ppm.
+- **`save_knowledge_base_index()` + `build_hose_kb.py --index`** emit the deployable artifact,
+  with transparent gzip on a `.gz` path. The CLI round-trips through the real loader rather
+  than reimplementing the indexer, so the two cannot drift.
+- **Format is detected, not inferred from the filename** — a renamed artifact cannot silently
+  take the slow path, and an unrecognised format raises instead of half-loading.
+
+| | molecules+assignments | **precomputed index (gz)** |
+|---|---|---|
+| size | 193 MB | **14 MB** |
+| load | 47.3 s | **1.1 s** |
+| RDKit at load | yes | **no** |
+
+Identical science: median-of-medians ¹³C 1.67 ppm and pooled median 1.88 ppm, unchanged to
+1e-9 ppm — pinned by a test that compares every lookup and every predicted shift against the
+table it was built from, because a representation change that moved a shift 0.3 ppm would raise
+no error, only a permanently slightly-wrong answer.
+
+- **`MOLTRACE_HOSE_KB` set-but-missing now logs at ERROR** instead of being absorbed. Unset is a
+  legitimate dev default and stays quiet; set-and-missing is what a deploy that forgot to stage
+  the table looks like, and silently substituting the 16-molecule seed for the table that was
+  explicitly configured is the same silent-degradation failure v0.64.0 existed to fix.
+- **Deployment slot**: `data/hose/` (gitignored except its README) baked by the Dockerfile via
+  `MOLTRACE_HOSE_KB`. Absent → the service still starts on the seed table and says so.
+- **`NOTICE`** extended: aggregation does not remove ShareAlike. The index stores only summary
+  statistics but is still a NMRShiftDB2 derivative, and baking it into a container image is
+  distribution if that image leaves the organization.
+
+---
+
 ## v0.64.0 — B0: switch the shift predictor on, and make its coverage visible (2026-08-07)
 
 Shift prediction had silently degraded to a **16-molecule curated seed table**. Measured on
