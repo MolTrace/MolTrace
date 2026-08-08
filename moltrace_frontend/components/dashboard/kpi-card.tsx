@@ -9,6 +9,12 @@ import { cn } from "@/lib/utils"
 export type KpiCardSeverity = "neutral" | "warning" | "critical" | "success"
 export type KpiCardAccent = "teal" | "cyan" | "violet" | "amber"
 
+/** Shown in place of a number that could not be loaded. Not zero -- unknown.
+ *
+ * A KPI card must not silently substitute a plausible figure: the number is what
+ * the eye lands on, and a disclaimer underneath it is read second if at all. */
+export const UNAVAILABLE_VALUE = "—"
+
 type KpiCardProps = {
   title: string
   icon: LucideIcon

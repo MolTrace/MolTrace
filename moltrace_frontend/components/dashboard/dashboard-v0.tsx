@@ -42,7 +42,7 @@ import {
   type DashboardPriority,
 } from "@/components/dashboard/dashboard-priority-callout"
 import { GoldenPathCard } from "@/components/dashboard/golden-path-card"
-import { KpiCard } from "@/components/dashboard/kpi-card"
+import { KpiCard, UNAVAILABLE_VALUE } from "@/components/dashboard/kpi-card"
 import { ModuleCard } from "@/components/dashboard/module-card"
 import { StatusFilterPills } from "@/components/dashboard/status-filter-pills"
 import { RegulatoryNotificationsCompactCard } from "@/components/regulatory-hub/regulatory-notifications-compact-card"
@@ -254,8 +254,7 @@ const NO_ACTIVITY_ROWS: DashboardActivityRow[] = []
 const NO_JOB_ROWS: DashboardJobRow[] = []
 const NO_QC_ROWS: DashboardRecentFailedQcRow[] = []
 
-/** Shown in place of a number that could not be loaded. Not zero -- unknown. */
-const UNAVAILABLE_VALUE = "—"
+
 
 function UnavailableSub({ what }: { what: string }) {
   return <p className="text-xs text-muted-foreground">Live {what} isn't available right now.</p>
