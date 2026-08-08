@@ -9,6 +9,7 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
 
+from . import ai_engine_adapter
 from .database import session_scope
 from .models import (
     ActiveLearningCandidate,
@@ -63,6 +64,14 @@ class AIInferenceError(ValueError):
     pass
 
 
+class AIInferenceEngineUnavailable(AIInferenceError):
+    """The prediction engine for an engine-backed service could not be run.
+
+    Distinct from a bad request: the caller did nothing wrong, and the correct
+    answer is that no prediction was produced -- never a substituted number.
+    """
+
+
 class AIInferenceNotFoundError(AIInferenceError):
     pass
 
@@ -82,6 +91,14 @@ _NO_MODEL_WARNING = (
     "No approved executable model artifact was available; production prediction was not faked."
 )
 _DEV_WARNING = "Development-mode rule_based response requested explicitly; output requires review."
+_NO_ENGINE_WARNING = (
+    "No prediction engine is wired for this service yet, so this record carries only what "
+    "the request supplied. Any confidence shown was not computed by a model."
+)
+_UNREGISTERED_ENGINE_WARNING = (
+    "This prediction was computed by the MolTrace inference engine, but no approved model "
+    "artifact was selected for it, so the result is not attributable to a released version."
+)
 _PRIVATE_KEY_MARKERS = (
     "password",
     "token",
@@ -440,16 +457,49 @@ def create_prediction(
             warnings.extend([_NO_MODEL_WARNING, _DEV_WARNING])
 
         request_summary = _safe_request_summary(payload)
-        confidence = _extract_confidence(payload, selected_artifact_id)
         threshold = _confidence_threshold(config)
-        ood_status = _extract_ood_status(payload, config)
-        uncertainty = _extract_uncertainty(payload, confidence, ood_status)
+
+        # Engine-backed services compute their own numbers. Everything below that
+        # a caller could otherwise dictate -- confidence, uncertainty, the domain
+        # assessment -- comes from the engine, and `engine_result` is None only for
+        # services that have no engine wired yet.
+        engine_result = _run_engine(payload, warnings, session_factory)
+        if engine_result is not None:
+            confidence = engine_result.confidence
+            ood_status = engine_result.ood_status
+            uncertainty = dict(engine_result.uncertainty)
+            engine_provenance: dict[str, Any] | None = {
+                "engine": engine_result.engine,
+                "model_versions": dict(engine_result.model_versions),
+            }
+            warnings.extend(engine_result.warnings)
+            notes.extend(engine_result.notes)
+            # The engine ran, so the development-mode wording ("rule_based response")
+            # would misdescribe what produced this number. The governance fact it was
+            # really carrying -- no approved artifact was selected -- is kept, stated
+            # accurately.
+            if _DEV_WARNING in warnings:
+                warnings[warnings.index(_DEV_WARNING)] = _UNREGISTERED_ENGINE_WARNING
+        else:
+            confidence = _extract_confidence(payload, selected_artifact_id)
+            ood_status = _extract_ood_status(payload, config)
+            uncertainty = _extract_uncertainty(payload, confidence, ood_status)
+            engine_provenance = None
         human_review_required = True
         status = "succeeded"
         low_confidence = confidence is not None and confidence < threshold
         if low_confidence:
             status = "requires_review"
             warnings.append("Prediction is low confidence and requires review.")
+        # An engine that ran and declined to report a confidence has abstained. That is
+        # not the same as a high-confidence result, and it must not pass through as one
+        # simply because there is no number to compare against the threshold.
+        if engine_result is not None and confidence is None:
+            status = "requires_review"
+            warnings.append(
+                "The engine produced a result but no confidence figure, so this prediction "
+                "cannot be screened automatically and requires review."
+            )
         if ood_status in {"possible_ood", "out_of_domain"}:
             status = "requires_review"
             warnings.append("Prediction input is possible out-of-domain and requires review.")
@@ -481,6 +531,7 @@ def create_prediction(
                     "routing_decision_id": decision.id,
                     "experimental": payload.experimental,
                     "development_mode": payload.development_mode,
+                    **({"provenance": engine_provenance} if engine_provenance else {}),
                 }
             ),
         )
@@ -497,6 +548,9 @@ def create_prediction(
         output = _prediction_output(
             service, payload, selected_artifact_id, development_mode=payload.development_mode
         )
+        if engine_result is not None:
+            output["engine_output"] = _public_json(engine_result.output)
+            output["message"] = "Prediction computed by the MolTrace inference engine for review."
         result = PredictionResultORM(
             prediction_run_id=run.id,
             result_type=payload.requested_result_type
@@ -506,7 +560,12 @@ def create_prediction(
             uncertainty_json=_json_dump(uncertainty),
             explanation_id=explanation.id,
             human_review_required=human_review_required,
-            metadata_json=_json_dump({"routing_decision_id": decision.id}),
+            metadata_json=_json_dump(
+                {
+                    "routing_decision_id": decision.id,
+                    **({"provenance": engine_provenance} if engine_provenance else {}),
+                }
+            ),
         )
         session.add(result)
         session.flush()
@@ -1291,12 +1350,51 @@ def _safe_candidates(candidates: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return output
 
 
+def _run_engine(
+    payload: PredictionRequest,
+    warnings: list[str],
+    session_factory: sessionmaker[Session],
+) -> ai_engine_adapter.EngineResult | None:
+    """Execute the prediction engine for ``payload``, or explain why there is none.
+
+    Returns ``None`` for a service with no engine wired yet -- and says so in the
+    warnings, so a caller can tell a recorded prediction from a computed one. It
+    never returns a fabricated result: an engine that cannot run raises.
+    """
+
+    service_key = payload.service_key
+    if not ai_engine_adapter.is_engine_backed(service_key):
+        warnings.append(_NO_ENGINE_WARNING)
+        return None
+
+    try:
+        ai_engine_adapter.assert_no_model_derived_inputs(service_key, payload.request_json)
+        return ai_engine_adapter.run_prediction(
+            service_key, payload.request_json, session_factory=session_factory
+        )
+    except ai_engine_adapter.EngineInputError as exc:
+        raise AIInferenceError(str(exc)) from exc
+    except ai_engine_adapter.EngineUnavailable as exc:
+        raise AIInferenceEngineUnavailable(
+            f"The prediction engine for this service could not run, so no prediction was "
+            f"produced: {exc}"
+        ) from exc
+
+
 def _extract_confidence(payload: PredictionRequest, model_artifact_id: int | None) -> float | None:
+    """Confidence for a service with no engine wired yet.
+
+    Deliberately returns ``None`` rather than a plausible-looking number when the
+    caller supplies none. This used to return a hard-coded ``0.82`` whenever a model
+    artifact happened to be selected, which recorded a confidence no model had
+    computed -- indistinguishable, downstream, from a measured one.
+    """
+
     for key in ("confidence_score", "mock_confidence_score", "score"):
         value = payload.request_json.get(key)
         if isinstance(value, int | float):
             return max(0.0, min(1.0, float(value)))
-    return 0.82 if model_artifact_id is not None else (0.5 if payload.development_mode else None)
+    return None
 
 
 def _confidence_threshold(config: PredictionServiceConfigORM | None) -> float:
