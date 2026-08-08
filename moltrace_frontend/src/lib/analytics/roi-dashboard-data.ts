@@ -26,6 +26,15 @@ export type RoiSnapshotData = {
   review_tasks_completed: number
   failed_jobs: number
   qc_warnings: number
+  /**
+   * Whether the time figures are estimated rather than measured. Defaults to
+   * TRUE when the field is absent, which is the safe direction: an older backend
+   * that does not send it is one whose hours were always estimates, so an absent
+   * field must not read as "measured".
+   */
+  time_saved_is_estimated: boolean
+  /** Machine-readable origin of the estimate, e.g. "per_task_type_constants". */
+  time_saved_basis: string
   /** Optional — filled from metadata_json when backend supplies counts. */
   evidence_items_generated: number | null
   period_start?: string
@@ -58,6 +67,9 @@ export function parseRoiSnapshot(raw: unknown): RoiSnapshotData | null {
     review_tasks_completed: readNum(raw.review_tasks_completed) ?? 0,
     failed_jobs: readNum(raw.failed_jobs) ?? 0,
     qc_warnings: readNum(raw.qc_warnings) ?? 0,
+    // Absent -> true. See the type. Never default this to false.
+    time_saved_is_estimated: typeof raw.time_saved_is_estimated === "boolean" ? raw.time_saved_is_estimated : true,
+    time_saved_basis: readStr(raw.time_saved_basis) ?? "per_task_type_constants",
     evidence_items_generated: readEvidenceItemsFromMetadata(metaObj),
     period_start: readStr(raw.period_start) ?? undefined,
     period_end: readStr(raw.period_end) ?? undefined,

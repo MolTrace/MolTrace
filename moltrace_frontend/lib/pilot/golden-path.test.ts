@@ -48,6 +48,9 @@ function snapshot(patch: Partial<RoiSnapshot> = {}): RoiSnapshot {
     tasks_automated: 12,
     total_minutes_saved: 240,
     total_hours_saved: 4,
+    // Added when the backend put the estimate qualifier on the wire.
+    time_saved_is_estimated: true,
+    time_saved_basis: "per_task_type_constants",
     reports_generated: 3,
     workflows_completed: 2,
     analyses_completed: 7,

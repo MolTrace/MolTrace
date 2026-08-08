@@ -56,8 +56,29 @@ import {
   type WorkflowSummaryData,
 } from "@/src/lib/analytics/roi-dashboard-data"
 
+/**
+ * Hours saved is NOT a measured duration, and the page now says so on its face
+ * rather than only inside a tooltip.
+ *
+ * It is the count of automation events multiplied by a per-task-type constant an
+ * administrator can edit — 5 minutes for a processed preview through 90 for the
+ * heaviest. The backend column is honestly named `estimated_minutes_saved`; the
+ * wire field historically dropped the qualifier, and `time_saved_is_estimated`
+ * restores it.
+ *
+ * The counts beside it — tasks automated, reports generated — ARE real
+ * measurements, so they carry no qualifier. Labelling everything "estimated"
+ * would be as misleading as labelling nothing: a buyer who discovers the
+ * "measured" hours were an assumption table discounts every other number on the
+ * page, including the ones that were counted.
+ */
 const HOURS_SAVED_TOOLTIP =
-  "Estimated from your automation task definitions. Values are approximate and should be reviewed by admins."
+  "Not a measured duration. Each completed task is multiplied by a per-task-type constant your administrators set, so this figure moves when those constants are edited. The task counts beside it are actual counts."
+
+/** Machine-readable basis token -> what to tell a human. */
+const TIME_SAVED_BASIS_LABEL: Record<string, string> = {
+  per_task_type_constants: "per-task-type constants set by your administrators",
+}
 
 const TASKS_AUTOMATED_TOOLTIP =
   "Count of workflow and analysis tasks completed by MolTrace instead of manual execution."
@@ -189,7 +210,20 @@ export default function AutomationRoiDashboard() {
           value={loading ? "…" : roi ? fmtNum(roi.total_hours_saved) : "—"}
           sub={
             <p className="text-xs text-muted-foreground">
-              {loading ? "Loading…" : roi ? "Across all automated tasks." : "No data."}
+              {loading ? (
+                "Loading…"
+              ) : !roi ? (
+                "No data."
+              ) : roi.time_saved_is_estimated ? (
+                <>
+                  <span style={{ color: "var(--mt-amber-ink)" }}>Estimated</span>
+                  {" — from "}
+                  {TIME_SAVED_BASIS_LABEL[roi.time_saved_basis] ?? roi.time_saved_basis}
+                  {"."}
+                </>
+              ) : (
+                "Measured across all automated tasks."
+              )}
             </p>
           }
         />
