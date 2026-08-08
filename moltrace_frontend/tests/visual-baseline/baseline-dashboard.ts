@@ -49,9 +49,9 @@ async function installMocks(page: Page) {
 const ROUTES: { path: string; signal: RegExp; label: string }[] = [
   { path: "/dashboard", signal: /Dashboard|Welcome|Overview/i, label: "Main dashboard (DashboardV0)" },
   { path: "/dashboard/projects", signal: /Projects|FolderOpen|Active/i, label: "Dashboard Projects subpage" },
-  { path: "/dashboard/reactions", signal: /Reaction|Optimization|RXN/i, label: "Dashboard Reactions subpage" },
-  { path: "/dashboard/regulatory", signal: /Regulatory|REG-2024|Compliance/i, label: "Dashboard Regulatory subpage" },
-  { path: "/dashboard/spectroscopy", signal: /Spectroscopy|NMR-2024|Sample/i, label: "Dashboard Spectroscopy subpage" },
+  { path: "/dashboard/reactions", signal: /Reaction|Optimization/i, label: "Dashboard Reactions subpage (redirects to Repho)" },
+  { path: "/dashboard/regulatory", signal: /Regulatory|Compliance|Dossier/i, label: "Dashboard Regulatory subpage (redirects to Regentry)" },
+  { path: "/dashboard/spectroscopy", signal: /SpectraCheck|Spectroscopy|Sample/i, label: "Dashboard Spectroscopy subpage (redirects to SpectraCheck)" },
   { path: "/dashboard/reports", signal: /Reports|Saved|Generate/i, label: "Saved reports workspace" },
   { path: "/dashboard/roi", signal: /ROI|Automation|Value/i, label: "Automation ROI dashboard" },
   { path: "/dashboard/settings", signal: /Settings|Preference|Profile/i, label: "Dashboard settings" },

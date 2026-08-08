@@ -109,7 +109,7 @@ const ROUTES: { path: string; signal: RegExp; label: string }[] = [
   { path: "/reactions?tab=reaction-studio", signal: /Studio|Reaction/i, label: "Reactions program (studio tab)" },
   { path: "/reactions/10", signal: /Reaction|Project|Variables|Experiments/i, label: "Reaction project detail (id=10)" },
   { path: "/reactions/studio", signal: /Studio|Reaction/i, label: "Reaction studio direct" },
-  { path: "/dashboard/reactions", signal: /Reaction|Recommendations|Experiments/i, label: "Dashboard reactions view" },
+  { path: "/dashboard/reactions", signal: /Reaction|Recommendations|Experiments/i, label: "Dashboard reactions view (redirects to Repho)" },
 ]
 
 async function main() {
