@@ -3,10 +3,11 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any
 
-from sqlalchemy import or_, select
+from sqlalchemy import and_, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -37,6 +38,7 @@ from .models import (
     KnowledgeSource,
     KnowledgeSourceCreate,
     KnowledgeSourceFile,
+    KnowledgeSourceRevision,
     KnowledgeSourceUpdate,
     ModelImprovementQueueItem,
     ModelImprovementQueueItemCreate,
@@ -59,6 +61,7 @@ from .orm import (
     KnowledgeReviewTaskORM,
     KnowledgeSourceFileORM,
     KnowledgeSourceORM,
+    KnowledgeSourceRevisionORM,
     ManagedFileRecordORM,
     ModelImprovementQueueItemORM,
     RegulatoryJurisdictionORM,
@@ -166,6 +169,127 @@ def _audit(
     )
 
 
+_REVISIONED_SOURCE_FIELDS: tuple[str, ...] = (
+    "title",
+    "source_type",
+    "source_url",
+    "doi",
+    "patent_number",
+    "jurisdiction_id",
+    "publisher",
+    "publication_date",
+    "status",
+    "reliability_label",
+)
+
+_RECORD_TYPES_BOUND_TO_A_REVISION: tuple[tuple[str, Any], ...] = (
+    ("reaction", ExtractedReactionRecordORM),
+    ("analytical", ExtractedAnalyticalRecordORM),
+    ("regulatory", ExtractedRegulatoryRecordORM),
+)
+
+
+def _humanize_fields(fields: Sequence[str]) -> str:
+    """Field names as a reader would say them -- these end up in a review task title."""
+    return ", ".join(field.replace("_", " ") for field in fields)
+
+
+def _write_source_revision(
+    session: Session,
+    row: KnowledgeSourceORM,
+    *,
+    actor: KnowledgeFlywheelActor,
+    changed_fields: Sequence[str],
+    change_reason: str | None,
+    supersedes_revision_id: int | None,
+) -> KnowledgeSourceRevisionORM:
+    """Append an immutable snapshot of what the source says now, and make it current.
+
+    Never mutates an existing revision: the predecessor stays readable forever, which is
+    what lets a record extracted under it still show the source as it stood at the time.
+    """
+    previous_number = 0
+    if supersedes_revision_id is not None:
+        previous = session.get(KnowledgeSourceRevisionORM, supersedes_revision_id)
+        previous_number = previous.revision_number if previous is not None else 0
+    revision = KnowledgeSourceRevisionORM(
+        source_id=row.id,
+        revision_number=previous_number + 1,
+        supersedes_revision_id=supersedes_revision_id,
+        title=row.title,
+        source_type=row.source_type,
+        source_url=row.source_url,
+        doi=row.doi,
+        patent_number=row.patent_number,
+        jurisdiction_id=row.jurisdiction_id,
+        publisher=row.publisher,
+        publication_date=row.publication_date,
+        status=row.status,
+        reliability_label=row.reliability_label,
+        metadata_json=row.metadata_json,
+        changed_fields_json=_json_dump(sorted(changed_fields)),
+        change_reason=change_reason,
+        created_by=actor.email,
+    )
+    session.add(revision)
+    session.flush()
+    row.current_revision_id = revision.id
+    return revision
+
+
+def _flag_records_for_re_review(
+    session: Session,
+    *,
+    source_id: int,
+    superseded_revision_id: int | None,
+    revision: KnowledgeSourceRevisionORM,
+    changed_fields: Sequence[str],
+) -> int:
+    """Flag every record derived from the superseded revision. Flag -- never rewrite.
+
+    The records keep their own review decisions and their own binding to the revision they
+    were actually read from. Re-pointing them at the new revision would quietly rewrite
+    what they were justified by; deciding whether the change matters is a human's call.
+    """
+    described = _humanize_fields(changed_fields)
+    flagged = 0
+    for record_type, record_orm in _RECORD_TYPES_BOUND_TO_A_REVISION:
+        # Records predating revisions carry no binding at all. "We cannot tell which
+        # revision this came from" is not a reason to skip them -- it is the reason they
+        # need a human most, since nothing rules out that the change invalidates them.
+        unknown_provenance = and_(
+            record_orm.source_id == source_id,
+            record_orm.source_revision_id.is_(None),
+        )
+        criteria = (
+            unknown_provenance
+            if superseded_revision_id is None
+            else or_(record_orm.source_revision_id == superseded_revision_id, unknown_provenance)
+        )
+        rows = session.scalars(select(record_orm).where(criteria)).all()
+        for record in rows:
+            session.add(
+                KnowledgeReviewTaskORM(
+                    extraction_run_id=record.extraction_run_id,
+                    record_type=record_type,
+                    record_id=record.id,
+                    title=f"Re-check this record: its source changed ({described}).",
+                    status="open",
+                    metadata_json=_json_dump(
+                        {
+                            "reason": "source_superseded",
+                            "changed_fields": sorted(changed_fields),
+                            "extracted_from_revision": record.source_revision_id,
+                            "current_revision": revision.id,
+                            "current_revision_number": revision.revision_number,
+                        }
+                    ),
+                )
+            )
+            flagged += 1
+    return flagged
+
+
 def create_source(
     session_factory: sessionmaker[Session],
     payload: KnowledgeSourceCreate,
@@ -189,6 +313,14 @@ def create_source(
         )
         session.add(row)
         session.flush()
+        _write_source_revision(
+            session,
+            row,
+            actor=actor,
+            changed_fields=_REVISIONED_SOURCE_FIELDS,
+            change_reason="Source registered.",
+            supersedes_revision_id=None,
+        )
         _audit(
             session,
             actor=actor,
@@ -200,6 +332,52 @@ def create_source(
         )
         return _source_to_record(row)
 
+
+
+def _revision_to_record(
+    row: KnowledgeSourceRevisionORM, *, current_revision_id: int | None
+) -> KnowledgeSourceRevision:
+    return KnowledgeSourceRevision(
+        id=row.id,
+        source_id=row.source_id,
+        revision_number=row.revision_number,
+        supersedes_revision_id=row.supersedes_revision_id,
+        title=row.title,
+        source_type=row.source_type,
+        source_url=row.source_url,
+        doi=row.doi,
+        patent_number=row.patent_number,
+        jurisdiction_id=row.jurisdiction_id,
+        publisher=row.publisher,
+        publication_date=row.publication_date,
+        status=row.status,
+        reliability_label=row.reliability_label,
+        changed_fields=[str(item) for item in _json_list(row.changed_fields_json)],
+        change_reason=row.change_reason,
+        created_by=row.created_by,
+        created_at=row.created_at,
+        is_current=row.id == current_revision_id,
+        human_review_required=True,
+    )
+
+
+def list_source_revisions(
+    session_factory: sessionmaker[Session], source_id: int
+) -> list[KnowledgeSourceRevision] | None:
+    """Every revision of a source, newest first. Superseded revisions stay readable."""
+    with session_scope(session_factory) as session:
+        source = session.get(KnowledgeSourceORM, source_id)
+        if source is None:
+            return None
+        rows = session.scalars(
+            select(KnowledgeSourceRevisionORM)
+            .where(KnowledgeSourceRevisionORM.source_id == source_id)
+            .order_by(KnowledgeSourceRevisionORM.revision_number.desc())
+        ).all()
+        return [
+            _revision_to_record(row, current_revision_id=source.current_revision_id)
+            for row in rows
+        ]
 
 def list_sources(
     session_factory: sessionmaker[Session],
@@ -223,46 +401,97 @@ def get_source(session_factory: sessionmaker[Session], source_id: int) -> Knowle
         return _source_to_record(row) if row is not None else None
 
 
-def update_source(
+def supersede_source(
     session_factory: sessionmaker[Session],
     source_id: int,
     payload: KnowledgeSourceUpdate,
     *,
     actor: KnowledgeFlywheelActor,
 ) -> KnowledgeSource | None:
+    """Supersede a source with a new revision. Sources are never edited in place.
+
+    ``publication_date``, ``doi`` and ``reliability_label`` are exactly the fields a
+    downstream extraction was justified by. Overwriting them would leave a record citing a
+    source that now says something else, with nothing to reveal the change. Instead each
+    change appends a revision, the predecessor stays readable, and records derived from it
+    are flagged for a human to re-check rather than being silently re-pointed.
+
+    The source id keeps meaning what it always meant -- the living source -- so anything
+    holding one across the change still resolves.
+    """
     with session_scope(session_factory) as session:
         row = session.get(KnowledgeSourceORM, source_id)
         if row is None:
             return None
         update = payload.model_dump(exclude_unset=True)
+        change_reason = update.pop("change_reason", None)
         if "jurisdiction_id" in update:
             _require_jurisdiction(session, update["jurisdiction_id"])
-        for field in (
-            "title",
-            "source_type",
-            "source_url",
-            "doi",
-            "patent_number",
-            "jurisdiction_id",
-            "publisher",
-            "publication_date",
-            "status",
-            "reliability_label",
-        ):
+        changed_fields = [
+            field
+            for field in _REVISIONED_SOURCE_FIELDS
+            if field in update and getattr(row, field) != update[field]
+        ]
+        metadata_changed = "metadata_json" in update
+        if not changed_fields and not metadata_changed:
+            # Nothing actually moved; an empty revision would be noise in the chain.
+            return _source_to_record(row)
+
+        superseded_revision_id = row.current_revision_id
+        for field in _REVISIONED_SOURCE_FIELDS:
             if field in update:
                 setattr(row, field, update[field])
-        if "metadata_json" in update:
+        if metadata_changed:
             row.metadata_json = _json_dump(_metadata_with_review(update["metadata_json"]))
         row.updated_at = utcnow()
+
+        revision = _write_source_revision(
+            session,
+            row,
+            actor=actor,
+            changed_fields=changed_fields,
+            change_reason=change_reason,
+            supersedes_revision_id=superseded_revision_id,
+        )
+        flagged = _flag_records_for_re_review(
+            session,
+            source_id=row.id,
+            superseded_revision_id=superseded_revision_id,
+            revision=revision,
+            changed_fields=changed_fields,
+        )
         _audit(
             session,
             actor=actor,
-            event_type="knowledge.source.update",
-            message="Knowledge source updated.",
+            event_type="knowledge.source.supersede",
+            message="Knowledge source superseded by a new revision.",
             entity_type="knowledge_source",
             entity_id=row.id,
-            metadata={"updated_fields": sorted(update)},
+            metadata={
+                "changed_fields": sorted(changed_fields),
+                "revision_id": revision.id,
+                "revision_number": revision.revision_number,
+                "superseded_revision_id": superseded_revision_id,
+                "records_flagged_for_re_review": flagged,
+            },
         )
+        if "reliability_label" in changed_fields:
+            # Its own event: how much a source is trusted can invalidate every
+            # conclusion already drawn from it, so it should not be findable only by
+            # reading a field list inside some other entry.
+            _audit(
+                session,
+                actor=actor,
+                event_type="knowledge.source.reliability_change",
+                message="Knowledge source reliability label changed.",
+                entity_type="knowledge_source",
+                entity_id=row.id,
+                metadata={
+                    "reliability_label": row.reliability_label,
+                    "revision_number": revision.revision_number,
+                    "records_flagged_for_re_review": flagged,
+                },
+            )
         return _source_to_record(row)
 
 
@@ -307,7 +536,14 @@ def add_source_file(
         session.add(row)
         session.flush()
         if parsed_text:
-            _create_citations(session, source_id=source_id, source_file_id=row.id, text=parsed_text)
+            source_row = session.get(KnowledgeSourceORM, source_id)
+            _create_citations(
+                session,
+                source_id=source_id,
+                source_file_id=row.id,
+                text=parsed_text,
+                source_revision_id=source_row.current_revision_id if source_row else None,
+            )
         _audit(
             session,
             actor=actor,
@@ -1081,6 +1317,7 @@ def _extract_reaction(
     row = ExtractedReactionRecordORM(
         extraction_run_id=run.id,
         source_id=source.id,
+        source_revision_id=source.current_revision_id,
         citation_ids_json=_json_dump(citation_ids),
         reaction_name=_extract_labeled_value(text, "reaction") or "extracted reaction",
         reaction_type=_first_match(text, r"(Suzuki|Buchwald|amide coupling|hydrogenation|oxidation|reduction|alkylation|acylation)", flags=re.I),
@@ -1130,6 +1367,7 @@ def _extract_analytical(
     row = ExtractedAnalyticalRecordORM(
         extraction_run_id=run.id,
         source_id=source.id,
+        source_revision_id=source.current_revision_id,
         citation_ids_json=_json_dump(citation_ids),
         compound_name=_extract_labeled_value(text, "compound") or _extract_labeled_value(text, "analyte"),
         structure_input=_first_match(text, r"SMILES\s*[:=]\s*([A-Za-z0-9@+\-\[\]\(\)=#$\\/%.]+)", flags=re.I),
@@ -1173,6 +1411,7 @@ def _extract_regulatory(
     row = ExtractedRegulatoryRecordORM(
         extraction_run_id=run.id,
         source_id=source.id,
+        source_revision_id=source.current_revision_id,
         citation_ids_json=_json_dump(citation_ids),
         jurisdiction_id=source.jurisdiction_id,
         topic=topic,
@@ -1284,12 +1523,20 @@ def _decode_text(content: bytes) -> str:
     return content.decode("utf-8", errors="replace")
 
 
-def _create_citations(session: Session, *, source_id: int, source_file_id: int | None, text: str) -> list[ExtractedCitationORM]:
+def _create_citations(
+    session: Session,
+    *,
+    source_id: int,
+    source_file_id: int | None,
+    text: str,
+    source_revision_id: int | None = None,
+) -> list[ExtractedCitationORM]:
     chunks = _citation_chunks(text)
     rows: list[ExtractedCitationORM] = []
     for index, chunk in enumerate(chunks[:12], start=1):
         row = ExtractedCitationORM(
             source_id=source_id,
+            source_revision_id=source_revision_id,
             source_file_id=source_file_id,
             citation_label=f"KS-{source_id}-F{source_file_id or 0}-P{index}",
             section_title="Extracted source text",
@@ -1507,6 +1754,7 @@ def _extract_requirement_text(text: str) -> str | None:
 def _source_to_record(row: KnowledgeSourceORM) -> KnowledgeSource:
     return KnowledgeSource(
         id=row.id,
+        current_revision_id=row.current_revision_id,
         title=row.title,
         source_type=row.source_type,
         source_url=row.source_url,
@@ -1567,6 +1815,7 @@ def _citation_to_record(row: ExtractedCitationORM) -> ExtractedCitation:
     return ExtractedCitation(
         id=row.id,
         source_id=row.source_id,
+        source_revision_id=row.source_revision_id,
         source_file_id=row.source_file_id,
         citation_label=row.citation_label,
         page_number=row.page_number,
@@ -1586,6 +1835,7 @@ def _reaction_to_record(row: ExtractedReactionRecordORM) -> ExtractedReactionRec
         id=row.id,
         extraction_run_id=row.extraction_run_id,
         source_id=row.source_id,
+        source_revision_id=row.source_revision_id,
         citation_ids_json=_json_int_list(row.citation_ids_json),
         reaction_name=row.reaction_name,
         reaction_type=row.reaction_type,
@@ -1624,6 +1874,7 @@ def _analytical_to_record(row: ExtractedAnalyticalRecordORM) -> ExtractedAnalyti
         id=row.id,
         extraction_run_id=row.extraction_run_id,
         source_id=row.source_id,
+        source_revision_id=row.source_revision_id,
         citation_ids_json=_json_int_list(row.citation_ids_json),
         compound_name=row.compound_name,
         structure_input=row.structure_input,
@@ -1653,6 +1904,7 @@ def _regulatory_to_record(row: ExtractedRegulatoryRecordORM) -> ExtractedRegulat
         id=row.id,
         extraction_run_id=row.extraction_run_id,
         source_id=row.source_id,
+        source_revision_id=row.source_revision_id,
         citation_ids_json=_json_int_list(row.citation_ids_json),
         jurisdiction_id=row.jurisdiction_id,
         topic=row.topic,
