@@ -49,9 +49,35 @@ have propagated silently through the mean and into the posterior.
 `details.mean_ambiguity_weight` and a per-resonance `ambiguity_weight` / `candidate_lines` are
 recorded for audit, so a verdict reached on diluted evidence is visible as such.
 
-**Not measured:** the aggregate distribution of ambiguity weights across the held-out corpus. The
-per-resonance rival statistics above are measured; how much the mean posterior moves in production
-is not, and this release does not claim it.
+### How much evidence was being over-claimed
+
+Measured on the same held-out split (`scripts/measure_ambiguity_discount.py`):
+
+| | ¹³C (32,234 resonances) | ¹H (10,521) |
+|---|---|---|
+| mean ambiguity weight | 0.610 | 0.537 |
+| median | 0.542 | 0.480 |
+| p10 / p90 | 0.223 / 1.000 | 0.180 / 1.000 |
+| undiscounted (> 0.99) | 32.4 % | 25.7 % |
+| **halved or worse (< 0.5)** | **41.1 %** | **50.5 %** |
+| mean significance | 3.851 → 2.566 | 2.812 → 1.694 |
+| quality `tanh(σ/3)` | 0.857 → 0.694 | 0.734 → 0.511 |
+| **odds multiplier, fully corroborating test** | **×7.20 → ×4.94 (−31.4 %)** | **×5.42 → ×3.25 (−40.1 %)** |
+
+So the shift test was over-claiming its evidence by roughly **a third on ¹³C and two-fifths on ¹H**.
+About a third of matches are genuinely unambiguous and are untouched; the median match was carrying
+roughly twice the weight it had earned.
+
+**This shifts verdicts, and that is worth stating plainly.** From a 0.50 prior, a single fully
+corroborating test now reaches:
+
+* ¹³C — 0.878 → **0.832**, still above the 0.80 `consistent` threshold;
+* ¹H — 0.844 → **0.765**, which falls **below** it.
+
+A ¹H-only verification that previously read `consistent` on a perfect match now reads
+`inconclusive`. That is the intended direction — one nucleus matching among ~2 candidate lines per
+resonance is not on its own a confirmed structure — but it is a real change in what the platform
+tells a user, not a rounding adjustment.
 
 ---
 

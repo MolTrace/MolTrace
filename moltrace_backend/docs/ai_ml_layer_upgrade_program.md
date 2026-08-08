@@ -515,9 +515,30 @@ B0 items 1–4 stand as written and are not restated. The additions:
 > `details.mean_ambiguity_weight` plus per-resonance `ambiguity_weight` / `candidate_lines` are
 > recorded, so a verdict reached on diluted evidence is visible as such.
 >
-> **Not measured:** the aggregate ambiguity-weight distribution across the corpus. The per-resonance
-> rival statistics above are measured; how much the mean posterior moves in production is not, and
-> nothing here claims it.
+> **Aggregate effect, measured** (`scripts/measure_ambiguity_discount.py`, same held-out split):
+>
+> | | ¹³C (32,234) | ¹H (10,521) |
+> |---|---|---|
+> | mean ambiguity weight | 0.610 | 0.537 |
+> | median | 0.542 | 0.480 |
+> | undiscounted (> 0.99) | 32.4 % | 25.7 % |
+> | halved or worse (< 0.5) | **41.1 %** | **50.5 %** |
+> | mean significance | 3.851 → 2.566 | 2.812 → 1.694 |
+> | odds multiplier, fully corroborating | **×7.20 → ×4.94** | **×5.42 → ×3.25** |
+>
+> The shift test was over-claiming its evidence by **31 % on ¹³C and 40 % on ¹H** in odds terms.
+> A third of matches are genuinely unambiguous and untouched; the median match was carrying about
+> twice the weight it had earned.
+>
+> **It shifts verdicts.** From a 0.50 prior a single fully corroborating test now reaches 0.832 on
+> ¹³C (still above the 0.80 `consistent` threshold) and **0.765 on ¹H (below it)** — so a ¹H-only
+> verification that read `consistent` on a perfect match now reads `inconclusive`. That is the
+> intended direction, since one nucleus matching among ~2 candidate lines per resonance is not a
+> confirmed structure on its own, but it is a real change in what the platform tells a user.
+>
+> **Caveat that bounds all of the above.** Measured on clean assignment data with no spurious peaks.
+> Real spectra carry 3–7× more lines (B1), so the true ambiguity — and therefore the true
+> over-claim — is larger than these figures, not smaller.
 >
 > **Still pending:** the two conformal metrics in `GoldMetricVector` (see the safety-critical
 > rollout hazard below).
