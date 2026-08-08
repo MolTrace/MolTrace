@@ -496,8 +496,28 @@ B0 items 1–4 stand as written and are not restated. The additions:
 > as the pipeline's defect.)
 >
 > The actionable conclusion is that the scoring model, not the window, is where this belongs:
-> `PredictionBoundsTest` scores a match as corroboration without discounting for how many other
+> `PredictionBoundsTest` scored a match as corroboration without discounting for how many other
 > lines could have matched equally well.
+>
+> **Fixed 2026-08-08.** `_ambiguity_weight` is a normalised likelihood under the same Gaussian the
+> merit function uses — the posterior that the line the matcher chose is the right one, given the
+> alternatives. One candidate gives **exactly 1.0** (so an unambiguous match is untouched, which is
+> what makes it safe to land); `k` equidistant candidates give **exactly 1/k**; a distant rival
+> barely dilutes anything. It depends only on the distances, so it is **order-independent**, and
+> rivals are counted over *all* in-window units including ones an earlier resonance already took —
+> ambiguity is a property of the spectrum and the prediction, not of the greedy matcher's order.
+>
+> It attenuates **significance**, never score. Five candidate lines do not mean the structure is
+> wrong; they mean the observation says little either way, and significance is the channel the
+> module defines as "how much the verdict should count". The discount can only attenuate, never flip
+> a sign. Scale is the resonance's conformal interval where one exists, the claimed σ otherwise, and
+> an unusable scale degrades to the uniform `1/k` rather than a NaN that would reach the posterior.
+> `details.mean_ambiguity_weight` plus per-resonance `ambiguity_weight` / `candidate_lines` are
+> recorded, so a verdict reached on diluted evidence is visible as such.
+>
+> **Not measured:** the aggregate ambiguity-weight distribution across the corpus. The per-resonance
+> rival statistics above are measured; how much the mean posterior moves in production is not, and
+> nothing here claims it.
 >
 > **Still pending:** the two conformal metrics in `GoldMetricVector` (see the safety-critical
 > rollout hazard below).
