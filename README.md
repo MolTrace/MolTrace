@@ -280,6 +280,7 @@ Key environment variables (in production these are injected from **Secret Manage
 | `SSO_ENCRYPTION_KEY` | backend | AES-256-GCM key for encrypting SSO IdP client secrets at rest. **Required before any tenant onboards SSO** (a loud dev-only fallback is used otherwise). |
 | `BASE_URL` / `FRONTEND_BASE_URL` | backend | API origin (used to compute the OIDC callback redirect URI) and SPA origin (where the SSO callback lands). |
 | `ANTHROPIC_API_KEY` | backend | Enables the optional RAG `/spectrum/reason` path (with the undeclared `anthropic` package). |
+| `COMPOUND_REGISTRY_VISIBILITY` | backend | Who can read a compound another account registered. `owner` (default) scopes reads to the registrant; `shared` restores the whole-registry view for a single-lab deployment. Writes are owner-scoped in both modes. |
 | `API_BASE_URL` | frontend | Backend target for the same-origin proxy (local + root deploy). |
 | `NEXT_PUBLIC_API_BASE_URL` | frontend | Public API base. Note: the browser always calls the same-origin `/api/backend` proxy — an absolute URL here is deliberately ignored by `lib/api/client.ts`. |
 | `MOLTRACE_ENABLED_MODULES` | backend | Which products this deployment serves: any of `spectracheck`, `regulatory_hub`, `reaction_optimization` (default: all three). Routes belonging to a product not listed are refused with `module_not_licensed`. An unrecognised value is a startup issue, not a later 403. |

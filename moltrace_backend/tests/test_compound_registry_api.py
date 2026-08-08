@@ -357,7 +357,12 @@ def test_a_non_registrant_cannot_rename_a_compound(client, api_headers):
         headers=bob,
         json={"preferred_name": "RENAMED BY BOB"},
     )
-    assert res.status_code == 403, f"non-registrant edited the compound: {res.status_code} {res.text[:200]}"
+    # Re-baselined from 403 when reads became owner-scoped by default
+    # (COMPOUND_REGISTRY_VISIBILITY). The old 403 was justified by "the registry
+    # is a shared reference and its rows are readable, so existence is not a
+    # secret". Reads are now scoped, so a 403 here would confirm a compound
+    # exists at an id Bob cannot read -- and the ids are sequential.
+    assert res.status_code == 404, f"non-registrant edited the compound: {res.status_code} {res.text[:200]}"
 
     # And the name must be untouched.
     current = client.get(f"/compound-registry/compounds/{cid}", headers=alice)
@@ -377,15 +382,34 @@ def test_the_registrant_can_still_edit(client, api_headers):
     assert res.json()["preferred_name"] == "Alice renamed it"
 
 
-def test_reads_stay_open_across_users(client, api_headers):
-    """The registry is a shared reference; only writes are owner-gated."""
+def test_reads_are_owner_scoped_by_default(client, api_headers):
+    """RE-BASELINED. This test used to assert the opposite, and was right to.
+
+    It was ``test_reads_stay_open_across_users``, asserting that "the registry is
+    a shared reference; only writes are owner-gated". That was a deliberate
+    design decision, not an oversight -- people really do look up structures
+    registered by colleagues.
+
+    It is the wrong DEFAULT for a hosted multi-tenant product: a compound's
+    existence under a code name is confidential long before its structure is,
+    and the registry id is the thing that leaks a program. The default is now
+    owner-scoped.
+
+    The old behaviour is not gone, it is a setting: the shared-reference case is
+    covered by ``TestSharedModeKeepsTheSingleLabCase`` in
+    ``test_compound_registry_read_scope.py``, which runs the registry with
+    ``compound_registry_visibility="shared"`` and asserts exactly what this test
+    used to.
+    """
     alice = _signup(client, "cr-alice3@example.com")
     bob = _signup(client, "cr-bob3@example.com")
     cid = _register_compound(client, alice, "SharedLookup")
 
     res = client.get(f"/compound-registry/compounds/{cid}", headers=bob)
-    assert res.status_code == 200, "a colleague must still be able to look the compound up"
-    assert res.json()["preferred_name"] == "SharedLookup"
+    assert res.status_code == 404, (
+        f"a stranger read another account's compound: {res.status_code} {res.text[:200]}"
+    )
+    assert client.get(f"/compound-registry/compounds/{cid}", headers=alice).status_code == 200
 
 
 def test_the_system_key_keeps_the_unscoped_write(client, api_headers):
@@ -420,12 +444,16 @@ def test_a_legacy_unattributed_row_is_not_editable_by_a_non_admin(client, api_he
             {"i": cid},
         )
 
+    # Re-baselined 403 -> 404 alongside the read scope: a NULL-owner row is now
+    # invisible to every non-admin, so its refusal must not disclose that it is
+    # there. The rule itself is unchanged -- "nobody is recorded as responsible"
+    # still does not mean "anybody may change it".
     assert client.patch(
         f"/compound-registry/compounds/{cid}", headers=bob, json={"preferred_name": "x"}
-    ).status_code == 403
+    ).status_code == 404
     assert client.patch(
         f"/compound-registry/compounds/{cid}", headers=alice, json={"preferred_name": "y"}
-    ).status_code == 403, "even the original registrant cannot be identified on a NULL row"
+    ).status_code == 404, "even the original registrant cannot be identified on a NULL row"
     assert client.patch(
         f"/compound-registry/compounds/{cid}", headers=api_headers, json={"preferred_name": "ops fix"}
     ).status_code == 200

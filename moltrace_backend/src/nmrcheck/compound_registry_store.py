@@ -397,16 +397,94 @@ def _graph_edge_to_record(row: ScientificKnowledgeGraphEdgeORM) -> ScientificKno
     )
 
 
-def _require_compound(session: Session, compound_id: int) -> CompoundEntityORM:
+def _visible(row: Any, owner_scope_id: int | None) -> bool:
+    """Whether ``owner_scope_id`` may see a compound row.
+
+    ``owner_scope_id`` is ``None`` for an admin, the system api key, or a
+    deployment running the registry in shared mode -- all of which see
+    everything. Otherwise a row is visible only to the account that registered
+    it.
+
+    A NULL ``created_by_user_id`` (rows predating attribution, migration 0039)
+    is visible to nobody but an admin, matching how the write side already
+    treats it: the safer reading of "nobody is recorded as responsible for this"
+    is not "everybody owns it".
+    """
+    if owner_scope_id is None:
+        return True
+    created_by = getattr(row, "created_by_user_id", None)
+    return created_by is not None and created_by == owner_scope_id
+
+
+def _require_compound(
+    session: Session, compound_id: int, owner_scope_id: int | None = None
+) -> CompoundEntityORM:
+    """Load a compound the caller is allowed to see.
+
+    Invisible and absent raise the SAME error, which routes to a 404. Existence
+    is the secret in this registry -- a compound's code name under a program is
+    confidential well before its structure is -- and compound ids are
+    sequential, so a distinguishable 403 would hand over an enumerable count of
+    what another tenant has registered.
+
+    Every child read (structures, aliases, batches, aliquots, relationships,
+    evidence links) already funnels through here, so scoping this one function
+    scopes all of them rather than leaving the alias list as the way around the
+    check.
+    """
     row = session.get(CompoundEntityORM, compound_id)
-    if row is None:
+    if row is None or not _visible(row, owner_scope_id):
         raise CompoundRegistryNotFoundError("Compound not found.")
     return row
 
 
-def _require_batch(session: Session, batch_id: int) -> CompoundBatchORM:
+def _require_own_compound(
+    session: Session, compound_id: int, actor_user_id: int | None
+) -> CompoundEntityORM:
+    """Load a compound the caller is allowed to ATTACH records to.
+
+    Distinct from :func:`_require_compound` in what it raises, because the two
+    questions differ. A read asks "may I see this", where invisible and absent
+    must be indistinguishable. A write asks "may I add to this", where the
+    caller may well be able to see the compound (shared mode) and still not be
+    entitled to hang an alias, batch or evidence link off it. The route decides
+    the status code from the visibility mode.
+
+    Attaching is a write. It stays owner-scoped in BOTH modes, matching
+    ``update_compound``: looking up a colleague's compound is reasonable,
+    editing what hangs off it is not.
+    """
+    row = session.get(CompoundEntityORM, compound_id)
+    if row is None:
+        raise CompoundRegistryNotFoundError("Compound not found.")
+    if actor_user_id is not None and not _visible(row, actor_user_id):
+        raise CompoundRegistryAccessError(
+            "This compound was registered by another user, so records cannot be "
+            "attached to it here."
+        )
+    return row
+
+
+def _require_own_batch(
+    session: Session, batch_id: int, actor_user_id: int | None
+) -> CompoundBatchORM:
+    """Load a batch whose parent compound the caller may attach records to."""
     row = session.get(CompoundBatchORM, batch_id)
     if row is None:
+        raise CompoundRegistryNotFoundError("Compound batch not found.")
+    _require_own_compound(session, row.compound_id, actor_user_id)
+    return row
+
+
+def _require_batch(
+    session: Session, batch_id: int, owner_scope_id: int | None = None
+) -> CompoundBatchORM:
+    """Load a batch whose parent compound the caller is allowed to see."""
+    row = session.get(CompoundBatchORM, batch_id)
+    if row is None:
+        raise CompoundRegistryNotFoundError("Compound batch not found.")
+    parent = session.get(CompoundEntityORM, row.compound_id)
+    if parent is None or not _visible(parent, owner_scope_id):
         raise CompoundRegistryNotFoundError("Compound batch not found.")
     return row
 
@@ -492,9 +570,12 @@ def list_compounds(
     status: str | None = None,
     compound_type: str | None = None,
     limit: int = 100,
+    owner_scope_id: int | None = None,
 ) -> list[CompoundEntity]:
     with session_scope(session_factory) as session:
         stmt = select(CompoundEntityORM).order_by(CompoundEntityORM.updated_at.desc(), CompoundEntityORM.id.desc())
+        if owner_scope_id is not None:
+            stmt = stmt.where(CompoundEntityORM.created_by_user_id == owner_scope_id)
         if q:
             pattern = f"%{q}%"
             alias_ids = select(CompoundAliasORM.compound_id).where(CompoundAliasORM.alias.ilike(pattern))
@@ -515,10 +596,22 @@ def list_compounds(
         return [_compound_to_record(row) for row in rows]
 
 
-def get_compound(session_factory: sessionmaker[Session], compound_id: int) -> CompoundEntity | None:
+def get_compound(
+    session_factory: sessionmaker[Session],
+    compound_id: int,
+    *,
+    owner_scope_id: int | None = None,
+) -> CompoundEntity | None:
+    """Return the compound, or None when it is absent OR not the caller's.
+
+    Both cases collapse to None -- and so to a 404 at the route -- on purpose;
+    see :func:`_require_compound`.
+    """
     with session_scope(session_factory) as session:
         row = session.get(CompoundEntityORM, compound_id)
-        return _compound_to_record(row) if row is not None else None
+        if row is None or not _visible(row, owner_scope_id):
+            return None
+        return _compound_to_record(row)
 
 
 class CompoundRegistryAccessError(RuntimeError):
@@ -625,11 +718,13 @@ def create_structure_record(
     session_factory: sessionmaker[Session],
     compound_id: int,
     payload: CompoundStructureRecordCreate,
+    *,
+    actor_user_id: int | None = None,
 ) -> CompoundStructureRecord:
     derived = derive_structure_metadata(payload.structure_input, payload.structure_format)
     validation_status = payload.validation_status or derived.validation_status
     with session_scope(session_factory) as session:
-        _require_compound(session, compound_id)
+        _require_own_compound(session, compound_id, actor_user_id)
         row = CompoundStructureRecordORM(
             compound_id=compound_id,
             structure_input=payload.structure_input,
@@ -654,9 +749,11 @@ def create_structure_record(
 def list_structure_records(
     session_factory: sessionmaker[Session],
     compound_id: int,
+    *,
+    owner_scope_id: int | None = None,
 ) -> list[CompoundStructureRecord]:
     with session_scope(session_factory) as session:
-        _require_compound(session, compound_id)
+        _require_compound(session, compound_id, owner_scope_id)
         rows = session.scalars(
             select(CompoundStructureRecordORM)
             .where(CompoundStructureRecordORM.compound_id == compound_id)
@@ -669,9 +766,11 @@ def create_alias(
     session_factory: sessionmaker[Session],
     compound_id: int,
     payload: CompoundAliasCreate,
+    *,
+    actor_user_id: int | None = None,
 ) -> CompoundAlias:
     with session_scope(session_factory) as session:
-        _require_compound(session, compound_id)
+        _require_own_compound(session, compound_id, actor_user_id)
         existing = session.scalar(
             select(CompoundAliasORM).where(
                 CompoundAliasORM.compound_id == compound_id,
@@ -696,9 +795,14 @@ def create_alias(
         return _alias_to_record(row)
 
 
-def list_aliases(session_factory: sessionmaker[Session], compound_id: int) -> list[CompoundAlias]:
+def list_aliases(
+    session_factory: sessionmaker[Session],
+    compound_id: int,
+    *,
+    owner_scope_id: int | None = None,
+) -> list[CompoundAlias]:
     with session_scope(session_factory) as session:
-        _require_compound(session, compound_id)
+        _require_compound(session, compound_id, owner_scope_id)
         rows = session.scalars(
             select(CompoundAliasORM)
             .where(CompoundAliasORM.compound_id == compound_id)
@@ -707,9 +811,14 @@ def list_aliases(session_factory: sessionmaker[Session], compound_id: int) -> li
         return [_alias_to_record(row) for row in rows]
 
 
-def create_batch(session_factory: sessionmaker[Session], payload: CompoundBatchCreate) -> CompoundBatch:
+def create_batch(
+    session_factory: sessionmaker[Session],
+    payload: CompoundBatchCreate,
+    *,
+    actor_user_id: int | None = None,
+) -> CompoundBatch:
     with session_scope(session_factory) as session:
-        _require_compound(session, payload.compound_id)
+        _require_own_compound(session, payload.compound_id, actor_user_id)
         if payload.reaction_experiment_id is not None:
             _require_resource(session, "reaction_experiment", payload.reaction_experiment_id)
         if payload.spectracheck_session_id is not None:
@@ -743,9 +852,18 @@ def list_batches(
     compound_id: int | None = None,
     status: str | None = None,
     limit: int = 100,
+    owner_scope_id: int | None = None,
 ) -> list[CompoundBatch]:
     with session_scope(session_factory) as session:
         stmt = select(CompoundBatchORM).order_by(CompoundBatchORM.updated_at.desc(), CompoundBatchORM.id.desc())
+        if owner_scope_id is not None:
+            # Scoped through the parent compound: batches carry no owner of
+            # their own, so an unfiltered listing here would expose every
+            # tenant's batch codes even while the compound list is scoped.
+            visible = select(CompoundEntityORM.id).where(
+                CompoundEntityORM.created_by_user_id == owner_scope_id
+            )
+            stmt = stmt.where(CompoundBatchORM.compound_id.in_(visible))
         if compound_id is not None:
             stmt = stmt.where(CompoundBatchORM.compound_id == compound_id)
         if status:
@@ -754,16 +872,28 @@ def list_batches(
         return [_batch_to_record(row) for row in rows]
 
 
-def get_batch(session_factory: sessionmaker[Session], batch_id: int) -> CompoundBatch | None:
+def get_batch(
+    session_factory: sessionmaker[Session],
+    batch_id: int,
+    *,
+    owner_scope_id: int | None = None,
+) -> CompoundBatch | None:
     with session_scope(session_factory) as session:
         row = session.get(CompoundBatchORM, batch_id)
-        return _batch_to_record(row) if row is not None else None
+        if row is None:
+            return None
+        parent = session.get(CompoundEntityORM, row.compound_id)
+        if parent is None or not _visible(parent, owner_scope_id):
+            return None
+        return _batch_to_record(row)
 
 
 def update_batch(
     session_factory: sessionmaker[Session],
     batch_id: int,
     payload: CompoundBatchUpdate,
+    *,
+    actor_user_id: int | None = None,
 ) -> CompoundBatch | None:
     with session_scope(session_factory) as session:
         row = session.get(CompoundBatchORM, batch_id)
@@ -787,7 +917,7 @@ def update_batch(
             if field_name in fields:
                 value = getattr(payload, field_name)
                 if field_name == "compound_id" and value is not None:
-                    _require_compound(session, int(value))
+                    _require_own_compound(session, int(value), actor_user_id)
                 setattr(row, field_name, value)
         if "metadata_json" in fields and payload.metadata_json is not None:
             row.metadata_json = _json_dump(payload.metadata_json, default={})
@@ -801,9 +931,11 @@ def create_aliquot(
     session_factory: sessionmaker[Session],
     batch_id: int,
     payload: SampleAliquotCreate,
+    *,
+    actor_user_id: int | None = None,
 ) -> SampleAliquot:
     with session_scope(session_factory) as session:
-        _require_batch(session, batch_id)
+        _require_own_batch(session, batch_id, actor_user_id)
         row = SampleAliquotORM(
             batch_id=batch_id,
             sample_id=payload.sample_id,
@@ -820,9 +952,14 @@ def create_aliquot(
         return _aliquot_to_record(row)
 
 
-def list_aliquots(session_factory: sessionmaker[Session], batch_id: int) -> list[SampleAliquot]:
+def list_aliquots(
+    session_factory: sessionmaker[Session],
+    batch_id: int,
+    *,
+    owner_scope_id: int | None = None,
+) -> list[SampleAliquot]:
     with session_scope(session_factory) as session:
-        _require_batch(session, batch_id)
+        _require_batch(session, batch_id, owner_scope_id)
         rows = session.scalars(
             select(SampleAliquotORM)
             .where(SampleAliquotORM.batch_id == batch_id)
@@ -835,10 +972,12 @@ def create_relationship(
     session_factory: sessionmaker[Session],
     source_compound_id: int,
     payload: CompoundRelationshipCreate,
+    *,
+    actor_user_id: int | None = None,
 ) -> CompoundRelationship:
     with session_scope(session_factory) as session:
-        _require_compound(session, source_compound_id)
-        _require_compound(session, payload.target_compound_id)
+        _require_own_compound(session, source_compound_id, actor_user_id)
+        _require_own_compound(session, payload.target_compound_id, actor_user_id)
         row = CompoundRelationshipORM(
             source_compound_id=source_compound_id,
             target_compound_id=payload.target_compound_id,
@@ -868,9 +1007,11 @@ def create_relationship(
 def list_relationships(
     session_factory: sessionmaker[Session],
     compound_id: int,
+    *,
+    owner_scope_id: int | None = None,
 ) -> list[CompoundRelationship]:
     with session_scope(session_factory) as session:
-        _require_compound(session, compound_id)
+        _require_compound(session, compound_id, owner_scope_id)
         rows = session.scalars(
             select(CompoundRelationshipORM)
             .where(
@@ -887,12 +1028,14 @@ def list_relationships(
 def create_evidence_link(
     session_factory: sessionmaker[Session],
     payload: CompoundEvidenceLinkCreate,
+    *,
+    actor_user_id: int | None = None,
 ) -> CompoundEvidenceLink:
     with session_scope(session_factory) as session:
         if payload.compound_id is not None:
-            _require_compound(session, payload.compound_id)
+            _require_own_compound(session, payload.compound_id, actor_user_id)
         if payload.batch_id is not None:
-            batch = _require_batch(session, payload.batch_id)
+            batch = _require_own_batch(session, payload.batch_id, actor_user_id)
             if payload.compound_id is not None and batch.compound_id != payload.compound_id:
                 raise CompoundRegistryValidationError("batch_id must belong to compound_id.")
         _require_resource(session, payload.resource_type, payload.resource_id)
@@ -916,9 +1059,11 @@ def create_evidence_link(
 def list_compound_evidence_links(
     session_factory: sessionmaker[Session],
     compound_id: int,
+    *,
+    owner_scope_id: int | None = None,
 ) -> list[CompoundEvidenceLink]:
     with session_scope(session_factory) as session:
-        _require_compound(session, compound_id)
+        _require_compound(session, compound_id, owner_scope_id)
         rows = session.scalars(
             select(CompoundEvidenceLinkORM)
             .where(CompoundEvidenceLinkORM.compound_id == compound_id)
@@ -930,9 +1075,11 @@ def list_compound_evidence_links(
 def list_batch_evidence_links(
     session_factory: sessionmaker[Session],
     batch_id: int,
+    *,
+    owner_scope_id: int | None = None,
 ) -> list[CompoundEvidenceLink]:
     with session_scope(session_factory) as session:
-        _require_batch(session, batch_id)
+        _require_batch(session, batch_id, owner_scope_id)
         rows = session.scalars(
             select(CompoundEvidenceLinkORM)
             .where(CompoundEvidenceLinkORM.batch_id == batch_id)
@@ -984,11 +1131,31 @@ def get_graph(
     *,
     compound_id: int | None = None,
     limit: int = 500,
+    owner_scope_id: int | None = None,
 ) -> ScientificKnowledgeGraph:
+    """Build the knowledge graph, restricted to compounds the caller may see.
+
+    The graph needs its own handling rather than inheriting a list filter: edges
+    reference compounds by id, and hydrating a node calls ``_compound_node``,
+    which carries the preferred name. An edge that merely *touches* another
+    tenant's compound would therefore print that tenant's compound name even if
+    every list endpoint were scoped. So an edge is dropped unless every
+    compound-typed endpoint on it is visible -- a partially-redacted edge would
+    still confirm that the invisible compound exists and is related to this one.
+    """
     with session_scope(session_factory) as session:
+        visible_ids: set[int] | None = None
+        if owner_scope_id is not None:
+            visible_ids = set(
+                session.scalars(
+                    select(CompoundEntityORM.id).where(
+                        CompoundEntityORM.created_by_user_id == owner_scope_id
+                    )
+                ).all()
+            )
         edge_stmt = select(ScientificKnowledgeGraphEdgeORM).order_by(ScientificKnowledgeGraphEdgeORM.id.desc())
         if compound_id is not None:
-            _require_compound(session, compound_id)
+            _require_compound(session, compound_id, owner_scope_id)
             compound_text = str(compound_id)
             edge_stmt = edge_stmt.where(
                 or_(
@@ -998,7 +1165,19 @@ def get_graph(
                     & (ScientificKnowledgeGraphEdgeORM.target_id == compound_text),
                 )
             )
-        edge_rows = session.scalars(edge_stmt.limit(limit)).all()
+        edge_rows = list(session.scalars(edge_stmt.limit(limit)).all())
+        if visible_ids is not None:
+            def _edge_visible(edge: Any) -> bool:
+                for node_type, node_id in (
+                    (edge.source_type, edge.source_id),
+                    (edge.target_type, edge.target_id),
+                ):
+                    if node_type == "compound" and str(node_id).isdigit():
+                        if int(node_id) not in visible_ids:
+                            return False
+                return True
+
+            edge_rows = [edge for edge in edge_rows if _edge_visible(edge)]
         node_map: dict[tuple[str, str], ScientificKnowledgeGraphNode] = {}
         compound_ids: set[int] = set()
         if compound_id is not None:
@@ -1015,8 +1194,13 @@ def get_graph(
                         metadata_json={},
                     )
         if compound_id is None:
-            for row in session.scalars(select(CompoundEntityORM).order_by(CompoundEntityORM.id.desc()).limit(100)).all():
+            recent = select(CompoundEntityORM).order_by(CompoundEntityORM.id.desc())
+            if owner_scope_id is not None:
+                recent = recent.where(CompoundEntityORM.created_by_user_id == owner_scope_id)
+            for row in session.scalars(recent.limit(100)).all():
                 compound_ids.add(row.id)
+        if visible_ids is not None:
+            compound_ids &= visible_ids
         if compound_ids:
             rows = session.scalars(select(CompoundEntityORM).where(CompoundEntityORM.id.in_(compound_ids))).all()
             for row in rows:
@@ -1035,9 +1219,19 @@ def get_graph(
 def search_compounds(
     session_factory: sessionmaker[Session],
     payload: CompoundRegistrySearchRequest,
+    *,
+    owner_scope_id: int | None = None,
 ) -> CompoundRegistrySearchResult:
+    """Structure/name/alias search, restricted to compounds the caller may see.
+
+    Scoped for the same reason as the list, and more urgently: the registry id
+    is precisely what someone would search for, so an unscoped search is a
+    lookup oracle even when every by-id read is closed.
+    """
     with session_scope(session_factory) as session:
         stmt = select(CompoundEntityORM).order_by(CompoundEntityORM.updated_at.desc(), CompoundEntityORM.id.desc())
+        if owner_scope_id is not None:
+            stmt = stmt.where(CompoundEntityORM.created_by_user_id == owner_scope_id)
         if payload.name:
             pattern = f"%{payload.name}%"
             alias_ids = select(CompoundAliasORM.compound_id).where(CompoundAliasORM.alias.ilike(pattern))
@@ -1102,6 +1296,7 @@ def _metadata_matches(candidate: dict[str, Any], query: dict[str, Any]) -> bool:
 def link_resource_to_compound(
     session_factory: sessionmaker[Session],
     *,
+    actor_user_id: int | None = None,
     resource_type: str,
     resource_id: int,
     payload: CompoundRegistryLinkRequest,
@@ -1110,9 +1305,9 @@ def link_resource_to_compound(
     compound_as_source: bool = False,
 ) -> CompoundRegistryLinkResponse:
     with session_scope(session_factory) as session:
-        _require_compound(session, payload.compound_id)
+        _require_own_compound(session, payload.compound_id, actor_user_id)
         if payload.batch_id is not None:
-            batch = _require_batch(session, payload.batch_id)
+            batch = _require_own_batch(session, payload.batch_id, actor_user_id)
             if batch.compound_id != payload.compound_id:
                 raise CompoundRegistryValidationError("batch_id must belong to compound_id.")
         _require_resource(session, resource_type, resource_id)

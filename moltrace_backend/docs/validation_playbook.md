@@ -1673,3 +1673,87 @@ no-budget case render as a ratio rather than as an `H` count needs
 `spectrum.py:2326`, the same contended file.
 
 ### 3-5. Registry reads, DP4 naming, corpus licence — see the sections below
+
+### 3. Compound registry read scope — ANSWERED, SHIPPED
+
+Answer: *"I think per user is fine. But if we can do both, that's also fine."*
+
+**This reversed a decision that was deliberate and documented**, which is worth
+recording because I first read it as a bug. `update_compound` carried:
+
+> Reads stay open deliberately. A compound registry is a shared reference:
+> people look up structures registered by colleagues, and closing reads would
+> break the feature rather than secure it.
+
+That is a fair description of one lab and the wrong default for a hosted
+multi-tenant product. Probed live before the change, a second account got:
+
+```
+GET  /compound-registry/compounds/1  as another user -> 200
+     leaked: preferred_name, registry_id, inchikey
+LIST /compound-registry/compounds     -> 200, n=1  (another account's row)
+SEARCH q=ACME-SECRET                  -> 200, n=1
+PATCH /compound-registry/compounds/1  -> 403        (write side already scoped)
+```
+
+For a pharma customer the confidential part is the compound's *existence under a
+code name* — the structure has not been disclosed yet, and the registry id is
+what leaks a program. So "both" was implemented as a setting rather than a
+straight reversal: `COMPOUND_REGISTRY_VISIBILITY=owner` (default) or `shared`,
+which keeps the single-lab case as a supported configuration.
+
+After: `404 / n=0 / n=0 / 404`.
+
+Three things that fell out of doing it properly:
+
+* **`_require_compound` was the seam.** Nineteen call sites already funnelled
+  through it and `_require_batch`, so scoping those two functions scoped every
+  child read — structures, aliases, batches, aliquots, relationships, evidence
+  links — instead of leaving the alias list as the way around the check.
+* **The graph needed its own handling.** Edges reference compounds by id and
+  hydrating a node emits its preferred name, so an edge merely *touching*
+  another tenant's compound would print that tenant's compound name even with
+  every list scoped. An edge is now dropped unless every compound endpoint on it
+  is visible — a partially-redacted edge still confirms the hidden compound
+  exists and is related.
+* **The write route's 403 had to become a 404.** Its comment justified 403 with
+  "the registry is a shared reference and its rows are readable" — the exact
+  premise being changed. Left alone it would have confirmed a compound exists at
+  an id the caller can no longer read, handing back what scoping the reads took
+  away. It now follows the mode.
+
+**Method note.** My first probe of `/compound-registry/search` used GET and got
+405, which says nothing about whether the search leaks. Probing it the wrong way
+would have recorded a pass for a route that was never exercised — the same
+mistake as the earlier `PATCH -> 405` and `401 step_up` refutations.
+
+**The half I nearly shipped without.** Scoping the reads alone would have been a
+half-applied guard, the shape I have now introduced twice while *fixing* this
+class of bug. Eight write functions — `create_structure_record`, `create_alias`,
+`create_batch`, `update_batch`, `create_aliquot`, `create_relationship`,
+`create_evidence_link`, `link_resource_to_compound` — resolved their target
+through the same unscoped `_require_compound`, so a stranger could still hang an
+alias or an evidence link off a compound they could not read, and the 201-vs-404
+would confirm it existed.
+
+Closed in the same commit with a write-side counterpart, `_require_own_compound`.
+It raises a *different* error from the read helper on purpose: a read asks "may I
+see this", where invisible and absent must be indistinguishable; a write asks
+"may I add to this", where in shared mode the caller can legitimately see the
+compound and still not be entitled to attach to it. Relationships check **both**
+endpoints — relating your compound to one you cannot see would otherwise confirm
+it exists and plant an edge on someone else's record.
+
+One trap worth naming: `CompoundRegistryAccessError` does not inherit
+`CompoundRegistryError`, so it fell straight through the route error mapper's
+`isinstance` chain to a bare re-raise. Every correctly-refused attach would have
+surfaced as a **500** — which a chemist reads as "MolTrace is broken", not "you
+may not do that". There is now a test asserting the refusal is under 500.
+
+**Re-baselined, visibly:** three tests in `test_compound_registry_api.py` encoded
+the old behaviour, including one named `test_reads_stay_open_across_users` whose
+docstring asserted the shared-reference design. It is now
+`test_reads_are_owner_scoped_by_default` and says what it used to assert, why
+that was reasonable, and where the old behaviour is still covered
+(`TestSharedModeKeepsTheSingleLabCase`). The other two moved 403 -> 404 with the
+reason recorded inline.
