@@ -31,6 +31,7 @@ from moltrace.spectroscopy.io.fid_reader import NMRSpectrum
 from moltrace.spectroscopy.verification.scorer import (
     _AMBIGUITY_FLOOR,
     _ambiguity_weight,
+    _soften,
     verify_structure,
 )
 
@@ -54,53 +55,62 @@ def test_the_weight_is_a_probability() -> None:
 # --------------------------------------------------------------------------- #
 # Shape
 # --------------------------------------------------------------------------- #
-def test_k_equidistant_candidates_give_one_over_k_until_the_floor() -> None:
+def test_k_equidistant_candidates_are_the_raw_likelihood_rescaled() -> None:
     """Maximal ambiguity: the matcher's choice carries the evidence of a coin flip.
 
-    Re-baselined when `_AMBIGUITY_FLOOR` landed: 1/k falls below the floor at k = 5,
-    so from there on every equidistant set returns the floor rather than continuing
-    down. That is the floor doing exactly what it is for — the extreme tail is the
-    part of the curve the measurement extrapolates most.
+    **Re-baselined twice.** Originally `1/k` exactly. Then a hard floor clamped it
+    below k = 5. Now the affine softening rescales *every* value, so the raw `1/k`
+    likelihood arrives as `f + (1-f)/k` and there is no clamping plateau at all —
+    the mapping stays strictly monotone in k, which the hard floor had destroyed.
     """
 
-    for k in (2, 3, 4):
-        assert _ambiguity_weight([1.0] * k, chosen=0, scale_ppm=2.0) == pytest.approx(1.0 / k)
-    for k in (5, 8, 20):
-        assert _ambiguity_weight([1.0] * k, chosen=0, scale_ppm=2.0) == pytest.approx(
-            _AMBIGUITY_FLOOR
+    for k in (2, 3, 4, 5, 8, 20):
+        expected = _AMBIGUITY_FLOOR + (1.0 - _AMBIGUITY_FLOOR) / k
+        assert _ambiguity_weight([1.0] * k, chosen=0, scale_ppm=2.0) == pytest.approx(expected)
+
+    # Strictly decreasing in k — no plateau, unlike the hard-floor version.
+    weights = [_ambiguity_weight([1.0] * k, chosen=0, scale_ppm=2.0) for k in (2, 5, 20, 100)]
+    assert weights == sorted(weights, reverse=True)
+    assert len(set(weights)) == len(weights)
+
+
+def test_the_floor_is_a_recorded_policy_choice_not_a_measured_constant() -> None:
+    """0.40 is where a fully corroborating ¹H test returns to `consistent` (0.8040).
+
+    Pinned so a change has to restate the basis. This constant was selected by the
+    verdict it produces, which is a product-owner decision and is documented as one
+    rather than presented as measurement.
+    """
+
+    assert _AMBIGUITY_FLOOR == 0.40
+
+
+def test_the_softening_is_affine_and_fixes_both_ends() -> None:
+    """`0 -> floor` and `1 -> 1`. The second is the one that matters."""
+
+    assert _soften(0.0) == pytest.approx(_AMBIGUITY_FLOOR)
+    assert _soften(1.0) == pytest.approx(1.0)
+    for raw in (0.1, 0.25, 0.5, 0.75, 0.9):
+        assert _soften(raw) == pytest.approx(
+            _AMBIGUITY_FLOOR + (1.0 - _AMBIGUITY_FLOOR) * raw
         )
+    # Monotone, and never below the floor or above 1.
+    values = [_soften(x) for x in (0.0, 0.2, 0.4, 0.6, 0.8, 1.0)]
+    assert values == sorted(values)
+    assert all(_AMBIGUITY_FLOOR <= v <= 1.0 for v in values)
 
 
-def test_the_floor_is_the_measured_tenth_percentile_not_a_round_number() -> None:
-    """0.20 sits between the measured p10 of 0.223 (¹³C) and 0.180 (¹H).
+def test_every_return_path_passes_through_the_softening() -> None:
+    """An edge case must not score harsher than the happy path.
 
-    Pinned so a future change has to restate the basis rather than nudge the constant.
+    The degenerate branches (no usable scale, underflowed Gaussian, non-finite chosen
+    distance) all return the uniform share, and each must be softened too — otherwise
+    a bad input would be penalised more than a genuinely ambiguous match.
     """
 
-    assert _AMBIGUITY_FLOOR == 0.20
-
-
-def test_the_floor_cannot_be_used_to_soften_the_discount() -> None:
-    """Documented because it is the thing someone will try.
-
-    Measured across the corpus, raising the floor to 0.50 — touching 41 % of ¹³C and
-    51 % of ¹H matches — moves a fully corroborating test's posterior by only +0.012
-    and +0.022. The tail carries almost none of the aggregate. Anything that
-    meaningfully softens the discount must lift the whole distribution, which is a
-    different decision. This test pins the mechanism: the floor never touches a
-    weight already above it.
-    """
-
-    for raw_distances in ([0.0, 3.0], [0.1, 0.2], [0.0], [0.5, 0.6, 0.7]):
-        weight = _ambiguity_weight(raw_distances, chosen=0, scale_ppm=1.0)
-        assert weight >= _AMBIGUITY_FLOOR
-        if weight > _AMBIGUITY_FLOOR:
-            # Above the floor the value is the untouched normalised likelihood.
-            scale = 1.0
-            expected = math.exp(-0.5 * (raw_distances[0] / scale) ** 2) / sum(
-                math.exp(-0.5 * (d / scale) ** 2) for d in raw_distances
-            )
-            assert weight == pytest.approx(expected)
+    for scale in (0.0, float("nan"), float("inf")):
+        assert _ambiguity_weight([0.2, 0.4, 5.0], chosen=0, scale_ppm=scale) >= _AMBIGUITY_FLOOR
+    assert _ambiguity_weight([1e9, 1e9], chosen=0, scale_ppm=1.0) >= _AMBIGUITY_FLOOR
 
 
 def test_a_clearly_nearest_line_keeps_almost_all_its_evidence() -> None:
@@ -135,7 +145,7 @@ def test_an_unusable_scale_falls_back_to_counting_the_candidates(scale: float) -
 
     weight = _ambiguity_weight([0.2, 0.4, 5.0], chosen=0, scale_ppm=scale)
     assert math.isfinite(weight)
-    assert weight == pytest.approx(max(_AMBIGUITY_FLOOR, 1.0 / 3.0))
+    assert weight == pytest.approx(_AMBIGUITY_FLOOR + (1.0 - _AMBIGUITY_FLOOR) / 3.0)
 
 
 def test_degenerate_inputs_do_not_produce_nan_or_zero() -> None:

@@ -14,6 +14,48 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.69.0 — every automation task in the catalogue now records itself (2026-08-08)
+
+v0.65.0 instrumented the four priorities in the ROI handoff and left 17 of the 22 catalogue
+entries with no emitter. A catalogue entry nothing emits is not neutral: it looks like a
+working task on the automation-tasks page and contributes zero, and there was nothing in the
+product that could show the difference. This closes the remaining 17.
+
+- **31 further emit sites.** The MS and LCMS routes (HRMS matching, MS/MS annotation,
+  fragmentation trees, LCMS import/detect/group/consensus) and the NMR previews are
+  **stateless** — they compute a result and persist nothing, so there is no transaction to
+  join and the usage event is the only record that the work happened. `record_automation_event`
+  now takes either an open `Session` or a `sessionmaker`, so the transactional guarantee still
+  holds everywhere the work *is* written. Each of those routes has a JSON, a form-`evidence`
+  and sometimes an `upload` variant; all are instrumented, because they are alternate
+  encodings a caller picks between, not stages of one job.
+- **The chokepoints were used where they exist.** All four `assess_*` entry points funnel
+  through `_persist_assessment`, so QC readiness needed one call, not four, and cannot drift
+  as targets are added.
+- **One unit of work, one event, chosen deliberately.** The closed-loop reaction task names
+  recommendation conversion, execution batches *and* confirmed outcomes; only `confirm_outcome`
+  emits, because billing all three would charge one loop three times.
+- **`workflow_run_execution` is now scoped to the orchestration**, excluding the steps.
+  Instrumenting the steps made the composition visible: a workflow whose QC step is itself an
+  automated task moved ROI by 45 minutes, not 30. The description now says what the 30 covers,
+  so the two compose instead of double-counting.
+- **Two id-space collisions avoided.** Reaction project ids are not written to `project_id`
+  (which `scope=project` filters on, and which addresses SpectraCheck projects), and an
+  analysis-job id is not written to `job_id` (which addresses `JobORM`, and feeds
+  `failed_jobs`). Both go in metadata. A third was caught by the type checker: a regulatory
+  dossier's `sample_id` is an integer foreign key, while a usage event's is the free-text
+  sample label — Pydantic would have coerced it and filed the row under a sample named "7".
+- **3 further tests**, two of them structural: every catalogue entry must have an emitter, and
+  no event type may match more than one ROI counter substring. Those are the two failures that
+  are invisible by inspection.
+
+Worth knowing before quoting these numbers: preview endpoints are cheap and idempotent, so a
+user tuning parameters re-invokes them, and each invocation credits its baseline. If that
+proves too generous in practice the honest fix is the catalogue value or a
+dedupe window, not a silent cap.
+
+---
+
 ## v0.68.9 — Five decisions answered, and the two defects answering them uncovered (2026-08-08)
 
 Five open product questions were answered by the maintainer and implemented in order. Two of them
@@ -209,25 +251,44 @@ have propagated silently through the mean and into the posterior.
 `details.mean_ambiguity_weight` and a per-resonance `ambiguity_weight` / `candidate_lines` are
 recorded for audit, so a verdict reached on diluted evidence is visible as such.
 
-### A floor was added, and it cannot do what a floor is usually wanted for
+### The discount is softened to 40 %, by direction
 
-`_AMBIGUITY_FLOOR = 0.20` clamps the discount's tail. The value is the measured 10th percentile of
-the weight distribution (0.223 ¹³C / 0.180 ¹H), chosen because that decile is where the estimate is
-least trustworthy: the measurement runs on clean assignment data, so crowding is *understated* and
-the extreme low weights are the most extrapolated part of the curve.
+`_AMBIGUITY_FLOOR = 0.40`, applied as an **affine** rescale `f + (1-f)·w` rather than a hard
+`max(f, w)`.
 
-**Its measured effect is nil**, and that is the point worth recording. Posterior of a fully
-corroborating test: ¹³C 0.8317 → **0.8321**, ¹H 0.7645 → **0.7657**. Swept further, a floor of 0.50
-— touching 41 % of ¹³C and 51 % of ¹H matches — reaches only 0.8435 and 0.7863. **¹H stays
-`inconclusive` at every floor value.** The tail carries almost none of the aggregate; the mean is
-set by the bulk, whose median weight is 0.48–0.54.
+**Recorded as a policy choice, not a measured constant.** It was selected as the point at which a
+fully corroborating ¹H test returns to `consistent` — i.e. by the verdict it produces rather than by
+evidence. That is a legitimate call for a product owner and an illegitimate one to make silently, so
+the constant's docstring and a test both say so.
 
-The only lever that moves the aggregate is an **affine** rescale `f + (1-f)·w`, which lifts the
-whole distribution. It restores ¹H to `consistent` at **f ≈ 0.40** (posterior 0.8040) — but that
-discards 40 % of a measured discount on *every* match, including the third that are genuinely
-unambiguous and the mid-range where the estimate is solid. Choosing `f` to recover a particular
-verdict is fitting a constant to a desired answer, so the affine form is **not** shipped; the sweep
-is in the script and the decision is left where it belongs.
+Why affine and not a hard floor: a hard floor only lifts the tail, and the tail carries almost none
+of the aggregate. Swept across the corpus, `max(0.50, w)` — touching 41 % of ¹³C and 51 % of ¹H
+matches — moved the posterior by just +0.012 and +0.022, leaving ¹H below threshold at *every*
+value. Only lifting the whole distribution moves the mean.
+
+What it costs: 40 % of a measured discount is discarded on **every** match, including the ~third
+that are genuinely unambiguous and the mid-range where the softmax estimate is solid. The invariant
+that survives is the one that matters — `w = 1` still maps to `1.0`, so a match with no rival in its
+window remains completely undiscounted.
+
+Re-scored on the same held-out split:
+
+| | ¹³C | ¹H |
+|---|---|---|
+| mean ambiguity weight | 0.610 → **0.766** | 0.537 → **0.722** |
+| median | 0.542 → **0.725** | 0.480 → **0.688** |
+| halved or worse (< 0.5) | 41.1 % → **4.1 %** | 50.5 % → **8.3 %** |
+| mean significance | 2.566 → **3.080** | 1.694 → **2.141** |
+| odds multiplier | ×4.94 → **×5.92** | ×3.25 → **×4.10** |
+| posterior from 0.50 | 0.8317 → **0.8556** | 0.7645 → **0.8040** |
+| verdict | consistent | **inconclusive → consistent** |
+
+Against the undiscounted baseline (×7.20 / ×5.42), the discount now removes **17.8 % of the
+evidence on ¹³C and 24.4 % on ¹H** — down from 31.4 % and 40.1 %. It retains roughly three-fifths of
+its measured strength.
+
+A side effect worth having: the affine form is strictly monotone in the number of candidates,
+whereas the hard floor produced a plateau where every set of 5 or more scored identically.
 
 ### How much evidence was being over-claimed
 
