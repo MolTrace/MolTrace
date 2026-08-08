@@ -132,6 +132,7 @@ from .carbon13 import (
 from .chemistry import structure_summary_from_smiles
 from .compound_classes import normalize_compound_class
 from .database import (
+    FIDRunSelfReviewError,
     audit_event,
     authenticate_user,
     build_evidence_report,
@@ -12808,6 +12809,9 @@ def _submit_fid_run_review(
     context: AccessContext,
     action: str,
 ) -> FIDRunReviewDecisionRecord:
+    # A system api key or an admin overrides the separation rule; everyone else
+    # must be someone other than the run's author.
+    privileged = bool(context.system_api_key or (context.user and context.user.is_admin))
     try:
         decision = submit_fid_run_review_decision(
             _state(request).session_factory,
@@ -12815,7 +12819,13 @@ def _submit_fid_run_review(
             reviewer_user_id=context.user.id if context.user else 0,
             action=action,
             comment=payload.comment,
+            enforce_separation=not privileged,
         )
+    except FIDRunSelfReviewError as exc:
+        # 409, not 403: the caller IS entitled to review runs, just not this one.
+        # A 403 would also be swallowed by the global access-denied sanitiser,
+        # which is what made the old refusal read as a broken feature.
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     _audit_from_context(
@@ -12833,13 +12843,13 @@ def _submit_fid_run_review(
 @router.post(
     "/fid/runs/{run_id}/review",
     response_model=FIDRunReviewDecisionRecord,
-    dependencies=[Depends(require_admin)],
+    dependencies=[Depends(require_access_context)],
 )
 def fid_run_review(
     run_id: int,
     payload: FIDRunReviewCreate,
     request: Request,
-    context: AccessContext = Depends(require_admin),
+    context: AccessContext = Depends(require_access_context),
 ) -> FIDRunReviewDecisionRecord:
     return _submit_fid_run_review(
         run_id=run_id,
@@ -12853,13 +12863,13 @@ def fid_run_review(
 @router.post(
     "/fid/runs/{run_id}/approve",
     response_model=FIDRunReviewDecisionRecord,
-    dependencies=[Depends(require_admin)],
+    dependencies=[Depends(require_access_context)],
 )
 def fid_run_approve(
     run_id: int,
     payload: FIDRunReviewCreate,
     request: Request,
-    context: AccessContext = Depends(require_admin),
+    context: AccessContext = Depends(require_access_context),
 ) -> FIDRunReviewDecisionRecord:
     return _submit_fid_run_review(
         run_id=run_id,
@@ -12873,13 +12883,13 @@ def fid_run_approve(
 @router.post(
     "/fid/runs/{run_id}/reject",
     response_model=FIDRunReviewDecisionRecord,
-    dependencies=[Depends(require_admin)],
+    dependencies=[Depends(require_access_context)],
 )
 def fid_run_reject(
     run_id: int,
     payload: FIDRunReviewCreate,
     request: Request,
-    context: AccessContext = Depends(require_admin),
+    context: AccessContext = Depends(require_access_context),
 ) -> FIDRunReviewDecisionRecord:
     return _submit_fid_run_review(
         run_id=run_id,
@@ -12893,13 +12903,13 @@ def fid_run_reject(
 @router.post(
     "/fid/runs/{run_id}/request-changes",
     response_model=FIDRunReviewDecisionRecord,
-    dependencies=[Depends(require_admin)],
+    dependencies=[Depends(require_access_context)],
 )
 def fid_run_request_changes(
     run_id: int,
     payload: FIDRunReviewCreate,
     request: Request,
-    context: AccessContext = Depends(require_admin),
+    context: AccessContext = Depends(require_access_context),
 ) -> FIDRunReviewDecisionRecord:
     return _submit_fid_run_review(
         run_id=run_id,

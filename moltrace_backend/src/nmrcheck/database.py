@@ -1952,6 +1952,10 @@ def list_fid_run_review_decisions(
         return [_fid_run_decision_to_record(row) for row in rows]
 
 
+class FIDRunSelfReviewError(RuntimeError):
+    """The caller is the run's author and cannot review their own work."""
+
+
 def submit_fid_run_review_decision(
     session_factory: sessionmaker[Session],
     *,
@@ -1959,7 +1963,25 @@ def submit_fid_run_review_decision(
     reviewer_user_id: int,
     action: str,
     comment: str | None = None,
+    enforce_separation: bool = False,
 ) -> FIDRunReviewDecisionRecord:
+    """Record a review decision on a FID run.
+
+    ``enforce_separation`` applies segregation of duties: the run's author may
+    not review their own work. It is opt-in so a system api key and an admin
+    keep the override, matching every other gate here.
+
+    These routes used to require the ADMIN role instead, which meant nobody in a
+    lab could approve an analysis -- the reviewer in a lab is a senior chemist,
+    not IT. Requiring "somebody else" is the rule the admin gate was standing in
+    for, and it is the one worth enforcing.
+
+    A run with no recorded author (``user_id`` NULL, predating attribution) is
+    reviewable: the check has nothing to compare against, and blocking review of
+    every historical run would be worse than allowing it. That is a deliberate
+    asymmetry with managed files, where a NULL owner means refuse -- there,
+    reading is disclosure; here, refusing is an obstruction with no upside.
+    """
     action_to_status = {
         "approve": "approved",
         "reject": "rejected",
@@ -1971,6 +1993,15 @@ def submit_fid_run_review_decision(
         row = session.get(FIDRunORM, run_id)
         if row is None:
             raise ValueError("FID run not found.")
+        if (
+            enforce_separation
+            and row.user_id is not None
+            and row.user_id == reviewer_user_id
+        ):
+            raise FIDRunSelfReviewError(
+                "You created this run, so it needs a review from someone else "
+                "before it can be approved."
+            )
         previous_status = row.review_status
         row.review_status = new_status
         row.reviewer_user_id = reviewer_user_id
