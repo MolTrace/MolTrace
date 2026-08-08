@@ -4,6 +4,11 @@ import Link from "next/link"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { apiFetch } from "@/lib/api/client"
 import { formatApiError } from "@/components/spectracheck/spectracheck-helpers"
+import {
+  COMPOUND_UNAVAILABLE_DESCRIPTION,
+  COMPOUND_UNAVAILABLE_TITLE,
+  isCompoundOutOfScope,
+} from "@/components/compounds/compound-registry-access"
 import { readRecordNumber, readRecordString } from "@/components/projects/project-workspace-utils"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
@@ -135,6 +140,9 @@ export function CompoundScientificKnowledgeGraphPanel({
 }: CompoundScientificKnowledgeGraphPanelProps) {
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState("")
+  // The graph is a child record of the compound, so it inherits the registry's
+  // owner scope: a 404 here says nothing about whether the compound exists.
+  const [outOfScope, setOutOfScope] = useState(false)
   const [payload, setPayload] = useState<Record<string, unknown> | null>(null)
   const graphViewTrackedKey = useRef<string | null>(null)
 
@@ -152,6 +160,7 @@ export function CompoundScientificKnowledgeGraphPanel({
     }
     setLoading(true)
     setErr("")
+    setOutOfScope(false)
     try {
       const q = new URLSearchParams()
       q.set("compound_id", String(numericId))
@@ -160,7 +169,11 @@ export function CompoundScientificKnowledgeGraphPanel({
       setPayload(isRecord(raw) ? raw : null)
     } catch (e) {
       setPayload(null)
-      setErr(formatApiError(e, "Could not load scientific knowledge graph."))
+      if (isCompoundOutOfScope(e)) {
+        setOutOfScope(true)
+      } else {
+        setErr(formatApiError(e, "Could not load scientific knowledge graph."))
+      }
     } finally {
       setLoading(false)
     }
@@ -214,6 +227,34 @@ export function CompoundScientificKnowledgeGraphPanel({
           {err || "Open a compound from the registry to see its graph."}
         </AlertDescription>
       </Alert>
+    )
+  }
+
+  // Replaces the whole view rather than sitting inside it: the graph was never
+  // readable, so the nodes / timeline / edges cards below have nothing to say,
+  // and their "No nodes" and "No edges to show." states would each assert that
+  // the compound exists and simply has an empty graph.
+  if (!loading && outOfScope) {
+    return (
+      <Card>
+        <CardHeader className="pb-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <CardTitle className="text-base">Scientific knowledge graph</CardTitle>
+            <InfoTooltip label="About this graph" content={GRAPH_TOOLTIP} />
+          </div>
+        </CardHeader>
+        <CardContent>
+          <Empty data-testid="compound-graph-unavailable">
+            <EmptyHeader>
+              <EmptyMedia variant="icon">
+                <Network />
+              </EmptyMedia>
+              <EmptyTitle>{COMPOUND_UNAVAILABLE_TITLE}</EmptyTitle>
+              <EmptyDescription>{COMPOUND_UNAVAILABLE_DESCRIPTION}</EmptyDescription>
+            </EmptyHeader>
+          </Empty>
+        </CardContent>
+      </Card>
     )
   }
 

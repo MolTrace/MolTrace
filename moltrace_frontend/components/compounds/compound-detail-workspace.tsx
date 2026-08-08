@@ -5,6 +5,12 @@ import { useParams } from "next/navigation"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { apiFetch } from "@/lib/api/client"
 import { formatApiError } from "@/components/spectracheck/spectracheck-helpers"
+import {
+  COMPOUND_UNAVAILABLE_DESCRIPTION,
+  COMPOUND_UNAVAILABLE_TITLE,
+  COMPOUND_UNAVAILABLE_WRITE_MESSAGE,
+  isCompoundOutOfScope,
+} from "@/components/compounds/compound-registry-access"
 import { readRecordNumber, readRecordString } from "@/components/projects/project-workspace-utils"
 import { CompoundBatchesAliquotsPanel } from "@/components/batches/compound-batches-aliquots-panel"
 import { CompoundScientificKnowledgeGraphPanel } from "@/components/compounds/compound-scientific-knowledge-graph-panel"
@@ -199,6 +205,10 @@ export function CompoundDetailWorkspace() {
   const [evidenceLinks, setEvidenceLinks] = useState<Record<string, unknown>[]>([])
 
   const [loadErr, setLoadErr] = useState("")
+  // Kept apart from ``loadErr`` because it is not an error. An owner-scoped
+  // registry answers 404 for someone else's compound exactly as it does for one
+  // that never existed, so this state must not read as a failure.
+  const [outOfScope, setOutOfScope] = useState(false)
   const [loading, setLoading] = useState(true)
 
   const [aliasInput, setAliasInput] = useState("")
@@ -225,6 +235,7 @@ export function CompoundDetailWorkspace() {
     }
     setLoading(true)
     setLoadErr("")
+    setOutOfScope(false)
     try {
       const [c, s, a, r, e] = await Promise.all([
         apiFetch<unknown>(`${base}`, { method: "GET" }),
@@ -244,7 +255,13 @@ export function CompoundDetailWorkspace() {
       setAliases([])
       setRelationships([])
       setEvidenceLinks([])
-      setLoadErr(formatApiError(err, "Could not load compound."))
+      if (isCompoundOutOfScope(err)) {
+        // Not an error line. The backend's own detail here is "Compound not
+        // found." — a claim about existence the caller is not entitled to.
+        setOutOfScope(true)
+      } else {
+        setLoadErr(formatApiError(err, "Could not load compound."))
+      }
     } finally {
       setLoading(false)
     }
@@ -285,7 +302,13 @@ export function CompoundDetailWorkspace() {
       setAliasInput("")
       await reloadAll()
     } catch (err) {
-      setAliasErr(formatApiError(err, "Add alias failed."))
+      // Attaching to a compound outside your registry is refused with the same
+      // 404 the read uses, so it must not surface as "Compound not found."
+      setAliasErr(
+        isCompoundOutOfScope(err)
+          ? COMPOUND_UNAVAILABLE_WRITE_MESSAGE
+          : formatApiError(err, "Add alias failed."),
+      )
     } finally {
       setAliasBusy(false)
     }
@@ -317,7 +340,11 @@ export function CompoundDetailWorkspace() {
       setRelType("")
       await reloadAll()
     } catch (err) {
-      setRelErr(formatApiError(err, "Add relationship failed."))
+      setRelErr(
+        isCompoundOutOfScope(err)
+          ? COMPOUND_UNAVAILABLE_WRITE_MESSAGE
+          : formatApiError(err, "Add relationship failed."),
+      )
     } finally {
       setRelBusy(false)
     }
@@ -887,7 +914,23 @@ export function CompoundDetailWorkspace() {
         </Tabs>
       ) : null}
 
-      {!loading && !compound && !loadErr ? (
+      {/* The owner-scoped refusal. Neutral by design: the copy has to hold
+          whether the compound is gone or simply someone else's, because the
+          backend will not say which and the id space is sequential. */}
+      {!loading && outOfScope ? (
+        <AlertCard
+          variant="info"
+          title={COMPOUND_UNAVAILABLE_TITLE}
+          description={COMPOUND_UNAVAILABLE_DESCRIPTION}
+          action={
+            <Button variant="outline" size="sm" asChild>
+              <Link href="/compounds">Back to compounds</Link>
+            </Button>
+          }
+        />
+      ) : null}
+
+      {!loading && !compound && !loadErr && !outOfScope ? (
         <AlertCard
           variant="info"
           title="No compound record"
