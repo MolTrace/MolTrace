@@ -9,6 +9,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
+from .analytics_store import record_automation_event
 from .database import session_scope
 from .integration_scale import disclose_relative_integrals
 from .models import (
@@ -519,6 +520,22 @@ def _persist_assessment(
             "assessment_id": row.id,
             "target_type": target_type,
             "target_id": target_id,
+            "qc_status": qc_status,
+            "readiness_status": readiness_status,
+        },
+    )
+    # Emitted here rather than in each assess_* entry point: all of them funnel through this
+    # one persist, so a single call covers file, artifact, evidence and session assessments
+    # and cannot drift apart as new targets are added.
+    record_automation_event(
+        session,
+        event_type="quality_readiness_assessed",
+        task_key="qc_readiness_assessment",
+        status="warning" if qc_status == "warning" else "succeeded",
+        user_id=actor_id,
+        metadata={
+            "assessment_id": row.id,
+            "target_type": target_type,
             "qc_status": qc_status,
             "readiness_status": readiness_status,
         },

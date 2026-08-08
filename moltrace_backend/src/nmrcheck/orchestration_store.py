@@ -9,6 +9,7 @@ from typing import Any
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session, sessionmaker
 
+from .analytics_store import record_automation_event
 from .database import session_scope
 from .file_storage import default_file_storage
 from .integration_scale import disclose_relative_integrals
@@ -896,6 +897,18 @@ def create_analysis_job(
                 progress_percent=100.0,
             )
         row.finished_at = utcnow()
+        # job_id is deliberately left unset: it addresses JobORM rows, and an analysis-job id
+        # dropped into that column would collide with an unrelated batch job of the same id in
+        # failed_jobs. The task_key already routes this to analyses_completed.
+        record_automation_event(
+            session,
+            event_type="spectracheck_analysis_job_completed",
+            task_key="spectracheck_analysis",
+            status="succeeded" if row.status == "succeeded" else "failed",
+            user_id=actor_id,
+            session_id=parent_session.id if parent_session is not None else None,
+            metadata={"analysis_job_id": row.id, "job_type": row.job_type},
+        )
         if parent_session is not None:
             parent_session.updated_at = utcnow()
             _add_session_audit(

@@ -269,9 +269,16 @@ def test_a_succeeding_workflow_run_counts_once_and_a_blocked_one_counts_nothing(
         assert started["status"] == "succeeded"
         after_success = _roi(client, api_headers)
         assert after_success["workflows_completed"] == before["workflows_completed"] + 1
-        assert after_success["total_minutes_saved"] == round(
-            before["total_minutes_saved"] + workflow_minutes, 2
+        # Asserted on the workflow's own event rather than on total_minutes_saved: the run's
+        # steps are themselves instrumented tasks, so the aggregate legitimately moves by more
+        # than the orchestration baseline. The orchestration is worth exactly its baseline and
+        # must not silently absorb the steps' minutes as well.
+        run_event = next(
+            event
+            for event in _events(client, api_headers)
+            if event["event_type"] == "workflow_run_completed" and event["status"] == "succeeded"
         )
+        assert run_event["estimated_minutes_saved"] == workflow_minutes
 
         # A run blocked before it executes anything is terminal too, so it is recorded --
         # but it finished no work, so it must not add to workflows_completed or to minutes.
@@ -282,13 +289,13 @@ def test_a_succeeding_workflow_run_counts_once_and_a_blocked_one_counts_nothing(
 
         after_blocked = _roi(client, api_headers)
         assert after_blocked["workflows_completed"] == after_success["workflows_completed"]
-        assert after_blocked["total_minutes_saved"] == after_success["total_minutes_saved"]
         blocked_event = next(
             event
             for event in _events(client, api_headers)
             if event["event_type"] == "workflow_run_completed" and event["status"] == "failed"
         )
         assert blocked_event["metadata_json"]["workflow_status"] == "requires_review"
+        assert blocked_event["estimated_minutes_saved"] == 0.0
 
 
 def test_a_new_catalogue_entry_reaches_an_already_seeded_instance(app):
@@ -351,3 +358,74 @@ def test_seeding_does_not_overwrite_an_operator_edit(app):
         assert after is not None
         assert after.default_minutes_saved == 3.0
         assert after.enabled is False
+
+
+def test_a_stateless_computation_route_records_its_own_work(client, api_headers):
+    """These routes persist nothing, so the usage event is the only record they ran."""
+    with client:
+        minutes = _task_minutes(client, api_headers, "hrms_exact_mass_matching")
+        before = _roi(client, api_headers)
+
+        res = client.post(
+            "/ms/hrms/candidates/match",
+            headers=api_headers,
+            json={
+                "observed_mz": 47.04914,
+                "adduct": "[M+H]+",
+                "ppm_tolerance": 5,
+                "candidates": [{"name": "methanol", "smiles": "CO"},
+                               {"name": "ethanol", "smiles": "CCO"}],
+            },
+        )
+        assert res.status_code == 200, res.text
+
+        after = _roi(client, api_headers)
+        assert after["tasks_automated"] == before["tasks_automated"] + 1
+        assert after["total_minutes_saved"] == round(before["total_minutes_saved"] + minutes, 2)
+        # An MS annotation is automated work, but it is not an analysis, a report, a
+        # workflow or a review -- naming decides that, and none of those must move.
+        for counter in ("analyses_completed", "reports_generated", "workflows_completed",
+                        "review_tasks_completed"):
+            assert after[counter] == before[counter], counter
+
+        event = _events(client, api_headers)[0]
+        assert event["event_type"] == "hrms_exact_mass_matching_completed"
+        assert event["metadata_json"]["task_key"] == "hrms_exact_mass_matching"
+
+
+def test_every_catalogue_task_has_an_emitter(app):
+    """A catalogue entry with nothing emitting it is worth zero and looks like a working one.
+
+    This is the guard the original gap needed: `create_usage_event` had a full catalogue and
+    exactly one caller, and nothing in the product could show that the numbers were unreachable.
+    """
+    import pathlib
+    import re
+
+    from nmrcheck.analytics_store import DEFAULT_AUTOMATION_TASKS
+
+    emitted: set[str] = set()
+    for path in pathlib.Path("src/nmrcheck").rglob("*.py"):
+        for match in re.finditer(r'(?:automation_)?task_key="([a-z0-9_]+)"', path.read_text()):
+            emitted.add(match.group(1))
+
+    missing = sorted(t["task_key"] for t in DEFAULT_AUTOMATION_TASKS if t["task_key"] not in emitted)
+    assert not missing, f"catalogue entries with no emitter: {missing}"
+
+
+def test_no_event_type_lands_in_two_roi_counters(app):
+    """_compute_roi buckets by substring, so one badly-named event double-counts silently."""
+    import pathlib
+    import re
+
+    tokens = ("analysis", "report", "workflow", "review")
+    offenders = []
+    for path in pathlib.Path("src/nmrcheck").rglob("*.py"):
+        for match in re.finditer(
+            r'event_type="([a-z0-9_]+)",\s*\n\s*task_key="[a-z0-9_]+"', path.read_text()
+        ):
+            event_type = match.group(1)
+            hit = [t for t in tokens if t in event_type]
+            if len(hit) > 1:
+                offenders.append((event_type, hit))
+    assert not offenders, f"event types matching more than one ROI counter: {offenders}"

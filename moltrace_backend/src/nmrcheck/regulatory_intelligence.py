@@ -15,6 +15,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
 
 from . import org_membership
+from .analytics_store import record_automation_event
 from .database import session_scope
 from .models import (
     RegulatoryAnswer,
@@ -303,6 +304,22 @@ def create_dossier(
             entity_type="regulatory_dossier",
             entity_id=row.id,
             metadata={"status": row.status, "jurisdiction_id": row.jurisdiction_id},
+        )
+        record_automation_event(
+            session,
+            event_type="regulatory_dossier_created",
+            task_key="regulatory_dossier_scaffolding",
+            user_id=actor.user_id,
+            project_id=row.project_id,
+            session_id=row.spectracheck_session_id,
+            # Not passed as sample_id: a dossier's sample_id is an integer foreign key, while
+            # the usage event's is the free-text sample label. Pydantic would coerce the int
+            # to a string and quietly file this row under a sample named "7".
+            metadata={
+                "dossier_id": row.id,
+                "dossier_status": row.status,
+                "sample_record_id": row.sample_id,
+            },
         )
         return _dossier_to_record(row)
 
@@ -935,6 +952,22 @@ def create_readiness_report(
             entity_type="regulatory_readiness_report",
             entity_id=row.id,
             metadata={"dossier_id": dossier_id, "status": row.status, "gap_count": len(gaps)},
+        )
+        # Named for the assessment, not the report it writes: _compute_roi buckets by
+        # substring, and "report" in the event type would also add this to reports_generated.
+        record_automation_event(
+            session,
+            event_type="regulatory_readiness_assessed",
+            task_key="regulatory_readiness_assessment",
+            user_id=actor.user_id,
+            project_id=dossier.project_id,
+            session_id=dossier.spectracheck_session_id,
+            metadata={
+                "sample_record_id": dossier.sample_id,
+                "dossier_id": dossier_id,
+                "readiness_status": row.status,
+                "gap_count": len(gaps),
+            },
         )
         return _readiness_report_to_record(row)
 
