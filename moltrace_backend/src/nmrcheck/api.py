@@ -348,6 +348,8 @@ from .models import (
     DatasetVersion,
     DatasetVersionCreate,
     DatasetVersionApprovalCreate,
+    KnowledgeDeploymentCandidate,
+    KnowledgeDeploymentCandidateCreate,
     DatasetVersionApprovalState,
     DatasetVersionUpdate,
     DebugBundle,
@@ -19449,6 +19451,132 @@ def update_knowledge_source_route(
         raise
     if record is None:
         raise HTTPException(status_code=404, detail="Knowledge source not found.")
+    return record
+
+
+@router.post(
+    "/knowledge/deployment-candidates",
+    response_model=KnowledgeDeploymentCandidate,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_access_context)],
+)
+def create_knowledge_deployment_candidate_route(
+    payload: KnowledgeDeploymentCandidateCreate,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> KnowledgeDeploymentCandidate:
+    """Propose a trained model, built from an approved dataset version, for deployment."""
+    try:
+        return knowledge_store.create_deployment_candidate(
+            _state(request).session_factory, payload, actor=_knowledge_actor(context)
+        )
+    except Exception as exc:
+        _raise_knowledge_http_error(exc)
+        raise
+
+
+@router.get(
+    "/knowledge/deployment-candidates",
+    response_model=list[KnowledgeDeploymentCandidate],
+    dependencies=[Depends(require_access_context)],
+)
+def list_knowledge_deployment_candidates_route(
+    request: Request,
+    candidate_status: str | None = Query(default=None, alias="status"),
+    limit: int = Query(default=200, ge=1, le=500),
+) -> list[KnowledgeDeploymentCandidate]:
+    return knowledge_store.list_deployment_candidates(
+        _state(request).session_factory, status=candidate_status, limit=limit
+    )
+
+
+@router.get(
+    "/knowledge/deployment-candidates/{candidate_id}",
+    response_model=KnowledgeDeploymentCandidate,
+    dependencies=[Depends(require_access_context)],
+)
+def get_knowledge_deployment_candidate_route(
+    candidate_id: int,
+    request: Request,
+) -> KnowledgeDeploymentCandidate:
+    record = knowledge_store.get_deployment_candidate(
+        _state(request).session_factory, candidate_id
+    )
+    if record is None:
+        raise HTTPException(status_code=404, detail="Deployment candidate not found.")
+    return record
+
+
+@router.post(
+    "/knowledge/deployment-candidates/{candidate_id}/gate",
+    response_model=KnowledgeDeploymentCandidate,
+    dependencies=[Depends(require_access_context)],
+)
+def gate_knowledge_deployment_candidate_route(
+    candidate_id: int,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> KnowledgeDeploymentCandidate:
+    """Judge the candidate against the incumbent.
+
+    The blocking measure must not slip at all and every other measure must be at least as
+    good. A measure that is missing or not a real number blocks rather than being skipped.
+    """
+    try:
+        record = knowledge_store.evaluate_deployment_candidate(
+            _state(request).session_factory, candidate_id, actor=_knowledge_actor(context)
+        )
+    except Exception as exc:
+        _raise_knowledge_http_error(exc)
+        raise
+    if record is None:
+        raise HTTPException(status_code=404, detail="Deployment candidate not found.")
+    return record
+
+
+@router.post(
+    "/knowledge/deployment-candidates/{candidate_id}/canary",
+    response_model=KnowledgeDeploymentCandidate,
+    dependencies=[Depends(require_access_context)],
+)
+def canary_knowledge_deployment_candidate_route(
+    candidate_id: int,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> KnowledgeDeploymentCandidate:
+    """Start a limited rollout. Only a candidate that cleared the gate is eligible."""
+    try:
+        record = knowledge_store.start_deployment_canary(
+            _state(request).session_factory, candidate_id, actor=_knowledge_actor(context)
+        )
+    except Exception as exc:
+        _raise_knowledge_http_error(exc)
+        raise
+    if record is None:
+        raise HTTPException(status_code=404, detail="Deployment candidate not found.")
+    return record
+
+
+@router.post(
+    "/knowledge/deployment-candidates/{candidate_id}/promote",
+    response_model=KnowledgeDeploymentCandidate,
+    dependencies=[Depends(require_access_context)],
+)
+def promote_knowledge_deployment_candidate_route(
+    candidate_id: int,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> KnowledgeDeploymentCandidate:
+    """Promote a candidate that has actually run a limited rollout."""
+    try:
+        record = knowledge_store.promote_deployment_candidate(
+            _state(request).session_factory, candidate_id, actor=_knowledge_actor(context)
+        )
+    except Exception as exc:
+        _raise_knowledge_http_error(exc)
+        raise
+    if record is None:
+        raise HTTPException(status_code=404, detail="Deployment candidate not found.")
     return record
 
 

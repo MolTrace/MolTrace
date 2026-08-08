@@ -1,10 +1,12 @@
 # FE Handoff — Knowledge corpus governance: rejected facts, and sources that change
 
-Two backend changes shipped together. Both are about the same thing: a curated corpus has
-to be able to show *what a fact was justified by, and whether anyone still stands behind it*.
-Neither is a redesign — both add fields to models the frontend already renders.
+Five backend changes, all about the same thing: a curated corpus has to be able to show
+*what a fact was justified by, and whether anyone still stands behind it*. Sections 3–5 add
+fields to models the frontend already renders; section 8 adds three surfaces.
 
-**Nothing is blocked on further backend work.** Steps 1–2 are mechanical; 3–6 are the UI.
+**Nothing is blocked on further backend work.** Steps 1–2 are mechanical; 3–5 and 8 are the
+UI. If you already shipped sections 3–5, start at §8 — but re-run `pnpm generate:openapi`
+first, because the types in §8 are newer than that pass.
 
 ---
 
@@ -187,3 +189,95 @@ humanize for display only, and never rename the keys you send back.
 
 `human_review_required` is `true` on every revision. Existing surfaces already handle this
 flag; keep the same treatment rather than adding a second, differently-worded caveat.
+
+---
+
+## 8. Second wave: locators, two-person promotion, the deployment conveyor
+
+Three further backend changes landed after the sections above. Same instructions apply —
+regenerate the contract first (§1), and none of this is blocked on further backend work.
+
+### 8.1 A record can show which passage it came from
+
+Every extracted record now carries `locators` — where in the source the fact actually came
+from:
+
+```ts
+locators: Array<{
+  citation_id: number
+  citation_label: string
+  source_id: number
+  source_revision_id: number | null
+  source_file_id: number | null
+  page_number: number | null
+  section_title: string | null
+  paragraph_number: number | null
+  quote_excerpt: string | null
+}>
+```
+
+These are **resolved from the record's citations, not copied onto the record**, so there is
+one locator shape in the product and no second copy that can drift. Render the
+`quote_excerpt` as the evidence and `page_number`/`section_title`/`paragraph_number` as the
+address. An empty `locators` array means the citation is gone or the record predates
+citation linking — say "source passage not recorded", never invent a location.
+
+### 8.2 Promoting a dataset version takes two different people
+
+| Method | Path | Notes |
+|---|---|---|
+| `POST` | `/knowledge/dataset-versions/{id}/approvals` | body `{comment?: string}` — **no approver field** |
+| `GET` | `/knowledge/dataset-versions/{id}/approvals` | current state |
+
+Both return `DatasetVersionApprovalState`: `{dataset_version_id, status, approvals[],
+distinct_approvers, approvals_required, promoted, human_review_required}`.
+
+What the UI must not do:
+
+1. **Never send an approver identity.** The body carries a comment and nothing else — who
+   approved comes from the signed-in principal. A form field naming the approver would let
+   one person nominate another.
+2. **Show `distinct_approvers` of `approvals_required`** (currently 1 of 2), not a boolean.
+   "Awaiting a second approver" is a different state from "not approved".
+3. **Expect `400` when the same person approves twice** — detail says the second approval
+   must come from someone else. Surface it as a normal, expected outcome, not an error.
+4. **Expect `400` on a machine credential** — approving needs a signed-in person.
+5. **`PATCH`ing `status` to `approved` now returns `400`.** If any existing screen offers
+   `approved` in a status dropdown, remove that option; promotion happens only through
+   approvals.
+
+### 8.3 The deployment conveyor
+
+| Method | Path |
+|---|---|
+| `POST` | `/knowledge/deployment-candidates` |
+| `GET` | `/knowledge/deployment-candidates` (`?status=`) |
+| `GET` | `/knowledge/deployment-candidates/{id}` |
+| `POST` | `/knowledge/deployment-candidates/{id}/gate` |
+| `POST` | `/knowledge/deployment-candidates/{id}/canary` |
+| `POST` | `/knowledge/deployment-candidates/{id}/promote` |
+
+`status` moves `draft → gate_passed | gate_failed → canary → promoted`, and **each step
+refuses to run without the one before it** (all `400`):
+
+- a candidate needs a dataset version two people approved,
+- a canary needs a passed gate,
+- promotion needs a canary — even when the gate passed.
+
+Drive the buttons off `status`; do not offer a step the backend will refuse. Note this is a
+**different** conveyor from the existing `/ml/deployment-candidates` screens — do not merge
+the two surfaces, they govern different things.
+
+`gate_verdict_json` carries `{promotable, safety_regression, dominates,
+requires_human_signoff, rollback_available, reasons[], excluded_metrics[],
+blocking_metric_name}`. Two rules for displaying it:
+
+- **`requires_human_signoff` is always `true`.** A passed gate means "eligible", never
+  "approved". Do not render a passed gate as a completed promotion.
+- **`gate_failed` with an empty-looking reason usually means a missing measure**, not a
+  close call. The gate fails closed: a measure that is absent or not a real number blocks,
+  however good the rest looks. Show `reasons[]` verbatim rather than summarising to
+  "did not improve".
+
+`blocking_metric_name` names which measure was treated as the hard one (it differs by
+model — e.g. `citation_support_recall`). Humanize it for display; it is a wire key.
