@@ -74,6 +74,7 @@ import numpy as np
 from rdkit import Chem
 from rdkit.Chem import Descriptors
 
+from moltrace.spectroscopy.eval.conformal import ConformalCalibration
 from moltrace.spectroscopy.io.fid_reader import NMRSpectrum
 from moltrace.spectroscopy.multiplet.analysis import Multiplet, detect_multiplets
 from moltrace.spectroscopy.peaks.gsd import Peak, gsd_peak_pick
@@ -161,6 +162,42 @@ def _significance_from_sigma(sigma: float, nucleus: str) -> float:
     if sigma is None or not math.isfinite(sigma) or sigma <= 0.0:
         return _SIG_DEFAULT
     return _SIG_MAX * ref / (ref + float(sigma))
+
+
+def _significance_from_half_width(
+    half_width: float | None, *, reference_half_width: float | None
+) -> float:
+    """Map a *guaranteed* interval half-width (ppm) to a significance in [0, _SIG_MAX].
+
+    Same shape and same anchor as :func:`_significance_from_sigma` — a width equal to
+    the reference scores 4, "medium" — but driven by a conformal interval instead of
+    the predictor's claimed σ.
+
+    Why the basis changed. Held-out measurement showed σ is not a consistent scale:
+    the ratio of 90 % half-width to mean reported σ runs 8.66× in the tightest ¹³C
+    band down to 1.77× in the widest. Under a correctly-scaled σ that ratio is a
+    *constant* — it is the error distribution's 90th percentile in units of σ,
+    whatever that distribution is. So σ was not merely mis-scaled, which one
+    multiplier would have fixed; it was differentially mis-scaled, and worst exactly
+    where this mapping weighted it highest. The interval is a measured guarantee and
+    is consistent by construction.
+
+    ``reference_half_width`` is read off the live calibration rather than restated
+    here as a constant, so refitting the bands cannot leave the anchor pointing at a
+    width they no longer produce.
+
+    Abstains (``_SIG_DEFAULT``) when there is no interval or no anchor, matching the
+    σ path's behaviour for an unusable uncertainty: an atom the predictor declined to
+    bound must not be scored as though it were certain.
+    """
+
+    if reference_half_width is None or not math.isfinite(reference_half_width):
+        return _SIG_DEFAULT
+    if reference_half_width <= 0.0:
+        return _SIG_DEFAULT
+    if half_width is None or not math.isfinite(half_width) or half_width < 0.0:
+        return _SIG_DEFAULT
+    return _SIG_MAX * reference_half_width / (reference_half_width + float(half_width))
 
 
 # --------------------------------------------------------------------------- #
@@ -259,6 +296,15 @@ class VerificationOptions:
     gsd_level: int = 2  # GSD peak-pick level for the experimental spectrum
     predict_n_conformers: int = 8  # conformer ensemble for predict_shifts
     nucleus: str | None = None  # override spectrum.nucleus ("1H" / "13C")
+    shift_calibration: ConformalCalibration | None = None
+    """Fitted conformal bands for the shift predictor.
+
+    When supplied, a matched resonance's evidence weight comes from its *guaranteed*
+    interval rather than the predictor's claimed σ, which held-out measurement showed
+    is differentially mis-scaled — and worst exactly where this weighting leaned
+    hardest. Absent, every match falls back to the σ basis and the test's details say
+    so; the verdict is still produced, on the weaker basis, rather than withheld.
+    """
 
 
 @dataclass
@@ -401,6 +447,7 @@ class PredictionBoundsTest:
         nucleus: str,
         total_h: int,
         prior_confidence: float,
+        calibration: ConformalCalibration | None = None,
     ) -> TestResult:
         resonances = _group_resonances(prediction, nucleus)
         if not resonances:
@@ -410,10 +457,22 @@ class PredictionBoundsTest:
                 diagnostic=f"No predicted {nucleus} shifts available to bound.",
             )
         total_area = _units_area(units)
+        # Anchor the interval basis on the live calibration rather than a constant, so
+        # refitting the bands moves the reference with them. A calibration that cannot
+        # anchor this nucleus leaves every atom on the σ basis, recorded below.
+        reference_half_width = (
+            calibration.reference_half_width(
+                nucleus, _SIGMA_REF_PPM.get(nucleus, _SIGMA_REF_PPM["1H"])
+            )
+            if calibration is not None
+            else None
+        )
         used = [False] * len(units)
         good = 0
         partial = 0
         matched_sigs: list[float] = []
+        interval_basis = 0
+        sigma_basis = 0
         rows: list[dict[str, Any]] = []
         for r in resonances:
             sigma = r["sigma_ppm"]
@@ -432,7 +491,25 @@ class PredictionBoundsTest:
                 rows.append({"delta_pred": round(r["delta_ppm"], 3), "matched": False})
                 continue
             used[best] = True
-            matched_sigs.append(_significance_from_sigma(sigma, nucleus))
+            half_width = (
+                calibration.interval(nucleus, sigma).half_width_ppm
+                if calibration is not None and reference_half_width is not None
+                else None
+            )
+            if half_width is not None:
+                interval_basis += 1
+                matched_sigs.append(
+                    _significance_from_half_width(
+                        half_width, reference_half_width=reference_half_width
+                    )
+                )
+            else:
+                # No calibrated interval for this atom -- fall back to the claimed σ,
+                # and count it, so a run scored mostly on the unreliable basis is
+                # visible in the audit record rather than indistinguishable from a
+                # calibrated one.
+                sigma_basis += 1
+                matched_sigs.append(_significance_from_sigma(sigma, nucleus))
             count_ok = True
             obs_protons = None
             if nucleus == "1H" and total_area > 0 and total_h > 0:
@@ -462,12 +539,23 @@ class PredictionBoundsTest:
             if prediction.method == "hose_fallback"
             else ""
         )
+        basis = (
+            "conformal interval"
+            if interval_basis and not sigma_basis
+            else (
+                "predicted σ"
+                if sigma_basis and not interval_basis
+                else f"conformal interval on {interval_basis}, predicted σ on {sigma_basis}"
+            )
+            if matched_sigs
+            else "no matches"
+        )
         diagnostic = (
             f"{good}/{total} predicted {nucleus} resonances matched an experimental "
             f"peak within tolerance with consistent nuclide count"
             f"{f' ({partial} matched with off integration)' if partial else ''}; "
             f"prediction method={prediction.method}{proxy}, mean significance "
-            f"{significance:.1f} ({_sig_band(significance)})."
+            f"{significance:.1f} ({_sig_band(significance)}) weighted by {basis}."
         )
         return TestResult.create(
             name=self.name,
@@ -481,6 +569,19 @@ class PredictionBoundsTest:
                 "total_resonances": total,
                 "method": prediction.method,
                 "resonances": rows,
+                # Provenance for the weighting: which basis scored each match, and
+                # which calibration produced the intervals.
+                "significance_basis": {
+                    "conformal_interval": interval_basis,
+                    "predicted_sigma": sigma_basis,
+                    "reference_half_width_ppm": reference_half_width,
+                    "calibration_fingerprint": (
+                        calibration.fingerprint() if calibration is not None else None
+                    ),
+                    "calibration_target_coverage": (
+                        calibration.target_coverage if calibration is not None else None
+                    ),
+                },
             },
         )
 
@@ -976,6 +1077,7 @@ def verify_structure(
                         nucleus=nucleus,
                         total_h=total_h,
                         prior_confidence=prior_confidence,
+                        calibration=options.shift_calibration,
                     )
                     if prediction is not None
                     else TestResult.abstain(

@@ -12,6 +12,7 @@ rather than widening everything.
 
 from __future__ import annotations
 
+import json
 import math
 import random
 
@@ -19,6 +20,7 @@ import pytest
 
 from moltrace.spectroscopy.eval.conformal import (
     CALIBRATION_VERSION,
+    ConformalCalibration,
     fit_conformal,
     measure_coverage,
     min_calibration_size,
@@ -189,6 +191,66 @@ def test_a_calibration_is_content_addressed_and_reproducible() -> None:
 
     c = fit_conformal({"13C": _miscalibrated(2000, seed=14)}, target_coverage=0.90)
     assert c.fingerprint() != a.fingerprint(), "different calibration data, same fingerprint"
+
+
+def test_a_calibration_round_trips_through_json_unchanged() -> None:
+    """It ships as deployed state, so the wire form must be lossless."""
+
+    original = fit_conformal({"13C": _miscalibrated(3000, seed=17)}, target_coverage=0.90)
+    restored = ConformalCalibration.from_json(original.to_json())
+    assert restored.fingerprint() == original.fingerprint()
+    assert restored.target_coverage == original.target_coverage
+    assert len(restored.bins) == len(original.bins)
+    for sigma in (0.25, 1.5, 13.6, 1e6):
+        a = original.interval("13C", sigma)
+        b = restored.interval("13C", sigma)
+        assert a.half_width_ppm == b.half_width_ppm
+        assert a.basis == b.basis
+
+
+def test_an_unbounded_band_survives_the_round_trip() -> None:
+    """The last band runs to +inf, which JSON cannot hold — it travels as null.
+
+    Needs a *continuous* σ: with only a handful of discrete σ values the top quantile
+    cut lands on the maximum, leaving the unbounded band empty and correctly folded
+    into the pooled interval instead.
+    """
+
+    rng = random.Random(18)
+    pairs = [(s, abs(rng.gauss(0.0, s))) for s in (rng.uniform(0.05, 15.0) for _ in range(3000))]
+    original = fit_conformal({"13C": pairs}, target_coverage=0.90)
+    assert any(math.isinf(b.sigma_hi) for b in original.bins), "no unbounded band was fitted"
+    restored = ConformalCalibration.from_json(original.to_json())
+    assert any(math.isinf(b.sigma_hi) for b in restored.bins)
+    assert restored.interval("13C", 1e9).available
+
+
+def test_a_calibration_from_a_different_fitting_version_is_refused() -> None:
+    """Its numbers cannot detect a change in how they were produced, so the version does."""
+
+    original = fit_conformal({"13C": _miscalibrated(2000, seed=19)}, target_coverage=0.90)
+    payload = json.loads(original.to_json())
+    payload["version"] = "conformal-v0"
+    with pytest.raises(ValueError, match="refit rather than reinterpreting"):
+        ConformalCalibration.from_json(json.dumps(payload))
+
+
+def test_an_edited_calibration_is_refused() -> None:
+    original = fit_conformal({"13C": _miscalibrated(2000, seed=20)}, target_coverage=0.90)
+    payload = json.loads(original.to_json())
+    payload["bins"][0]["half_width_ppm"] = 0.001  # someone tightens a band by hand
+    with pytest.raises(ValueError, match="fingerprint does not match"):
+        ConformalCalibration.from_json(json.dumps(payload))
+
+
+def test_the_reference_half_width_is_read_off_the_bands() -> None:
+    """Consumers anchor on this, so it must track the fit rather than a constant."""
+
+    calibration = fit_conformal({"13C": _miscalibrated(4000, seed=21)}, target_coverage=0.90)
+    ref = calibration.reference_half_width("13C", 2.0)
+    assert ref is not None
+    assert ref == calibration.interval("13C", 2.0).half_width_ppm
+    assert calibration.reference_half_width("15N", 2.0) is None
 
 
 def test_coverage_and_width_are_both_reported() -> None:
