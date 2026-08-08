@@ -1,5 +1,7 @@
 "use client"
 
+import Link from "next/link"
+
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { apiFetch } from "@/lib/api/client"
 import { formatApiError } from "@/components/spectracheck/spectracheck-helpers"
@@ -9,7 +11,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { ModuleCard } from "@/components/dashboard/module-card"
-import { Activity, ListChecks } from "lucide-react"
+import { ArrowLeft, Activity, ListChecks } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -154,6 +156,18 @@ export function AiModelMonitoringWorkspace() {
 
   return (
     <div className="space-y-6">
+      {/* Every one of these pages was a dead end: no back link, no breadcrumb,
+          and the shell provides neither — so the only way back to the AI hub was
+          the browser button or the sidebar. The Knowledge Library sub-pages all
+          carry this; these did not. */}
+      <div className="flex flex-wrap items-center gap-2">
+        <Button variant="ghost" size="sm" asChild>
+          <Link href="/ai">
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            AI Services
+          </Link>
+        </Button>
+      </div>
       <div className="space-y-1">
         <h1 className="font-mono text-2xl font-bold tracking-tight">Model Monitoring</h1>
         <p className="text-sm text-muted-foreground">Read monitoring summaries and log monitoring events.</p>

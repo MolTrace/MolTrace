@@ -14,7 +14,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { ModuleCard } from "@/components/dashboard/module-card"
-import { ClipboardList, ListChecks, Play, Sparkles } from "lucide-react"
+import { ArrowLeft, ClipboardList, ListChecks, Play, Sparkles } from "lucide-react"
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -193,6 +193,18 @@ export function AiPredictionsWorkspace() {
 
   return (
     <div className="space-y-6">
+      {/* Every one of these pages was a dead end: no back link, no breadcrumb,
+          and the shell provides neither — so the only way back to the AI hub was
+          the browser button or the sidebar. The Knowledge Library sub-pages all
+          carry this; these did not. */}
+      <div className="flex flex-wrap items-center gap-2">
+        <Button variant="ghost" size="sm" asChild>
+          <Link href="/ai">
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            AI Services
+          </Link>
+        </Button>
+      </div>
       <div className="space-y-1">
         <p
           className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
