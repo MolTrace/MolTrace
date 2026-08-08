@@ -157,9 +157,9 @@ const WORKFLOWS: UseCase[] = [
     icon: CheckCircle2,
     name: "Routine characterization",
     blurb:
-      "Confirm a freshly synthesized compound matches its intended structure. NMR + HRMS scored together with DP4 confidence and an evidence trail you can paste into a notebook.",
+      "Confirm a freshly synthesized compound matches its intended structure. NMR + HRMS scored together, with a DP4 candidate ranking when you supply alternatives, and an evidence trail you can paste into a notebook.",
     inputs: "Raw FID · mzML · target SMILES",
-    outputs: "Match verdict · DP4 · per-peak assignment",
+    outputs: "Match evidence · DP4 ranking · per-peak assignment",
   },
   {
     icon: Atom,
@@ -283,7 +283,7 @@ type LoopStep = {
 const WORKED_EXAMPLE: LoopStep[] = [
   {
     step: "A student characterizes",
-    body: "Illustrative: a freshly made compound goes in as a raw Bruker FID. SpectraCheck confirms the structure with a DP4 confidence score, and flags a residual CDCl₃ peak at 7.26 ppm so it isn't mistaken for signal.",
+    body: "Illustrative: a freshly made compound goes in as a raw Bruker FID. SpectraCheck reports whether the spectrum is consistent with the intended structure, and flags a residual CDCl₃ peak at 7.26 ppm so it isn't mistaken for signal.",
   },
   {
     step: "Evidence stays visible",
@@ -811,7 +811,7 @@ export function AcademicResearchPage() {
                   <div>
                     <p className="text-sm font-semibold">Spectroscopy →</p>
                     <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                      The evidence engine behind every confirmation and elucidation.
+                      The evidence engine behind every assignment and elucidation.
                     </p>
                   </div>
                 </div>

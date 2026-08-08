@@ -157,9 +157,9 @@ const WORKFLOWS: UseCase[] = [
     icon: Boxes,
     name: "High-throughput confirmation",
     blurb:
-      "Run identity confirmation across a full batch with consistent processing and QC. NMR + HRMS scored together so a mis-assignment never reaches a deliverable.",
+      "Run identity confirmation across a full batch with consistent processing and QC. NMR + HRMS scored together, so cross-modal disagreement surfaces before the deliverable ships.",
     inputs: "Batch of raw FIDs · mzML · target SMILES",
-    outputs: "Per-sample verdict · DP4 · QC metrics",
+    outputs: "Per-sample verdict · DP4 ranking · QC metrics",
   },
   {
     icon: AlertTriangle,
@@ -836,7 +836,7 @@ export function CroAnalyticalPage() {
                   <div>
                     <p className="text-sm font-semibold">Spectroscopy →</p>
                     <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                      The evidence engine that processes and confirms every sample.
+                      The evidence engine that processes and cross-checks every sample.
                     </p>
                   </div>
                 </div>

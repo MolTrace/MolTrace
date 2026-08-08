@@ -697,7 +697,7 @@ export function SpectroscopyExploreInterface({ onClose }: { onClose: () => void 
         "Automated deconvolution is designed to separate overlapping multiplets, including peaks near a residual solvent signal that would otherwise complicate quantification.",
         "FID processed in one pass: apodization, zero-filling, phase correction, and baseline drift handled before integration.",
         "Auto-referenced against a known standard so every chemical shift you publish is grounded in raw signal you can re-derive.",
-        "Five multiplets resolved with integrations designed to support USP <761> workflows, and a confidence value per peak.",
+        "Five multiplets resolved with integrations designed to support USP <761> workflows, and a confidence level per peak.",
       ],
       footer: (
         <>
