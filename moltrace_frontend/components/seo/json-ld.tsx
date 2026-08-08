@@ -25,7 +25,23 @@ export function OrganizationJsonLd() {
         // else. Verified 2026-08-02: Google renders the brand as "Moltrace" and
         // offers "Did you mean: moltres" on the brand query, so the collision is
         // live rather than hypothetical.
-        alternateName: ["Moltrace", "Mol Trace", "MolTrace platform"],
+        //
+        // Every entry must be a name the brand is ACTUALLY known by — a
+        // spelling variant, or the registered legal form. Descriptive phrases
+        // ("MolTrace Intelligence", "MolTrace ai") are deliberately excluded:
+        // they are not names anyone uses, the domain is .co rather than .ai,
+        // and padding this list with keyword variants both dilutes the real
+        // signals and asserts an identity the company does not hold.
+        //
+        // "MolTrace Technologies, Inc." is the registered entity, as carried in
+        // the footer copyright line.
+        alternateName: [
+          "Moltrace",
+          "Mol Trace",
+          "MolTrace platform",
+          "MolTrace Technologies",
+          "MolTrace Technologies, Inc.",
+        ],
         url: SITE_URL,
         logo: {
           "@type": "ImageObject",
