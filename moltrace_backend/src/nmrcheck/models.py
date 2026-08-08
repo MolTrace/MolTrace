@@ -5119,6 +5119,14 @@ class ModelArtifact(BaseModel):
     status: ModelArtifactStatus
     created_at: datetime
     metadata_json: dict[str, Any] = Field(default_factory=dict)
+    #: The registry entry the inference router resolves for this artifact, and that
+    #: entry's live lifecycle state. ``None`` means this artifact is not serving
+    #: traffic, whatever its ``status`` says -- so what this listing shows is what
+    #: the router would actually use.
+    registry_model_id: str | None = None
+    registry_status: Literal["candidate", "shadow", "production", "retired"] | None = None
+    registry_role: str | None = None
+    registry_nucleus: str | None = None
 
 
 class ModelCardCreate(BaseModel):
@@ -5281,6 +5289,48 @@ class DeploymentCandidateCreate(BaseModel):
     metadata_json: dict[str, Any] = Field(default_factory=dict)
 
 
+class RegistryPromotionRequest(BaseModel):
+    """Promote an approved artifact to *serving* in the science model registry.
+
+    Approving a deployment candidate is a product decision; making the inference
+    router actually resolve that artifact is a second, narrower one, and it needs
+    facts only the promoter holds -- which role the artifact plays, for which
+    nucleus, and what data built it. Those are not derivable from the artifact row,
+    so they are supplied here rather than guessed. Omit this block and the artifact
+    is approved without changing what serves traffic.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    role: Literal[
+        "nmrnet_checkpoint",
+        "hose_kb",
+        "lora_adapter",
+        "embedding_model",
+        "csi_fingerid",
+        "rt_predictor",
+        "dp4_ranker",
+    ]
+    semantic_version: str = Field(min_length=1, max_length=64)
+    #: Content address of the data this artifact was built from. Required: a
+    #: promotion with no data lineage is not reproducible, and reproducibility is a
+    #: validation requirement rather than a nicety.
+    dataset_snapshot_hash: str = Field(min_length=1, max_length=200)
+    dataset_row_count: int = Field(ge=0)
+    #: Per-nucleus for shift predictors and LoRA adapters; omit for artifacts that
+    #: serve every nucleus. The router resolves on (role, nucleus), so this decides
+    #: which incumbent the promotion supersedes.
+    nucleus: str | None = Field(default=None, max_length=16)
+    dataset_tag: str | None = Field(default=None, max_length=200)
+    dataset_source: str | None = Field(default=None, max_length=200)
+    #: Falls back to the artifact row's own hash. Promotion is refused when neither
+    #: carries one.
+    artifact_sha256: str | None = Field(default=None, min_length=64, max_length=64)
+    #: LoRA only: the validated maximum prediction uncertainty at which the adapter
+    #: may be used. The router skips an adapter that has none.
+    confidence_band_ppm: float | None = Field(default=None, gt=0.0)
+
+
 class DeploymentCandidateApprovalRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -5290,6 +5340,7 @@ class DeploymentCandidateApprovalRequest(BaseModel):
         "approved_for_internal_use"
     )
     metadata_json: dict[str, Any] = Field(default_factory=dict)
+    registry_promotion: RegistryPromotionRequest | None = None
 
 
 class DeploymentCandidateRejectRequest(BaseModel):

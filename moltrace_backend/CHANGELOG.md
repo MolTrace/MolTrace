@@ -14,6 +14,46 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.67.1 — Approving a model now changes what the router serves (2026-08-08)
+
+`InferenceRouter` resolves what to serve from `moltrace.spectroscopy.ai.registry`, keyed by
+(role, nucleus) among entries whose current status is `production`. **Nothing in the product ever
+wrote those tables.** So `POST /ml/deployment-candidates/{id}/approve` flipped a row's status and
+changed nothing about which artifact actually answered a prediction. The governance surface and
+the serving path were two systems that both called their subject "the deployed model".
+
+Migration `0044` adds `model_artifacts.registry_model_id` — nullable, unique, **not backfilled**,
+because NULL is the truthful state of every artifact approved before this existed.
+
+A link, not a merge, and that is the interesting part. The obvious move is to point the registry
+store at `model_artifacts` and delete one of the two tables. It would cost the property that makes
+the registry worth having: entries are immutable and lifecycle changes are *appended*, so a
+promotion is reconstructable and a retirement cannot be edited away. `model_artifacts.status` is a
+mutable column. Merging would either destroy the append-only guarantee or require rewriting a
+table 35 routes read.
+
+Approval is now the single writer of `ModelStatus.PRODUCTION`. It carries an optional
+`registry_promotion` block — role, nucleus, semantic version, dataset snapshot hash and row count —
+because those are facts only the promoter holds and are **not derivable from the artifact row**.
+Omit it and the artifact is approved without changing what serves traffic, which is a different
+decision and now says so. Nothing is guessed from `task_key`.
+
+`GET /ml/model-artifacts` reports the registry's **live** status, not a copy: a superseded artifact
+reads `retired` rather than `approved`, so what a reviewer sees as deployed is what the router
+would resolve.
+
+Promotion is refused, with the approval left standing, when the artifact carries no content hash
+(a promotion that cannot be verified later is not reproducible) or when a semantic version is
+reused against different bytes (the append-only registry must not reconcile that). Ordering is
+deliberate: the approval commits *before* the promotion is attempted, so a failed promotion leaves
+the router serving the incumbent — the safe direction. The reverse could leave the registry serving
+a model whose approval never recorded.
+
+Both migration paths were exercised on a scratch database: idempotent no-op on a `create_all`-built
+schema, and a real column + unique index add on a schema without it.
+
+---
+
 ## v0.67.0 — The AI/ML layer is now wired to the product (2026-08-08)
 
 MolTrace had two AI/ML layers and they did not touch each other.

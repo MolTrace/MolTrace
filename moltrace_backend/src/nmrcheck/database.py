@@ -209,6 +209,25 @@ def _ensure_sqlite_schema(engine: Engine) -> None:
                     connection.exec_driver_sql(
                         f"ALTER TABLE regulatory_action_items ADD COLUMN {column} INTEGER"
                     )
+        if "model_artifacts" in tables:
+            # Registry link (migration 0044) on a pre-existing dev SQLite DB. Without
+            # it, promoting an artifact to serving fails on a database built before the
+            # column existed -- and promotion is the only thing that makes the router
+            # serve what the product approved.
+            artifact_existing = {
+                str(row[1])
+                for row in connection.exec_driver_sql(
+                    "PRAGMA table_info(model_artifacts)"
+                ).fetchall()
+            }
+            if "registry_model_id" not in artifact_existing:
+                connection.exec_driver_sql(
+                    "ALTER TABLE model_artifacts ADD COLUMN registry_model_id VARCHAR(512)"
+                )
+                connection.exec_driver_sql(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS ix_model_artifacts_registry_model_id "
+                    "ON model_artifacts (registry_model_id)"
+                )
         if "approval_records" in tables:
             # Subject-addressed approvals (migration 0037) on a pre-existing dev SQLite DB.
             approval_existing = {

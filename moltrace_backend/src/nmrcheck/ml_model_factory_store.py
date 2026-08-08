@@ -43,6 +43,7 @@ from .models import (
     OutOfDomainAssessmentCreate,
     PredictionServiceConfig,
     PredictionServiceConfigCreate,
+    RegistryPromotionRequest,
 )
 from .orm import (
     AuditEventORM,
@@ -710,7 +711,10 @@ def list_model_artifacts(
             stmt = stmt.where(ModelArtifactORM.task_key == task_key)
         if status is not None:
             stmt = stmt.where(ModelArtifactORM.status == status)
-        return [_artifact_to_record(row) for row in session.scalars(stmt).all()]
+        rows = [_artifact_to_record(row) for row in session.scalars(stmt).all()]
+    # Enrichment reads the registry's own tables on the same engine, so it runs after
+    # the session closes rather than opening a second connection inside it.
+    return _with_registry_state(session_factory, rows)
 
 
 def get_model_artifact(
@@ -718,7 +722,10 @@ def get_model_artifact(
 ) -> ModelArtifact | None:
     with session_scope(session_factory) as session:
         row = session.get(ModelArtifactORM, model_artifact_id)
-        return _artifact_to_record(row) if row is not None else None
+        record = _artifact_to_record(row) if row is not None else None
+    if record is None:
+        return None
+    return _with_registry_state(session_factory, [record])[0]
 
 
 def create_model_card(
@@ -1091,6 +1098,8 @@ def approve_deployment_candidate(
             }
         )
         artifact.status = "approved"
+        artifact_id = artifact.id
+        artifact_sha256 = artifact.artifact_sha256
         _audit(
             session,
             actor=actor,
@@ -1100,7 +1109,117 @@ def approve_deployment_candidate(
             entity_id=row.id,
             metadata={"status": row.status, "reviewer_name": row.reviewer_name},
         )
-        return _deployment_response(row)
+
+    # The approval is committed before the artifact is promoted to serving, and in that
+    # order deliberately. The human decision is the record that must survive; a failed
+    # promotion then leaves the router serving the incumbent -- the safe direction. The
+    # reverse order could leave the registry serving a model whose approval never
+    # recorded.
+    if payload.registry_promotion is None:
+        return _reload_deployment_response(session_factory, candidate_id)
+    return _apply_registry_promotion(
+        session_factory,
+        candidate_id=candidate_id,
+        artifact_id=artifact_id,
+        artifact_sha256=artifact_sha256,
+        request=payload.registry_promotion,
+        actor=actor,
+    )
+
+
+def _apply_registry_promotion(
+    session_factory: sessionmaker[Session],
+    *,
+    candidate_id: int,
+    artifact_id: int,
+    artifact_sha256: str | None,
+    request: RegistryPromotionRequest,
+    actor: MLModelFactoryActor,
+) -> DeploymentCandidateResponse | None:
+    """Promote the approved artifact to serving, and record what happened either way.
+
+    A promotion that fails does **not** unwind the approval -- it is reported. The
+    artifact is approved and not serving, which is a state a reviewer can act on;
+    silently reporting a successful promotion that did not occur is not.
+    """
+
+    sha256 = request.artifact_sha256 or artifact_sha256
+    outcome: dict[str, Any]
+    if not sha256:
+        outcome = {
+            "promoted": False,
+            "reason": (
+                "this artifact records no content hash, so a promotion could not be "
+                "reproduced or verified later"
+            ),
+        }
+    else:
+        try:
+            record = ai_engine_adapter.promote_to_serving(
+                session_factory=session_factory,
+                role=request.role,
+                semantic_version=request.semantic_version,
+                artifact_sha256=sha256,
+                dataset_snapshot_hash=request.dataset_snapshot_hash,
+                dataset_row_count=request.dataset_row_count,
+                nucleus=request.nucleus,
+                dataset_tag=request.dataset_tag,
+                dataset_source=request.dataset_source,
+                confidence_band_ppm=request.confidence_band_ppm,
+                reason=f"approved deployment candidate {candidate_id}",
+            )
+        except (ai_engine_adapter.EngineInputError, ai_engine_adapter.EngineUnavailable) as exc:
+            outcome = {"promoted": False, "reason": str(exc)}
+        else:
+            outcome = {
+                "promoted": True,
+                "model_id": record.model_id,
+                "role": record.role,
+                "nucleus": record.nucleus,
+                "superseded_model_id": record.superseded_model_id,
+                "newly_registered": record.registered,
+                "reason": (
+                    f"{record.model_id} now serves {record.role}"
+                    + (f" for {record.nucleus}" if record.nucleus else "")
+                ),
+            }
+
+    with session_scope(session_factory) as session:
+        candidate = session.get(DeploymentCandidateORM, candidate_id)
+        if candidate is None:  # pragma: no cover - approved a moment ago
+            return None
+        artifact = session.get(ModelArtifactORM, artifact_id)
+        if artifact is not None and outcome["promoted"]:
+            artifact.registry_model_id = str(outcome["model_id"])
+        candidate.metadata_json = _json_dump(
+            {**_json_dict(candidate.metadata_json), "registry_promotion": outcome}
+        )
+        _audit(
+            session,
+            actor=actor,
+            event_type=(
+                "ml_factory.deployment_candidate.promote"
+                if outcome["promoted"]
+                else "ml_factory.deployment_candidate.promote_failed"
+            ),
+            message=(
+                "Approved artifact promoted to serving."
+                if outcome["promoted"]
+                else "Approved artifact was not promoted to serving."
+            ),
+            entity_type="deployment_candidate",
+            entity_id=candidate.id,
+            metadata=outcome,
+        )
+        return _deployment_response(candidate)
+
+
+def _reload_deployment_response(
+    session_factory: sessionmaker[Session], candidate_id: int
+) -> DeploymentCandidateResponse | None:
+    with session_scope(session_factory) as session:
+        row = session.get(DeploymentCandidateORM, candidate_id)
+        return _deployment_response(row) if row is not None else None
 
 
 def reject_deployment_candidate(
@@ -1752,7 +1871,9 @@ def _evaluation_response(row: MLEvaluationRunORM) -> MLEvaluationRunResponse:
     )
 
 
-def _artifact_to_record(row: ModelArtifactORM) -> ModelArtifact:
+def _artifact_to_record(
+    row: ModelArtifactORM, view: ai_engine_adapter.RegistryView | None = None
+) -> ModelArtifact:
     return ModelArtifact(
         id=row.id,
         training_run_id=row.training_run_id,
@@ -1766,7 +1887,46 @@ def _artifact_to_record(row: ModelArtifactORM) -> ModelArtifact:
         status=row.status,  # type: ignore[arg-type]
         created_at=row.created_at,
         metadata_json=_json_dict(row.metadata_json),
+        registry_model_id=row.registry_model_id,
+        registry_status=view.status if view is not None else None,  # type: ignore[arg-type]
+        registry_role=view.role if view is not None else None,
+        registry_nucleus=view.nucleus if view is not None else None,
     )
+
+
+def _with_registry_state(
+    session_factory: sessionmaker[Session], records: list[ModelArtifact]
+) -> list[ModelArtifact]:
+    """Attach the registry state the router actually reads to each artifact record.
+
+    The lifecycle status shown for a serving model is the registry's *live* status, not
+    a copy of it: a row can say ``approved`` while the registry has since retired the
+    entry because a newer version superseded it, and showing the stale one would tell a
+    reviewer this artifact is deployed when the router no longer resolves it.
+    """
+
+    linked = [r.registry_model_id for r in records if r.registry_model_id]
+    if not linked:
+        return records
+    views = ai_engine_adapter.registry_views(session_factory, linked)
+    if not views:
+        return records
+    out: list[ModelArtifact] = []
+    for record in records:
+        view = views.get(record.registry_model_id or "")
+        if view is None:
+            out.append(record)
+            continue
+        out.append(
+            record.model_copy(
+                update={
+                    "registry_status": view.status,
+                    "registry_role": view.role,
+                    "registry_nucleus": view.nucleus,
+                }
+            )
+        )
+    return out
 
 
 def _model_card_to_record(row: ModelCardORM) -> ModelCard:
