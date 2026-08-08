@@ -11249,6 +11249,23 @@ async def nmr_processed_analyze_route(
     if dp4_ranking_rows:
         citation_keys.append("howarth_goodman_2020_dp4ai")
         citation_keys.append("howarth_goodman_2022_dp5")
+        # Surface the ranking's caveats at analysis level, not only inside a row
+        # a reader has to expand. The top candidate is the one that gets quoted
+        # into an assignment argument, so its coverage is the number that has to
+        # travel with it.
+        warnings.append(
+            "Candidate ranking orders the structures you supplied; it is not a "
+            "calibrated probability that the leading candidate is correct."
+        )
+        leader = dp4_ranking_rows[0]
+        if leader.get("low_coverage"):
+            warnings.append(
+                "The leading candidate accounts for "
+                f"{leader.get('matched_peaks')} of "
+                f"{leader.get('observed_peak_count')} observed signals. Its "
+                "error figures describe only those signals, so they understate "
+                "how far the rest of the spectrum is from this structure."
+            )
     if (
         (structure_summary is not None and is_aminoglycoside_like_structure(structure_summary))
         or peak_category_summary.get("carbohydrate_sugar")
