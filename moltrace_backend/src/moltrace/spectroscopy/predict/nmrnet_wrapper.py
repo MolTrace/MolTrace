@@ -51,9 +51,10 @@ import os
 import statistics
 import urllib.request
 from collections import defaultdict
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 # Must be set before torch is imported anywhere (torch is imported lazily below).
 os.environ.setdefault("PYTORCH_ENABLE_MPS_FALLBACK", "1")
@@ -70,6 +71,8 @@ __all__ = [
     "build_seed_knowledge_base",
     "load_knowledge_base",
     "save_knowledge_base_index",
+    "build_knowledge_base",
+    "molecule_from_record",
 ]
 
 _NUCLEUS_TO_ELEMENT: dict[str, str] = {"1H": "H", "13C": "C"}
@@ -597,18 +600,41 @@ def load_knowledge_base(path: str | Path) -> KnowledgeBase:
             )
         return _load_index(data)
 
+    return build_knowledge_base(data)
+
+
+def molecule_from_record(record: Mapping[str, Any]) -> Chem.Mol | None:
+    """The H-explicit molecule a knowledge-base record describes, or ``None``.
+
+    ``molblock`` takes precedence over ``smiles`` — see :func:`load_knowledge_base`
+    for why that distinction is load-bearing rather than cosmetic.
+    """
+
+    if record.get("molblock"):
+        return Chem.MolFromMolBlock(record["molblock"], removeHs=False)
+    mol = Chem.MolFromSmiles(record.get("smiles", ""))
+    return Chem.AddHs(mol) if mol is not None else None
+
+
+def build_knowledge_base(
+    records: Sequence[Mapping[str, Any]], source: str = "nmrshiftdb2"
+) -> KnowledgeBase:
+    """Index molecule+assignment records into a knowledge base, in memory.
+
+    Split out from :func:`load_knowledge_base` so a *subset* of records can be
+    indexed without a file — which is what held-out evaluation needs. The
+    knowledge base is built from NMRShiftDB2, so scoring the predictor on
+    NMRShiftDB2 molecules that are *in* it measures memorisation, not accuracy;
+    an honest error bar requires training on one split and scoring on a disjoint
+    one.
+    """
+
     kb = _new_kb()
     n_ref = 0
-    for record in data:
-        if record.get("molblock"):
-            mol_h = Chem.MolFromMolBlock(record["molblock"], removeHs=False)
-            if mol_h is None:
-                continue
-        else:
-            mol = Chem.MolFromSmiles(record["smiles"])
-            if mol is None:
-                continue
-            mol_h = Chem.AddHs(mol)
+    for record in records:
+        mol_h = molecule_from_record(record)
+        if mol_h is None:
+            continue
         n_atoms = mol_h.GetNumAtoms()
         for assignment in record.get("assignments", []):
             nucleus = assignment["nucleus"]
@@ -622,7 +648,7 @@ def load_knowledge_base(path: str | Path) -> KnowledgeBase:
             )
             n_ref += 1
     kb.reference_count = n_ref
-    kb.source = "nmrshiftdb2"
+    kb.source = source
     _finalize_priors(kb)
     return kb
 
