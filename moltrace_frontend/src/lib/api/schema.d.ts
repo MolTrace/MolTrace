@@ -6534,6 +6534,29 @@ export interface paths {
         patch: operations["update_knowledge_source_route_knowledge_sources__source_id__patch"];
         trace?: never;
     };
+    "/knowledge/sources/{source_id}/revisions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Knowledge Source Revisions Route
+         * @description Every revision of a source, newest first.
+         *
+         *     A source is superseded rather than edited, so this is the record of what it said at
+         *     each point -- including the revision a given extracted record was actually read from.
+         */
+        get: operations["list_knowledge_source_revisions_route_knowledge_sources__source_id__revisions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/knowledge/sources/{source_id}/files": {
         parameters: {
             query?: never;
@@ -6747,7 +6770,15 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Search Knowledge Route */
+        /**
+         * Search Knowledge Route
+         * @description Search the knowledge corpus, honouring the review decisions already made about it.
+         *
+         *     Records a reviewer **rejected** are excluded unless `include_rejected` is set. Unreviewed
+         *     records are returned — a young corpus would otherwise look empty — but every hit carries
+         *     its own `review_status`, so "nobody has checked this" is never presentable as "someone
+         *     approved it".
+         */
         get: operations["search_knowledge_route_knowledge_search_get"];
         put?: never;
         post?: never;
@@ -19219,6 +19250,7 @@ export interface components {
             metadata_json?: {
                 [key: string]: unknown;
             };
+            registry_promotion?: components["schemas"]["RegistryPromotionRequest"] | null;
         };
         /** DeploymentCandidateCreate */
         DeploymentCandidateCreate: {
@@ -20234,6 +20266,8 @@ export interface components {
             extraction_run_id: number;
             /** Source Id */
             source_id: number;
+            /** Source Revision Id */
+            source_revision_id?: number | null;
             /** Citation Ids Json */
             citation_ids_json?: number[];
             /** Compound Name */
@@ -20294,6 +20328,8 @@ export interface components {
             id: number;
             /** Source Id */
             source_id: number;
+            /** Source Revision Id */
+            source_revision_id?: number | null;
             /** Source File Id */
             source_file_id?: number | null;
             /** Citation Label */
@@ -20333,6 +20369,8 @@ export interface components {
             extraction_run_id: number;
             /** Source Id */
             source_id: number;
+            /** Source Revision Id */
+            source_revision_id?: number | null;
             /** Citation Ids Json */
             citation_ids_json?: number[];
             /** Reaction Name */
@@ -20429,6 +20467,8 @@ export interface components {
             extraction_run_id: number;
             /** Source Id */
             source_id: number;
+            /** Source Revision Id */
+            source_revision_id?: number | null;
             /** Citation Ids Json */
             citation_ids_json?: number[];
             /** Jurisdiction Id */
@@ -23365,6 +23405,8 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+            /** Current Revision Id */
+            current_revision_id?: number | null;
             /** Metadata Json */
             metadata_json?: {
                 [key: string]: unknown;
@@ -23458,6 +23500,61 @@ export interface components {
              */
             human_review_required: boolean;
         };
+        /**
+         * KnowledgeSourceRevision
+         * @description What a source said at one point in time. Revisions are appended, never edited.
+         */
+        KnowledgeSourceRevision: {
+            /** Id */
+            id: number;
+            /** Source Id */
+            source_id: number;
+            /** Revision Number */
+            revision_number: number;
+            /** Supersedes Revision Id */
+            supersedes_revision_id?: number | null;
+            /** Title */
+            title: string;
+            /** Source Type */
+            source_type: string;
+            /** Source Url */
+            source_url?: string | null;
+            /** Doi */
+            doi?: string | null;
+            /** Patent Number */
+            patent_number?: string | null;
+            /** Jurisdiction Id */
+            jurisdiction_id?: number | null;
+            /** Publisher */
+            publisher?: string | null;
+            /** Publication Date */
+            publication_date?: string | null;
+            /** Status */
+            status: string;
+            /** Reliability Label */
+            reliability_label: string;
+            /** Changed Fields */
+            changed_fields?: string[];
+            /** Change Reason */
+            change_reason?: string | null;
+            /** Created By */
+            created_by?: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Is Current
+             * @default false
+             */
+            is_current: boolean;
+            /**
+             * Human Review Required
+             * @default true
+             */
+            human_review_required: boolean;
+        };
         /** KnowledgeSourceUpdate */
         KnowledgeSourceUpdate: {
             /** Title */
@@ -23484,6 +23581,8 @@ export interface components {
             metadata_json?: {
                 [key: string]: unknown;
             } | null;
+            /** Change Reason */
+            change_reason?: string | null;
         };
         /** LCMSCandidateFeatureFamilyMatch */
         LCMSCandidateFeatureFamilyMatch: {
@@ -27053,6 +27152,14 @@ export interface components {
             metadata_json?: {
                 [key: string]: unknown;
             };
+            /** Registry Model Id */
+            registry_model_id?: string | null;
+            /** Registry Status */
+            registry_status?: ("candidate" | "shadow" | "production" | "retired") | null;
+            /** Registry Role */
+            registry_role?: string | null;
+            /** Registry Nucleus */
+            registry_nucleus?: string | null;
         };
         /** ModelCard */
         ModelCard: {
@@ -34134,6 +34241,40 @@ export interface components {
             peaks_used_indices?: number[];
             /** Excluded Peaks Indices */
             excluded_peaks_indices?: number[];
+        };
+        /**
+         * RegistryPromotionRequest
+         * @description Promote an approved artifact to *serving* in the science model registry.
+         *
+         *     Approving a deployment candidate is a product decision; making the inference
+         *     router actually resolve that artifact is a second, narrower one, and it needs
+         *     facts only the promoter holds -- which role the artifact plays, for which
+         *     nucleus, and what data built it. Those are not derivable from the artifact row,
+         *     so they are supplied here rather than guessed. Omit this block and the artifact
+         *     is approved without changing what serves traffic.
+         */
+        RegistryPromotionRequest: {
+            /**
+             * Role
+             * @enum {string}
+             */
+            role: "nmrnet_checkpoint" | "hose_kb" | "lora_adapter" | "embedding_model" | "csi_fingerid" | "rt_predictor" | "dp4_ranker";
+            /** Semantic Version */
+            semantic_version: string;
+            /** Dataset Snapshot Hash */
+            dataset_snapshot_hash: string;
+            /** Dataset Row Count */
+            dataset_row_count: number;
+            /** Nucleus */
+            nucleus?: string | null;
+            /** Dataset Tag */
+            dataset_tag?: string | null;
+            /** Dataset Source */
+            dataset_source?: string | null;
+            /** Artifact Sha256 */
+            artifact_sha256?: string | null;
+            /** Confidence Band Ppm */
+            confidence_band_ppm?: number | null;
         };
         /**
          * RegulatoryAIDecision
@@ -60696,6 +60837,41 @@ export interface operations {
             };
         };
     };
+    list_knowledge_source_revisions_route_knowledge_sources__source_id__revisions_get: {
+        parameters: {
+            query?: {
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path: {
+                source_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KnowledgeSourceRevision"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_knowledge_source_files_route_knowledge_sources__source_id__files_get: {
         parameters: {
             query?: {
@@ -61217,6 +61393,8 @@ export interface operations {
                 query?: string | null;
                 record_type?: string | null;
                 limit?: number;
+                /** @description Include records a reviewer refused. Off by default: a rejected extraction returned beside an accepted one discards the review that produced it. */
+                include_rejected?: boolean;
                 access_token?: string | null;
             };
             header?: {

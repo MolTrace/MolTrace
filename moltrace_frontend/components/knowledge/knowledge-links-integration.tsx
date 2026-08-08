@@ -6,6 +6,13 @@ import { apiFetch } from "@/lib/api/client"
 import { formatApiError } from "@/components/spectracheck/spectracheck-helpers"
 import { readRecordNumber, readRecordString } from "@/components/projects/project-workspace-utils"
 import { KNOWLEDGE_LINK_CONFIDENCE_LABELS, KNOWLEDGE_REVIEW_RECORD_TYPES, knowledgeLabel } from "@/components/knowledge/knowledge-constants"
+import { ReviewStateBadge, rejectedRowClass } from "@/components/knowledge/knowledge-governance-badges"
+import {
+  INCLUDE_REJECTED_HINT,
+  INCLUDE_REJECTED_LABEL,
+  readReviewState,
+} from "@/lib/knowledge/corpus-governance"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -56,12 +63,74 @@ type KnowledgeSearchPayload = {
   warnings?: unknown[]
 }
 
-async function fetchKnowledgeSearch(queryProbe: string, recordType: string | undefined, limit: number) {
+/**
+ * Search the corpus.
+ *
+ * Results default to accepted-or-unreviewed: a record a reviewer explicitly
+ * refused is withheld unless asked for by name, because returned beside an
+ * accepted one it is indistinguishable and throws that review away. Pass
+ * `includeRejected` only from an explicit, off-by-default control.
+ */
+async function fetchKnowledgeSearch(
+  queryProbe: string,
+  recordType: string | undefined,
+  limit: number,
+  includeRejected = false,
+) {
   const params = new URLSearchParams()
   params.set("query", queryProbe)
   params.set("limit", String(limit))
   if (recordType) params.set("record_type", recordType)
+  if (includeRejected) params.set("include_rejected", "true")
   return apiFetch<unknown>(`/knowledge/search?${params.toString()}`, { method: "GET" })
+}
+
+/**
+ * The opt-in control for refused material.
+ *
+ * Labelled for what it does rather than "Show all". The linking note is not
+ * decoration: `link_record` refuses anything a reviewer has not accepted, so a
+ * refused or unreviewed row is visible-but-unlinkable, and saying so here is
+ * what stops that reading as a bug.
+ */
+function IncludeRejectedControl({
+  id,
+  checked,
+  onCheckedChange,
+  disabled,
+}: {
+  id: string
+  checked: boolean
+  onCheckedChange: (next: boolean) => void
+  disabled?: boolean
+}) {
+  return (
+    <div className="rounded-md border border-dashed p-2.5">
+      <div className="flex items-start gap-2">
+        <Checkbox
+          id={id}
+          checked={checked}
+          disabled={disabled}
+          onCheckedChange={(v) => onCheckedChange(v === true)}
+          className="mt-0.5"
+        />
+        <div className="min-w-0">
+          <Label htmlFor={id} className="text-xs font-medium">
+            {INCLUDE_REJECTED_LABEL}
+          </Label>
+          <p className="mt-0.5 text-[11px] text-muted-foreground">{INCLUDE_REJECTED_HINT}</p>
+          <p className="mt-0.5 text-[11px] text-muted-foreground">
+            Only a record a reviewer accepted can be linked.
+          </p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/** Review marker for one search hit, from its raw `review_status`. */
+function RowReviewState({ row }: { row: Record<string, unknown> }) {
+  return <ReviewStateBadge state={readReviewState(row["review_status"])} />
 }
 
 async function fetchTrainingCandidates() {
@@ -183,6 +252,7 @@ const INTEGRATION_TOOLTIP =
 export function SpectraCheckKnowledgeLinksCard({ backendSessionId }: { backendSessionId: string | null }) {
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [includeRejected, setIncludeRejected] = useState(false)
   const [err, setErr] = useState("")
   const [analytical, setAnalytical] = useState<Record<string, unknown>[]>([])
   const [training, setTraining] = useState<Record<string, unknown>[]>([])
@@ -192,7 +262,7 @@ export function SpectraCheckKnowledgeLinksCard({ backendSessionId }: { backendSe
     setErr("")
     try {
       const [s, tr] = await Promise.all([
-        fetchKnowledgeSearch(BROAD_CATALOG_QUERY, "analytical", 18),
+        fetchKnowledgeSearch(BROAD_CATALOG_QUERY, "analytical", 18, includeRejected),
         fetchTrainingCandidates(),
       ])
       const sp = s as KnowledgeSearchPayload
@@ -222,7 +292,7 @@ export function SpectraCheckKnowledgeLinksCard({ backendSessionId }: { backendSe
     } finally {
       setLoading(false)
     }
-  }, [backendSessionId])
+  }, [backendSessionId, includeRejected])
 
   useEffect(() => {
     if (open) void load()
@@ -275,6 +345,13 @@ export function SpectraCheckKnowledgeLinksCard({ backendSessionId }: { backendSe
               </Alert>
             ) : null}
 
+            <IncludeRejectedControl
+              id="sc-knowledge-include-rejected"
+              checked={includeRejected}
+              onCheckedChange={setIncludeRejected}
+              disabled={loading}
+            />
+
             {loading ? (
               <p className="flex items-center gap-2 text-xs text-muted-foreground">
                 <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
@@ -307,12 +384,14 @@ export function SpectraCheckKnowledgeLinksCard({ backendSessionId }: { backendSe
                           analytical.map((row, idx) => {
                             const id = readRecordNumber(row, "id")
                             return (
-                              <TableRow key={id != null ? `a-${id}` : `a-${idx}`}>
+                              <TableRow key={id != null ? `a-${id}` : `a-${idx}`} className={rejectedRowClass(readReviewState(row["review_status"]))}>
                                 <TableCell className="font-mono text-[11px]">{id ?? "—"}</TableCell>
                                 <TableCell className="max-w-[200px] truncate text-xs">
                                   {truncateLabel(readRecordString(row, "compound_name"), 48)}
                                 </TableCell>
-                                <TableCell className="text-xs">{knowledgeLabel(readRecordString(row, "review_status"))}</TableCell>
+                                <TableCell className="text-xs">
+                                  <RowReviewState row={row} />
+                                </TableCell>
                                 <TableCell className="text-right font-mono text-[11px]">
                                   {readIntList(row["citation_ids_json"]).length}
                                 </TableCell>
@@ -377,6 +456,7 @@ export function SpectraCheckKnowledgeLinksCard({ backendSessionId }: { backendSe
 export function ReactionStudioKnowledgeLinksCard({ reactionProjectId }: { reactionProjectId: number }) {
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [includeRejected, setIncludeRejected] = useState(false)
   const [err, setErr] = useState("")
   const [reactions, setReactions] = useState<Record<string, unknown>[]>([])
   const [training, setTraining] = useState<Record<string, unknown>[]>([])
@@ -386,7 +466,7 @@ export function ReactionStudioKnowledgeLinksCard({ reactionProjectId }: { reacti
     setErr("")
     try {
       const [s, tr] = await Promise.all([
-        fetchKnowledgeSearch(BROAD_CATALOG_QUERY, "reaction", 16),
+        fetchKnowledgeSearch(BROAD_CATALOG_QUERY, "reaction", 16, includeRejected),
         fetchTrainingCandidates(),
       ])
       const sp = s as KnowledgeSearchPayload
@@ -400,7 +480,7 @@ export function ReactionStudioKnowledgeLinksCard({ reactionProjectId }: { reacti
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [includeRejected])
 
   useEffect(() => {
     if (open) void load()
@@ -443,6 +523,13 @@ export function ReactionStudioKnowledgeLinksCard({ reactionProjectId }: { reacti
               </Alert>
             ) : null}
 
+            <IncludeRejectedControl
+              id="rx-knowledge-include-rejected"
+              checked={includeRejected}
+              onCheckedChange={setIncludeRejected}
+              disabled={loading}
+            />
+
             {loading ? (
               <p className="flex items-center gap-2 text-xs text-muted-foreground">
                 <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
@@ -479,7 +566,9 @@ export function ReactionStudioKnowledgeLinksCard({ reactionProjectId }: { reacti
                                 <TableCell className="max-w-[200px] truncate text-xs">
                                   {truncateLabel(readRecordString(row, "substrate_summary"), 56)}
                                 </TableCell>
-                                <TableCell className="text-xs">{knowledgeLabel(readRecordString(row, "review_status"))}</TableCell>
+                                <TableCell className="text-xs">
+                                  <RowReviewState row={row} />
+                                </TableCell>
                               </TableRow>
                             )
                           })
@@ -535,6 +624,7 @@ export function ReactionStudioKnowledgeLinksCard({ reactionProjectId }: { reacti
 export function RegulatoryDossierKnowledgeLinksCard({ dossierId }: { dossierId: number }) {
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [includeRejected, setIncludeRejected] = useState(false)
   const [err, setErr] = useState("")
   const [regs, setRegs] = useState<Record<string, unknown>[]>([])
   const [warnList, setWarnList] = useState<string[]>([])
@@ -543,7 +633,7 @@ export function RegulatoryDossierKnowledgeLinksCard({ dossierId }: { dossierId: 
     setLoading(true)
     setErr("")
     try {
-      const s = await fetchKnowledgeSearch(BROAD_CATALOG_QUERY, "regulatory", 16)
+      const s = await fetchKnowledgeSearch(BROAD_CATALOG_QUERY, "regulatory", 16, includeRejected)
       const sp = s as KnowledgeSearchPayload & { warnings?: unknown }
       setRegs(asRows(sp.regulatory_records))
       const w = sp.warnings
@@ -555,7 +645,7 @@ export function RegulatoryDossierKnowledgeLinksCard({ dossierId }: { dossierId: 
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [includeRejected])
 
   useEffect(() => {
     if (open) void load()
@@ -611,6 +701,13 @@ export function RegulatoryDossierKnowledgeLinksCard({ dossierId }: { dossierId: 
               </Alert>
             ) : null}
 
+            <IncludeRejectedControl
+              id="rg-knowledge-include-rejected"
+              checked={includeRejected}
+              onCheckedChange={setIncludeRejected}
+              disabled={loading}
+            />
+
             {loading ? (
               <p className="flex items-center gap-2 text-xs text-muted-foreground">
                 <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
@@ -658,7 +755,9 @@ export function RegulatoryDossierKnowledgeLinksCard({ dossierId }: { dossierId: 
                             <TableCell className="max-w-[140px] truncate font-mono text-[11px]">
                               {truncateLabel(readRecordString(row, "topic"), 40)}
                             </TableCell>
-                            <TableCell className="text-xs">{knowledgeLabel(readRecordString(row, "review_status"))}</TableCell>
+                            <TableCell className="text-xs">
+                                  <RowReviewState row={row} />
+                                </TableCell>
                             <TableCell className="text-right font-mono text-[11px]">
                               {readIntList(row["citation_ids_json"]).length}
                             </TableCell>
@@ -781,7 +880,7 @@ export function CompoundDetailKnowledgeLinksCard({
                     ) : (
                       analytical.slice(0, 5).map((row, i) => (
                         <li key={readRecordNumber(row, "id") ?? i} className="font-mono">
-                          ID {readRecordNumber(row, "id") ?? "—"} · {knowledgeLabel(readRecordString(row, "review_status"))} ·{" "}
+                          ID {readRecordNumber(row, "id") ?? "—"} · <RowReviewState row={row} /> ·{" "}
                           {readIntList(row["citation_ids_json"]).length} citations
                         </li>
                       ))
@@ -796,7 +895,7 @@ export function CompoundDetailKnowledgeLinksCard({
                     ) : (
                       reactions.slice(0, 5).map((row, i) => (
                         <li key={readRecordNumber(row, "id") ?? i} className="font-mono">
-                          ID {readRecordNumber(row, "id") ?? "—"} · {knowledgeLabel(readRecordString(row, "review_status"))}
+                          ID {readRecordNumber(row, "id") ?? "—"} · <RowReviewState row={row} />
                         </li>
                       ))
                     )}

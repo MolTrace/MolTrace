@@ -3,6 +3,11 @@
 import Link from "next/link"
 import { useCallback, useEffect, useState } from "react"
 import { apiFetch } from "@/lib/api/client"
+import {
+  SUPERSEDED_TASK_EXPLANATION,
+  changedFieldsSentence,
+  readSupersededTask,
+} from "@/lib/knowledge/corpus-governance"
 import { formatApiError } from "@/components/spectracheck/spectracheck-helpers"
 import { DeveloperJsonPanel } from "@/components/spectracheck/spectracheck-result-panels"
 import { readRecordNumber, readRecordString } from "@/components/projects/project-workspace-utils"
@@ -64,6 +69,8 @@ export function KnowledgeReviewWorkspace() {
   const [filterRecordType, setFilterRecordType] = useState<string>("")
 
   const [selected, setSelected] = useState<Record<string, unknown> | null>(null)
+  /** Null for a task raised for any other reason. */
+  const supersededContext = selected ? readSupersededTask(selected["metadata_json"]) : null
 
   const [patchStatus, setPatchStatus] = useState<string>("open")
   const [patchReviewerName, setPatchReviewerName] = useState("")
@@ -275,7 +282,17 @@ export function KnowledgeReviewWorkspace() {
                       <TableCell>
                         <Badge variant="outline">{knowledgeLabel(readRecordString(row, "status"))}</Badge>
                       </TableCell>
-                      <TableCell className="max-w-[220px] truncate text-sm">{readRecordString(row, "title") ?? "—"}</TableCell>
+                      <TableCell className="max-w-[220px] text-sm">
+                        <span className="block truncate">{readRecordString(row, "title") ?? "—"}</span>
+                        {readSupersededTask(row["metadata_json"]) ? (
+                          <Badge
+                            variant="outline"
+                            className="mt-1 border-amber-500/60 text-[10px] text-amber-700 dark:text-amber-400"
+                          >
+                            Source changed
+                          </Badge>
+                        ) : null}
+                      </TableCell>
                       <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
                         {formatWhen(readRecordString(row, "updated_at"))}
                       </TableCell>
@@ -317,6 +334,30 @@ export function KnowledgeReviewWorkspace() {
           description="Approve, reject, or flag for further review."
         >
           <div className="space-y-4">
+            {supersededContext ? (
+              <Alert>
+                <AlertTitle className="text-sm">Raised because the source changed</AlertTitle>
+                <AlertDescription className="space-y-1 text-sm">
+                  <p>
+                    {changedFieldsSentence(supersededContext.changedFields)
+                      ? `What moved on the source: ${changedFieldsSentence(supersededContext.changedFields)}.`
+                      : "The source was revised."}
+                    {supersededContext.extractedFromRevision != null &&
+                    supersededContext.currentRevision != null ? (
+                      <>
+                        {" "}
+                        This record was drawn from version {supersededContext.extractedFromRevision}; the
+                        source is now at version {supersededContext.currentRevision}.
+                      </>
+                    ) : null}
+                  </p>
+                  {/* Superseding raises a question; it does not overturn a decision.
+                      A record can legitimately read "Accepted" and carry this task. */}
+                  <p>{SUPERSEDED_TASK_EXPLANATION}</p>
+                </AlertDescription>
+              </Alert>
+            ) : null}
+
             {patchErr ? (
               <Alert variant="destructive">
                 <AlertDescription className="text-sm">{patchErr}</AlertDescription>
