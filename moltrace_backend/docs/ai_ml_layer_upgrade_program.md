@@ -384,26 +384,91 @@ B0 items 1–4 stand as written and are not restated. The additions:
 > the audit record instead of indistinguishable from a calibrated one. A calibration that cannot
 > anchor a nucleus falls back rather than scoring everything as certain.
 >
-> **Adjacent defect, measured but deliberately NOT fixed here — needs a decision.** The same test
-> uses σ a second time, for the *match tolerance*: `tol = max(base, 3σ)` with
-> `_SHIFT_TOL_PPM = {"1H": 0.30, "13C": 4.0}`. Against the measured 90 % half-widths that
-> tolerance is too permissive everywhere, and worst for confident atoms:
+> ### ~~Adjacent defect: the match tolerance~~ — **WITHDRAWN 2026-08-08, and the withdrawal
+> itself was wrong the first time**
 >
-> | nucleus | σ | current tolerance | measured 90 % half-width | too permissive by |
+> This section previously claimed `PredictionBoundsTest`'s `tol = max(base, 3σ)` is "too
+> permissive everywhere and worst for confident atoms — 2.74× at σ = 0.169". **That claim is
+> withdrawn.** It compared a rule operating at ~96 % retention against a *90 %* conformal window,
+> which is not a comparison. `scripts/measure_match_tolerance.py` measures the two quantities that
+> actually move in opposite directions, on 4,947 held-out molecules / 49,352 matched atoms:
+>
+> * **retention** — share of atoms whose *true* line falls inside the window;
+> * **exposure** — mean count of *other* atoms' lines also inside it.
+>
+> | rule | ¹³C retention | ¹³C exposure | ¹H retention | ¹H exposure |
 > |---|---|---|---|---|
-> | ¹³C | 0.169 | 4.000 ppm | 1.460 ppm | **2.74×** |
-> | ¹³C | 2.005 | 6.015 ppm | 4.722 ppm | 1.27× |
-> | ¹³C | 12.656 | 37.968 ppm | 22.365 ppm | 1.70× |
-> | ¹H | 0.021 | 0.300 ppm | 0.149 ppm | **2.01×** |
-> | ¹H | 1.368 | 4.104 ppm | 2.594 ppm | 1.58× |
+> | current `max(base, 3σ)` | 96.301 % | 2.515 | 96.067 % | 3.363 |
+> | conformal 90 % | 90.026 % | 1.755 | 90.614 % | 2.542 |
+> | conformal 95 % | 94.721 % | 2.221 | 94.931 % | 3.196 |
+> | conformal 99 % | 99.012 % | 3.531 | 99.137 % | 4.912 |
 >
-> The ¹³C base of **4.0 ppm is a round number**, which the house rule on bounds forbids. The
-> matcher currently accepts a line up to 2.7× further away than the predictor's own 90 % error
-> bound — and with the peak detector over-picking 3–7×, a too-loose window is a mechanism for
-> matching a *spurious* line and scoring it as corroboration. That is a change to what matches,
-> not to what a match is worth, so it moves `good`/`partial`/`missed` counts and therefore the
-> score itself. It needs its own invariant test, its own re-baseline, and B1 (over-picking) closed
-> first so the two effects can be told apart.
+> **Correction to the first withdrawal, recorded because the mechanism is the reusable part.** The
+> first version of this retraction interpolated conformal exposure to the current rule's 96.301 %
+> retention by drawing a chord between the **non-adjacent** 95 % and 99 % rows, got ~2.70, and
+> concluded conformal was worse. That is invalid: exposure-vs-retention is strongly **convex**
+> (¹³C slope 0.0992 from 90→95, 0.3052 from 95→99), and a convex function lies **below** its
+> chord, so the estimate was biased upward by **8.8 %**. Refitting the calibration directly at
+> targets 0.963/0.965 gives ¹³C exposure **2.484** at matched retention — **1.24 % better** than
+> the current rule, not worse. On ¹H the current rule wins by 1.85 %. **It is a wash that reverses
+> by nucleus.** A retraction of a conclusion drawn from an invalid comparison must not itself rest
+> on one.
+>
+> **The conclusion survives on better evidence.** Two independent tests, neither relying on
+> interpolation:
+>
+> 1. **Weighted by the code's own objective.** `PredictionBoundsTest` weights each match by
+>    `tanh(significance/3)`, and significance is monotone-decreasing in the half-width, so a false
+>    match on a *tight* atom is worth ~4.4× more evidence than one on a wide atom. Measured on that
+>    objective the current rule is still ahead (¹³C weighted exposure 2.2872 vs 2.2971): it
+>    concentrates its exposure on low-weight, wide-σ atoms.
+> 2. **Family frontier.** Across **108** `(base, k)` settings for ¹³C and **99** for ¹H, **zero**
+>    weakly dominate `(4.0, 3.0)` / `(0.30, 3.0)`.
+>
+> **The original claim was also inverted, not merely overstated.** Per-band realized retention
+> shows the flat floor **under**-covers confident atoms: ¹³C floor-bound bands realize
+> 96.80 / 95.96 / 94.41 / 93.74 % against a 96.30 % aggregate, while the widest bands reach
+> 97.74–98.43 % (¹H the same shape: 94.1 % tight, 98.5 % wide). "Worst for confident atoms" points
+> the wrong way — the confident atoms are the ones getting *less* than nominal coverage.
+>
+> ### The defect that does survive — `AssignmentsTest`, which nothing above had looked at
+>
+> `_SHIFT_TOL_PPM` has a **second consumer**. `AssignmentsTest` (`scorer.py:641`) builds its
+> candidate set with `d <= 3.0 * base_tol` — a flat **12.0 ppm** (¹³C) / **0.90 ppm** (¹H) radius
+> with **no σ adaptation at all**. Measured on the same split, that window is **strictly dominated
+> on both axes**:
+>
+> | window | ¹³C retention | ¹³C exposure | ¹H retention | ¹H exposure |
+> |---|---|---|---|---|
+> | `AssignmentsTest` flat 3×base | 95.06 % | 3.133 | 91.05 % | 3.672 |
+> | `PredictionBoundsTest` `max(base, 3σ)` | **96.30 %** | **2.515** | **96.07 %** | **3.363** |
+>
+> Strictly dominated means there is no trade-off to argue about: the σ-adaptive rule already in the
+> file achieves *higher* retention at *lower* exposure, on both nuclei. This is the mechanism-backed
+> version of "too permissive", it is in a different test from the one the original claim named, and
+> it is **open**. It needs its own invariant test and visible re-baseline; it changes which
+> resonances get assigned, so it moves the merit function and the impurity estimate, not just a
+> weight.
+>
+> ### And the finding that neither window can fix
+>
+> Ambiguity is **intrinsic at this predictor's accuracy, not a tuning failure.** Replicating
+> `_group_resonances` (ε = 0.50 ppm ¹³C / 0.03 ppm ¹H) on both sides and deduplicating observed
+> shifts to lines — i.e. matching as `PredictionBoundsTest` actually does — **26.5 % of in-window
+> ¹³C resonances and 32.5 % of ¹H resonances have a rival line strictly closer to the prediction
+> than their own**. Narrowing the window from the current rule to conformal-90 cuts exposure 33 %
+> (1.917 → 1.278) but misassignment only 2.3 pp (26.5 % → 24.2 %).
+>
+> Two honest limits on that number. It is measured on **clean assignment data with no spurious
+> peaks** — with the picker over-picking 3–7×, real spectra are worse. And it is a **per-resonance
+> ambiguity rate**, not end-to-end assignment accuracy: the real matcher's sequential `used[]`
+> bookkeeping is order-dependent and this does not model it. (The raw per-atom figure before
+> grouping was 36.0 % / 42.2 %; quoting *that* would have reported the measuring method's artefact
+> as the pipeline's defect.)
+>
+> The actionable conclusion is that the scoring model, not the window, is where this belongs:
+> `PredictionBoundsTest` scores a match as corroboration without discounting for how many other
+> lines could have matched equally well.
 >
 > **Still pending:** the two conformal metrics in `GoldMetricVector` (see the safety-critical
 > rollout hazard below).
