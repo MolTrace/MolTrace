@@ -14,6 +14,74 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.66.0 — Processed-spectrum ingest, and MolTrace's first measured error bar (2026-08-07)
+
+Two halves of the same goal: get real spectra *in*, then be able to say how accurate we are on
+them without quoting somebody else's benchmark.
+
+### Processed-spectrum ingest (B2)
+
+`read_processed_spectrum()` reads **Bruker `pdata/N/1r`** and **JCAMP-DX**. Until now only raw
+FIDs could be ingested, while most customers hold processed data — the narrowest part of the
+ingest surface.
+
+It is deliberately not just a second loader. Processed data arrives already apodized, phased,
+baseline-corrected and referenced **by someone else**, and a quantitation claim over a spectrum
+an unknown operator processed sits in a different evidentiary class from one over a FID we
+processed ourselves. So the reader records the difference: `domain='frequency'` /
+`processed_by='vendor'`, a `processing_provenance` block (window function, line broadening,
+both phase corrections, baseline mode), and a `referencing` block stating the basis on which the
+ppm axis was established — **read** from the file, never assumed. When it cannot be established
+the axis is point index and `established=False` says so, rather than a plausible-looking scale.
+
+Refusals name their cause: a JCAMP file with a Hz axis but no carrier frequency is refused
+rather than returned as Hz labelled ppm, which would put every ¹³C peak at ~190× its true shift
+with nothing to signal it.
+
+Verified against ground truth, not structure — every structural assertion would still pass with
+a subtly wrong axis: ethylene glycol's single ¹³C line at **62.64 ppm** (literature ~63.0), and
+the Hz-axis JCAMP fixture's **CDCl₃ triplet at 77.06 / 76.80 ppm**. Both pinned as tests.
+
+nmrML is deliberately **not** built: no fixture exists on disk and nmrglue has no reader, so it
+would be an unverifiable parser written from a spec.
+
+### Held-out accuracy measurement (B5)
+
+`spectroscopy/eval/shift_accuracy.py` splits NMRShiftDB2 **by molecule** (SHA-256 of the
+structure — deterministic, so a published figure is reproducible), builds the table from the
+training split alone, and scores the disjoint remainder. Leakage is the design problem: score
+the predictor on molecules already in its table and every atom finds its own reference, the
+error collapses to ~0, and the number is worthless.
+
+44,668 train / 4,950 test molecules; 445,702 training reference atoms:
+
+| | n | coverage | MAE | median | p90 | p95 | max |
+|---|---|---|---|---|---|---|---|
+| ¹³C | 37,005 | 99.6 % | **3.44 ppm** | **1.54** | 8.22 | 12.07 | 146.1 |
+| ¹H | 12,508 | 100 % | **0.332 ppm** | **0.151** | 0.82 | 1.22 | 14.2 |
+
+A matched environment beats the element prior by **13.7×** on ¹³C (3.28 vs 44.98 ppm) — the
+premise of the method, measured rather than assumed.
+
+**Correction to v0.64.x.** Those entries reported *median predicted σ* of 1.88 ppm and called the
+predictor "sharper than the error model that consumes it". σ is the **claimed** uncertainty, not
+the **measured** error. Measured ¹³C MAE is **3.44 ppm, above** DP4's 2.306 ppm scale; the
+*median* error, 1.54 ppm, is below it. The distribution is strongly right-skewed, so mean and
+median tell different stories and only quoting both is honest.
+
+**Calibration is the finding that matters.** ¹³C σ is well calibrated at 2–5 ppm (σ 3.40 → error
+3.28), conservative above that, and **optimistic by ~3× in the tightest bin** (σ 0.26 → error
+0.76). That is exactly where DP4 weights most heavily and where the verifier's
+`_significance_from_sigma` scores highest, so confidence is overstated precisely on the atoms
+the ranking leans on. ¹H is well calibrated throughout. Calibrating σ before feeding DP4 is no
+longer optional — and now has a measured curve to calibrate against.
+
+Not yet built: the decoy generator and false-confirmation measurement. Accuracy on correct
+structures says nothing about how often a *wrong* structure is confirmed, which is the
+safety-critical metric the harness already treats as zero-regression.
+
+---
+
 ## v0.65.0 — ROI read zero because nothing recorded that work had happened (2026-08-07)
 
 `/analytics/roi` derives **every** figure from `usage_events` rows, and `create_usage_event`
