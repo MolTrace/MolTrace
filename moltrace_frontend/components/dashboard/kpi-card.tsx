@@ -85,7 +85,7 @@ export function KpiCard({
       <CardContent className="pb-6">
         {/* Steps up only once the card is wide enough to hold it. These cards
             sit in a 4-column grid on some pages and a 5-column grid on others,
-            and a flat 4xl clipped the widest values ("94.2%") in the narrower
+            and a flat 4xl clipped the widest values (a four-character percentage) in the narrower
             one. Keyed to the card, not the viewport, so the grid it happens to
             be in is what decides. */}
         <div

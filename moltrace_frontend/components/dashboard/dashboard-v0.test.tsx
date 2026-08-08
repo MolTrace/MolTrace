@@ -208,6 +208,88 @@ describe("DashboardV0 connector/ingestion fallback", () => {
     })
   })
 
+  // ---------------------------------------------------------------------
+  // No invented numbers. Every mock in this file resolves to
+  // `available: false` / `metrics: null`, so this whole describe block runs in
+  // exactly the state a first-login GxP buyer hits when the backend is not
+  // reachable yet. The dashboard used to fill that state with plausible
+  // fiction -- 23 active analyses, 7 in review, 94.2 % model confidence, and
+  // five activity rows reviewed by "Dr. Chen" -- which is indistinguishable
+  // from real data on the screen where trust is established.
+  // ---------------------------------------------------------------------
+
+  it("shows no fabricated KPI numbers when live data is unavailable", async () => {
+    render(<DashboardV0 />)
+
+    // Let the mocked fetches settle first, like every other test here. Without
+    // it the assertions race a dozen in-flight promises and the teardown waits
+    // on them.
+    await waitFor(() => {
+      expect(screen.getByText("Active Analyses")).toBeInTheDocument()
+    })
+    for (const invented of ["23", "7", "12", "156", "94.2%"]) {
+      expect(
+        screen.queryByText(invented, { selector: "div.font-mono" }),
+        `the dashboard rendered ${invented} with no live data behind it`,
+      ).not.toBeInTheDocument()
+    }
+  })
+
+  it("invents no reviewers, samples or analysis ids", async () => {
+    render(<DashboardV0 />)
+
+    await waitFor(() => {
+      expect(screen.getByText("Active Analyses")).toBeInTheDocument()
+    })
+    for (const invented of [
+      "Dr. Chen",
+      "Dr. Patel",
+      "Dr. Kim",
+      "API-Q4-BATCH-12",
+      "MET-STUDY-089",
+      "NMR-2024-0847",
+    ]) {
+      expect(
+        screen.queryByText(invented),
+        `the dashboard invented ${invented}`,
+      ).not.toBeInTheDocument()
+    }
+  })
+
+  it("never reports a green system state it cannot observe", async () => {
+    /* The worst of the fabrications, and a different kind from the counts: a
+       made-up "23" is wrong, but a made-up "healthy" is wrong in the
+       reassuring direction, on the signal a reviewer would act on. */
+    render(<DashboardV0 />)
+
+    await waitFor(() => {
+      expect(screen.getByText("Active Analyses")).toBeInTheDocument()
+    })
+    /* A filter chip may legitimately be labelled "Succeeded" -- it names a
+       choice, not a state of the system. What must not appear is a *status
+       display* asserting green, so allow matches inside an interactive control
+       and forbid them anywhere else. */
+    for (const el of screen.queryAllByText(/^(healthy|succeeded)$/i)) {
+      expect(
+        el.closest("button"),
+        `"${el.textContent}" is rendered as a status, not a filter control`,
+      ).not.toBeNull()
+    }
+  })
+
+  it("says the number is unavailable rather than omitting the tile", async () => {
+    /* Hiding the tile would be its own dishonesty -- the reader cannot tell a
+       metric that is zero from one that could not be loaded. The card stays,
+       the number becomes an explicit dash. */
+    render(<DashboardV0 />)
+
+    await waitFor(() => {
+      expect(screen.getByText("Active Analyses")).toBeInTheDocument()
+    })
+    expect(screen.getAllByText("—", { selector: "div.font-mono" }).length).toBeGreaterThan(0)
+    expect(screen.getAllByText(/not available|unavailable|couldn't load/i).length).toBeGreaterThan(0)
+  })
+
   it("surfaces testing-phase core module activity in the cross-module command center", async () => {
     render(<DashboardV0 />)
 
