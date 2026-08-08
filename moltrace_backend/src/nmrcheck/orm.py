@@ -5594,6 +5594,48 @@ class KnowledgeSourceORM(Base):
         DateTime(timezone=True), default=utcnow, onupdate=utcnow
     )
     metadata_json: Mapped[str] = mapped_column(Text, default="{}")
+    current_revision_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+
+
+class KnowledgeSourceRevisionORM(Base):
+    """An immutable snapshot of what a source said at one point in time.
+
+    Sources are superseded, never edited: every change appends a revision and leaves the
+    previous one readable forever. Extracted records bind to the revision they were read
+    from, so a record can never silently come to cite a source that now says something
+    else -- the mismatch between the record's revision and the source's current one is
+    what makes the change detectable at all.
+    """
+
+    __tablename__ = "knowledge_source_revisions"
+    __table_args__ = (
+        Index("ix_knowledge_source_revisions_source", "source_id", "revision_number"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    source_id: Mapped[int] = mapped_column(
+        ForeignKey("knowledge_sources.id", ondelete="CASCADE"), index=True
+    )
+    source_revision_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    revision_number: Mapped[int] = mapped_column(Integer, default=1)
+    supersedes_revision_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    title: Mapped[str] = mapped_column(String(300))
+    source_type: Mapped[str] = mapped_column(String(64), default="other")
+    source_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    doi: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    patent_number: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    jurisdiction_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    publisher: Mapped[str | None] = mapped_column(String(240), nullable=True)
+    publication_date: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    status: Mapped[str] = mapped_column(String(32), default="draft")
+    reliability_label: Mapped[str] = mapped_column(String(32), default="unknown")
+    metadata_json: Mapped[str] = mapped_column(Text, default="{}")
+    changed_fields_json: Mapped[str] = mapped_column(Text, default="[]")
+    change_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_by: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
 class KnowledgeSourceFileORM(Base):
@@ -5662,6 +5704,7 @@ class ExtractedCitationORM(Base):
     source_id: Mapped[int] = mapped_column(
         ForeignKey("knowledge_sources.id", ondelete="CASCADE"), index=True
     )
+    source_revision_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
     source_file_id: Mapped[int | None] = mapped_column(
         ForeignKey("knowledge_source_files.id", ondelete="SET NULL"),
         nullable=True,
@@ -5692,6 +5735,7 @@ class ExtractedReactionRecordORM(Base):
     source_id: Mapped[int] = mapped_column(
         ForeignKey("knowledge_sources.id", ondelete="CASCADE"), index=True
     )
+    source_revision_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
     citation_ids_json: Mapped[str] = mapped_column(Text, default="[]")
     reaction_name: Mapped[str | None] = mapped_column(String(300), nullable=True)
     reaction_type: Mapped[str | None] = mapped_column(String(160), nullable=True)
@@ -5738,6 +5782,7 @@ class ExtractedAnalyticalRecordORM(Base):
     source_id: Mapped[int] = mapped_column(
         ForeignKey("knowledge_sources.id", ondelete="CASCADE"), index=True
     )
+    source_revision_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
     citation_ids_json: Mapped[str] = mapped_column(Text, default="[]")
     compound_name: Mapped[str | None] = mapped_column(String(300), nullable=True)
     structure_input: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -5775,6 +5820,7 @@ class ExtractedRegulatoryRecordORM(Base):
     source_id: Mapped[int] = mapped_column(
         ForeignKey("knowledge_sources.id", ondelete="CASCADE"), index=True
     )
+    source_revision_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
     citation_ids_json: Mapped[str] = mapped_column(Text, default="[]")
     jurisdiction_id: Mapped[int | None] = mapped_column(
         ForeignKey("regulatory_jurisdictions.id", ondelete="SET NULL"), nullable=True

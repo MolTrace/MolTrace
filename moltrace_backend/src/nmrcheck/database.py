@@ -134,6 +134,33 @@ def _ensure_sqlite_schema(engine: Engine) -> None:
                 connection.exec_driver_sql(
                     "ALTER TABLE users ADD COLUMN gsd_graduated_at TIMESTAMP"
                 )
+        # Migration 0045 introduced source revisions. Dev SQLite databases built before
+        # it have the tables but not the new columns, and create_all() only creates
+        # tables it has never seen -- it will not alter one that already exists.
+        for revisioned_table in (
+            "knowledge_sources",
+            "extracted_reaction_records",
+            "extracted_analytical_records",
+            "extracted_regulatory_records",
+            "extracted_citations",
+        ):
+            if revisioned_table not in tables:
+                continue
+            revision_column = (
+                "current_revision_id"
+                if revisioned_table == "knowledge_sources"
+                else "source_revision_id"
+            )
+            revisioned_existing = {
+                str(row[1])
+                for row in connection.exec_driver_sql(
+                    f"PRAGMA table_info({revisioned_table})"
+                ).fetchall()
+            }
+            if revision_column not in revisioned_existing:
+                connection.exec_driver_sql(
+                    f"ALTER TABLE {revisioned_table} ADD COLUMN {revision_column} INTEGER"
+                )
         if "fid_runs" in tables:
             existing = {
                 str(row[1])

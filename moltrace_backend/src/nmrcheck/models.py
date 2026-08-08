@@ -4336,6 +4336,7 @@ class KnowledgeSourceUpdate(BaseModel):
     status: KnowledgeSourceStatus | None = None
     reliability_label: KnowledgeReliabilityLabel | None = None
     metadata_json: dict[str, Any] | None = None
+    change_reason: str | None = Field(default=None, max_length=500)
 
     @field_validator("title", "source_url", "doi", "patent_number", "publisher", mode="before")
     @classmethod
@@ -4362,6 +4363,7 @@ class KnowledgeSource(BaseModel):
     reliability_label: KnowledgeReliabilityLabel
     created_at: datetime
     updated_at: datetime
+    current_revision_id: int | None = None
     metadata_json: dict[str, Any] = Field(default_factory=dict)
     warnings: list[str] = Field(default_factory=list)
     notes: list[str] = Field(default_factory=list)
@@ -4422,11 +4424,39 @@ class KnowledgeExtractionRun(BaseModel):
     human_review_required: bool = True
 
 
+class KnowledgeSourceRevision(BaseModel):
+    """What a source said at one point in time. Revisions are appended, never edited."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: int
+    source_id: int
+    revision_number: int
+    supersedes_revision_id: int | None = None
+    title: str
+    source_type: str
+    source_url: str | None = None
+    doi: str | None = None
+    patent_number: str | None = None
+    jurisdiction_id: int | None = None
+    publisher: str | None = None
+    publication_date: datetime | None = None
+    status: str
+    reliability_label: str
+    changed_fields: list[str] = Field(default_factory=list)
+    change_reason: str | None = None
+    created_by: str | None = None
+    created_at: datetime
+    is_current: bool = False
+    human_review_required: bool = True
+
+
 class ExtractedCitation(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     id: int
     source_id: int
+    source_revision_id: int | None = None
     source_file_id: int | None = None
     citation_label: str
     page_number: int | None = None
@@ -4446,6 +4476,7 @@ class ExtractedReactionRecord(BaseModel):
     id: int
     extraction_run_id: int
     source_id: int
+    source_revision_id: int | None = None
     citation_ids_json: list[int] = Field(default_factory=list)
     reaction_name: str | None = None
     reaction_type: str | None = None
@@ -4484,6 +4515,7 @@ class ExtractedAnalyticalRecord(BaseModel):
     id: int
     extraction_run_id: int
     source_id: int
+    source_revision_id: int | None = None
     citation_ids_json: list[int] = Field(default_factory=list)
     compound_name: str | None = None
     structure_input: str | None = None
@@ -4513,6 +4545,7 @@ class ExtractedRegulatoryRecord(BaseModel):
     id: int
     extraction_run_id: int
     source_id: int
+    source_revision_id: int | None = None
     citation_ids_json: list[int] = Field(default_factory=list)
     jurisdiction_id: int | None = None
     topic: KnowledgeRegulatoryTopic

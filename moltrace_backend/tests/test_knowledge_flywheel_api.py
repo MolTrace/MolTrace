@@ -373,3 +373,124 @@ def test_an_unreviewed_record_is_returned_but_carries_its_state(client, api_head
         found = client.get("/knowledge/search", headers=headers, params={"query": "Suzuki"})
         hit = next(r for r in found.json()["reaction_records"] if r["id"] == record["id"])
         assert hit["review_status"] == "unreviewed"
+
+
+def test_superseding_a_source_appends_a_revision_and_never_edits_the_old_one(client, api_headers):
+    headers = api_headers
+    source = _source(client, headers)
+    original_doi = source["doi"]
+    assert source["current_revision_id"], "a new source should already have revision 1"
+    first_revision_id = source["current_revision_id"]
+
+    changed = client.patch(
+        f"/knowledge/sources/{source['id']}",
+        headers=headers,
+        json={"doi": "10.9999/corrected", "change_reason": "Publisher issued a correction."},
+    )
+    assert changed.status_code == 200, changed.text
+    assert changed.json()["doi"] == "10.9999/corrected"
+    assert changed.json()["current_revision_id"] != first_revision_id
+
+    revisions = client.get(f"/knowledge/sources/{source['id']}/revisions", headers=headers)
+    assert revisions.status_code == 200, revisions.text
+    body = revisions.json()
+    assert [r["revision_number"] for r in body] == [2, 1], "newest revision first"
+
+    superseded = next(r for r in body if r["revision_number"] == 1)
+    current = next(r for r in body if r["revision_number"] == 2)
+    # The whole point: the predecessor still says what it said, forever.
+    assert superseded["doi"] == original_doi
+    assert superseded["is_current"] is False
+    assert current["doi"] == "10.9999/corrected"
+    assert current["is_current"] is True
+    assert current["supersedes_revision_id"] == first_revision_id
+    assert current["changed_fields"] == ["doi"]
+    assert current["change_reason"] == "Publisher issued a correction."
+
+
+def test_a_superseded_source_flags_its_records_without_overturning_the_review(client, api_headers):
+    headers = api_headers
+    record = _extracted_reaction(client, headers)
+    source_id = record["source_id"]
+    extracted_from = record["source_revision_id"]
+
+    approved = client.post(
+        f"/knowledge/records/{record['id']}/approve",
+        headers=headers,
+        json={"record_type": "reaction", "reviewer_name": "A Reviewer",
+              "reviewer_comment": "matches the paper"},
+    )
+    assert approved.status_code in (200, 201), approved.text
+
+    changed = client.patch(
+        f"/knowledge/sources/{source_id}",
+        headers=headers,
+        json={"reliability_label": "low", "change_reason": "Journal issued an expression of concern."},
+    )
+    assert changed.status_code == 200, changed.text
+
+    tasks = client.get("/knowledge/review-tasks", headers=headers, params={"status": "open"})
+    assert tasks.status_code == 200, tasks.text
+    raised = [
+        t for t in tasks.json()
+        if t["record_type"] == "reaction" and t["record_id"] == record["id"]
+    ]
+    assert raised, "superseding the source should ask a human to re-check the derived record"
+    assert "source changed" in raised[0]["title"]
+    assert "reliability label" in raised[0]["title"], "the title should name what moved"
+
+    # Flag, never rewrite: the record keeps the decision a human actually made, and stays
+    # bound to the revision it was really extracted from.
+    listing = client.get(
+        f"/knowledge/extractions/{record['extraction_run_id']}/reactions", headers=headers
+    )
+    assert listing.status_code == 200, listing.text
+    after = next(r for r in listing.json() if r["id"] == record["id"])
+    assert after["review_status"] == "accepted", "the human's decision must survive the cascade"
+    assert after["source_revision_id"] == extracted_from, (
+        "the record must stay bound to the revision it was actually read from; re-pointing "
+        "it at the new one would rewrite what it was justified by"
+    )
+
+
+def test_changing_how_far_a_source_is_trusted_is_its_own_audit_event(client, api_headers):
+    headers = api_headers
+    source = _source(client, headers)
+    changed = client.patch(
+        f"/knowledge/sources/{source['id']}",
+        headers=headers,
+        json={"reliability_label": "low"},
+    )
+    assert changed.status_code == 200, changed.text
+    assert changed.json()["reliability_label"] == "low"
+
+    events = client.get(
+        "/audit/events", headers=headers, params={"entity_type": "knowledge_source", "limit": 50}
+    )
+    assert events.status_code == 200, events.text
+    payload = events.json()
+    entries = payload if isinstance(payload, list) else payload.get("items", payload.get("events", []))
+    types = [e.get("event_type") for e in entries]
+    assert "knowledge.source.reliability_change" in types, (
+        "a reliability change can invalidate every conclusion drawn from the source, so it "
+        "should not be findable only by reading a field list inside another entry"
+    )
+
+
+def test_resaving_a_source_unchanged_does_not_manufacture_a_revision(client, api_headers):
+    headers = api_headers
+    source = _source(client, headers)
+    unchanged = client.patch(
+        f"/knowledge/sources/{source['id']}",
+        headers=headers,
+        json={"reliability_label": source["reliability_label"], "doi": source["doi"]},
+    )
+    assert unchanged.status_code == 200, unchanged.text
+    assert unchanged.json()["current_revision_id"] == source["current_revision_id"]
+
+    revisions = client.get(f"/knowledge/sources/{source['id']}/revisions", headers=headers)
+    assert revisions.status_code == 200, revisions.text
+    assert [r["revision_number"] for r in revisions.json()] == [1], (
+        "a save that changed nothing should leave no revision behind; an empty entry is "
+        "noise in the one chain that is supposed to mean something"
+    )

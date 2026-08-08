@@ -467,6 +467,7 @@ from .models import (
     KnowledgeSource,
     KnowledgeSourceCreate,
     KnowledgeSourceFile,
+    KnowledgeSourceRevision,
     KnowledgeSourceUpdate,
     LCMSConsensusCandidateBridgeRequest,
     LCMSConsensusCandidateBridgeResult,
@@ -19381,7 +19382,7 @@ def update_knowledge_source_route(
     context: AccessContext = Depends(require_access_context),
 ) -> KnowledgeSource:
     try:
-        record = knowledge_store.update_source(
+        record = knowledge_store.supersede_source(
             _state(request).session_factory,
             source_id,
             payload,
@@ -19393,6 +19394,26 @@ def update_knowledge_source_route(
     if record is None:
         raise HTTPException(status_code=404, detail="Knowledge source not found.")
     return record
+
+
+@router.get(
+    "/knowledge/sources/{source_id}/revisions",
+    response_model=list[KnowledgeSourceRevision],
+    dependencies=[Depends(require_access_context)],
+)
+def list_knowledge_source_revisions_route(
+    source_id: int,
+    request: Request,
+) -> list[KnowledgeSourceRevision]:
+    """Every revision of a source, newest first.
+
+    A source is superseded rather than edited, so this is the record of what it said at
+    each point -- including the revision a given extracted record was actually read from.
+    """
+    revisions = knowledge_store.list_source_revisions(_state(request).session_factory, source_id)
+    if revisions is None:
+        raise HTTPException(status_code=404, detail="Knowledge source not found.")
+    return revisions
 
 
 @router.post(
