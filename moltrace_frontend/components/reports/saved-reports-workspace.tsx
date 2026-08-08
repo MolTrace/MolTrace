@@ -49,12 +49,22 @@ import { ReportLockControls } from "@/components/reports/report-lock-controls"
 import { ReportCompoundProvenanceDialog } from "@/components/reports/report-compound-provenance-dialog"
 import { ReportsRegulatoryComplianceSection } from "@/components/reports/reports-regulatory-compliance-section"
 import { ReportsValidationReadinessCard } from "@/components/validation/validation-readiness-summary"
-import { KpiCard } from "@/components/dashboard/kpi-card"
+import { KpiCard, UNAVAILABLE_VALUE } from "@/components/dashboard/kpi-card"
 import { ModuleCard } from "@/components/dashboard/module-card"
 import { AlertCard } from "@/components/dashboard/alert-card"
 import { StatusFilterPills } from "@/components/dashboard/status-filter-pills"
 
-const DEMO_STAT_CARDS = { ready: 12, generating: 3, month: 47 } as const
+/* No DEMO_STAT_CARDS.
+ *
+ * These three tiles rendered 12 ready / 3 generating / 47 this month whenever
+ * the stats fetch failed, with "Example value" as small print underneath. The
+ * number is what the eye lands on and the disclaimer is read second if at all,
+ * so a reader came away with a report count that was never measured.
+ *
+ * The "Example layout" table further down is deliberately left as it is: it sits
+ * under a heading that says so and states the rows are not approved or signed
+ * off, which is a labelled mockup rather than a fabrication presented as data.
+ */
 
 const DEMO_ILLUSTRATION_ROWS: Omit<SavedReportRow, "key">[] = [
   {
@@ -299,10 +309,10 @@ export default function SavedReportsWorkspace() {
           icon={CheckCircle2}
           accent="cyan"
           severity={stats && stats.ready > 0 ? "success" : "neutral"}
-          value={stats ? stats.ready : DEMO_STAT_CARDS.ready}
+          value={stats ? stats.ready : UNAVAILABLE_VALUE}
           sub={
             <p className="text-xs text-muted-foreground">
-              {stats ? "Approved or released for export" : "Example value"}
+              {stats ? "Approved or released for export" : "Live report data isn't available right now."}
             </p>
           }
           onClick={() => setFilter("approved")}
@@ -313,10 +323,10 @@ export default function SavedReportsWorkspace() {
           icon={Clock}
           accent="cyan"
           severity={stats && stats.generating > 0 ? "warning" : "neutral"}
-          value={stats ? stats.generating : DEMO_STAT_CARDS.generating}
+          value={stats ? stats.generating : UNAVAILABLE_VALUE}
           sub={
             <p className="text-xs text-muted-foreground">
-              {stats ? "Drafts and items awaiting review" : "Example value"}
+              {stats ? "Drafts and items awaiting review" : "Live report data isn't available right now."}
             </p>
           }
         />
@@ -324,10 +334,10 @@ export default function SavedReportsWorkspace() {
           title="This Month"
           icon={FileText}
           accent="cyan"
-          value={stats ? stats.total : DEMO_STAT_CARDS.month}
+          value={stats ? stats.total : UNAVAILABLE_VALUE}
           sub={
             <p className="text-xs text-muted-foreground">
-              {stats ? "Total saved reports" : "Example value"}
+              {stats ? "Total saved reports" : "Live report data isn't available right now."}
             </p>
           }
         />

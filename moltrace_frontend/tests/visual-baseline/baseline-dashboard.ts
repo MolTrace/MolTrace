@@ -48,7 +48,7 @@ async function installMocks(page: Page) {
 
 const ROUTES: { path: string; signal: RegExp; label: string }[] = [
   { path: "/dashboard", signal: /Dashboard|Welcome|Overview/i, label: "Main dashboard (DashboardV0)" },
-  { path: "/dashboard/projects", signal: /Projects|FolderOpen|Active/i, label: "Dashboard Projects subpage" },
+  { path: "/dashboard/projects", signal: /Project|Active/i, label: "Dashboard Projects subpage (redirects to Projects)" },
   { path: "/dashboard/reactions", signal: /Reaction|Optimization/i, label: "Dashboard Reactions subpage (redirects to Repho)" },
   { path: "/dashboard/regulatory", signal: /Regulatory|Compliance|Dossier/i, label: "Dashboard Regulatory subpage (redirects to Regentry)" },
   { path: "/dashboard/spectroscopy", signal: /SpectraCheck|Spectroscopy|Sample/i, label: "Dashboard Spectroscopy subpage (redirects to SpectraCheck)" },
