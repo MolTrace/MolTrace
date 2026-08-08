@@ -19699,13 +19699,28 @@ def search_knowledge_route(
     query: str | None = Query(default=None, min_length=1, max_length=500),
     record_type: str | None = Query(default=None),
     limit: int = Query(default=50, ge=1, le=200),
+    include_rejected: bool = Query(
+        default=False,
+        description=(
+            "Include records a reviewer refused. Off by default: a rejected extraction "
+            "returned beside an accepted one discards the review that produced it."
+        ),
+    ),
     context: AccessContext = Depends(require_access_context),
 ) -> KnowledgeSearchResult:
+    """Search the knowledge corpus, honouring the review decisions already made about it.
+
+    Records a reviewer **rejected** are excluded unless `include_rejected` is set. Unreviewed
+    records are returned — a young corpus would otherwise look empty — but every hit carries
+    its own `review_status`, so "nobody has checked this" is never presentable as "someone
+    approved it".
+    """
     return knowledge_store.search_knowledge(
         _state(request).session_factory,
         query=query,
         record_type=record_type,
         limit=limit,
+        review_states=None if include_rejected else knowledge_store.DEFAULT_SEARCH_REVIEW_STATES,
     )
 
 

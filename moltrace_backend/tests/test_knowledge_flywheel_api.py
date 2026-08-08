@@ -288,3 +288,88 @@ def test_knowledge_flywheel_endpoints_appear_in_openapi(client):
         "DatasetVersion",
     ]:
         assert schema in schemas
+
+
+# --- search must honour the review decisions already made ---------------------------------
+#
+# Search used to filter on text alone. A record a reviewer had explicitly REJECTED came back
+# beside an accepted one, indistinguishable — the review ran, a human refused a bad
+# extraction, and this surface threw that away. For a corpus whose whole value is that the
+# curation is load-bearing, that inverts the feature rather than leaving it incomplete.
+
+
+def _extracted_reaction(client: TestClient, headers: dict[str, str]) -> dict:
+    """Run the pipeline far enough to get one extracted reaction record back."""
+    source = _source(client, headers)
+    source_file = _upload_text(
+        client, headers, source["id"],
+        "Suzuki coupling of aryl bromide with boronic acid gave the biaryl in 82% yield.",
+    )
+    run = client.post(
+        "/knowledge/extractions/run",
+        headers=headers,
+        json={"source_id": source["id"], "source_file_id": source_file["id"],
+              "extraction_type": "reaction"},
+    )
+    assert run.status_code == 201, run.text
+    records = client.get(f"/knowledge/extractions/{run.json()['id']}/reactions", headers=headers)
+    assert records.status_code == 200, records.text
+    assert records.json(), "extraction produced no reaction record to review"
+    return records.json()[0]
+
+
+def test_a_rejected_record_does_not_come_back_from_search(client, api_headers):
+    headers = api_headers
+    with client:
+        record = _extracted_reaction(client, headers)
+
+        before = client.get("/knowledge/search", headers=headers, params={"query": "Suzuki"})
+        assert before.status_code == 200, before.text
+        assert any(r["id"] == record["id"] for r in before.json()["reaction_records"]), (
+            "the record should be findable before anyone reviews it"
+        )
+
+        reject = client.post(
+            f"/knowledge/records/{record['id']}/reject",
+            headers=headers,
+            json={"record_type": "reaction", "reviewer_name": "A Reviewer",
+                  "reviewer_comment": "misread the yield"},
+        )
+        assert reject.status_code in (200, 201), reject.text
+
+        after = client.get("/knowledge/search", headers=headers, params={"query": "Suzuki"})
+        assert after.status_code == 200, after.text
+        assert not any(r["id"] == record["id"] for r in after.json()["reaction_records"]), (
+            "a reviewer rejected this record and search returned it anyway"
+        )
+
+
+def test_the_rejected_record_is_still_reachable_when_asked_for_by_name(client, api_headers):
+    """The escape hatch exists — a curator auditing rejections needs it — but a caller has
+    to ask, rather than receiving rejected material by accident."""
+    headers = api_headers
+    with client:
+        record = _extracted_reaction(client, headers)
+        client.post(
+            f"/knowledge/records/{record['id']}/reject",
+            headers=headers,
+            json={"record_type": "reaction", "reviewer_name": "A Reviewer",
+                  "reviewer_comment": "misread the yield"},
+        )
+        shown = client.get(
+            "/knowledge/search", headers=headers,
+            params={"query": "Suzuki", "include_rejected": True},
+        )
+        assert shown.status_code == 200, shown.text
+        assert any(r["id"] == record["id"] for r in shown.json()["reaction_records"])
+
+
+def test_an_unreviewed_record_is_returned_but_carries_its_state(client, api_headers):
+    """Excluding unreviewed material would make a young corpus look empty. Returning it
+    unlabelled would let "nobody has checked this" read as "someone approved it"."""
+    headers = api_headers
+    with client:
+        record = _extracted_reaction(client, headers)
+        found = client.get("/knowledge/search", headers=headers, params={"query": "Suzuki"})
+        hit = next(r for r in found.json()["reaction_records"] if r["id"] == record["id"])
+        assert hit["review_status"] == "unreviewed"
