@@ -2651,9 +2651,51 @@ def _raise_mobile_http_error(exc: Exception) -> None:
     raise exc
 
 
-def _raise_compound_registry_http_error(exc: Exception) -> None:
+def _compound_registry_scope(request: Request, context: AccessContext) -> int | None:
+    """The user id a compound registry read is restricted to, or None for all.
+
+    None (unscoped) for the system api key, an admin, and any deployment running
+    ``compound_registry_visibility="shared"`` -- the single-lab case where the
+    registry really is a shared reference.
+
+    Otherwise the caller's own id. Reads used to be open everywhere by design;
+    that is the right default for one lab and the wrong one for a hosted
+    product, where a compound's existence under a code name is the confidential
+    part long before its structure is.
+    """
+    if _state(request).settings.compound_registry_visibility == "shared":
+        return None
+    return _user_scope_for_context(context)
+
+
+def _compound_registry_existence_is_secret(request: Request) -> bool:
+    """Whether a refusal must be a non-leaking 404 rather than a 403.
+
+    Tracks the read scope: once reads are owner-scoped, a 403 on a write would
+    confirm the row exists at an id the caller cannot read, and the ids are
+    sequential. In shared mode the row is readable anyway, so 403 stays the
+    more useful answer.
+    """
+    return _state(request).settings.compound_registry_visibility != "shared"
+
+
+def _raise_compound_registry_http_error(
+    exc: Exception, request: Request | None = None
+) -> None:
     if isinstance(exc, compound_store.CompoundRegistryNotFoundError):
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+    if isinstance(exc, compound_store.CompoundRegistryAccessError):
+        # "Exists, but not yours." The status follows the read scope, like the
+        # compound PATCH: 403 where the row is readable anyway (shared mode),
+        # 404 where it is not, so the refusal cannot confirm an id the caller
+        # was never allowed to see.
+        #
+        # Without this branch the error is a bare RuntimeError to the mapper --
+        # CompoundRegistryAccessError does not inherit CompoundRegistryError --
+        # and every refused attach would surface as a 500.
+        if request is None or _compound_registry_existence_is_secret(request):
+            raise HTTPException(status_code=404, detail="Compound not found.") from exc
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
     if isinstance(exc, compound_store.CompoundRegistryError):
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     raise exc
@@ -23301,7 +23343,7 @@ def create_compound_registry_compound_route(
             created_by_user_id=_user_scope_for_context(context),
         )
     except Exception as exc:
-        _raise_compound_registry_http_error(exc)
+        _raise_compound_registry_http_error(exc, request)
         raise
     _audit_from_context(
         request,
@@ -23334,6 +23376,7 @@ def list_compound_registry_compounds_route(
         status=status_filter,
         compound_type=compound_type,
         limit=limit,
+        owner_scope_id=_compound_registry_scope(request, context),
     )
 
 
@@ -23347,7 +23390,11 @@ def get_compound_registry_compound_route(
     request: Request,
     context: AccessContext = Depends(require_access_context),
 ) -> CompoundEntity:
-    record = compound_store.get_compound(_state(request).session_factory, compound_id)
+    record = compound_store.get_compound(
+        _state(request).session_factory,
+        compound_id,
+        owner_scope_id=_compound_registry_scope(request, context),
+    )
     if record is None:
         raise HTTPException(status_code=404, detail="Compound not found.")
     return record
@@ -23376,14 +23423,15 @@ def update_compound_registry_compound_route(
             enforce_owner=actor_user_id is not None,
         )
     except compound_store.CompoundRegistryAccessError as exc:
-        # 403, not 404: the compound registry is a shared reference and its rows
-        # are readable, so existence is not a secret here and pretending
-        # otherwise would only confuse a chemist who can see the record on
-        # screen. This is the opposite call from dossiers, where ownership is
-        # itself confidential and a non-owner gets a non-leaking 404.
+        # The status code follows the read scope. In shared mode the row is
+        # readable, so 403 is the more useful answer and hides nothing. In owner
+        # mode the caller cannot read the row at all, so a 403 would confirm it
+        # exists at an id they were refused -- and the ids are sequential.
+        if _compound_registry_existence_is_secret(request):
+            raise HTTPException(status_code=404, detail="Compound not found.") from exc
         raise HTTPException(status_code=403, detail=str(exc)) from exc
     except Exception as exc:
-        _raise_compound_registry_http_error(exc)
+        _raise_compound_registry_http_error(exc, request)
         raise
     if record is None:
         raise HTTPException(status_code=404, detail="Compound not found.")
@@ -23413,10 +23461,13 @@ def create_compound_registry_structure_route(
 ) -> CompoundStructureRecord:
     try:
         record = compound_store.create_structure_record(
-            _state(request).session_factory, compound_id, payload
+            _state(request).session_factory,
+            compound_id,
+            payload,
+            actor_user_id=_user_scope_for_context(context),
         )
     except Exception as exc:
-        _raise_compound_registry_http_error(exc)
+        _raise_compound_registry_http_error(exc, request)
         raise
     _audit_from_context(
         request,
@@ -23441,9 +23492,13 @@ def list_compound_registry_structures_route(
     context: AccessContext = Depends(require_access_context),
 ) -> list[CompoundStructureRecord]:
     try:
-        return compound_store.list_structure_records(_state(request).session_factory, compound_id)
+        return compound_store.list_structure_records(
+            _state(request).session_factory,
+            compound_id,
+            owner_scope_id=_compound_registry_scope(request, context),
+        )
     except Exception as exc:
-        _raise_compound_registry_http_error(exc)
+        _raise_compound_registry_http_error(exc, request)
         raise
 
 
@@ -23460,9 +23515,14 @@ def create_compound_registry_alias_route(
     context: AccessContext = Depends(require_access_context),
 ) -> CompoundAlias:
     try:
-        record = compound_store.create_alias(_state(request).session_factory, compound_id, payload)
+        record = compound_store.create_alias(
+            _state(request).session_factory,
+            compound_id,
+            payload,
+            actor_user_id=_user_scope_for_context(context),
+        )
     except Exception as exc:
-        _raise_compound_registry_http_error(exc)
+        _raise_compound_registry_http_error(exc, request)
         raise
     _audit_from_context(
         request,
@@ -23487,9 +23547,13 @@ def list_compound_registry_aliases_route(
     context: AccessContext = Depends(require_access_context),
 ) -> list[CompoundAlias]:
     try:
-        return compound_store.list_aliases(_state(request).session_factory, compound_id)
+        return compound_store.list_aliases(
+            _state(request).session_factory,
+            compound_id,
+            owner_scope_id=_compound_registry_scope(request, context),
+        )
     except Exception as exc:
-        _raise_compound_registry_http_error(exc)
+        _raise_compound_registry_http_error(exc, request)
         raise
 
 
@@ -23507,10 +23571,13 @@ def create_compound_registry_relationship_route(
 ) -> CompoundRelationship:
     try:
         record = compound_store.create_relationship(
-            _state(request).session_factory, compound_id, payload
+            _state(request).session_factory,
+            compound_id,
+            payload,
+            actor_user_id=_user_scope_for_context(context),
         )
     except Exception as exc:
-        _raise_compound_registry_http_error(exc)
+        _raise_compound_registry_http_error(exc, request)
         raise
     _audit_from_context(
         request,
@@ -23540,9 +23607,13 @@ def list_compound_registry_relationships_route(
     context: AccessContext = Depends(require_access_context),
 ) -> list[CompoundRelationship]:
     try:
-        return compound_store.list_relationships(_state(request).session_factory, compound_id)
+        return compound_store.list_relationships(
+            _state(request).session_factory,
+            compound_id,
+            owner_scope_id=_compound_registry_scope(request, context),
+        )
     except Exception as exc:
-        _raise_compound_registry_http_error(exc)
+        _raise_compound_registry_http_error(exc, request)
         raise
 
 
@@ -23558,9 +23629,13 @@ def create_compound_registry_batch_route(
     context: AccessContext = Depends(require_access_context),
 ) -> CompoundBatch:
     try:
-        record = compound_store.create_batch(_state(request).session_factory, payload)
+        record = compound_store.create_batch(
+            _state(request).session_factory,
+            payload,
+            actor_user_id=_user_scope_for_context(context),
+        )
     except Exception as exc:
-        _raise_compound_registry_http_error(exc)
+        _raise_compound_registry_http_error(exc, request)
         raise
     _audit_from_context(
         request,
@@ -23591,6 +23666,7 @@ def list_compound_registry_batches_route(
         compound_id=compound_id,
         status=status_filter,
         limit=limit,
+        owner_scope_id=_compound_registry_scope(request, context),
     )
 
 
@@ -23604,7 +23680,11 @@ def get_compound_registry_batch_route(
     request: Request,
     context: AccessContext = Depends(require_access_context),
 ) -> CompoundBatch:
-    record = compound_store.get_batch(_state(request).session_factory, batch_id)
+    record = compound_store.get_batch(
+        _state(request).session_factory,
+        batch_id,
+        owner_scope_id=_compound_registry_scope(request, context),
+    )
     if record is None:
         raise HTTPException(status_code=404, detail="Compound batch not found.")
     return record
@@ -23622,9 +23702,14 @@ def update_compound_registry_batch_route(
     context: AccessContext = Depends(require_access_context),
 ) -> CompoundBatch:
     try:
-        record = compound_store.update_batch(_state(request).session_factory, batch_id, payload)
+        record = compound_store.update_batch(
+            _state(request).session_factory,
+            batch_id,
+            payload,
+            actor_user_id=_user_scope_for_context(context),
+        )
     except Exception as exc:
-        _raise_compound_registry_http_error(exc)
+        _raise_compound_registry_http_error(exc, request)
         raise
     if record is None:
         raise HTTPException(status_code=404, detail="Compound batch not found.")
@@ -23653,9 +23738,14 @@ def create_compound_registry_aliquot_route(
     context: AccessContext = Depends(require_access_context),
 ) -> SampleAliquot:
     try:
-        record = compound_store.create_aliquot(_state(request).session_factory, batch_id, payload)
+        record = compound_store.create_aliquot(
+            _state(request).session_factory,
+            batch_id,
+            payload,
+            actor_user_id=_user_scope_for_context(context),
+        )
     except Exception as exc:
-        _raise_compound_registry_http_error(exc)
+        _raise_compound_registry_http_error(exc, request)
         raise
     _audit_from_context(
         request,
@@ -23680,9 +23770,13 @@ def list_compound_registry_aliquots_route(
     context: AccessContext = Depends(require_access_context),
 ) -> list[SampleAliquot]:
     try:
-        return compound_store.list_aliquots(_state(request).session_factory, batch_id)
+        return compound_store.list_aliquots(
+            _state(request).session_factory,
+            batch_id,
+            owner_scope_id=_compound_registry_scope(request, context),
+        )
     except Exception as exc:
-        _raise_compound_registry_http_error(exc)
+        _raise_compound_registry_http_error(exc, request)
         raise
 
 
@@ -23698,9 +23792,13 @@ def create_compound_registry_evidence_link_route(
     context: AccessContext = Depends(require_access_context),
 ) -> CompoundEvidenceLink:
     try:
-        record = compound_store.create_evidence_link(_state(request).session_factory, payload)
+        record = compound_store.create_evidence_link(
+            _state(request).session_factory,
+            payload,
+            actor_user_id=_user_scope_for_context(context),
+        )
     except Exception as exc:
-        _raise_compound_registry_http_error(exc)
+        _raise_compound_registry_http_error(exc, request)
         raise
     _audit_from_context(
         request,
@@ -23730,10 +23828,12 @@ def list_compound_registry_compound_evidence_links_route(
 ) -> list[CompoundEvidenceLink]:
     try:
         return compound_store.list_compound_evidence_links(
-            _state(request).session_factory, compound_id
+            _state(request).session_factory,
+            compound_id,
+            owner_scope_id=_compound_registry_scope(request, context),
         )
     except Exception as exc:
-        _raise_compound_registry_http_error(exc)
+        _raise_compound_registry_http_error(exc, request)
         raise
 
 
@@ -23748,9 +23848,13 @@ def list_compound_registry_batch_evidence_links_route(
     context: AccessContext = Depends(require_access_context),
 ) -> list[CompoundEvidenceLink]:
     try:
-        return compound_store.list_batch_evidence_links(_state(request).session_factory, batch_id)
+        return compound_store.list_batch_evidence_links(
+            _state(request).session_factory,
+            batch_id,
+            owner_scope_id=_compound_registry_scope(request, context),
+        )
     except Exception as exc:
-        _raise_compound_registry_http_error(exc)
+        _raise_compound_registry_http_error(exc, request)
         raise
 
 
@@ -23768,7 +23872,7 @@ def create_compound_registry_graph_edge_route(
     try:
         record = compound_store.create_graph_edge(_state(request).session_factory, payload)
     except Exception as exc:
-        _raise_compound_registry_http_error(exc)
+        _raise_compound_registry_http_error(exc, request)
         raise
     _audit_from_context(
         request,
@@ -23798,10 +23902,13 @@ def get_compound_registry_graph_route(
 ) -> ScientificKnowledgeGraph:
     try:
         return compound_store.get_graph(
-            _state(request).session_factory, compound_id=compound_id, limit=limit
+            _state(request).session_factory,
+            compound_id=compound_id,
+            limit=limit,
+            owner_scope_id=_compound_registry_scope(request, context),
         )
     except Exception as exc:
-        _raise_compound_registry_http_error(exc)
+        _raise_compound_registry_http_error(exc, request)
         raise
 
 
@@ -23823,10 +23930,11 @@ def link_spectracheck_session_compound_route(
             resource_type="spectracheck_session",
             resource_id=session_id,
             payload=payload,
+            actor_user_id=_user_scope_for_context(context),
             default_title="SpectraCheck session linked compound",
         )
     except Exception as exc:
-        _raise_compound_registry_http_error(exc)
+        _raise_compound_registry_http_error(exc, request)
         raise
     _audit_from_context(
         request,
@@ -23858,12 +23966,13 @@ def link_reaction_experiment_compound_route(
             resource_type="reaction_experiment",
             resource_id=experiment_id,
             payload=payload,
+            actor_user_id=_user_scope_for_context(context),
             default_title="Reaction experiment linked compound",
             default_relation_type="product_of",
             compound_as_source=True,
         )
     except Exception as exc:
-        _raise_compound_registry_http_error(exc)
+        _raise_compound_registry_http_error(exc, request)
         raise
     _audit_from_context(
         request,
@@ -23899,10 +24008,11 @@ def link_regulatory_dossier_compound_route(
             resource_type="regulatory_dossier",
             resource_id=dossier_id,
             payload=payload,
+            actor_user_id=_user_scope_for_context(context),
             default_title="Regulatory dossier linked compound",
         )
     except Exception as exc:
-        _raise_compound_registry_http_error(exc)
+        _raise_compound_registry_http_error(exc, request)
         raise
     _audit_from_context(
         request,
@@ -23934,10 +24044,11 @@ def link_report_compound_route(
             resource_type="report",
             resource_id=report_id,
             payload=payload,
+            actor_user_id=_user_scope_for_context(context),
             default_title="Report linked compound",
         )
     except Exception as exc:
-        _raise_compound_registry_http_error(exc)
+        _raise_compound_registry_http_error(exc, request)
         raise
     _audit_from_context(
         request,
@@ -23961,7 +24072,11 @@ def search_compound_registry_route(
     request: Request,
     context: AccessContext = Depends(require_access_context),
 ) -> CompoundRegistrySearchResult:
-    return compound_store.search_compounds(_state(request).session_factory, payload)
+    return compound_store.search_compounds(
+        _state(request).session_factory,
+        payload,
+        owner_scope_id=_compound_registry_scope(request, context),
+    )
 
 
 @router.post(

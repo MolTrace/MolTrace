@@ -69,6 +69,23 @@ class Settings:
 
     api_key: str | None = None
     disable_auth: bool = False
+
+    # Who can READ a compound someone else registered.
+    #
+    # "owner"  -- you see what you registered (default). Admins and the system
+    #             api key still see everything.
+    # "shared" -- anyone signed in sees the whole registry, the behaviour before
+    #             this setting existed.
+    #
+    # Reads were open deliberately: a compound registry is a shared reference and
+    # people do look up structures registered by colleagues. That holds for a
+    # single lab and is wrong for a hosted multi-tenant product, where a
+    # compound's existence under a code name is itself the confidential part.
+    # Hence a setting rather than a straight reversal -- the single-lab case is
+    # still supported, it just is not the default. Writes are owner-scoped in
+    # BOTH modes: looking up a colleague's compound is reasonable, renaming it
+    # is not.
+    compound_registry_visibility: str = "owner"
     # No admin is granted by default. Set ADMIN_EMAILS (comma-separated) in the
     # environment to designate admin accounts; see get_settings() below.
     admin_emails: tuple[str, ...] = ()
@@ -247,6 +264,12 @@ def get_settings() -> Settings:
             False,
         ),
         admin_emails=env_admins,
+        compound_registry_visibility=(
+            "shared"
+            if (os.getenv("COMPOUND_REGISTRY_VISIBILITY") or "owner").strip().lower()
+            == "shared"
+            else "owner"
+        ),
         host=os.getenv("HOST", "127.0.0.1"),
         port=_parse_int(os.getenv("PORT"), 8000),
         healthcheck_path=os.getenv("HEALTHCHECK_PATH", "/health"),
