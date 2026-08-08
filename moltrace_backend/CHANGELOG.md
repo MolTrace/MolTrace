@@ -14,6 +14,58 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.68.2 — How often a wrong structure wins: 38.1 % (2026-08-08)
+
+The eval harness has always treated `false_confirmation_rate` as a **zero-regression** safety
+metric. It had no source of wrong answers to compute it from, so it had never been computed.
+Accuracy on correct structures says nothing about the failure that matters.
+
+`spectroscopy/eval/decoys.py` generates plausibly-wrong structures — the mistakes a chemist
+actually makes (heteroatom misread, homologue off by one CH₂, misplaced methyl, regioisomer,
+inverted stereocentre). A randomly drawn molecule is rejected trivially and measures nothing.
+`spectroscopy/eval/false_confirmation.py` scores them, so the number is reproducible on demand
+rather than living in a terminal.
+
+**1,657 held-out molecules / 5,639 decoy pairs**, ¹³C shift lists through DP4:
+
+| bucket | pairs |
+|---|---|
+| scored by DP4 | 3,073 |
+| rejected on carbon count (formula, not NMR) | 2,287 |
+| **indistinguishable to the predictor** | 279 |
+| unscorable | 0 |
+
+**False-confirmation rate: 38.1 %** (1,172 / 3,073).
+
+| decoy kind | FC rate |
+|---|---|
+| heteroatom swap | 38.5 % — changes the formula; HRMS catches these upstream |
+| **ring substitution (regioisomer)** | **37.7 % — same formula, nothing upstream catches it** |
+| homologue / methyl added | all rejected on carbon count |
+| stereo inversion | 279 of 282 indistinguishable |
+
+**Read it precisely.** This is *not* "MolTrace confirms wrong structures 38 % of the time". It is
+the ¹³C-shift-list layer alone, through DP4 — no 2-D, no MS, no multiplicity, and **not** the
+multi-test `verify_structure` arbiter. What it establishes is that this one evidence layer
+discriminates barely better than chance once a formula check has done its work, and that the
+formula check is doing most of the real filtering (2,287 of 5,639 pairs).
+
+The load-bearing row is the regioisomer: it survives every upstream filter and ¹³C shifts resolve
+it at 37.7 % error. Chemically unsurprising — regiochemistry is what HMBC and HSQC are for — and
+direct evidence that candidate generation must be driven by 2-D correlations rather than shift
+lists.
+
+**Stereochemistry is now a demonstrated bound.** 279 of 282 stereo decoys are *literally*
+indistinguishable: identical connectivity → identical HOSE code → identical prediction. Recorded
+in the claim-integrity register as a hard capability boundary.
+
+The accounting is the design: every decoy lands in exactly one bucket, the buckets sum to the
+total, and the rate is `None` rather than `0.0` when nothing was scored — zero evidence is not a
+perfect score. Formula-rejected and indistinguishable pairs never enter the denominator, because
+crediting either to shift evidence would overstate what the spectrum contributed.
+
+---
+
 ## v0.68.1 — The verifier now weighs evidence by a guarantee, not a claim (2026-08-08)
 
 v0.68.0 measured that the predictor's σ is *differentially* mis-scaled — the half-width/σ ratio
