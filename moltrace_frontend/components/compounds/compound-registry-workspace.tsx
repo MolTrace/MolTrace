@@ -532,7 +532,7 @@ export function CompoundRegistryWorkspace() {
         eyebrow="Registry"
         title={searchActive ? "Search results" : "Compounds"}
         icon={Database}
-        description="List from the registry, or results after search."
+        description="Compounds you have registered, or results after search."
       >
         <div>
           {loading ? <p className="text-sm text-muted-foreground">Loading compounds…</p> : null}
@@ -543,9 +543,13 @@ export function CompoundRegistryWorkspace() {
                   {searchActive ? <Search /> : <Database />}
                 </EmptyMedia>
                 <EmptyTitle>{searchActive ? "No matches" : "No compounds yet"}</EmptyTitle>
+                {/* Search and listing both cover only what this account
+                    registered, so an empty result is the normal answer for a
+                    colleague's compound — not a failed query. Saying so keeps
+                    the reader from broadening a search that can never match. */}
                 <EmptyDescription>
                   {searchActive
-                    ? "Try broadening or clearing the search."
+                    ? "Search covers the compounds you have registered. Try broadening or clearing it — a compound registered by another account will not appear here."
                     : "Register your first compound to start tracking batches, evidence, and dossiers."}
                 </EmptyDescription>
               </EmptyHeader>

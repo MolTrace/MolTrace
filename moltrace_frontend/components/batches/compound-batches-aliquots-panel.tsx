@@ -6,6 +6,11 @@ import { apiFetch } from "@/lib/api/client"
 import { readRecordString } from "@/components/projects/project-workspace-utils"
 import { trackAliquotCreated, trackBatchCreated } from "@/src/lib/analytics/analytics-client"
 import { formatApiError } from "@/components/spectracheck/spectracheck-helpers"
+import {
+  BATCH_UNAVAILABLE_MESSAGE,
+  COMPOUND_UNAVAILABLE_WRITE_MESSAGE,
+  isCompoundOutOfScope,
+} from "@/components/compounds/compound-registry-access"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -121,7 +126,13 @@ export function CompoundBatchesAliquotsPanel({ compoundId }: Props) {
       setAliquots(normalizeAliquotList(raw))
     } catch (e) {
       setAliquots([])
-      setAliquotsErr(formatApiError(e, "Could not load aliquots."))
+      // Batches inherit the compound's owner scope, so this 404 says nothing
+      // about whether the batch exists.
+      setAliquotsErr(
+        isCompoundOutOfScope(e)
+          ? BATCH_UNAVAILABLE_MESSAGE
+          : formatApiError(e, "Could not load aliquots."),
+      )
     } finally {
       setAliquotsLoading(false)
     }
@@ -204,7 +215,11 @@ export function CompoundBatchesAliquotsPanel({ compoundId }: Props) {
       setPurityMethod("")
       await loadBatches()
     } catch (err) {
-      setCreateErr(formatApiError(err, "Create batch failed."))
+      setCreateErr(
+        isCompoundOutOfScope(err)
+          ? COMPOUND_UNAVAILABLE_WRITE_MESSAGE
+          : formatApiError(err, "Create batch failed."),
+      )
     } finally {
       setCreateBusy(false)
     }
@@ -259,7 +274,11 @@ export function CompoundBatchesAliquotsPanel({ compoundId }: Props) {
       setAlSampleId("")
       await loadAliquots(selectedBatchId)
     } catch (err) {
-      setAlCreateErr(formatApiError(err, "Create aliquot failed."))
+      setAlCreateErr(
+        isCompoundOutOfScope(err)
+          ? BATCH_UNAVAILABLE_MESSAGE
+          : formatApiError(err, "Create aliquot failed."),
+      )
     } finally {
       setAlCreateBusy(false)
     }
