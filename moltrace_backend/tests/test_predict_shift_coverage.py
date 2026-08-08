@@ -119,6 +119,47 @@ def test_prediction_reports_knowledge_base_provenance(panel_predictions):
             assert pred.kb_records > 0, f"{name}: KB named but reports 0 records"
 
 
+def test_hose_matches_report_their_sphere_and_bucket_size(panel_predictions):
+    """The strongest quality signal the predictor has must reach the caller.
+
+    Measured on 36,856 held-out ¹³C atoms, a sphere ≤2 match carries ~4x the error
+    of a deep one (5.75 vs 1.45 ppm MAE). Without the sphere on the result there is
+    no way for a caller to tell those apart — σ alone does not separate them.
+    """
+
+    for name, pred in panel_predictions.items():
+        for s in pred.shifts:
+            if s.source == "hose":
+                assert s.match_sphere is not None and 1 <= s.match_sphere <= 6, (
+                    f"{name}: HOSE match with no usable sphere ({s.match_sphere})"
+                )
+                assert s.match_count is not None and s.match_count >= 3, (
+                    f"{name}: HOSE match reports {s.match_count} references, below the "
+                    "minimum a bucket must hold to be used"
+                )
+            else:
+                # A model prediction or an abstention has no HOSE sphere; claiming
+                # one would invent provenance.
+                assert s.match_sphere is None and s.match_count is None
+
+
+def test_shallow_match_fraction_is_reported(panel_predictions):
+    """Coverage is not quality — the same lesson as prior_fallback_fraction.
+
+    A shallow-matched atom *has* a prediction, so it never appears as a fallback.
+    A result that is 100% covered but mostly shallow is not a good result, and
+    nothing else in the object would say so.
+    """
+
+    for name, pred in panel_predictions.items():
+        fraction = pred.shallow_match_fraction
+        assert 0.0 <= fraction <= 1.0, f"{name}: shallow fraction out of range"
+        counted = sum(
+            1 for s in pred.shifts if s.match_sphere is not None and s.match_sphere <= 2
+        )
+        assert fraction == pytest.approx(counted / len(pred.shifts))
+
+
 def test_median_uncertainty_is_reported_per_nucleus(panel_predictions):
     """Callers gate on σ, so σ must be summarised at the prediction level."""
 
