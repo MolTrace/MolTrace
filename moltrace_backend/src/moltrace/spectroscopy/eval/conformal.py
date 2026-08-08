@@ -31,6 +31,7 @@ did; an atom with no usable σ (an element-prior abstention) gets no interval at
 
 from __future__ import annotations
 
+import json
 import math
 import statistics
 from collections.abc import Mapping, Sequence
@@ -205,6 +206,66 @@ class ConformalCalibration:
                 "pooled": {k: round(v, 6) for k, v in sorted(self.pooled.items())},
             }
         )
+
+    def reference_half_width(self, nucleus: str, reference_sigma_ppm: float) -> float | None:
+        """The half-width at ``reference_sigma_ppm`` — the anchor a consumer scales against.
+
+        Consumers that used to compare a σ against a fixed reference σ need the same
+        anchor expressed as an interval. Derived from *this* calibration rather than
+        restated as a constant, so refitting cannot leave the anchor pointing at a
+        width the bands no longer produce.
+        """
+
+        return self.interval(nucleus, reference_sigma_ppm).half_width_ppm
+
+    def to_json(self) -> str:
+        """Serialise for deployment. Round-trips to an identical fingerprint."""
+
+        return json.dumps(self.as_dict(), indent=2, sort_keys=True)
+
+    @classmethod
+    def from_json(cls, text: str) -> ConformalCalibration:
+        """Load a deployed calibration.
+
+        Refuses a payload written by a different fitting procedure rather than
+        interpreting its numbers under today's assumptions: a persisted calibration
+        cannot detect a change in how it was produced, so the version is checked
+        explicitly — the same reason the similarity encoder carries one.
+        """
+
+        payload = json.loads(text)
+        version = payload.get("version")
+        if version != CALIBRATION_VERSION:
+            raise ValueError(
+                f"calibration was fitted by {version!r} but this build expects "
+                f"{CALIBRATION_VERSION!r}; refit rather than reinterpreting it"
+            )
+        bins = tuple(
+            ConformalBin(
+                nucleus=str(b["nucleus"]),
+                sigma_lo=float(b["sigma_lo_ppm"]),
+                sigma_hi=math.inf if b["sigma_hi_ppm"] is None else float(b["sigma_hi_ppm"]),
+                n=int(b["n"]),
+                half_width_ppm=float(b["half_width_ppm"]),
+                mean_sigma_ppm=float(b["mean_sigma_ppm"]),
+            )
+            for b in payload.get("bins", [])
+        )
+        loaded = cls(
+            target_coverage=float(payload["target_coverage"]),
+            bins=bins,
+            pooled={k: float(v) for k, v in payload.get("pooled_half_width_ppm", {}).items()},
+            n_calibration={k: int(v) for k, v in payload.get("n_calibration", {}).items()},
+            version=str(version),
+            notes=tuple(payload.get("notes", [])),
+        )
+        expected = payload.get("fingerprint")
+        if expected and loaded.fingerprint() != expected:
+            raise ValueError(
+                "calibration fingerprint does not match its contents; the file has been "
+                "edited or truncated since it was fitted"
+            )
+        return loaded
 
     def as_dict(self) -> dict[str, Any]:
         return {

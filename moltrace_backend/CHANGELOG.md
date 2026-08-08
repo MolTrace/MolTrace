@@ -14,6 +14,61 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.68.1 — The verifier now weighs evidence by a guarantee, not a claim (2026-08-08)
+
+v0.68.0 measured that the predictor's σ is *differentially* mis-scaled — the half-width/σ ratio
+runs 8.66× in the tightest ¹³C band down to 1.77× in the widest, where a correctly-scaled σ gives a
+constant — and worst exactly where the arbiter leaned hardest. This switches the arbiter onto the
+conformal interval.
+
+`_significance_from_half_width` replaces `_significance_from_sigma` at its single call site in
+`PredictionBoundsTest`. Same shape, same anchor — a width equal to the reference still scores 4,
+"medium" — but the anchor is read off the live calibration
+(`reference_half_width(nucleus, σ_ref)`) rather than restated as a constant, so refitting the bands
+cannot leave it pointing at a width they no longer produce.
+
+**Invariant tests were written before the change** (range, monotonicity, the anchor, and abstention
+on an unusable width or a missing anchor), and the numbers that legitimately moved are re-baselined
+visibly:
+
+| ¹³C mean σ | from σ | from the interval |
+|---|---|---|
+| 0.169 | 7.377 | **6.111** |
+| 2.005 | 3.995 | 4.000 |
+| 12.656 | 1.092 | **1.395** |
+
+The mapping **compresses** — most-to-least significant falls from 6.757× to 4.382×. Tight atoms
+lose weight they had not earned; wide atoms get some back. Verdicts on clear cases do not flip: the
+interval changes how much evidence is worth, not which way it points.
+
+`VerificationOptions.shift_calibration` supplies the calibration. Absent, every match falls back to
+the σ basis, and `details.significance_basis` records how many atoms used each basis plus the
+calibration fingerprint and target coverage — so a run scored on the weaker basis is visible in the
+audit record rather than indistinguishable from a calibrated one. A calibration that cannot anchor
+a nucleus falls back rather than scoring everything as certain.
+
+### Measured but deliberately not fixed: the match tolerance
+
+The same test uses σ a second time, to decide *whether* a predicted shift matches — `max(base, 3σ)`
+with a ¹³C base of **4.0 ppm**, a round number the house rule on bounds forbids. Against the
+measured 90 % half-widths it is too permissive everywhere and worst for confident atoms: **2.74×**
+at σ = 0.169, 1.27× at σ = 2.005, 1.70× at σ = 12.656 (¹H: 2.01× at its tightest).
+
+With the peak detector over-picking 3–7×, a too-loose window is a mechanism for matching a
+*spurious* line and scoring it as corroboration. But that changes what matches, not what a match is
+worth — it moves the good/partial/missed counts and therefore the score — so it needs its own
+invariant test and re-baseline, with B1 (over-picking) closed first so the two effects can be told
+apart. Recorded here rather than folded in silently.
+
+### Also
+
+`ConformalCalibration` gains `to_json`/`from_json` so a fitted calibration can ship as deployed
+state. Loading refuses a payload written by a different fitting version rather than reinterpreting
+its numbers under today's assumptions, and refuses one whose fingerprint does not match its
+contents.
+
+---
+
 ## v0.68.0 — A prediction interval MolTrace can guarantee (2026-08-08)
 
 The predictor reports a per-atom σ. B5 measured that σ as optimistic by roughly 3× in its tightest

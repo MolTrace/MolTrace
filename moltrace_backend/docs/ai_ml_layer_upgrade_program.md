@@ -360,11 +360,53 @@ B0 items 1–4 stand as written and are not restated. The additions:
 > (mean σ 0.021 and 0.056 ppm) need **7.22×** and **4.33×** their claimed σ. B5's coarse bins
 > averaged over the region where the defect is.
 >
-> **Deliberately not done in this pass:** `_significance_from_sigma` still consumes σ, not the
-> interval. Switching it changes every posterior in the system, so it needs its invariant test
-> and a visible re-baseline as its own change, with this measurement in hand first. Also pending:
-> the two conformal metrics in `GoldMetricVector` (see the note below on the safety-critical
-> rollout hazard).
+> **The verifier now scores on the interval — landed, with the re-baseline recorded.**
+> `_significance_from_half_width` replaces `_significance_from_sigma` at the single call site in
+> `PredictionBoundsTest`, anchored on `calibration.reference_half_width(nucleus, σ_ref)` so
+> refitting the bands moves the anchor with them. Same shape, same anchor: a width equal to the
+> reference still scores 4 ("medium"). Invariant tests were written first (range, monotonicity,
+> anchor, abstention on an unusable width or a missing anchor); the numbers that legitimately
+> moved are pinned in `test_significance_rebaseline_*`:
+>
+> | ¹³C mean σ | significance from σ | from the interval |
+> |---|---|---|
+> | 0.169 | 7.377 | **6.111** |
+> | 2.005 | 3.995 | 4.000 |
+> | 12.656 | 1.092 | **1.395** |
+>
+> The mapping **compresses**: most-to-least significant falls from **6.757× to 4.382×**. Tight
+> atoms lose weight they had not earned; wide atoms get some back. That is the correction, not a
+> side effect — σ's spread was the artefact.
+>
+> `VerificationOptions.shift_calibration` supplies it. Absent, every match falls back to the σ
+> basis and the test's `details.significance_basis` counts how many atoms used each, alongside the
+> calibration fingerprint and target coverage — so a run scored on the weaker basis is visible in
+> the audit record instead of indistinguishable from a calibrated one. A calibration that cannot
+> anchor a nucleus falls back rather than scoring everything as certain.
+>
+> **Adjacent defect, measured but deliberately NOT fixed here — needs a decision.** The same test
+> uses σ a second time, for the *match tolerance*: `tol = max(base, 3σ)` with
+> `_SHIFT_TOL_PPM = {"1H": 0.30, "13C": 4.0}`. Against the measured 90 % half-widths that
+> tolerance is too permissive everywhere, and worst for confident atoms:
+>
+> | nucleus | σ | current tolerance | measured 90 % half-width | too permissive by |
+> |---|---|---|---|---|
+> | ¹³C | 0.169 | 4.000 ppm | 1.460 ppm | **2.74×** |
+> | ¹³C | 2.005 | 6.015 ppm | 4.722 ppm | 1.27× |
+> | ¹³C | 12.656 | 37.968 ppm | 22.365 ppm | 1.70× |
+> | ¹H | 0.021 | 0.300 ppm | 0.149 ppm | **2.01×** |
+> | ¹H | 1.368 | 4.104 ppm | 2.594 ppm | 1.58× |
+>
+> The ¹³C base of **4.0 ppm is a round number**, which the house rule on bounds forbids. The
+> matcher currently accepts a line up to 2.7× further away than the predictor's own 90 % error
+> bound — and with the peak detector over-picking 3–7×, a too-loose window is a mechanism for
+> matching a *spurious* line and scoring it as corroboration. That is a change to what matches,
+> not to what a match is worth, so it moves `good`/`partial`/`missed` counts and therefore the
+> score itself. It needs its own invariant test, its own re-baseline, and B1 (over-picking) closed
+> first so the two effects can be told apart.
+>
+> **Still pending:** the two conformal metrics in `GoldMetricVector` (see the safety-critical
+> rollout hazard below).
 >
 > **Rollout hazard to resolve before promoting coverage to `SAFETY_CRITICAL`.** The adapter's
 > promotion gate refuses when one evaluation reports a safety-critical metric and the other does
