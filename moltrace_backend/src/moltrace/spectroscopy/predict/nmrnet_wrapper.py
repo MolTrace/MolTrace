@@ -118,6 +118,30 @@ class AtomShift:
     reaching a real prediction as ``'unknown'`` is a bug, and
     ``test_every_atom_shift_names_its_source`` fails on it.
     """
+    match_sphere: int | None = None
+    """How deep a HOSE environment matched (1-6), or ``None`` off the fallback path.
+
+    **The strongest quality signal this predictor has, and it was not surfaced.**
+    Measured on 36,856 held-out ¹³C atoms, MAE by matched sphere:
+
+    ===========  ======  ============
+    sphere        share   MAE (ppm)
+    ===========  ======  ============
+    1              8.7 %       9.59
+    2             27.4 %       4.53
+    3             25.9 %       2.51
+    4-6           38.0 %       1.45
+    ===========  ======  ============
+
+    A shallow match means the lookup fell back to a generic environment whose
+    bucket lumps chemically distinct atoms together, so its ``uncertainty_ppm``
+    describes the width of a *mixture* rather than a unimodal uncertainty. 36 % of
+    atoms match at sphere ≤ 2 and carry ~4x the error of a deep match. Gate on
+    this before treating a shift as evidence — σ alone does not separate the two
+    cases.
+    """
+    match_count: int | None = None
+    """References in the matched bucket. Large *and* shallow means generic, not certain."""
 
 
 @dataclass
@@ -151,6 +175,25 @@ class ShiftPrediction:
         if not self.shifts:
             return 0.0
         return sum(1 for s in self.shifts if s.source == "element_prior") / len(self.shifts)
+
+    @property
+    def shallow_match_fraction(self) -> float:
+        """Share of atoms matched only at a generic HOSE sphere (≤ 2).
+
+        Companion to :attr:`prior_fallback_fraction`, and the same lesson a second
+        time: coverage is not quality. An atom matched at sphere 1-2 *has* a
+        prediction, so it does not show up as a fallback — but measured on 36,856
+        held-out ¹³C atoms it carries **~4x the error** of a deep match (5.75 vs
+        1.45 ppm MAE). A prediction that is 100 % "covered" but mostly shallow is
+        not a good prediction, and nothing else in the result would say so.
+        """
+
+        if not self.shifts:
+            return 0.0
+        shallow = sum(
+            1 for s in self.shifts if s.match_sphere is not None and s.match_sphere <= 2
+        )
+        return shallow / len(self.shifts)
 
     @property
     def median_uncertainty_ppm(self) -> dict[str, float]:
@@ -902,7 +945,18 @@ def _hose_predict(
             hit = kb.lookup(nucleus, hose_code(mol_h, idx))
             if hit is not None:
                 mean, std, sphere, n = hit
-                shifts.append(AtomShift(idx, element, nucleus, mean, std, source="hose"))
+                shifts.append(
+                    AtomShift(
+                        idx,
+                        element,
+                        nucleus,
+                        mean,
+                        std,
+                        source="hose",
+                        match_sphere=int(sphere),
+                        match_count=int(n),
+                    )
+                )
                 warnings.append(f"atom {idx} {nucleus}: HOSE match at sphere {sphere} (n={n}).")
             else:
                 shifts.append(
