@@ -317,7 +317,63 @@ model-derived number from the request body.** That last one is the test to write
 L1 = `structure_elucidation_program.md` **B0**, plus three additions that document does not cover.
 B0 items 1–4 stand as written and are not restated. The additions:
 
-### D1. Conformal prediction over the shift predictor *(new)*
+### D1. Conformal prediction over the shift predictor — **fitted and measured 2026-08-08**
+
+> **The guarantee holds on real data, and the defect is larger than B5 could see.**
+> `spectroscopy/eval/conformal.py` fits Mondrian split-conformal bands (nucleus × reported-σ
+> decile). Reproduce with `scripts/measure_conformal_calibration.py`. Three molecule-level
+> splits cut from one hash in a single pass — 39,628 train / 5,040 calibration / 4,950
+> evaluation from 49,618 NMRShiftDB2 molecules, 393,760 reference atoms in the table.
+>
+> | target | nucleus | n | empirical coverage | mean half-width | median |
+> |---|---|---|---|---|---|
+> | 90 % | ¹³C | 36,844 | **90.03 %** | 6.95 ppm | 4.72 ppm |
+> | 90 % | ¹H | 12,508 | **90.61 %** | 0.714 ppm | 0.397 ppm |
+> | 95 % | ¹³C | 36,844 | 94.72 % | 9.18 ppm | 6.23 ppm |
+> | 95 % | ¹H | 12,508 | 94.93 % | 0.951 ppm | 0.520 ppm |
+>
+> At 90 % the worst deficit is **0.0000** — both nuclei meet target. At 95 % there is a
+> **0.28 pp shortfall on ¹³C** (94.72 % against 95 %), reported rather than rounded away; it is
+> within sampling noise at n = 36,844 but it is a shortfall, and the report names it. Every atom
+> found a calibrated band (pooled fallback 0.0 %).
+>
+> **The finding — σ is not merely mis-scaled, it is *differentially* mis-scaled.** The ratio of
+> conformal half-width to mean reported σ, across the ten ¹³C bands:
+>
+> | mean σ (ppm) | 0.17 | 0.46 | 0.82 | 1.31 | 2.01 | 2.83 | 3.67 | 4.64 | 6.38 | 12.66 |
+> |---|---|---|---|---|---|---|---|---|---|---|
+> | half-width / σ | **8.66×** | 4.09× | 3.08× | 2.62× | 2.36× | 2.09× | 1.92× | 1.79× | 1.83× | **1.77×** |
+>
+> **Under a correctly-scaled σ that ratio is a constant** — it is the error distribution's 90th
+> percentile expressed in units of σ, whatever that distribution happens to be. It is not
+> constant: it varies **4.90×** on ¹³C and **3.81×** on ¹H, monotonically, and the extreme is at
+> the tight end. This is a stronger statement than B5's "optimistic ~3×", and materially worse
+> news: a constant mis-scaling could be repaired by multiplying σ by one number. This cannot.
+>
+> **It is worst exactly where the arbiter leans hardest.** `_significance_from_sigma` scores a
+> tight σ highest, so the atoms the verifier weights most are the atoms whose confidence is most
+> overstated — the failure is aligned with the decision, not orthogonal to it.
+>
+> **Extends, rather than contradicts, B5's ¹H finding.** B5 reported ¹H well calibrated
+> throughout, and at its bin resolution (σ ≈ 0.18 / 0.70 / 1.40) that still holds — those bands
+> sit at ratios 2.10× / 1.85× / 1.90×. The problem lives below them: ¹H's two tightest bands
+> (mean σ 0.021 and 0.056 ppm) need **7.22×** and **4.33×** their claimed σ. B5's coarse bins
+> averaged over the region where the defect is.
+>
+> **Deliberately not done in this pass:** `_significance_from_sigma` still consumes σ, not the
+> interval. Switching it changes every posterior in the system, so it needs its invariant test
+> and a visible re-baseline as its own change, with this measurement in hand first. Also pending:
+> the two conformal metrics in `GoldMetricVector` (see the note below on the safety-critical
+> rollout hazard).
+>
+> **Rollout hazard to resolve before promoting coverage to `SAFETY_CRITICAL`.** The adapter's
+> promotion gate refuses when one evaluation reports a safety-critical metric and the other does
+> not — the anti-asymmetry rule. Adding a third safety metric would therefore refuse every
+> promotion during rollout, because no incumbent reports it yet. Add it as a normal metric with
+> tolerance 0 first (same strictness, no trap), and promote it once evaluations report it across
+> the board.
+
+### D1 — original specification
 
 B5 measured the defect precisely: reported ¹³C σ is **optimistic ~3× in the 0–0.5 ppm bin** —
 worst exactly where the verifier's `_significance_from_sigma` weights it highest. Platt and

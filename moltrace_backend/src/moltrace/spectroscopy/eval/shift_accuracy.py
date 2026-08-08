@@ -50,6 +50,7 @@ __all__ = [
     "ShiftAccuracyReport",
     "ErrorModelFit",
     "split_records",
+    "split_records_three_way",
     "evaluate_shift_accuracy",
     "fit_error_model",
 ]
@@ -90,6 +91,54 @@ def split_records(
     return train, test
 
 
+def split_records_three_way(
+    records: Sequence[Mapping[str, Any]],
+    *,
+    calibration_fraction: float = 0.10,
+    test_fraction: float = 0.10,
+) -> tuple[list[Mapping[str, Any]], list[Mapping[str, Any]], list[Mapping[str, Any]]]:
+    """Split by molecule into (train, calibration, test), deterministically.
+
+    Conformal prediction needs a calibration set disjoint from *both* the training
+    data and the split coverage is measured on — calibrate and evaluate on the same
+    atoms and the interval is fitted to the errors it is then scored against, so the
+    coverage guarantee measures nothing.
+
+    **Do not build this by calling :func:`split_records` twice.** The split is a
+    deterministic function of the molecule hash, so re-splitting a held-out set with
+    the same hash puts *every* record on one side: each one already sits below the
+    first threshold, so it also sits below any larger second threshold. That returns
+    an empty calibration set — silently, if nobody checks. The three bands here are
+    cut from one hash in a single pass, which is the only way to keep them disjoint.
+    """
+
+    if not 0.0 < calibration_fraction < 1.0:
+        raise ValueError(f"calibration_fraction must be in (0, 1); got {calibration_fraction}")
+    if not 0.0 < test_fraction < 1.0:
+        raise ValueError(f"test_fraction must be in (0, 1); got {test_fraction}")
+    if calibration_fraction + test_fraction >= 1.0:
+        raise ValueError(
+            f"calibration_fraction + test_fraction must leave a training split; got "
+            f"{calibration_fraction} + {test_fraction}"
+        )
+
+    test_cut = int(test_fraction * (1 << 32))
+    calibration_cut = test_cut + int(calibration_fraction * (1 << 32))
+    train: list[Mapping[str, Any]] = []
+    calibration: list[Mapping[str, Any]] = []
+    test: list[Mapping[str, Any]] = []
+    for record in records:
+        digest = hashlib.sha256(_record_key(record).encode("utf-8")).digest()
+        bucket = int.from_bytes(digest[:4], "big")
+        if bucket < test_cut:
+            test.append(record)
+        elif bucket < calibration_cut:
+            calibration.append(record)
+        else:
+            train.append(record)
+    return train, calibration, test
+
+
 @dataclass(frozen=True)
 class ShiftAccuracyReport:
     """Measured accuracy on a held-out split. Every figure is reproducible."""
@@ -101,6 +150,19 @@ class ShiftAccuracyReport:
     n_train_references: int
     signed_errors: dict[str, list[float]] = field(default_factory=dict)
     """Matched-only ``predicted − observed`` per nucleus; the input to :func:`fit_error_model`."""
+    sigma_error_pairs: dict[str, list[tuple[float, float]]] = field(default_factory=dict)
+    """Matched-only ``(reported_sigma_ppm, absolute_error_ppm)`` per nucleus.
+
+    The input to :func:`~moltrace.spectroscopy.eval.conformal.fit_conformal`. Kept
+    paired rather than as two lists because the whole point is the *relationship*:
+    :attr:`calibration` measured that a reported σ ≤ 0.5 ppm on ¹³C carries a mean
+    error of 0.76 ppm, and a conformal band can only repair that if it knows which
+    error went with which claim.
+
+    Element-prior atoms are excluded — they report no σ, so there is nothing to
+    calibrate against, and treating an abstention as a σ of zero would fabricate the
+    most confident possible claim out of the least confident state.
+    """
     notes: list[str] = field(default_factory=list)
 
     def as_dict(self) -> dict[str, Any]:
@@ -146,6 +208,7 @@ def evaluate_shift_accuracy(
     # nucleus -> lists of (abs_error, sigma, matched)
     errors: dict[str, list[tuple[float, float, bool]]] = {}
     signed: dict[str, list[float]] = {}
+    sigma_pairs: dict[str, list[tuple[float, float]]] = {}
     skipped = 0
 
     for record in test:
@@ -181,6 +244,10 @@ def evaluate_shift_accuracy(
                 # Signed, matched-only — the input fit_error_model needs. An
                 # element-prior atom is an abstention, not a prediction.
                 signed.setdefault(nucleus, []).append(predicted - observed)
+                if math.isfinite(sigma):
+                    sigma_pairs.setdefault(nucleus, []).append(
+                        (sigma, abs(predicted - observed))
+                    )
 
     per_nucleus: dict[str, dict[str, float]] = {}
     for nucleus, rows in sorted(errors.items()):
@@ -218,6 +285,7 @@ def evaluate_shift_accuracy(
         per_nucleus=per_nucleus,
         calibration=calibration,
         signed_errors=signed,
+        sigma_error_pairs=sigma_pairs,
         n_train_molecules=len(train),
         n_test_molecules=len(test),
         n_train_references=kb.reference_count,
