@@ -10,7 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
 from .database import session_scope
-from .orchestration_store import read_managed_file_bytes
+from .integration_scale import disclose_relative_integrals
 from .models import (
     QualityAssessment,
     QualityAssessmentRequest,
@@ -19,6 +19,7 @@ from .models import (
     QualityOverride,
     QualityOverrideCreate,
 )
+from .orchestration_store import read_managed_file_bytes
 from .orm import (
     ArtifactRecordORM,
     ManagedFileRecordORM,
@@ -615,7 +616,11 @@ def _build_file_assessment(
             actions.append("Restore managed storage or re-upload the processed spectrum.")
         else:
             try:
-                preview = parse_processed_spectrum(filename=row.original_filename, content=file_bytes)
+                # QC never has a structure here, so the integrals are ratios.
+                preview = disclose_relative_integrals(
+                    parse_processed_spectrum(filename=row.original_filename, content=file_bytes),
+                    expected_total_h=None,
+                )
             except SpectrumParseError as exc:
                 findings.append(_finding(severity="warning", code="processed_parse_warning", title="Processed spectrum not parsed", message=str(exc), recommendation="Review the processed file export format."))
                 not_assessed = True

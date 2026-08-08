@@ -16153,7 +16153,7 @@ export interface components {
         /** Body_raw_fid_archive_process_raw_fid__archive_id__process_post */
         Body_raw_fid_archive_process_raw_fid__archive_id__process_post: {
             /** Smiles */
-            smiles: string;
+            smiles?: string | null;
             /** Sample Id */
             sample_id?: string | null;
             /** Solvent */
@@ -20515,11 +20515,23 @@ export interface components {
             fid_run_id?: number | null;
             processing_metadata: components["schemas"]["FIDProcessingMetadata"];
         };
-        /** FIDProcessResult */
+        /**
+         * FIDProcessResult
+         * @description A processed FID, and -- when a structure was supplied -- its verdict.
+         *
+         *     ``generated_inputs`` and ``analysis`` are ``None`` when the caller supplied
+         *     no structure. Verification means "does this spectrum match THIS structure",
+         *     so with nothing to match there is no verdict to report; absent is the honest
+         *     answer and a placeholder verdict would be a fiction. ``preview`` is populated
+         *     either way -- the processing does not depend on knowing the answer first.
+         *
+         *     Both fields were required until the structure became optional. Callers that
+         *     supply a structure see no change.
+         */
         FIDProcessResult: {
             preview: components["schemas"]["FIDPreviewReport"];
-            generated_inputs: components["schemas"]["AnalysisInputs"];
-            analysis: components["schemas"]["AnalysisReport"];
+            generated_inputs?: components["schemas"]["AnalysisInputs"] | null;
+            analysis?: components["schemas"]["AnalysisReport"] | null;
         };
         /** FIDProcessingMetadata */
         FIDProcessingMetadata: {
@@ -51372,7 +51384,7 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody: {
+        requestBody?: {
             content: {
                 "application/x-www-form-urlencoded": components["schemas"]["Body_raw_fid_archive_process_raw_fid__archive_id__process_post"];
             };

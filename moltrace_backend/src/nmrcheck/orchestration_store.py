@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from .database import session_scope
 from .file_storage import default_file_storage
+from .integration_scale import disclose_relative_integrals
 from .models import (
     AnalysisJobCreate,
     AnalysisJobRecord,
@@ -677,12 +678,19 @@ def _execute_processed_preview(
         raise OrchestrationError("Input file bytes are not available in storage.") from exc
     params = _json_dict(row.parameters_json)
     try:
-        preview = parse_processed_spectrum(
-            filename=file_row.original_filename,
-            content=file_bytes,
-            solvent=params.get("solvent"),
-            frequency_mhz=params.get("spectrometer_frequency_mhz"),
-            reference_nmr_text=params.get("nmr_text"),
+        # No structure reaches this path, so the integrals below are always
+        # ratios anchored to the smallest signal -- and the preview is dumped
+        # verbatim into a downloadable artifact, where "123.5H" would read as a
+        # proton count.
+        preview = disclose_relative_integrals(
+            parse_processed_spectrum(
+                filename=file_row.original_filename,
+                content=file_bytes,
+                solvent=params.get("solvent"),
+                frequency_mhz=params.get("spectrometer_frequency_mhz"),
+                reference_nmr_text=params.get("nmr_text"),
+            ),
+            expected_total_h=None,
         )
     except SpectrumParseError as exc:
         raise OrchestrationError(str(exc)) from exc

@@ -549,11 +549,23 @@ class FIDPreviewReport(SpectrumPreviewReport):
 
 
 class FIDProcessResult(BaseModel):
+    """A processed FID, and -- when a structure was supplied -- its verdict.
+
+    ``generated_inputs`` and ``analysis`` are ``None`` when the caller supplied
+    no structure. Verification means "does this spectrum match THIS structure",
+    so with nothing to match there is no verdict to report; absent is the honest
+    answer and a placeholder verdict would be a fiction. ``preview`` is populated
+    either way -- the processing does not depend on knowing the answer first.
+
+    Both fields were required until the structure became optional. Callers that
+    supply a structure see no change.
+    """
+
     model_config = ConfigDict(extra="forbid")
 
     preview: FIDPreviewReport
-    generated_inputs: AnalysisInputs
-    analysis: AnalysisReport
+    generated_inputs: AnalysisInputs | None = None
+    analysis: AnalysisReport | None = None
 
 
 NMRFrontendNucleus = Literal["1H", "13C"]
