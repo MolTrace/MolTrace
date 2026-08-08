@@ -121,6 +121,20 @@ export const LEAKAGE_RISK_LABELS = ["low", "medium", "high", "unknown"] as const
 /** Mirrors backend DatasetVersionStatus */
 export const DATASET_VERSION_STATUSES = ["draft", "ready_for_review", "approved", "archived"] as const
 
+/**
+ * The statuses a person may set directly on a dataset version.
+ *
+ * `approved` is deliberately absent. A version is promoted by two separate
+ * people approving it, and setting the status straight to approved is refused —
+ * on creation as well as on edit, so the version cannot simply be born promoted.
+ * Offering it here would present a rule the service enforces as a dropdown
+ * option that silently fails. Filtering by `approved` is unaffected; that reads
+ * rather than sets.
+ */
+export const DATASET_VERSION_SETTABLE_STATUSES = DATASET_VERSION_STATUSES.filter(
+  (s) => s !== "approved",
+)
+
 /** Mirrors backend ModelImprovementSourceType */
 export const MODEL_IMPROVEMENT_SOURCE_TYPES = [
   "error_case",

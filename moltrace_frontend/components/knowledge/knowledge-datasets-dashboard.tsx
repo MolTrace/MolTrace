@@ -8,6 +8,7 @@ import { DeveloperJsonPanel } from "@/components/spectracheck/spectracheck-resul
 import { readRecordNumber, readRecordString } from "@/components/projects/project-workspace-utils"
 import {
   DATASET_SPLIT_RECOMMENDATIONS,
+  DATASET_VERSION_SETTABLE_STATUSES,
   DATASET_VERSION_STATUSES,
   KNOWLEDGE_BENCHMARK_TYPES,
   KNOWLEDGE_CANDIDATE_STATUSES,
@@ -48,6 +49,8 @@ import {
 } from "@/components/ui/empty"
 import { AlertCard } from "@/components/dashboard/alert-card"
 import { ModuleCard } from "@/components/dashboard/module-card"
+import { KnowledgeDatasetVersionApprovals } from "@/components/knowledge/knowledge-dataset-version-approvals"
+import { KnowledgeDeploymentConveyor } from "@/components/knowledge/knowledge-deployment-conveyor"
 import {
   ArrowLeft,
   BarChart3,
@@ -55,6 +58,7 @@ import {
   GitBranch,
   Loader2,
   RefreshCw,
+  Rocket,
   ShieldAlert,
 } from "lucide-react"
 
@@ -540,6 +544,17 @@ export function KnowledgeDatasetsDashboard() {
   const trainId = selTrain ? readRecordNumber(selTrain, "id") : null
   const benchId = selBench ? readRecordNumber(selBench, "id") : null
   const verId = selVersion ? readRecordNumber(selVersion, "id") : null
+
+  // The settable statuses, plus wherever this version already is. A version that
+  // two people have already approved must still be able to show "Approved" —
+  // it just cannot be moved there from this control.
+  const versionStatusOptions = useMemo(() => {
+    const options = [...DATASET_VERSION_SETTABLE_STATUSES]
+    if (patchVStatus && !options.includes(patchVStatus as (typeof options)[number])) {
+      options.push(patchVStatus as (typeof options)[number])
+    }
+    return options
+  }, [patchVStatus])
 
   return (
     <TooltipProvider delayDuration={200}>
@@ -1272,12 +1287,18 @@ export function KnowledgeDatasetsDashboard() {
                     </div>
                     <div className="space-y-2">
                       <Label>Status</Label>
+                      {/* "Approved" is not an option you can move to. Promotion
+                          happens through two approvals below, and the service
+                          refuses a status set straight to approved — so offering
+                          it would be a dropdown entry that always fails. It is
+                          still listed when the version is already there, because
+                          the control has to be able to show where it stands. */}
                       <Select value={patchVStatus} onValueChange={setPatchVStatus}>
                         <SelectTrigger>
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          {DATASET_VERSION_STATUSES.map((s) => (
+                          {versionStatusOptions.map((s) => (
                             <SelectItem key={s} value={s}>
                               {knowledgeLabel(s)}
                             </SelectItem>
@@ -1292,6 +1313,12 @@ export function KnowledgeDatasetsDashboard() {
                   </Button>
                   {patchVErr ? <p className="text-sm text-destructive">{patchVErr}</p> : null}
                   {patchVOk ? <p className="text-sm text-muted-foreground">{patchVOk}</p> : null}
+
+                  <KnowledgeDatasetVersionApprovals
+                    key={verId}
+                    datasetVersionId={verId}
+                    onPromoted={() => void loadAll()}
+                  />
 
                   {versionDetail ? (
                     <>
@@ -1401,6 +1428,21 @@ export function KnowledgeDatasetsDashboard() {
               </Table>
             )}
           </div>
+        </ModuleCard>
+
+        {/* 6. Deployment. Placed here because its entry condition is a dataset
+            version two people approved, which is section 3 — this is where that
+            approval leads. It is a separate queue from the model factory's
+            deployment reviews, which govern model artifacts rather than what a
+            model was trained on. */}
+        <ModuleCard
+          accent="teal"
+          eyebrow="Deployment"
+          title="6. Deployment conveyor"
+          icon={Rocket}
+          description="An approved dataset version becomes a model that is checked against the one in service, rolled out to a slice of traffic, and only then put into service."
+        >
+          <KnowledgeDeploymentConveyor />
         </ModuleCard>
       </div>
     </TooltipProvider>

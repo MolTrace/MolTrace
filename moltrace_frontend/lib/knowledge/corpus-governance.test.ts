@@ -5,6 +5,8 @@
 
 import { describe, expect, it, vi, beforeEach } from "vitest"
 import {
+  LOCATOR_ADDRESS_MISSING,
+  LOCATOR_MISSING_LABEL,
   PROVENANCE_PRESENTATION,
   REVIEW_STATE_PRESENTATION,
   SOURCE_SUPERSEDED_REASON,
@@ -12,7 +14,9 @@ import {
   changedFieldsSentence,
   fetchCurrentRevisionIds,
   hasReviewState,
+  locatorAddress,
   provenanceState,
+  readLocators,
   readReviewState,
   readSupersededTask,
 } from "@/lib/knowledge/corpus-governance"
@@ -164,5 +168,62 @@ describe("source_superseded review tasks", () => {
     expect(readSupersededTask({ reason: "manual_review" })).toBeNull()
     expect(readSupersededTask({})).toBeNull()
     expect(readSupersededTask(null)).toBeNull()
+  })
+})
+
+describe("locators: not-recorded is not not-there", () => {
+  const locator = {
+    citation_id: 7,
+    citation_label: "Smith 2024, SI",
+    source_id: 3,
+    source_revision_id: 2,
+    source_file_id: null,
+    page_number: 12,
+    section_title: "Methods",
+    paragraph_number: 3,
+    quote_excerpt: "The reaction was run at 40 °C for 6 h.",
+  }
+
+  it("reads a well-formed locator through unchanged", () => {
+    expect(readLocators([locator])).toEqual([locator])
+  })
+
+  it("drops an entry with no citation or source to point at, rather than inventing one", () => {
+    expect(readLocators([{ ...locator, citation_id: null }])).toEqual([])
+    expect(readLocators([{ ...locator, source_id: "3" }])).toEqual([])
+    expect(readLocators([null, "nope", 42])).toEqual([])
+  })
+
+  it("reads a missing array as no locators, not as an error", () => {
+    expect(readLocators(undefined)).toEqual([])
+    expect(readLocators(null)).toEqual([])
+    expect(readLocators({})).toEqual([])
+  })
+
+  it("normalises a blank quote or section to null instead of an empty string", () => {
+    const [read] = readLocators([{ ...locator, quote_excerpt: "   ", section_title: "" }])
+    expect(read.quote_excerpt).toBeNull()
+    expect(read.section_title).toBeNull()
+  })
+
+  it("builds the address from whichever parts were recorded", () => {
+    expect(locatorAddress(locator)).toBe("Page 12 · Methods · Paragraph 3")
+    expect(locatorAddress({ ...locator, section_title: null })).toBe("Page 12 · Paragraph 3")
+    expect(locatorAddress({ ...locator, page_number: null, paragraph_number: null })).toBe("Methods")
+  })
+
+  it("returns an empty address rather than guessing a page", () => {
+    const bare = { ...locator, page_number: null, section_title: null, paragraph_number: null }
+    expect(locatorAddress(bare)).toBe("")
+    // Callers render LOCATOR_ADDRESS_MISSING here. The one thing that must never
+    // happen is a default page number standing in for one nobody wrote down.
+    expect(LOCATOR_ADDRESS_MISSING).toMatch(/not recorded/i)
+  })
+
+  it("says the passage was not recorded, without claiming there is no passage", () => {
+    expect(LOCATOR_MISSING_LABEL).toMatch(/not recorded/i)
+    // "No source", "unsourced" and the like would assert something stronger than
+    // "nobody wrote down where in the source this came from".
+    expect(LOCATOR_MISSING_LABEL).not.toMatch(/no source|unsourced|none/i)
   })
 })
