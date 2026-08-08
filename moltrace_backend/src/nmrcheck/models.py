@@ -10467,8 +10467,21 @@ class RoiSnapshot(BaseModel):
     period_start: datetime
     period_end: datetime
     tasks_automated: int
+    # NOT a measured duration. Each is the count of automation events multiplied by a
+    # per-task-type constant an administrator can edit (`analytics_store.DEFAULT_AUTOMATION_TASKS`,
+    # 5 min for a processed preview through 90 for the heaviest). The database column is honest
+    # about this and is named `estimated_minutes_saved`; this field historically dropped the
+    # qualifier on the way out, so `time_saved_is_estimated` restores it rather than renaming a
+    # wire key clients already read.
     total_minutes_saved: float
     total_hours_saved: float
+    #: Always true today. Present as a field rather than as documentation because a UI must be
+    #: able to label the figure without knowing how it was derived, and because if a genuinely
+    #: measured duration ever replaces it this flips rather than silently changing meaning.
+    time_saved_is_estimated: bool = True
+    #: Where the estimate comes from, in one machine-readable token. Not prose — a client
+    #: branches on this the same way it branches on an error `code`.
+    time_saved_basis: str = "per_task_type_constants"
     reports_generated: int
     workflows_completed: int
     analyses_completed: int
