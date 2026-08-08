@@ -1800,12 +1800,33 @@ candidate (there is a test). It is a **reporting** defect, so the fix adds
 `probability_is_calibrated` and `probability_basis`, plus two analysis-level
 warnings — and does not touch the arithmetic.
 
-**What was deliberately not done: no corrected σ was invented.** The true value is
-*bracketed* by the two A5 measurements (2.25x censored, 7.72x uncensored), not
-pinned — the censored figure drops every badly-predicted peak, the uncensored one
-greedily pairs distant ones. Substituting a round number for a measured
-distribution is the mistake that shipped the `integration_h le=50` cap. The
-number is labelled, not silently rescaled.
+**What was deliberately not done: no corrected constants were substituted.**
+
+> **CORRECTION (2026-08-08), from a better measurement than mine.** A parallel
+> session fitted the predictor's own held-out signed errors over 4,950 molecules
+> (`fit_error_model`, commit `c59ba75`) while this was in flight. For 1H: fitted
+> scale **0.162** against a published 0.185, and fitted **ν ≈ 1.23 against a
+> published 14.18**.
+>
+> That corrects the direction I had written. σ is not understated — it is
+> marginally *tighter* than DP4 assumes. **ν is the load-bearing parameter**, and
+> the tails are enormously heavier (ν = 1 is Cauchy, ν ≈ 14 nearly Gaussian).
+> Scoring a heavy-tailed predictor with a thin-tailed model does not mainly
+> inflate the nearest candidate; it treats one badly-predicted atom as
+> near-impossible and drives the **correct** candidate toward zero. The dangerous
+> direction is a confident false *rejection*, not a confident false acceptance.
+>
+> The coverage fix below is unaffected — it is a reporting change that does not
+> touch the arithmetic — but anyone reading the original framing would have
+> concluded "widen σ", which the evidence does not support.
+
+The constants still should not be swapped, for their reason rather than mine: a
+heavy tail measured against NMRShiftDB2 is part genuine prediction failure and
+part **label noise** (community-submitted reference data), and the measurement
+cannot separate them. It is strong evidence the published ν is wrong for this
+predictor, not a finished replacement constant. Substituting a round number for a
+measured distribution is the mistake that shipped the `integration_h le=50` cap.
+The number is labelled, not silently rescaled.
 
 `DP4_MIN_COVERAGE = 0.75` comes from where the measurement decouples: at 11/12
 matched the reported error still tracked the real one (0.118 vs 0.140); by 8/12

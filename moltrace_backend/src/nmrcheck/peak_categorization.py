@@ -1747,9 +1747,9 @@ DP4_MIN_COVERAGE = 0.75
 
 DP4_PROBABILITY_BASIS = (
     "Relative ranking across the candidates supplied, computed with the "
-    "Smith & Goodman 2010 DP4 likelihood. Its sigma and nu describe "
+    "Smith & Goodman 2010 DP4 likelihood. Its shape parameters describe "
     "DFT-computed shifts, while these shifts come from an empirical predictor "
-    "whose measured error is several times larger, so the value orders the "
+    "whose error distribution has far heavier tails, so the value orders the "
     "candidates but is not a calibrated probability that the top one is correct."
 )
 
@@ -1795,18 +1795,28 @@ def build_dp4_candidate_ranking(
 
     **Calibration.** The σ / ν above are the residual distribution of
     DFT/GIAO-computed shifts. Production predicts shifts with an empirical RDKit
-    atom-environment model whose measured error on real paired spectra is 2.25x σ
-    (within DP4's own pairing window) to 7.72x σ (unwindowed). A DP4 posterior is
-    steep in σ, so an understated σ pushes the top candidate up: measured, P(top)
-    is 0.996 at an injected σ of 0.05 and 0.73 at the 0.42 the predictor actually
-    achieves.
+    atom-environment model, so they do not describe this predictor.
 
-    No corrected σ is invented here. The true value is *bracketed* by those two
-    measurements, not pinned — the censored figure drops every badly-predicted
-    peak and the uncensored one greedily pairs distant ones — and substituting a
-    round number for a measured distribution is the mistake this codebase has
-    already shipped once. The number is therefore labelled for what it is, a
-    relative ranking, via ``probability_is_calibrated`` and
+    ``ν`` is the parameter that matters, not ``σ``. Fitted to the predictor's own
+    held-out signed errors over 4,950 molecules (see ``fit_error_model``, commit
+    c59ba75), 1H comes out at scale 0.162 against a published 0.185 and **ν ≈ 1.23
+    against a published 14.18**. The bulk of predictions are marginally *better*
+    than DP4 assumes; the tails are enormously heavier — ν = 1 is Cauchy, ν ≈ 14
+    is nearly Gaussian.
+
+    That inverts the intuition. Scoring a heavy-tailed predictor with a
+    thin-tailed model does not mainly inflate the nearest candidate; it treats one
+    badly-predicted atom as near-impossible and drives the **correct** candidate's
+    probability toward zero. The dangerous direction is a confident false
+    rejection.
+
+    No corrected constants are substituted here. A heavy tail measured against
+    NMRShiftDB2 is part genuine prediction failure and part label noise — the
+    reference data is community-submitted — and that measurement cannot separate
+    them, so it is strong evidence the published ν is wrong for this predictor
+    rather than a finished replacement. Changing a scoring path needs its own
+    invariant test and a visible re-baseline. The number is therefore labelled for
+    what it is, a relative ranking, via ``probability_is_calibrated`` and
     ``probability_basis``.
     """
     from .dp4_scoring import dp4_probabilities  # local import to avoid cycle in tests
