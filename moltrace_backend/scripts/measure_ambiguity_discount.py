@@ -99,7 +99,15 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source", type=Path, default=DEFAULT_SOURCE)
     parser.add_argument("--target", type=float, default=0.90)
+    parser.add_argument(
+        "--floor",
+        type=float,
+        action="append",
+        dest="floors",
+        help="ambiguity-weight floor to score; repeatable (default: sweep 0.0-0.5)",
+    )
     args = parser.parse_args(argv)
+    floors = tuple(args.floors or (0.0, 0.10, 0.15, 0.20, 0.25, 0.30, 0.40, 0.50))
     if not args.source.exists():
         parser.error(f"{args.source} not found; pass --source.")
 
@@ -167,31 +175,68 @@ def main(argv: list[str] | None = None) -> int:
                 sig_before[nucleus].append(significance)
                 sig_after[nucleus].append(weight * significance)
 
+    ln10 = math.log(10.0)
+
+    def posterior(quality: float) -> float:
+        """Posterior from a 0.50 prior after one test of this quality."""
+
+        return 1.0 / (1.0 + math.exp(-(quality * ln10)))
+
+    print(
+        "NOTE: weights already carry the shipped _AMBIGUITY_FLOOR, so the f = 0.00 row is\n"
+        "      today's behaviour and the rest show an ADDITIONAL floor on top of it.\n"
+        "      max() is idempotent, so the hard-floor column reads directly; the affine\n"
+        "      column composes with the shipped floor.\n"
+    )
     for nucleus in sorted(weights):
         w = weights[nucleus]
-        before = statistics.fmean(sig_before[nucleus])
-        after = statistics.fmean(sig_after[nucleus])
+        raw_sig = sig_before[nucleus]
+        before = statistics.fmean(raw_sig)
         q_before = math.tanh(before / 3.0)
-        q_after = math.tanh(after / 3.0)
         print(f"=== {nucleus}: {len(w)} matched resonances ===")
         print(
             f"  ambiguity weight   mean={statistics.fmean(w):.4f}  "
             f"median={statistics.median(w):.4f}"
-            f"  p10={_pct(w, 0.10):.4f}  p90={_pct(w, 0.90):.4f}"
+            f"  p10={_pct(w, 0.10):.4f}  p25={_pct(w, 0.25):.4f}  p90={_pct(w, 0.90):.4f}"
         )
         print(
             f"  undiscounted (>0.99)={sum(1 for x in w if x > 0.99) / len(w):.1%}   "
             f"halved or worse (<0.5)={sum(1 for x in w if x < 0.5) / len(w):.1%}"
         )
         print(
-            f"  mean significance  {before:.3f} -> {after:.3f}   "
-            f"quality {q_before:.4f} -> {q_after:.4f}"
+            f"  undiscounted baseline: mean significance {before:.3f}, "
+            f"quality {q_before:.4f}, odds x{10 ** q_before:.2f}, "
+            f"posterior-from-0.50 {posterior(q_before):.4f}"
         )
-        print(
-            f"  odds multiplier for a fully corroborating test  "
-            f"x{10 ** q_before:.2f} -> x{10 ** q_after:.2f}  "
-            f"({(10 ** q_after) / (10 ** q_before) - 1:+.1%})"
-        )
+        # Two softenings, because they do very different things. A HARD floor
+        # max(f, w) only lifts the tail, and the tail contributes little to a mean
+        # over tens of thousands of resonances. An AFFINE floor f + (1-f)*w lifts the
+        # whole distribution, which is the only lever that moves the aggregate.
+        for form, apply, label in (
+            ("hard", lambda f, x: max(f, x), "max(f, w)"),
+            ("affine", lambda f, x: f + (1.0 - f) * x, "f + (1-f)*w"),
+        ):
+            print(f"  --- {form} floor: {label} ---")
+            print(f"  {'f':>6}  {'mean w':>7}  {'touched':>8}  {'mean sig':>9}"
+                  f"  {'quality':>8}  {'odds':>7}  {'posterior':>10}  verdict")
+            for floor in floors:
+                adjusted = [apply(floor, x) for x in w]
+                touched = (
+                    sum(1 for x in w if x < floor) / len(w)
+                    if form == "hard"
+                    else (1.0 if floor > 0.0 else 0.0)
+                )
+                after = statistics.fmean(
+                    a * s for a, s in zip(adjusted, raw_sig, strict=True)
+                )
+                q_after = math.tanh(after / 3.0)
+                p_after = posterior(q_after)
+                verdict = "consistent" if p_after >= 0.80 else "inconclusive"
+                print(
+                    f"  {floor:6.2f}  {statistics.fmean(adjusted):7.4f}  {touched:7.1%}"
+                    f"  {after:9.3f}  {q_after:8.4f}  x{10 ** q_after:6.2f}"
+                    f"  {p_after:10.4f}  {verdict}"
+                )
         print()
     return 0
 
