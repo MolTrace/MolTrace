@@ -536,6 +536,25 @@ B0 items 1–4 stand as written and are not restated. The additions:
 > intended direction, since one nucleus matching among ~2 candidate lines per resonance is not a
 > confirmed structure on its own, but it is a real change in what the platform tells a user.
 >
+> **Softened to 40 % by direction (2026-08-08).** `_AMBIGUITY_FLOOR = 0.40`, applied affinely as
+> `f + (1-f)·w`. A **policy choice, not a measured constant** — selected as the point where a fully
+> corroborating ¹H test returns to `consistent`, i.e. by the verdict it produces. Recorded as such in
+> the constant's docstring and pinned by a test. A hard `max(f, w)` was tried first and cannot do
+> this: swept to 0.50 it touched 41 %/51 % of matches and moved the posterior only +0.012/+0.022,
+> leaving ¹H below threshold at every value, because the tail carries almost none of the aggregate.
+>
+> | | ¹³C | ¹H |
+> |---|---|---|
+> | mean weight | 0.610 → 0.766 | 0.537 → 0.722 |
+> | halved or worse | 41.1 % → 4.1 % | 50.5 % → 8.3 % |
+> | odds multiplier | ×4.94 → ×5.92 | ×3.25 → ×4.10 |
+> | posterior | 0.8317 → 0.8556 | 0.7645 → **0.8040** |
+> | verdict | consistent | inconclusive → **consistent** |
+>
+> Against the undiscounted baseline the discount now removes 17.8 % of the evidence on ¹³C and
+> 24.4 % on ¹H, down from 31.4 % and 40.1 % — roughly three-fifths of its measured strength retained.
+> `w = 1` still maps to 1.0, so an unambiguous match stays undiscounted.
+>
 > **Caveat that bounds all of the above.** Measured on clean assignment data with no spurious peaks.
 > Real spectra carry 3–7× more lines (B1), so the true ambiguity — and therefore the true
 > over-claim — is larger than these figures, not smaller.

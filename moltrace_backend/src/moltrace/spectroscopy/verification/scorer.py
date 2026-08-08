@@ -184,23 +184,42 @@ def _shift_merit(distance_ppm: float, scale_ppm: float) -> float:
     return math.exp(-0.5 * (float(distance_ppm) / float(scale_ppm)) ** 2)
 
 
-_AMBIGUITY_FLOOR = 0.20
-"""Least evidence a matched resonance may be discounted to.
+_AMBIGUITY_FLOOR = 0.40
+"""Evidence a maximally ambiguous match retains, applied as ``f + (1-f)·w``.
 
-Set to the measured 10th percentile of the ambiguity-weight distribution on held-out
-NMRShiftDB2 (0.223 on ¹³C, 0.180 on ¹H — see
-``scripts/measure_ambiguity_discount.py``), because that decile is where the estimate
-is least trustworthy: the measurement runs on clean assignment data, so crowding is
-*understated*, and the extreme low weights are the most extrapolated part of the curve.
+**A policy parameter set by the maintainer, not a measured constant**, and recorded as
+such so nobody later mistakes it for one. It encodes a judgement the data cannot settle:
+how much credit a nearest-line match keeps when several lines could have explained it
+equally well.
 
-**It is deliberately not a way to soften the discount, and cannot be used as one.**
-Measured across the corpus, raising this floor all the way to 0.50 — which would touch
-41 % of ¹³C and 51 % of ¹H matches — moves the posterior of a fully corroborating test
-by only +0.012 and +0.022 respectively. The tail carries almost none of the aggregate
-weight. Anything that meaningfully softens the discount has to lift the whole
-distribution (an affine ``f + (1-f)·w``), which is a different decision with a
-different justification, and is not what this constant does.
+Why affine rather than a hard ``max(f, w)``. A hard floor only lifts the tail, and the
+tail carries almost none of the aggregate: swept across the corpus, ``max(0.50, w)`` —
+touching 41 % of ¹³C and 51 % of ¹H matches — moved a fully corroborating test's
+posterior by just +0.012 and +0.022, leaving ¹H below the ``consistent`` threshold at
+every value. Only lifting the whole distribution changes the aggregate.
+
+What 0.40 costs, stated plainly. It discards 40 % of a *measured* discount on **every**
+match, including the ~third that are genuinely unambiguous and the mid-range where the
+softmax estimate is solid. It was chosen because it is the point at which a fully
+corroborating ¹H test returns to ``consistent`` (posterior 0.8040), which is selecting a
+constant by the verdict it produces rather than by evidence. That is a legitimate call
+for a product owner to make and an illegitimate one to make silently, so it is written
+down here.
+
+The invariant that survives regardless: ``w = 1`` maps to ``1.0``, so a match with no
+rival in its window is still completely undiscounted.
 """
+
+
+def _soften(raw_weight: float) -> float:
+    """Rescale a raw ambiguity likelihood onto ``[_AMBIGUITY_FLOOR, 1]``.
+
+    Affine, so it is monotone and fixes both ends: ``0 -> floor`` and ``1 -> 1``. The
+    second is the one that matters -- an unambiguous match must stay undiscounted no
+    matter how the floor is set.
+    """
+
+    return _AMBIGUITY_FLOOR + (1.0 - _AMBIGUITY_FLOOR) * float(raw_weight)
 
 
 def _ambiguity_weight(
@@ -221,32 +240,36 @@ def _ambiguity_weight(
     right one given the alternatives. Consequences worth stating:
 
     * one candidate ⇒ exactly **1.0**, so an unambiguous match is untouched;
-    * ``k`` equidistant candidates ⇒ ``1/k``, until :data:`_AMBIGUITY_FLOOR` clamps it
-      (so k ≥ 5 all return the floor);
+    * ``k`` equidistant candidates ⇒ ``f + (1-f)/k`` after the
+      :data:`_AMBIGUITY_FLOOR` rescale — the raw likelihood is ``1/k``;
     * a rival far outside the scale barely dilutes anything;
     * it depends only on the distances, not on the order the matcher visited them.
 
     Without a usable scale it degrades to the uniform ``1/k`` rather than returning a
     NaN that would propagate silently into the posterior.
+
+    Every return path passes through :func:`_soften`, so the floor cannot be bypassed by
+    a degenerate input -- the failure mode where an edge case scores harsher than the
+    happy path.
     """
 
     usable = [float(d) for d in distances_ppm if math.isfinite(float(d))]
     if not usable:
         return 1.0
     if not math.isfinite(scale_ppm) or scale_ppm <= 0.0:
-        return max(_AMBIGUITY_FLOOR, 1.0 / len(usable))
+        return _soften(1.0 / len(usable))
 
     weights = [math.exp(-0.5 * (d / float(scale_ppm)) ** 2) for d in usable]
     total = sum(weights)
     if total <= 0.0:
         # Every candidate is so far out that the Gaussian underflows; the choice among
         # them carries no information, so fall back to the uniform share.
-        return max(_AMBIGUITY_FLOOR, 1.0 / len(usable))
+        return _soften(1.0 / len(usable))
     chosen_distance = float(distances_ppm[chosen])
     if not math.isfinite(chosen_distance):
-        return max(_AMBIGUITY_FLOOR, 1.0 / len(usable))
+        return _soften(1.0 / len(usable))
     raw = math.exp(-0.5 * (chosen_distance / float(scale_ppm)) ** 2) / total
-    return max(_AMBIGUITY_FLOOR, raw)
+    return _soften(raw)
 
 
 def _significance_from_half_width(
