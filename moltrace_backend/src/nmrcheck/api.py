@@ -8713,18 +8713,46 @@ def _to_reason_candidate(candidate: Any) -> SpectrumReasonCandidate:
     )
 
 
+#: Licence strings whose terms permit redistributing the record itself. Empty by
+#: default and deliberately so: the shipped corpus is NMRShiftDB2, whose records
+#: carry "CC-BY-SA (NMRShiftDB2) - local use only, do not distribute", and
+#: CC-BY-SA's share-alike clause cannot be satisfied by a BUSL-licensed product
+#: that redistributes the work. Add a licence here only when someone has
+#: established that its terms allow it.
+_REDISTRIBUTABLE_LICENCES: frozenset[str] = frozenset()
+
+
+def _may_redistribute(licence: str | None) -> bool:
+    return bool(licence) and str(licence).strip() in _REDISTRIBUTABLE_LICENCES
+
+
 def _to_reason_analogue(analogue: Any) -> SpectrumReasonAnalogue:
-    """Map a library ``rag.RetrievedAnalogue`` (duck-typed) onto the wire model."""
+    """Map a library ``rag.RetrievedAnalogue`` (duck-typed) onto the wire model.
+
+    The structure itself is withheld unless its licence permits redistribution.
+
+    That distinction is the whole point: the corpus is used to GROUND the
+    reasoner -- it builds the prompt and backs the hallucination guard, both of
+    which are internal processing -- while returning each record's SMILES to a
+    caller is redistribution, and that is what the licence speaks to. Withholding
+    the structure costs the retrieval nothing; the reasoner still sees it, the
+    guard still works, and the caller still gets the similarity, rank, shift
+    summary and citation id needed to judge how well grounded a proposal is.
+    """
+    redistributable = _may_redistribute(getattr(analogue, "license", None))
     return SpectrumReasonAnalogue(
         analogue_id=analogue.analogue_id,
-        smiles=analogue.smiles,
+        smiles=analogue.smiles if redistributable else "",
         similarity=_clip01(analogue.similarity),
         l2_distance=max(0.0, float(analogue.l2_distance)),
         rank=int(analogue.rank),
         license=analogue.license,
+        # The shift summary is a coarse count ("0x 1H, 14x 13C"), not the data,
+        # so it travels either way; the structure does not.
         shift_summary=analogue.shift_summary,
-        multiplet_summary=analogue.multiplet_summary,
+        multiplet_summary=analogue.multiplet_summary if redistributable else None,
         source=analogue.source,
+        structure_withheld=not redistributable,
     )
 
 

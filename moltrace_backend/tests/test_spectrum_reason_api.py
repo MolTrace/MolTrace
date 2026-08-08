@@ -235,9 +235,19 @@ def test_reason_metadata_sidecar_grounds_analogue(client, tmp_path, monkeypatch)
     assert body["retrieved"]
     hit = body["retrieved"][0]
     assert hit["analogue_id"] == "db:001"
-    assert hit["smiles"] == "c1ccccc1"  # resolved from the sidecar, not the id
-    assert hit["license"] == "CC-BY-SA"
-    assert hit["source"] == "nmrshiftdb2"
+    # RE-BASELINED: this asserted hit["smiles"] == "c1ccccc1". The structure of a
+    # non-redistributable record is now withheld at the wire boundary -- CC-BY-SA
+    # share-alike cannot be satisfied by a BUSL-licensed product that
+    # redistributes the work -- so the SMILES no longer reaches the caller.
+    #
+    # The test's actual subject is unchanged and still proven: an opaque "db:001"
+    # was resolved through the metadata sidecar. `license` and `source` come from
+    # that same sidecar and legitimately travel, so they show the lookup happened;
+    # only the record itself stays behind.
+    assert hit["smiles"] == "", "a CC-BY-SA structure reached the caller"
+    assert hit["structure_withheld"] is True
+    assert hit["license"] == "CC-BY-SA"  # sidecar-resolved -> the lookup ran
+    assert hit["source"] == "nmrshiftdb2"  # likewise
 
 
 def test_reason_license_allow_list_filters(client, tmp_path, monkeypatch):

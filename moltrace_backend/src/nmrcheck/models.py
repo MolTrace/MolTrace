@@ -16561,6 +16561,10 @@ class SpectrumReasonAnalogue(BaseModel):
     shift_summary: str | None = None
     multiplet_summary: str | None = None
     source: str | None = None
+    #: True when the source licence does not permit redistributing the record,
+    #: so ``smiles`` is blank. The analogue still grounded the reasoning; it is
+    #: the structure that is withheld, not the retrieval.
+    structure_withheld: bool = False
 
 
 class SpectrumReasonCandidate(BaseModel):
