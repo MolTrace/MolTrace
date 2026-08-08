@@ -44,7 +44,7 @@ const CHANNELS: Channel[] = [
     eyebrow: "Sales · Demos",
     title: "See MolTrace in action",
     description: "Walk through SpectraCheck, the Regentry, and Repho with our solutions team.",
-    email: "sales@moltrace.com",
+    email: "sales@moltrace.co",
     responseTime: "Typically within 1 business day",
   },
   {
@@ -52,7 +52,7 @@ const CHANNELS: Channel[] = [
     eyebrow: "Customer support",
     title: "Open a support ticket",
     description: "Have a question about your account? Send us the details and we'll get back to you.",
-    email: "support@moltrace.com",
+    email: "support@moltrace.co",
     responseTime: "We aim to reply within 1 business day",
   },
   {
@@ -60,7 +60,7 @@ const CHANNELS: Channel[] = [
     eyebrow: "Security · Compliance",
     title: "Report a vulnerability",
     description: "Coordinated disclosure encouraged. PGP key on request. We aim to acknowledge reports promptly.",
-    email: "security@moltrace.com",
+    email: "security@moltrace.co",
     responseTime: "We aim to acknowledge promptly",
   },
   {
@@ -68,7 +68,7 @@ const CHANNELS: Channel[] = [
     eyebrow: "Press · Analysts",
     title: "Media inquiries",
     description: "For analyst briefings and regulatory commentary.",
-    email: "press@moltrace.com",
+    email: "press@moltrace.co",
     responseTime: "Typically within 2 business days",
   },
 ]
@@ -84,19 +84,19 @@ const OFFICES: Office[] = [
   {
     city: "Americas",
     region: "Remote-first team",
-    address: "Reach us anytime at hello@moltrace.com",
+    address: "Reach us anytime at hello@moltrace.co",
     hours: "Mon–Fri · ET business hours",
   },
   {
     city: "EMEA",
     region: "Remote-first team",
-    address: "Reach us anytime at hello@moltrace.com",
+    address: "Reach us anytime at hello@moltrace.co",
     hours: "Mon–Fri · GMT business hours",
   },
   {
     city: "APAC",
     region: "Remote-first team",
-    address: "Reach us anytime at hello@moltrace.com",
+    address: "Reach us anytime at hello@moltrace.co",
     hours: "Mon–Fri · SGT business hours",
   },
 ]

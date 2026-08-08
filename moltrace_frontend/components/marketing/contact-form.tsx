@@ -25,13 +25,13 @@ import { cn } from "@/lib/utils"
  */
 
 const REASONS = [
-  { value: "demo", label: "Request a demo", inbox: "sales@moltrace.com" },
-  { value: "sales", label: "Sales question", inbox: "sales@moltrace.com" },
-  { value: "support", label: "Customer support", inbox: "support@moltrace.com" },
-  { value: "partnership", label: "Partnership / Integration", inbox: "partnerships@moltrace.com" },
-  { value: "press", label: "Press / Analyst inquiry", inbox: "press@moltrace.com" },
-  { value: "security", label: "Security / Vulnerability report", inbox: "security@moltrace.com" },
-  { value: "other", label: "Other", inbox: "hello@moltrace.com" },
+  { value: "demo", label: "Request a demo", inbox: "sales@moltrace.co" },
+  { value: "sales", label: "Sales question", inbox: "sales@moltrace.co" },
+  { value: "support", label: "Customer support", inbox: "support@moltrace.co" },
+  { value: "partnership", label: "Partnership / Integration", inbox: "partnerships@moltrace.co" },
+  { value: "press", label: "Press / Analyst inquiry", inbox: "press@moltrace.co" },
+  { value: "security", label: "Security / Vulnerability report", inbox: "security@moltrace.co" },
+  { value: "other", label: "Other", inbox: "hello@moltrace.co" },
 ] as const
 type ReasonValue = (typeof REASONS)[number]["value"]
 
@@ -134,10 +134,10 @@ export function ContactForm() {
           Your mail client should have opened with everything prefilled. If it didn't, you can write
           us directly at{" "}
           <a
-            href={`mailto:${REASONS.find((r) => r.value === state.reason)?.inbox ?? "hello@moltrace.com"}`}
+            href={`mailto:${REASONS.find((r) => r.value === state.reason)?.inbox ?? "hello@moltrace.co"}`}
             className="font-medium text-foreground underline-offset-4 hover:underline"
           >
-            {REASONS.find((r) => r.value === state.reason)?.inbox ?? "hello@moltrace.com"}
+            {REASONS.find((r) => r.value === state.reason)?.inbox ?? "hello@moltrace.co"}
           </a>
           .
         </p>
