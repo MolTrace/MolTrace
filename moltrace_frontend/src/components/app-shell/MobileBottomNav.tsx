@@ -24,7 +24,7 @@ import {
 } from "lucide-react"
 import { SpectraCheckLogoIcon } from "@/components/branding/spectracheck-logo-icon"
 import { Button } from "@/components/ui/button"
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 import { cn } from "@/lib/utils"
 import { useTenant } from "@/src/lib/tenant/tenant-context"
 import { useIncludedModules } from "@/src/lib/modules/included-modules-provider"
@@ -229,6 +229,9 @@ export function MobileBottomNav() {
           >
             <SheetHeader className="shrink-0 px-4">
               <SheetTitle>More</SheetTitle>
+              <SheetDescription className="sr-only">
+                The workspace destinations that do not fit in the bottom bar.
+              </SheetDescription>
             </SheetHeader>
             {/* Scrollable item list: SheetContent is a flex column capped at
                 max-h-[80vh]; flex-1 + min-h-0 + overflow-y-auto lets the items

@@ -1,7 +1,7 @@
 "use client"
 
 import { AIEvidenceQueuePanel } from "@/components/app/ai-evidence-queue"
-import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet"
+import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet"
 
 type Props = {
   open: boolean
@@ -34,7 +34,14 @@ export function AIEvidenceQueueSheet({ open, onOpenChange }: Props) {
         className="flex w-[92vw] flex-col gap-0 p-0 sm:max-w-md"
       >
         {/* The panel's own visible heading IS the dialog title, so the sheet has
-            exactly one accessible name. */}
+            exactly one accessible name. The description is rendered here rather
+            than threaded through the panel as another prop: the panel is shared
+            with the desktop docked view, which is not a dialog and needs no
+            description at all. sr-only because the panel's own copy already
+            explains itself to anyone who can see it. */}
+        <SheetDescription className="sr-only">
+          Evidence items awaiting review, and recent platform activity.
+        </SheetDescription>
         <AIEvidenceQueuePanel
           variant="sheet"
           titleAs={SheetTitle}
