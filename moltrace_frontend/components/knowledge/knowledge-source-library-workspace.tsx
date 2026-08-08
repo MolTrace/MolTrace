@@ -38,9 +38,11 @@ import {
   KNOWLEDGE_SOURCE_STATUS,
   KNOWLEDGE_SOURCE_TYPES,
 } from "@/components/knowledge/knowledge-constants"
+import { KnowledgeSourceRevisionsPanel } from "@/components/knowledge/knowledge-source-revisions-panel"
 import { AlertCard } from "@/components/dashboard/alert-card"
 import { ModuleCard } from "@/components/dashboard/module-card"
-import { ArrowLeft, FileText, Library, Loader2, Paperclip, Plus } from "lucide-react"
+import { ArrowLeft, FileText, History, Library, Loader2, Paperclip, Plus } from "lucide-react"
+import { Textarea } from "@/components/ui/textarea"
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return Boolean(v) && typeof v === "object" && !Array.isArray(v)
@@ -114,6 +116,11 @@ export function KnowledgeSourceLibraryWorkspace() {
   const [patchBusy, setPatchBusy] = useState(false)
   const [patchErr, setPatchErr] = useState("")
   const [patchOk, setPatchOk] = useState("")
+  // Optional on the wire, and deliberately not enforced here: a save is never
+  // blocked on it. It is expected-but-not-required, which is what the label says.
+  const [patchChangeReason, setPatchChangeReason] = useState("")
+  /** Bumped after a save so the history panel picks up the new version. */
+  const [revisionsToken, setRevisionsToken] = useState(0)
 
   const [uploadFile, setUploadFile] = useState<File | null>(null)
   const [uploadBusy, setUploadBusy] = useState(false)
@@ -268,9 +275,17 @@ export function KnowledgeSourceLibraryWorkspace() {
         reliability_label: patchReliability,
         metadata_json: {},
       }
+      // Only sent when supplied. KnowledgeSourceUpdate is extra="forbid", so a
+      // key outside that model is a 100% 422 — but change_reason is on it, and
+      // omitting it entirely is what "optional" means here.
+      const reason = patchChangeReason.trim()
+      if (reason) body.change_reason = reason
+
       const updated = await apiFetch<unknown>(`/knowledge/sources/${selectedId}`, { method: "PATCH", body })
       setDetail(isRecord(updated) ? updated : null)
-      setPatchOk("Source updated.")
+      setPatchOk("Saved as a new version. The previous version stays readable in the history below.")
+      setPatchChangeReason("")
+      setRevisionsToken((t) => t + 1)
       await loadSources()
     } catch (e) {
       setPatchErr(formatApiError(e, "Could not save changes to the source."))
@@ -625,7 +640,26 @@ export function KnowledgeSourceLibraryWorkspace() {
                       </SelectContent>
                     </Select>
                   </div>
+                  <div className="space-y-2 md:col-span-2">
+                    <Label htmlFor="kp-change-reason">Reason for this change</Label>
+                    <Textarea
+                      id="kp-change-reason"
+                      rows={2}
+                      maxLength={500}
+                      value={patchChangeReason}
+                      onChange={(e) => setPatchChangeReason(e.target.value)}
+                      placeholder="What changed about this source, and why"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Optional, but it is what a later reviewer reads when deciding whether this
+                      change affects anything drawn from the source.
+                    </p>
+                  </div>
                 </div>
+                <p className="text-xs text-muted-foreground">
+                  Saving records a new version rather than overwriting this one. Anything already
+                  extracted stays pointed at the version it was drawn from.
+                </p>
                 <Button type="button" disabled={patchBusy} onClick={() => void submitPatch()}>
                   {patchBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden /> : null}
                   Save changes
@@ -637,6 +671,18 @@ export function KnowledgeSourceLibraryWorkspace() {
               <p className="text-sm text-muted-foreground">No detail loaded.</p>
             )}
           </div>
+        </ModuleCard>
+      ) : null}
+
+      {selectedId != null ? (
+        <ModuleCard
+          accent="teal"
+          eyebrow="History"
+          title="Version history"
+          icon={History}
+          description="Every recorded version of this source, newest first."
+        >
+          <KnowledgeSourceRevisionsPanel sourceId={selectedId} reloadToken={revisionsToken} />
         </ModuleCard>
       ) : null}
 

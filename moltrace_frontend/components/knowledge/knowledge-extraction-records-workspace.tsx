@@ -28,6 +28,15 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
+import { ProvenanceBadge, ReviewStateBadge } from "@/components/knowledge/knowledge-governance-badges"
+import {
+  PROVENANCE_PRESENTATION,
+  REVIEW_STATE_PRESENTATION,
+  fetchCurrentRevisionIds,
+  provenanceState,
+  readReviewState,
+  type ProvenanceState,
+} from "@/lib/knowledge/corpus-governance"
 import {
   Table,
   TableBody,
@@ -144,7 +153,43 @@ export function KnowledgeExtractionRecordsWorkspace({ recordKind }: { recordKind
     }
   }, [runIdInput, recordKind])
 
+  // Records carry `source_revision_id`, but `current_revision_id` lives on the
+  // source — so the comparison needs both. Per row that is an N+1; this resolves
+  // each distinct source once for the whole list and compares in memory.
+  // A source that fails to resolve is simply absent, which reads as "unknown"
+  // rather than as "unchanged".
+  const [currentRevisions, setCurrentRevisions] = useState<Map<number, number | null>>(new Map())
+
+  useEffect(() => {
+    const sourceIds = rows
+      .map((row) => readRecordNumber(row, "source_id"))
+      .filter((id): id is number => id != null)
+    if (sourceIds.length === 0) {
+      setCurrentRevisions(new Map())
+      return
+    }
+    let cancelled = false
+    void fetchCurrentRevisionIds(sourceIds).then((map) => {
+      if (!cancelled) setCurrentRevisions(map)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [rows])
+
+  const provenanceOf = useCallback(
+    (row: Record<string, unknown> | null): ProvenanceState => {
+      if (!row) return "unknown"
+      const sourceId = readRecordNumber(row, "source_id")
+      const current = sourceId != null ? currentRevisions.get(sourceId) ?? null : null
+      return provenanceState(readRecordNumber(row, "source_revision_id"), current)
+    },
+    [currentRevisions],
+  )
+
   const selectedId = selected ? readRecordNumber(selected, "id") : null
+  const selectedSourceId = selected ? readRecordNumber(selected, "source_id") : null
+  const selectedProvenance = provenanceOf(selected)
   const reviewStatus = selected ? readRecordString(selected, "review_status") ?? "" : ""
   const citationIds = selected ? readIntList(selected["citation_ids_json"]) : []
   const citationMissing = selected != null && citationIds.length === 0
@@ -440,6 +485,7 @@ export function KnowledgeExtractionRecordsWorkspace({ recordKind }: { recordKind
                   ) : null}
                   <TableHead>Citations</TableHead>
                   <TableHead>Review status</TableHead>
+                  <TableHead>Source</TableHead>
                   <TableHead className="w-[90px]">Open</TableHead>
                 </TableRow>
               </TableHeader>
@@ -447,7 +493,7 @@ export function KnowledgeExtractionRecordsWorkspace({ recordKind }: { recordKind
                 {rows.map((row, idx) => {
                   const id = readRecordNumber(row, "id")
                   const cit = readIntList(row["citation_ids_json"]).length
-                  const rs = knowledgeLabel(readRecordString(row, "review_status"))
+                  const provenance = provenanceOf(row)
                   return (
                     <TableRow key={id != null ? `row-${id}` : `row-${idx}`}>
                       <TableCell className="font-mono text-xs">{id ?? "—"}</TableCell>
@@ -494,7 +540,12 @@ export function KnowledgeExtractionRecordsWorkspace({ recordKind }: { recordKind
                         )}
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline">{rs}</Badge>
+                        <ReviewStateBadge state={readReviewState(row["review_status"])} />
+                      </TableCell>
+                      <TableCell>
+                        {/* "Source unchanged" is the quiet case and stays hidden; a
+                            changed or unrecorded source is what a reviewer needs to see. */}
+                        <ProvenanceBadge state={provenance} hideWhenCurrent />
                       </TableCell>
                       <TableCell>
                         {id != null ? (
@@ -529,6 +580,31 @@ export function KnowledgeExtractionRecordsWorkspace({ recordKind }: { recordKind
           description="Extracted values are shown read-only; approval requires reviewer identity and a comment."
         >
           <div className="space-y-4">
+            {/* The caveat goes above the values it qualifies: a reader who scrolls
+                past this has already read the extracted numbers as current. */}
+            {selectedProvenance !== "current" ? (
+              <Alert variant={selectedProvenance === "superseded" ? "destructive" : "default"}>
+                <AlertTitle className="text-sm">
+                  {PROVENANCE_PRESENTATION[selectedProvenance].label}
+                </AlertTitle>
+                <AlertDescription className="text-sm">
+                  {PROVENANCE_PRESENTATION[selectedProvenance].description}
+                  {selectedSourceId != null ? (
+                    <>
+                      {" "}
+                      <Link
+                        href={`/knowledge/sources?source=${selectedSourceId}`}
+                        className="underline underline-offset-4"
+                      >
+                        Open the source history
+                      </Link>{" "}
+                      to see what changed.
+                    </>
+                  ) : null}
+                </AlertDescription>
+              </Alert>
+            ) : null}
+
             {citationMissing ? (
               <Alert variant="destructive">
                 <AlertTitle className="text-sm">Citation missing</AlertTitle>
@@ -568,7 +644,10 @@ export function KnowledgeExtractionRecordsWorkspace({ recordKind }: { recordKind
               <div className="grid gap-3 md:grid-cols-2">
                 <DetailKV label="Reaction name" value={readRecordString(selected, "reaction_name")} />
                 <DetailKV label="Reaction type" value={readRecordString(selected, "reaction_type")} />
-                <DetailKV label="Review status" value={knowledgeLabel(readRecordString(selected, "review_status"))} />
+                <DetailKV
+                  label="Review status"
+                  value={REVIEW_STATE_PRESENTATION[readReviewState(readRecordString(selected, "review_status"))].label}
+                />
                 <DetailKV label="Substrate" value={readRecordString(selected, "substrate_summary")} wide />
                 <DetailKV label="Product" value={readRecordString(selected, "product_summary")} wide />
                 <DetailBlock label="Product SMILES" mono value={readRecordString(selected, "product_smiles")} />
@@ -655,7 +734,10 @@ export function KnowledgeExtractionRecordsWorkspace({ recordKind }: { recordKind
             {recordKind === "analytical" && selected ? (
               <div className="grid gap-3 md:grid-cols-2">
                 <DetailKV label="Compound name" value={readRecordString(selected, "compound_name")} wide />
-                <DetailKV label="Review status" value={knowledgeLabel(readRecordString(selected, "review_status"))} />
+                <DetailKV
+                  label="Review status"
+                  value={REVIEW_STATE_PRESENTATION[readReviewState(readRecordString(selected, "review_status"))].label}
+                />
                 <DetailBlock label="Structure input" mono value={readRecordString(selected, "structure_input")} />
                 <DetailKV label="Structure format" value={readRecordString(selected, "structure_format")} />
                 <DetailKV label="Formula" value={readRecordString(selected, "formula")} />
@@ -719,7 +801,10 @@ export function KnowledgeExtractionRecordsWorkspace({ recordKind }: { recordKind
                   label="Topic"
                   value={readRecordString(selected, "topic") ?? (typeof selected["topic"] === "string" ? selected["topic"] : undefined)}
                 />
-                <DetailKV label="Review status" value={knowledgeLabel(readRecordString(selected, "review_status"))} />
+                <DetailKV
+                  label="Review status"
+                  value={REVIEW_STATE_PRESENTATION[readReviewState(readRecordString(selected, "review_status"))].label}
+                />
                 <DetailKV
                   label="Jurisdiction ID"
                   value={
