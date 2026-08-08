@@ -29,13 +29,16 @@ import {
 } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { ProvenanceBadge, ReviewStateBadge } from "@/components/knowledge/knowledge-governance-badges"
+import { KnowledgeRecordLocators } from "@/components/knowledge/knowledge-record-locators"
 import {
   PROVENANCE_PRESENTATION,
   REVIEW_STATE_PRESENTATION,
   fetchCurrentRevisionIds,
   provenanceState,
+  readLocators,
   readReviewState,
   type ProvenanceState,
+  type RecordLocator,
 } from "@/lib/knowledge/corpus-governance"
 import {
   Table,
@@ -187,9 +190,18 @@ export function KnowledgeExtractionRecordsWorkspace({ recordKind }: { recordKind
     [currentRevisions],
   )
 
+  // A citation can point at an older revision than the record itself does, so the
+  // staleness question is asked per locator rather than inherited from the record.
+  const locatorProvenance = useCallback(
+    (locator: RecordLocator): ProvenanceState =>
+      provenanceState(locator.source_revision_id, currentRevisions.get(locator.source_id) ?? null),
+    [currentRevisions],
+  )
+
   const selectedId = selected ? readRecordNumber(selected, "id") : null
   const selectedSourceId = selected ? readRecordNumber(selected, "source_id") : null
   const selectedProvenance = provenanceOf(selected)
+  const selectedLocators = selected ? readLocators(selected["locators"]) : []
   const reviewStatus = selected ? readRecordString(selected, "review_status") ?? "" : ""
   const citationIds = selected ? readIntList(selected["citation_ids_json"]) : []
   const citationMissing = selected != null && citationIds.length === 0
@@ -613,6 +625,13 @@ export function KnowledgeExtractionRecordsWorkspace({ recordKind }: { recordKind
                 </AlertDescription>
               </Alert>
             ) : null}
+
+            {/* The passage sits above the extracted values, because it is what
+                those values are supposed to be a reading of. */}
+            <KnowledgeRecordLocators
+              locators={selectedLocators}
+              provenanceOfRevision={locatorProvenance}
+            />
 
             {warningLines.length > 0 ? (
               <Alert variant="destructive">

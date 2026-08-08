@@ -20,6 +20,11 @@
 //     predates revisions entirely — unknown, never "up to date". The backend
 //     deliberately did not backfill these, because claiming those records came
 //     from what the source says now would be asserting something unknowable.
+//
+//  4. NOT-RECORDED vs NOT-THERE, for a locator. An absent page or quote means
+//     nobody wrote down where in the source the fact came from. It is never
+//     evidence that the fact has no passage behind it, and a location must
+//     never be inferred to fill the gap.
 
 import { apiFetch } from "@/lib/api/client"
 import { humanizeField } from "@/lib/ui/status"
@@ -27,6 +32,7 @@ import type { components } from "@/src/lib/api/schema"
 
 export type KnowledgeSourceRevision = components["schemas"]["KnowledgeSourceRevision"]
 export type KnowledgeSource = components["schemas"]["KnowledgeSource"]
+export type RecordLocator = components["schemas"]["RecordLocator"]
 
 // ── 1 · review state ──────────────────────────────────────────────────────────
 
@@ -236,3 +242,73 @@ export function readSupersededTask(metadataJson: unknown): SupersededTaskContext
  */
 export const SUPERSEDED_TASK_EXPLANATION =
   "This record's own review decision still stands. The source it was drawn from changed afterwards, so someone needs to decide whether that change affects it."
+
+// ── 5 · locators: which passage a fact came from ──────────────────────────────
+//
+// Locators are resolved from a record's citations rather than copied onto it, so
+// there is one locator shape in the product and no second copy that can drift.
+// Everything below is read defensively: these arrive as plain JSON on records the
+// rest of this workspace already handles as `Record<string, unknown>`.
+
+function readOptionalString(value: unknown): string | null {
+  return typeof value === "string" && value.trim().length > 0 ? value.trim() : null
+}
+
+function readOptionalInt(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null
+}
+
+/** Read `locators` off a record. Anything malformed is dropped rather than guessed at. */
+export function readLocators(value: unknown): RecordLocator[] {
+  if (!Array.isArray(value)) return []
+  const out: RecordLocator[] = []
+  for (const entry of value) {
+    if (!isRecord(entry)) continue
+    const citationId = readOptionalInt(entry.citation_id)
+    const sourceId = readOptionalInt(entry.source_id)
+    if (citationId == null || sourceId == null) continue
+    out.push({
+      citation_id: citationId,
+      citation_label: readOptionalString(entry.citation_label) ?? "",
+      source_id: sourceId,
+      source_revision_id: readOptionalInt(entry.source_revision_id),
+      source_file_id: readOptionalInt(entry.source_file_id),
+      page_number: readOptionalInt(entry.page_number),
+      section_title: readOptionalString(entry.section_title),
+      paragraph_number: readOptionalInt(entry.paragraph_number),
+      quote_excerpt: readOptionalString(entry.quote_excerpt),
+    })
+  }
+  return out
+}
+
+/**
+ * The address within the source: "Page 12 · Methods · paragraph 3".
+ *
+ * Empty when none of the three parts was recorded. Callers render
+ * {@link LOCATOR_ADDRESS_MISSING} in that case rather than an em dash, because
+ * "not written down" is a different claim from "not applicable".
+ */
+export function locatorAddress(locator: RecordLocator): string {
+  const parts: string[] = []
+  if (locator.page_number != null) parts.push(`Page ${locator.page_number}`)
+  if (locator.section_title) parts.push(locator.section_title)
+  if (locator.paragraph_number != null) parts.push(`Paragraph ${locator.paragraph_number}`)
+  return parts.join(" · ")
+}
+
+/**
+ * Copy for a record with no locators at all.
+ *
+ * Per the contract this means the citation is gone or the record predates
+ * citation linking. Either way the honest statement is that the passage was not
+ * recorded — never a location worked out from the source.
+ */
+export const LOCATOR_MISSING_LABEL = "Source passage not recorded"
+export const LOCATOR_MISSING_DESCRIPTION =
+  "No passage is attached to this record, so where in the source it came from is not known. Verify it against the source before relying on it."
+
+/** A locator that resolved but carries no page, section or paragraph. */
+export const LOCATOR_ADDRESS_MISSING = "Location within the source not recorded"
+/** A locator that resolved but carries no quoted text. */
+export const LOCATOR_QUOTE_MISSING = "No quoted passage was recorded for this citation."

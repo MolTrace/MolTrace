@@ -6534,6 +6534,135 @@ export interface paths {
         patch: operations["update_knowledge_source_route_knowledge_sources__source_id__patch"];
         trace?: never;
     };
+    "/knowledge/deployment-candidates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Knowledge Deployment Candidates Route */
+        get: operations["list_knowledge_deployment_candidates_route_knowledge_deployment_candidates_get"];
+        put?: never;
+        /**
+         * Create Knowledge Deployment Candidate Route
+         * @description Propose a trained model, built from an approved dataset version, for deployment.
+         */
+        post: operations["create_knowledge_deployment_candidate_route_knowledge_deployment_candidates_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/knowledge/deployment-candidates/{candidate_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Knowledge Deployment Candidate Route */
+        get: operations["get_knowledge_deployment_candidate_route_knowledge_deployment_candidates__candidate_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/knowledge/deployment-candidates/{candidate_id}/gate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Gate Knowledge Deployment Candidate Route
+         * @description Judge the candidate against the incumbent.
+         *
+         *     The blocking measure must not slip at all and every other measure must be at least as
+         *     good. A measure that is missing or not a real number blocks rather than being skipped.
+         */
+        post: operations["gate_knowledge_deployment_candidate_route_knowledge_deployment_candidates__candidate_id__gate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/knowledge/deployment-candidates/{candidate_id}/canary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Canary Knowledge Deployment Candidate Route
+         * @description Start a limited rollout. Only a candidate that cleared the gate is eligible.
+         */
+        post: operations["canary_knowledge_deployment_candidate_route_knowledge_deployment_candidates__candidate_id__canary_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/knowledge/deployment-candidates/{candidate_id}/promote": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Promote Knowledge Deployment Candidate Route
+         * @description Promote a candidate that has actually run a limited rollout.
+         */
+        post: operations["promote_knowledge_deployment_candidate_route_knowledge_deployment_candidates__candidate_id__promote_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/knowledge/dataset-versions/{dataset_version_id}/approvals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Knowledge Dataset Version Approvals Route
+         * @description Who has approved this dataset version, and how many more are needed.
+         */
+        get: operations["list_knowledge_dataset_version_approvals_route_knowledge_dataset_versions__dataset_version_id__approvals_get"];
+        put?: never;
+        /**
+         * Approve Knowledge Dataset Version Route
+         * @description Record your approval of a dataset version.
+         *
+         *     Promotion is the point where curated records start training something, so it takes two
+         *     separate people. Who you are is taken from your signed-in identity, not from the
+         *     request, and approving twice yourself does not count twice.
+         */
+        post: operations["approve_knowledge_dataset_version_route_knowledge_dataset_versions__dataset_version_id__approvals_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/knowledge/sources/{source_id}/revisions": {
         parameters: {
             query?: never;
@@ -18990,6 +19119,67 @@ export interface components {
              */
             human_review_required: boolean;
         };
+        /** DatasetVersionApproval */
+        DatasetVersionApproval: {
+            /** Id */
+            id: number;
+            /** Dataset Version Id */
+            dataset_version_id: number;
+            /** Approver User Id */
+            approver_user_id?: number | null;
+            /** Approver Email */
+            approver_email?: string | null;
+            /** Comment */
+            comment?: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /**
+         * DatasetVersionApprovalCreate
+         * @description A request to approve. It carries no approver identity on purpose.
+         *
+         *     Who approved is taken from the authenticated principal; accepting it from the caller
+         *     would let one person nominate another as the second approver.
+         */
+        DatasetVersionApprovalCreate: {
+            /** Comment */
+            comment?: string | null;
+        };
+        /**
+         * DatasetVersionApprovalState
+         * @description Where a dataset version stands against the two-person rule.
+         */
+        DatasetVersionApprovalState: {
+            /** Dataset Version Id */
+            dataset_version_id: number;
+            /** Status */
+            status: string;
+            /** Approvals */
+            approvals?: components["schemas"]["DatasetVersionApproval"][];
+            /**
+             * Distinct Approvers
+             * @default 0
+             */
+            distinct_approvers: number;
+            /**
+             * Approvals Required
+             * @default 2
+             */
+            approvals_required: number;
+            /**
+             * Promoted
+             * @default false
+             */
+            promoted: boolean;
+            /**
+             * Human Review Required
+             * @default true
+             */
+            human_review_required: boolean;
+        };
         /** DatasetVersionCreate */
         DatasetVersionCreate: {
             /** Dataset Type */
@@ -20270,6 +20460,8 @@ export interface components {
             source_revision_id?: number | null;
             /** Citation Ids Json */
             citation_ids_json?: number[];
+            /** Locators */
+            locators?: components["schemas"]["RecordLocator"][];
             /** Compound Name */
             compound_name?: string | null;
             /** Structure Input */
@@ -20373,6 +20565,8 @@ export interface components {
             source_revision_id?: number | null;
             /** Citation Ids Json */
             citation_ids_json?: number[];
+            /** Locators */
+            locators?: components["schemas"]["RecordLocator"][];
             /** Reaction Name */
             reaction_name?: string | null;
             /** Reaction Type */
@@ -20471,6 +20665,8 @@ export interface components {
             source_revision_id?: number | null;
             /** Citation Ids Json */
             citation_ids_json?: number[];
+            /** Locators */
+            locators?: components["schemas"]["RecordLocator"][];
             /** Jurisdiction Id */
             jurisdiction_id?: number | null;
             /**
@@ -23076,6 +23272,105 @@ export interface components {
             detail: string;
             /** Point Count */
             point_count: number;
+        };
+        /** KnowledgeDeploymentCandidate */
+        KnowledgeDeploymentCandidate: {
+            /** Id */
+            id: number;
+            /** Dataset Version Id */
+            dataset_version_id: number;
+            /** Model Artifact Id */
+            model_artifact_id?: number | null;
+            /**
+             * Model Version
+             * @default
+             */
+            model_version: string;
+            /** Metrics Json */
+            metrics_json?: {
+                [key: string]: number;
+            };
+            /** Incumbent Metrics Json */
+            incumbent_metrics_json?: {
+                [key: string]: number;
+            };
+            /** Metric Directions Json */
+            metric_directions_json?: {
+                [key: string]: string;
+            };
+            /** Blocking Metric Name */
+            blocking_metric_name?: string | null;
+            /** Blocking Metric Value */
+            blocking_metric_value?: number | null;
+            /** Incumbent Blocking Metric Value */
+            incumbent_blocking_metric_value?: number | null;
+            /**
+             * Status
+             * @default draft
+             * @enum {string}
+             */
+            status: "draft" | "gate_passed" | "gate_failed" | "canary" | "promoted";
+            /** Gate Verdict Json */
+            gate_verdict_json?: {
+                [key: string]: unknown;
+            };
+            /** Canary Started At */
+            canary_started_at?: string | null;
+            /** Promoted At */
+            promoted_at?: string | null;
+            /** Created By */
+            created_by?: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Warnings */
+            warnings?: string[];
+            /** Notes */
+            notes?: string[];
+            /**
+             * Human Review Required
+             * @default true
+             */
+            human_review_required: boolean;
+        };
+        /**
+         * KnowledgeDeploymentCandidateCreate
+         * @description Propose a trained artifact, built from an approved dataset version, for deployment.
+         */
+        KnowledgeDeploymentCandidateCreate: {
+            /** Dataset Version Id */
+            dataset_version_id: number;
+            /** Model Artifact Id */
+            model_artifact_id?: number | null;
+            /**
+             * Model Version
+             * @default
+             */
+            model_version: string;
+            /** Metrics Json */
+            metrics_json?: {
+                [key: string]: number;
+            };
+            /** Incumbent Metrics Json */
+            incumbent_metrics_json?: {
+                [key: string]: number;
+            };
+            /** Metric Directions Json */
+            metric_directions_json?: {
+                [key: string]: string;
+            };
+            /** Blocking Metric Name */
+            blocking_metric_name?: string | null;
+            /** Blocking Metric Value */
+            blocking_metric_value?: number | null;
+            /** Incumbent Blocking Metric Value */
+            incumbent_blocking_metric_value?: number | null;
+            /** Metadata Json */
+            metadata_json?: {
+                [key: string]: unknown;
+            };
         };
         /** KnowledgeExtractionRun */
         KnowledgeExtractionRun: {
@@ -34131,6 +34426,33 @@ export interface components {
              * @default Yield predictions are advisory decision support from a surrogate fit on this project's own recorded experiments. They rank candidate conditions for review and are never a synthesis instruction or a guarantee; a qualified chemist reviews every prediction. The backend that produced each number is recorded in capability_provenance.
              */
             disclaimer: string;
+        };
+        /**
+         * RecordLocator
+         * @description Where in a source a fact actually came from -- page, section, paragraph, quote.
+         *
+         *     Resolved from the citations a record was extracted with rather than copied onto the
+         *     record, so there is one locator shape in the product and no second copy to drift.
+         */
+        RecordLocator: {
+            /** Citation Id */
+            citation_id: number;
+            /** Citation Label */
+            citation_label: string;
+            /** Source Id */
+            source_id: number;
+            /** Source Revision Id */
+            source_revision_id?: number | null;
+            /** Source File Id */
+            source_file_id?: number | null;
+            /** Page Number */
+            page_number?: number | null;
+            /** Section Title */
+            section_title?: string | null;
+            /** Paragraph Number */
+            paragraph_number?: number | null;
+            /** Quote Excerpt */
+            quote_excerpt?: string | null;
         };
         /** RecordRetentionPolicy */
         RecordRetentionPolicy: {
@@ -60824,6 +61146,292 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["KnowledgeSource"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_knowledge_deployment_candidates_route_knowledge_deployment_candidates_get: {
+        parameters: {
+            query?: {
+                status?: string | null;
+                limit?: number;
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KnowledgeDeploymentCandidate"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_knowledge_deployment_candidate_route_knowledge_deployment_candidates_post: {
+        parameters: {
+            query?: {
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["KnowledgeDeploymentCandidateCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KnowledgeDeploymentCandidate"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_knowledge_deployment_candidate_route_knowledge_deployment_candidates__candidate_id__get: {
+        parameters: {
+            query?: {
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path: {
+                candidate_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KnowledgeDeploymentCandidate"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    gate_knowledge_deployment_candidate_route_knowledge_deployment_candidates__candidate_id__gate_post: {
+        parameters: {
+            query?: {
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path: {
+                candidate_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KnowledgeDeploymentCandidate"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    canary_knowledge_deployment_candidate_route_knowledge_deployment_candidates__candidate_id__canary_post: {
+        parameters: {
+            query?: {
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path: {
+                candidate_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KnowledgeDeploymentCandidate"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    promote_knowledge_deployment_candidate_route_knowledge_deployment_candidates__candidate_id__promote_post: {
+        parameters: {
+            query?: {
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path: {
+                candidate_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KnowledgeDeploymentCandidate"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_knowledge_dataset_version_approvals_route_knowledge_dataset_versions__dataset_version_id__approvals_get: {
+        parameters: {
+            query?: {
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path: {
+                dataset_version_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DatasetVersionApprovalState"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    approve_knowledge_dataset_version_route_knowledge_dataset_versions__dataset_version_id__approvals_post: {
+        parameters: {
+            query?: {
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path: {
+                dataset_version_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DatasetVersionApprovalCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DatasetVersionApprovalState"];
                 };
             };
             /** @description Validation Error */
