@@ -1025,9 +1025,22 @@ prediction"** — an empirical predictor with a different, wider error
 distribution.
 
 The failure mode is asymmetric and therefore dangerous: a DP4 posterior is steep
-in σ, so an understated σ **saturates the posterior toward 1.0** for whichever
-candidate sits nearest. It yields a confident number, not an obviously wrong
-one — the worst shape for a figure quoted into a structure-assignment argument.
+in σ, so an understated σ pushes the nearest candidate up. It yields a confident
+number, not an obviously wrong one — the worst shape for a figure quoted into a
+structure-assignment argument.
+
+> **CORRECTION (2026-08-08), measured.** This paragraph originally said an
+> understated σ "saturates the posterior toward 1.0". Measured directly — twelve
+> 1H shifts, two candidates, observed = truth + N(0, err) — P(top) is 0.996 at an
+> injected σ of 0.05 but **0.73 at the 0.42 the predictor actually achieves**.
+> The effect is real and the direction was right; the magnitude at the error level
+> that matters was overstated. Saturation is not what a user hits in practice.
+>
+> Chasing the mechanism turned up a **larger and better-evidenced defect in the
+> same rows**: `rms_error_ppm` is computed over paired peaks only, so it stops
+> responding to error. True RMSE 0.140 → 2.418 ppm (17x worse) moves the reported
+> figure only 0.118 → 0.154, while matched drops 11/12 → 6/12 — and the row
+> emitted `matched_peaks` with no denominator. See the answer-4 section below.
 
 ### Measured on the seven structure-paired real spectra
 
@@ -1757,3 +1770,47 @@ docstring asserted the shared-reference design. It is now
 that was reasonable, and where the old behaviour is still covered
 (`TestSharedModeKeepsTheSingleLabCase`). The other two moved 403 -> 404 with the
 reason recorded inline.
+
+### 4. DP4 — ANSWERED, SHIPPED ("go with the best option")
+
+Best option chosen: **keep the ranking, report what it covers, label what the
+number is, and do not invent a σ.**
+
+The A5 phase found the calibration mismatch — DP4's σ/ν are DFT/GIAO residuals,
+production predicts shifts empirically. Re-probing it to build the fix turned up
+a second defect in the same rows that is easier to hit and easier to believe:
+
+```
+true RMSE  0.140  ->  reported 0.118   matched 11/12
+true RMSE  0.540  ->  reported 0.203   matched  8/12
+true RMSE  1.068  ->  reported 0.151   matched  6/12
+true RMSE  2.418  ->  reported 0.154   matched  6/12
+```
+
+`rms_error_ppm` is computed over the peaks that paired within ±0.3 ppm. Peaks the
+prediction missed badly are excluded from the error figure, so **a seventeen-fold
+degradation in the real fit moves the reported number from 0.118 to 0.154.** The
+only thing that moved was the matched count, and the row emitted `matched_peaks`
+with no denominator — `6` was indistinguishable from 6 of 6.
+
+The likelihood is *not* blind to this: unmatched peaks take a soft `log(0.5)`
+penalty, so the ranking itself is defensible and still identifies the correct
+candidate (there is a test). It is a **reporting** defect, so the fix adds
+`observed_peak_count`, `matched_fraction`, `low_coverage`, `error_basis`,
+`probability_is_calibrated` and `probability_basis`, plus two analysis-level
+warnings — and does not touch the arithmetic.
+
+**What was deliberately not done: no corrected σ was invented.** The true value is
+*bracketed* by the two A5 measurements (2.25x censored, 7.72x uncensored), not
+pinned — the censored figure drops every badly-predicted peak, the uncensored one
+greedily pairs distant ones. Substituting a round number for a measured
+distribution is the mistake that shipped the `integration_h le=50` cap. The
+number is labelled, not silently rescaled.
+
+`DP4_MIN_COVERAGE = 0.75` comes from where the measurement decouples: at 11/12
+matched the reported error still tracked the real one (0.118 vs 0.140); by 8/12
+it had separated (0.203 vs 0.540) and never recovered.
+
+FE relabelling is handed off in `docs/fe_handoff_dp4_ranking_coverage.md`. No
+contract change — `dp4_ranking` is untyped `list[dict[str, Any]]`, so the new keys
+are additive and `schema.d.ts` needs no regeneration.

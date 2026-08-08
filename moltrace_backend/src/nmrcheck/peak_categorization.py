@@ -1738,6 +1738,22 @@ def build_predicted_vs_observed(
     return rows
 
 
+# Below this share of the observed signals, a candidate's error figures describe
+# too little of the spectrum to stand on their own. Chosen at the point where the
+# measured reported-vs-true RMSE gap opens up: at 11/12 matched the reported
+# error still tracked the real one (0.118 vs 0.140), and by 8/12 it had decoupled
+# (0.203 vs 0.540) and never recovered.
+DP4_MIN_COVERAGE = 0.75
+
+DP4_PROBABILITY_BASIS = (
+    "Relative ranking across the candidates supplied, computed with the "
+    "Smith & Goodman 2010 DP4 likelihood. Its sigma and nu describe "
+    "DFT-computed shifts, while these shifts come from an empirical predictor "
+    "whose measured error is several times larger, so the value orders the "
+    "candidates but is not a calibrated probability that the top one is correct."
+)
+
+
 def build_dp4_candidate_ranking(
     *,
     observed_peaks: Sequence[dict[str, Any]],
@@ -1745,14 +1761,53 @@ def build_dp4_candidate_ranking(
     candidate_labels: Sequence[str],
     nucleus: Nucleus,
 ) -> list[dict[str, Any]]:
-    """Run DP4 across a list of candidates and return a ranked, JSON-ready list.
+    """Rank candidates by DP4 and return a JSON-ready list, with its coverage.
 
     Uses the published Smith & Goodman 2010 σ / ν (1H σ=0.185 ν=14.18;
-    13C σ=2.306 ν=11.38). Each row carries the candidate label, the DP4
-    posterior probability, the candidate's MAE and RMSE vs the observed shifts,
-    and the linear-scaling slope/intercept the fit produced.
+    13C σ=2.306 ν=11.38). Each row carries the candidate label, the score, the
+    MAE and RMSE over the peaks that paired, and the linear-scaling
+    slope/intercept the fit produced. Sorted by descending score.
 
-    Returned list is sorted by descending probability.
+    Two things every row now states about itself, because neither was safe to
+    leave implicit:
+
+    **Coverage.** ``mean_abs_error_ppm`` and ``rms_error_ppm`` are computed over
+    the peaks that paired within the window (±0.3 ppm for 1H), so peaks the
+    prediction missed badly are excluded from the error figure — which stops it
+    responding to error. Measured on twelve 1H shifts, one candidate, observed =
+    truth + N(0, err)::
+
+        true RMSE  0.140  ->  reported 0.118   matched 11/12
+        true RMSE  0.540  ->  reported 0.203   matched  8/12
+        true RMSE  1.068  ->  reported 0.151   matched  6/12
+        true RMSE  2.418  ->  reported 0.154   matched  6/12
+
+    A seventeen-fold degradation in the real fit moves the reported number from
+    0.118 to 0.154. The only thing that moved was the matched count, and the row
+    used to emit ``matched_peaks`` with no denominator, so 6 was
+    indistinguishable from 6 of 6. Hence ``observed_peak_count``,
+    ``matched_fraction``, ``error_basis`` and ``low_coverage``.
+
+    The *likelihood* is not blind to this — unmatched peaks take a soft
+    ``log(0.5)`` penalty, so the ranking is defensible. It is the reported error
+    that misleads, which is why this adds reporting and does not touch the
+    arithmetic.
+
+    **Calibration.** The σ / ν above are the residual distribution of
+    DFT/GIAO-computed shifts. Production predicts shifts with an empirical RDKit
+    atom-environment model whose measured error on real paired spectra is 2.25x σ
+    (within DP4's own pairing window) to 7.72x σ (unwindowed). A DP4 posterior is
+    steep in σ, so an understated σ pushes the top candidate up: measured, P(top)
+    is 0.996 at an injected σ of 0.05 and 0.73 at the 0.42 the predictor actually
+    achieves.
+
+    No corrected σ is invented here. The true value is *bracketed* by those two
+    measurements, not pinned — the censored figure drops every badly-predicted
+    peak and the uncensored one greedily pairs distant ones — and substituting a
+    round number for a measured distribution is the mistake this codebase has
+    already shipped once. The number is therefore labelled for what it is, a
+    relative ranking, via ``probability_is_calibrated`` and
+    ``probability_basis``.
     """
     from .dp4_scoring import dp4_probabilities  # local import to avoid cycle in tests
 
@@ -1772,6 +1827,7 @@ def build_dp4_candidate_ranking(
         candidate_predicted_shifts_ppm=candidate_shifts,
         nucleus=nucleus,
     )
+    observed_count = len(observed_shifts)
     rows = []
     for score in scores:
         label = (
@@ -1779,17 +1835,40 @@ def build_dp4_candidate_ranking(
             if 0 <= score.candidate_index < len(candidate_labels)
             else f"candidate_{score.candidate_index}"
         )
+        matched_fraction = (
+            score.matched_peaks / observed_count if observed_count else 0.0
+        )
+        low_coverage = matched_fraction < DP4_MIN_COVERAGE
+        notes = list(score.notes)
+        if low_coverage:
+            notes.append(
+                f"This candidate accounts for {score.matched_peaks} of "
+                f"{observed_count} observed signals. The error figures below "
+                f"describe only those {score.matched_peaks}, so they understate "
+                "how far the rest of the spectrum is from this structure."
+            )
         rows.append(
             {
                 "candidate_index": score.candidate_index,
                 "candidate_label": label,
                 "dp4_probability": score.probability,
                 "matched_peaks": score.matched_peaks,
+                # The denominator. Without it `matched_peaks` cannot be read:
+                # 6 looks the same whether it is 6 of 6 or 6 of 12.
+                "observed_peak_count": observed_count,
+                "matched_fraction": matched_fraction,
+                "low_coverage": low_coverage,
+                # The error statistics cover the paired peaks only. Saying so is
+                # the difference between "this fits to 0.15 ppm" and "the sixth
+                # of the spectrum it explains fits to 0.15 ppm".
+                "error_basis": "matched_peaks_only",
                 "mean_abs_error_ppm": score.mean_abs_error_ppm,
                 "rms_error_ppm": score.rms_error_ppm,
                 "scaling_slope": score.slope,
                 "scaling_intercept": score.intercept,
-                "notes": list(score.notes),
+                "probability_is_calibrated": False,
+                "probability_basis": DP4_PROBABILITY_BASIS,
+                "notes": notes,
             }
         )
     rows.sort(key=lambda r: r["dp4_probability"], reverse=True)
@@ -1797,6 +1876,8 @@ def build_dp4_candidate_ranking(
 
 
 __all__ = [
+    "DP4_MIN_COVERAGE",
+    "DP4_PROBABILITY_BASIS",
     "PEAK_CATEGORIES",
     "build_dp4_candidate_ranking",
     "build_impurity_candidates",
