@@ -1,6 +1,6 @@
 "use client"
 
-import Link from "next/link"
+import { DestinationGrid, type Destination } from "@/components/app/destination-card"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -13,7 +13,6 @@ import { formatApiError } from "@/components/spectracheck/spectracheck-helpers"
 import { humanizeField, statusLabel } from "@/lib/ui/status"
 import {
   Activity,
-  ArrowRight,
   ClipboardCheck,
   FlaskConical,
   GitCompare,
@@ -21,7 +20,6 @@ import {
   RefreshCw,
   Rocket,
   ServerCog,
-  type LucideIcon,
 } from "lucide-react"
 
 type AnyRecord = Record<string, unknown>
@@ -120,54 +118,29 @@ const PREDICTION_KEYS = ["predictions", "items", "results", "rows", "data"]
 const ACTIVE_LEARNING_KEYS = ["candidates", "active_learning_candidates", "items", "results", "rows", "data"]
 
 /**
- * The six destinations, grouped by where they sit in a model's life rather than
- * listed flat: you try a model, you feed it back, you check it against the
- * incumbent, you roll it out carefully, and you watch what is live. A row of six
- * identical buttons showed none of that, and made "AI Service Registry" look
- * like a peer of "Prediction Playground".
+ * The six destinations, in the order a model moves through them.
+ *
+ * ONE FLAT LIST with the group as a pill, not grouped grids: a grid per group
+ * left ragged holes wherever a group's count was not a multiple of three. Six
+ * cards fill two rows exactly.
  *
  * Descriptions are each workspace's OWN stated purpose, lifted from the page
- * being linked to rather than written fresh here, so this hub cannot drift into
+ * being linked to rather than written fresh, so this hub cannot drift into
  * describing something its destination does not do.
- *
- * Same accent-per-group scheme as the Knowledge Library, and the same rule about
- * which token goes where: the vivid accent fills the left rule and the icon, the
- * -ink variant colours every piece of type.
  */
-const AI_DESTINATIONS: ReadonlyArray<{
-  label: string
-  accent: string
-  ink: string
-  items: ReadonlyArray<{ label: string; href: string; desc: string; icon: LucideIcon }>
-}> = [
-  {
-    label: "Try it, and teach it",
-    accent: "var(--mt-teal)",
-    ink: "var(--mt-teal-ink)",
-    items: [
-      { label: "Prediction Playground", href: "/ai/predictions", desc: "Run a prediction by hand. Available only where your organization's policy allows it.", icon: FlaskConical },
-      { label: "Active Learning Queue", href: "/ai/active-learning", desc: "Submit prediction feedback and manage the active-learning candidate lifecycle.", icon: ClipboardCheck },
-    ],
-  },
-  {
-    label: "Check before rollout",
-    accent: "var(--mt-violet)",
-    ink: "var(--mt-violet-ink)",
-    items: [
-      { label: "Shadow Evaluations", href: "/ai/shadow-evaluations", desc: "Run side-by-side candidate checks and review results before a deployment decision.", icon: GitCompare },
-      { label: "Canary Deployments", href: "/ai/canary", desc: "Propose, review and resolve canary deployments through a human approval workflow.", icon: Rocket },
-    ],
-  },
-  {
-    label: "Watch what is live",
-    accent: "var(--mt-cyan)",
-    ink: "var(--mt-cyan-ink)",
-    items: [
-      { label: "Model Monitoring", href: "/ai/monitoring", desc: "Read monitoring summaries and log monitoring events.", icon: Activity },
-      { label: "AI Service Registry", href: "/ai/services", desc: "Create and update service routing definitions without auto-activating models.", icon: ServerCog },
-    ],
-  },
+const TEAL = { accent: "var(--mt-teal)", ink: "var(--mt-teal-ink)", soft: "var(--mt-teal-soft)" }
+const VIOLET = { accent: "var(--mt-violet)", ink: "var(--mt-violet-ink)", soft: "var(--mt-violet-soft)" }
+const CYAN = { accent: "var(--mt-cyan)", ink: "var(--mt-cyan-ink)", soft: "var(--mt-cyan-soft)" }
+
+const AI_DESTINATIONS: readonly Destination[] = [
+  { group: "Try it", ...TEAL, label: "Prediction Playground", href: "/ai/predictions", desc: "Run a prediction by hand. Available only where your organization's policy allows it.", icon: FlaskConical },
+  { group: "Try it", ...TEAL, label: "Active Learning Queue", href: "/ai/active-learning", desc: "Submit prediction feedback and manage the active-learning candidate lifecycle.", icon: ClipboardCheck },
+  { group: "Check", ...VIOLET, label: "Shadow Evaluations", href: "/ai/shadow-evaluations", desc: "Run side-by-side candidate checks and review results before a deployment decision.", icon: GitCompare },
+  { group: "Check", ...VIOLET, label: "Canary Deployments", href: "/ai/canary", desc: "Propose, review and resolve canary deployments through a human approval workflow.", icon: Rocket },
+  { group: "Watch", ...CYAN, label: "Model Monitoring", href: "/ai/monitoring", desc: "Read monitoring summaries and log monitoring events.", icon: Activity },
+  { group: "Watch", ...CYAN, label: "AI Service Registry", href: "/ai/services", desc: "Create and update service routing definitions without auto-activating models.", icon: ServerCog },
 ]
+
 
 export function AiServicesDashboard() {
   const [loading, setLoading] = useState(true)
@@ -347,37 +320,7 @@ export function AiServicesDashboard() {
           Where to go next
         </h2>
 
-        {AI_DESTINATIONS.map((group) => (
-          <div key={group.label} className="space-y-3">
-            <p className="text-xs font-medium text-muted-foreground">{group.label}</p>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {group.items.map((item) => (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className="group relative flex h-full min-w-0 flex-col rounded-xl border bg-card p-5 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring motion-reduce:transition-none motion-reduce:hover:translate-y-0"
-                  /* Same signature as the Knowledge Library cards and the home
-                     page module row: a 3px rule carrying the group's colour
-                     without tinting any text. */
-                  style={{ borderLeftWidth: "3px", borderLeftColor: group.accent }}
-                >
-                  <div className="flex items-center gap-2">
-                    {/* Icons keep the vivid accent — shapes, not type. */}
-                    <item.icon className="h-5 w-5 shrink-0" style={{ color: group.accent }} aria-hidden />
-                    <h3 className="min-w-0 text-sm font-semibold" style={{ color: group.ink }}>
-                      {item.label}
-                    </h3>
-                    <ArrowRight
-                      className="h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform duration-200 group-hover:translate-x-0.5 motion-reduce:transition-none"
-                      aria-hidden
-                    />
-                  </div>
-                  <p className="mt-3 text-sm leading-relaxed text-muted-foreground">{item.desc}</p>
-                </Link>
-              ))}
-            </div>
-          </div>
-        ))}
+        <DestinationGrid items={AI_DESTINATIONS} />
       </section>
 
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">

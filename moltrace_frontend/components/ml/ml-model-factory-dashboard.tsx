@@ -1,7 +1,7 @@
 "use client"
 
 import { statusLabel } from "@/lib/ui/status"
-import Link from "next/link"
+import { DestinationGrid, type Destination } from "@/components/app/destination-card"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { ApiError, apiFetch } from "@/lib/api/client"
 import { readRecordNumber } from "@/components/projects/project-workspace-utils"
@@ -20,8 +20,6 @@ import {
 } from "@/components/ui/table"
 import { BackendStatusIndicator } from "@/components/app/backend-status-indicator"
 import {
-  ArrowRight,
-  ArrowUpRight,
   BarChart3,
   Boxes,
   Bug,
@@ -32,7 +30,6 @@ import {
   GaugeCircle,
   Library,
   Loader2,
-  type LucideIcon,
   Package,
   PlayCircle,
   Radar,
@@ -166,65 +163,35 @@ const EVAL_KEYS = ["evaluation_runs", "runs", "items", "results", "rows", "data"
 const DEPLOY_KEYS = ["deployment_candidates", "candidates", "items", "results", "rows", "data"]
 
 /**
- * The nine destinations, grouped by where they sit in a model's life: you train
- * it, you assess it from four angles before anyone ships it, a human decides, and
- * two of the nine are not in this module at all.
+ * The nine destinations, in the order the work happens: train, assess from four
+ * angles, decide, and two that are not in this module at all.
  *
- * Descriptions name what each destination CONTAINS rather than what it can do.
- * These workspaces carry no summary line to lift, and writing capability claims
+ * ONE FLAT LIST, not four grouped ones. Grouped grids left ragged holes — "Decide"
+ * is a single card and sat alone in a three-wide row. The group now rides on each
+ * card as a pill, and nine cards fill three rows exactly.
+ *
+ * Descriptions name what each destination CONTAINS rather than what it can do:
+ * these workspaces carry no summary line to lift, and writing capability claims
  * from a route name is how a hub ends up describing something its destination
  * does not do.
- *
- * `leavesModule` marks the two Knowledge Library links. They sit in the same row
- * as seven in-module destinations and looked identical to them; a link that
- * silently relocates you is worse than one that says so first.
  */
-const ML_DESTINATIONS: ReadonlyArray<{
-  label: string
-  accent: string
-  ink: string
-  leavesModule?: boolean
-  items: ReadonlyArray<{ label: string; href: string; desc: string; icon: LucideIcon }>
-}> = [
-  {
-    label: "Train",
-    accent: "var(--mt-teal)",
-    ink: "var(--mt-teal-ink)",
-    items: [
-      { label: "Training launcher", href: "/ml/training", desc: "Start a training run, and the runs already started.", icon: PlayCircle },
-      { label: "Model artifacts", href: "/ml/models", desc: "Registered artifacts and the provenance recorded with each one.", icon: Boxes },
-    ],
-  },
-  {
-    label: "Assess before shipping",
-    accent: "var(--mt-violet)",
-    ink: "var(--mt-violet-ink)",
-    items: [
-      { label: "Evaluation dashboard", href: "/ml/evaluations", desc: "Evaluation runs and the metrics they produced.", icon: GaugeCircle },
-      { label: "Calibration", href: "/ml/calibration", desc: "Calibration assessments — whether a confidence behaves like a probability.", icon: Crosshair },
-      { label: "Error analysis", href: "/ml/error-analysis", desc: "Where a model's errors concentrate.", icon: Radar },
-      { label: "Out-of-domain", href: "/ml/ood", desc: "Out-of-domain assessments, for inputs unlike anything trained on.", icon: Radar },
-    ],
-  },
-  {
-    label: "Decide",
-    accent: "var(--mt-cyan)",
-    ink: "var(--mt-cyan-ink)",
-    items: [
-      { label: "Deployment review", href: "/ml/deployment-candidates", desc: "Candidates waiting on a human decision before they go anywhere.", icon: ShieldCheck },
-    ],
-  },
-  {
-    label: "Where the data comes from",
-    accent: "var(--mt-amber)",
-    ink: "var(--mt-amber-ink)",
-    leavesModule: true,
-    items: [
-      { label: "Dataset versions", href: "/knowledge/datasets", desc: "The dataset candidates a training run draws from.", icon: Database },
-      { label: "Knowledge Library", href: "/knowledge", desc: "Ingested sources, extractions and reviewed records.", icon: Library },
-    ],
-  },
+const TEAL = { accent: "var(--mt-teal)", ink: "var(--mt-teal-ink)", soft: "var(--mt-teal-soft)" }
+const VIOLET = { accent: "var(--mt-violet)", ink: "var(--mt-violet-ink)", soft: "var(--mt-violet-soft)" }
+const CYAN = { accent: "var(--mt-cyan)", ink: "var(--mt-cyan-ink)", soft: "var(--mt-cyan-soft)" }
+const AMBER = { accent: "var(--mt-amber)", ink: "var(--mt-amber-ink)", soft: "var(--mt-amber-soft)" }
+
+const ML_DESTINATIONS: readonly Destination[] = [
+  { group: "Train", ...TEAL, label: "Training launcher", href: "/ml/training", desc: "Start a training run, and the runs already started.", icon: PlayCircle },
+  { group: "Train", ...TEAL, label: "Model artifacts", href: "/ml/models", desc: "Registered artifacts and the provenance recorded with each one.", icon: Boxes },
+  { group: "Assess", ...VIOLET, label: "Evaluation dashboard", href: "/ml/evaluations", desc: "Evaluation runs and the metrics they produced.", icon: GaugeCircle },
+  { group: "Assess", ...VIOLET, label: "Calibration", href: "/ml/calibration", desc: "Calibration assessments — whether a confidence behaves like a probability.", icon: Crosshair },
+  { group: "Assess", ...VIOLET, label: "Error analysis", href: "/ml/error-analysis", desc: "Where a model's errors concentrate.", icon: Radar },
+  { group: "Assess", ...VIOLET, label: "Out-of-domain", href: "/ml/ood", desc: "Out-of-domain assessments, for inputs unlike anything trained on.", icon: Radar },
+  { group: "Decide", ...CYAN, label: "Deployment review", href: "/ml/deployment-candidates", desc: "Candidates waiting on a human decision before they go anywhere.", icon: ShieldCheck },
+  { group: "Source data", ...AMBER, leavesModule: true, label: "Dataset versions", href: "/knowledge/datasets", desc: "The dataset candidates a training run draws from.", icon: Database },
+  { group: "Source data", ...AMBER, leavesModule: true, label: "Knowledge Library", href: "/knowledge", desc: "Ingested sources, extractions and reviewed records.", icon: Library },
 ]
+
 
 export function MlModelFactoryDashboard() {
   const [reloadToken, setReloadToken] = useState(0)
@@ -369,41 +336,7 @@ export function MlModelFactoryDashboard() {
         </Button>
       </div>
 
-      <div className="space-y-5">
-        {ML_DESTINATIONS.map((group) => (
-          <div key={group.label} className="space-y-3">
-            <p className="text-xs font-medium text-muted-foreground">
-              {group.label}
-              {group.leavesModule ? (
-                <span className="ml-1.5 font-normal opacity-70">{" "}— opens another module</span>
-              ) : null}
-            </p>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {group.items.map((item) => (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className="group relative flex h-full min-w-0 flex-col rounded-xl border bg-card p-5 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring motion-reduce:transition-none motion-reduce:hover:translate-y-0"
-                  style={{ borderLeftWidth: "3px", borderLeftColor: group.accent }}
-                >
-                  <div className="flex items-center gap-2">
-                    <item.icon className="h-5 w-5 shrink-0" style={{ color: group.accent }} aria-hidden />
-                    <h3 className="min-w-0 text-sm font-semibold" style={{ color: group.ink }}>
-                      {item.label}
-                    </h3>
-                    {group.leavesModule ? (
-                      <ArrowUpRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform duration-200 group-hover:-translate-y-0.5 group-hover:translate-x-0.5 motion-reduce:transition-none" aria-hidden />
-                    ) : (
-                      <ArrowRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform duration-200 group-hover:translate-x-0.5 motion-reduce:transition-none" aria-hidden />
-                    )}
-                  </div>
-                  <p className="mt-3 text-sm leading-relaxed text-muted-foreground">{item.desc}</p>
-                </Link>
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
+      <DestinationGrid items={ML_DESTINATIONS} />
 
       {partialErr}
 
