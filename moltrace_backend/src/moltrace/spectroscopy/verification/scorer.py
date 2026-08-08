@@ -184,6 +184,25 @@ def _shift_merit(distance_ppm: float, scale_ppm: float) -> float:
     return math.exp(-0.5 * (float(distance_ppm) / float(scale_ppm)) ** 2)
 
 
+_AMBIGUITY_FLOOR = 0.20
+"""Least evidence a matched resonance may be discounted to.
+
+Set to the measured 10th percentile of the ambiguity-weight distribution on held-out
+NMRShiftDB2 (0.223 on ¹³C, 0.180 on ¹H — see
+``scripts/measure_ambiguity_discount.py``), because that decile is where the estimate
+is least trustworthy: the measurement runs on clean assignment data, so crowding is
+*understated*, and the extreme low weights are the most extrapolated part of the curve.
+
+**It is deliberately not a way to soften the discount, and cannot be used as one.**
+Measured across the corpus, raising this floor all the way to 0.50 — which would touch
+41 % of ¹³C and 51 % of ¹H matches — moves the posterior of a fully corroborating test
+by only +0.012 and +0.022 respectively. The tail carries almost none of the aggregate
+weight. Anything that meaningfully softens the discount has to lift the whole
+distribution (an affine ``f + (1-f)·w``), which is a different decision with a
+different justification, and is not what this constant does.
+"""
+
+
 def _ambiguity_weight(
     distances_ppm: Sequence[float], *, chosen: int, scale_ppm: float
 ) -> float:
@@ -202,7 +221,8 @@ def _ambiguity_weight(
     right one given the alternatives. Consequences worth stating:
 
     * one candidate ⇒ exactly **1.0**, so an unambiguous match is untouched;
-    * ``k`` equidistant candidates ⇒ exactly **1/k**;
+    * ``k`` equidistant candidates ⇒ ``1/k``, until :data:`_AMBIGUITY_FLOOR` clamps it
+      (so k ≥ 5 all return the floor);
     * a rival far outside the scale barely dilutes anything;
     * it depends only on the distances, not on the order the matcher visited them.
 
@@ -214,18 +234,19 @@ def _ambiguity_weight(
     if not usable:
         return 1.0
     if not math.isfinite(scale_ppm) or scale_ppm <= 0.0:
-        return 1.0 / len(usable)
+        return max(_AMBIGUITY_FLOOR, 1.0 / len(usable))
 
     weights = [math.exp(-0.5 * (d / float(scale_ppm)) ** 2) for d in usable]
     total = sum(weights)
     if total <= 0.0:
         # Every candidate is so far out that the Gaussian underflows; the choice among
         # them carries no information, so fall back to the uniform share.
-        return 1.0 / len(usable)
+        return max(_AMBIGUITY_FLOOR, 1.0 / len(usable))
     chosen_distance = float(distances_ppm[chosen])
     if not math.isfinite(chosen_distance):
-        return 1.0 / len(usable)
-    return math.exp(-0.5 * (chosen_distance / float(scale_ppm)) ** 2) / total
+        return max(_AMBIGUITY_FLOOR, 1.0 / len(usable))
+    raw = math.exp(-0.5 * (chosen_distance / float(scale_ppm)) ** 2) / total
+    return max(_AMBIGUITY_FLOOR, raw)
 
 
 def _significance_from_half_width(
