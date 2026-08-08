@@ -1,4 +1,5 @@
 import { ApiError, sanitizePublicApiErrorMessage } from "@/lib/api/client"
+import { readUpgradeRefusal, upgradeCopy } from "@/lib/api/upgrade-state"
 
 /** First pipe-delimited SMILES-like token from candidate lines (e.g. `Ethanol | CCO | proposed`). */
 export function extractFirstSmiles(candidatesText: string): string {
@@ -15,6 +16,19 @@ export function authErrorMessage(): string {
 }
 
 export function formatApiError(err: unknown, fallback: string): string {
+  // A closed product is not a sign-in problem, and this formatter is used by ~104
+  // surfaces — so until now every one of them answered "Sign in to access live
+  // MolTrace data" to a user whose administrator simply had not switched a
+  // product on. Telling someone to sign in when they are already signed in, and
+  // when signing in again cannot possibly help, is the worst of the four wrong
+  // guesses the single generic lock produced.
+  //
+  // Checked before the 401/403 branch precisely because that branch would
+  // otherwise swallow it. Falls through untouched when the refusal is not one of
+  // the four, so ordinary auth failures still read as they did.
+  const refusal = readUpgradeRefusal(err)
+  if (refusal) return upgradeCopy(refusal).title
+
   if (err instanceof ApiError && (err.status === 401 || err.status === 403)) return authErrorMessage()
   if (err instanceof ApiError && err.status === 404) {
     // FastAPI returns {"detail":"Not Found"} for an unmatched route — the only
