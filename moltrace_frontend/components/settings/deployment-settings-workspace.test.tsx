@@ -312,7 +312,11 @@ describe("DeploymentSettingsWorkspace release diagnostics", () => {
   })
 
   it("downloads the current read-only fixture report as local JSON and CSV", async () => {
-    const createObjectURL = vi.fn(() => "blob:raw-fid-sidecar-report")
+    // Declared with the argument it is actually called with. A bare ``vi.fn(() => …)``
+    // infers an empty parameter tuple, so every ``mock.calls[n][0]`` below is an index
+    // into a zero-length tuple — the assertions still ran, but nothing type-checked the
+    // thing they were asserting about.
+    const createObjectURL = vi.fn<(blob: Blob) => string>(() => "blob:raw-fid-sidecar-report")
     const revokeObjectURL = vi.fn()
     Object.defineProperty(window.URL, "createObjectURL", { configurable: true, value: createObjectURL })
     Object.defineProperty(window.URL, "revokeObjectURL", { configurable: true, value: revokeObjectURL })

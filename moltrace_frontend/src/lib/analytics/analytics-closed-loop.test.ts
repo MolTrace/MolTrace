@@ -131,6 +131,15 @@ const BACKEND_USAGE_EVENT_CREATE_KEYS = new Set([
   "metadata_json",
 ])
 
+/**
+ * What ``apiFetch`` actually accepts — ``ApiRequestInit`` in lib/api/client.ts, which is
+ * ``Omit<RequestInit, "body"> & { body?: unknown }``. The client JSON-stringifies a plain
+ * object body itself, so ``body`` is deliberately NOT ``BodyInit``. Asserting ``RequestInit``
+ * here claimed the opposite and left the object branch of ``lastAnalyticsRequestBody``
+ * uncastable, since ``ArrayBuffer`` has no index signature.
+ */
+type ApiFetchInit = Omit<RequestInit, "body"> & { body?: unknown }
+
 type AnalyticsRequestBody = {
   event_source?: string
   event_type?: string
@@ -141,7 +150,7 @@ type AnalyticsRequestBody = {
 
 function lastAnalyticsRequestBody(): AnalyticsRequestBody {
   expect(apiFetchMock).toHaveBeenCalled()
-  const call = apiFetchMock.mock.calls[apiFetchMock.mock.calls.length - 1] as [string, RequestInit]
+  const call = apiFetchMock.mock.calls[apiFetchMock.mock.calls.length - 1] as [string, ApiFetchInit]
   const raw = call[1]?.body
   /** Mock replaces `apiFetch` before stringify — body is usually the POST object envelope. */
   if (typeof raw === "string") {
@@ -438,7 +447,7 @@ describe("core module analytics", () => {
       },
     })
 
-    const call = apiFetchMock.mock.calls[apiFetchMock.mock.calls.length - 1] as [string, RequestInit]
+    const call = apiFetchMock.mock.calls[apiFetchMock.mock.calls.length - 1] as [string, ApiFetchInit]
     const raw = lastAnalyticsRequestBody()
     expect(call[0]).toBe("/analytics/events")
     for (const key of Object.keys(raw)) {
