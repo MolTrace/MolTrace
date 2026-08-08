@@ -327,7 +327,7 @@ type LoopStep = {
 const CROSS_MODULE_LOOP: LoopStep[] = [
   {
     step: "SpectraCheck routes in",
-    body: "Peak at 2.10 ppm classified as acetic acid impurity (confidence 0.93). Regentry receives the structured evidence object.",
+    body: "Peak at 2.10 ppm classified as acetic acid impurity (published shift table). Regentry receives the structured evidence object.",
   },
   {
     step: "Framework lookup",

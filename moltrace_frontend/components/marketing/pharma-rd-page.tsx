@@ -92,7 +92,7 @@ const LIFECYCLE: Phase[] = [
     name: "Candidate selection",
     icon: Target,
     fits: [
-      "Definitive elucidation with DP4 confidence + a full evidence trail",
+      "Structure elucidation with DP4 ranking + a full evidence trail",
       "Nominate a candidate with the data package already assembled",
       "Every numerical claim hyperlinked back to the spectrum it came from",
     ],
@@ -161,9 +161,9 @@ const WORKFLOWS: UseCase[] = [
     icon: Microscope,
     name: "Structure confirmation & elucidation",
     blurb:
-      "NMR, HRMS, and MS/MS scored together against candidate SMILES with DP4 confidence. Cross-modal disagreement surfaces as a first-class warning before you commit.",
+      "NMR, HRMS, and MS/MS scored together against candidate SMILES and ranked by DP4. Cross-modal disagreement surfaces as a first-class warning before you commit.",
     inputs: "Raw FID · mzML · candidate SMILES",
-    outputs: "Ranked candidates · DP4 · evidence trail",
+    outputs: "Ranked candidates · DP4 ranking · evidence trail",
   },
   {
     icon: AlertTriangle,
@@ -250,7 +250,7 @@ const COMPARISON: Comparison[] = [
   {
     dimension: "Confirming a structure",
     before: "NMR app + MS app + manual reconciliation, judgement call recorded in a notebook",
-    after: "Cross-modal evidence stack with DP4 confidence and contradiction warnings in one view",
+    after: "Cross-modal evidence stack with DP4 candidate ranking and contradiction warnings in one view",
   },
   {
     dimension: "Impurity audit trail",
@@ -287,7 +287,7 @@ type LoopStep = {
 const WORKED_EXAMPLE: LoopStep[] = [
   {
     step: "SpectraCheck detects",
-    body: "A peak at 2.10 ppm is auto-classified as acetic acid (residual), 93% confidence, and HRMS corroborates the implied formula. No mis-assignment slips through.",
+    body: "A peak at 2.10 ppm is auto-classified as acetic acid (residual) against the published shift table, and HRMS corroborates the implied formula. Disagreement between the two is raised, not averaged away.",
   },
   {
     step: "Regentry classifies",
@@ -434,7 +434,7 @@ export function PharmaRdPage() {
                   {[
                     { code: "DSC", title: "Discovery — hit confirmed", state: "done" },
                     { code: "LO", title: "Lead opt — 18 analogs traced", state: "done" },
-                    { code: "CS", title: "Candidate selected · DP4 96%", state: "done" },
+                    { code: "CS", title: "Candidate selected · DP4 rank 1", state: "done" },
                     { code: "CMC", title: "Impurities → ICH Q3C / Q3D", state: "active" },
                     { code: "IND", title: "Dossier 3.2.S drafting", state: "queued" },
                   ].map((row) => (
@@ -562,7 +562,7 @@ export function PharmaRdPage() {
 {`  Discovery ──► Lead opt ──► Candidate ──► Process / CMC ──► IND / Submission
      │            │             │              │                    │
      ▼            ▼             ▼              ▼                    ▼
-  confirm     optimize      definitive     impurity +          dossier +
+  confirm     optimize      structure      impurity +          dossier +
   hits        the route     elucidation    method val.         ALCOA+ ledger
   (NMR+MS)    (Repho)  (DP4 + trail)  (Q3x · Q2(R2))      (signoff gate)`}
               </pre>
@@ -829,7 +829,7 @@ export function PharmaRdPage() {
                   <div>
                     <p className="text-sm font-semibold">Spectroscopy →</p>
                     <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                      The evidence engine that detects and confirms every finding.
+                      The evidence engine that detects and cross-checks every finding.
                     </p>
                   </div>
                 </div>

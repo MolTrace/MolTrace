@@ -94,7 +94,7 @@ const WORKFLOW: WorkflowStage[] = [
     title: "Score",
     detail:
       "39-layer evidence stack scores candidate SMILES across NMR, HRMS, MS/MS, predicted shifts, fragmentation trees, and reaction history. Cross-modal contradictions surface as warnings.",
-    outputs: "Ranked candidates · DP4 confidence · multi-layer evidence",
+    outputs: "Ranked candidates · DP4 ranking · multi-layer evidence",
   },
   {
     stage: "06",
@@ -300,7 +300,7 @@ type Loop = {
 const CLOSING_LOOP: Loop[] = [
   {
     step: "Spectroscopy detects",
-    body: "Impurity peak at 2.10 ppm matched to acetic acid CH₃ within 0.001 ppm. Confidence 93%.",
+    body: "Impurity peak at 2.10 ppm matched to acetic acid CH₃ within 0.001 ppm. Published shift table cited.",
   },
   {
     step: "Regulatory routes",

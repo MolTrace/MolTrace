@@ -74,11 +74,11 @@ export const SPECTROSCOPY_SEO: ModuleSeo = {
     },
     {
       q: "Can SpectraCheck do automated structure elucidation from NMR?",
-      a: "It ranks candidate SMILES across a multi-layer evidence stack (1H/13C, 2D NMR, HRMS, MS/MS, predicted shifts, fragmentation trees) and runs an automated structure-verification layer, but the platform frames every output as decision support, never a proof of identity.",
+      a: "It ranks candidate SMILES across a multi-layer evidence stack (1H/13C, 2D NMR, HRMS, MS/MS, predicted shifts, fragmentation trees) and shows the evidence behind each rank, but the platform frames every output as decision support, never a proof of identity.",
     },
     {
       q: "How does SpectraCheck score confidence, and is it a calibrated DP4 probability?",
-      a: "It aggregates cross-modal evidence into a ranked candidate list and exposes a DP4/DP5 panel, but MolTrace states the result is decision support — not proof of identity, and not a calibrated DP4/DP5 probability. A human reviewer weighs it before signoff.",
+      a: "It aggregates cross-modal evidence into a ranked candidate list and exposes a DP4 ranking panel, but MolTrace states the result is decision support — not proof of identity, and not a calibrated DP4/DP5 probability. A human reviewer weighs it before signoff.",
     },
     {
       q: "How does SpectraCheck keep spectroscopy results auditable for a regulatory submission?",

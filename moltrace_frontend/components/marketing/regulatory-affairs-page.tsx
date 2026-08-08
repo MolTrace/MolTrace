@@ -287,7 +287,7 @@ type LoopStep = {
 const WORKED_EXAMPLE: LoopStep[] = [
   {
     step: "Evidence arrives",
-    body: "A residual-solvent finding comes from R&D as a structured evidence object — acetic acid at 2.10 ppm, 93% confidence, already cited back to the raw FID and the HRMS that corroborated it.",
+    body: "A residual-solvent finding comes from R&D as a structured evidence object — acetic acid at 2.10 ppm, matched to its published shift, already cited back to the raw FID and the HRMS that corroborated it.",
   },
   {
     step: "It classifies itself",
