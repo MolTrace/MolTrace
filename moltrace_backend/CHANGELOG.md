@@ -14,6 +14,44 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.68.8 — HMBC separates 99 % of the regioisomers ¹³C shifts get wrong (2026-08-08)
+
+v0.68.2 measured that ¹³C shift lists resolve **regioisomers at a 37.7 % false-confirmation
+rate** — barely better than chance, and the one decoy class that survives every upstream filter
+because it shares the truth's molecular formula and carbon count. The obvious response is "use
+2-D", which was asserted without evidence. This measures it.
+
+`spectroscopy/eval/correlation_evidence.py` predicts HSQC (1-bond) and HMBC (2–3 bond) H→C
+correlations from topology and compares two candidates. Over **2,840 held-out regioisomer
+pairs**:
+
+| | |
+|---|---|
+| **separated by predicted HMBC** | **2,812 / 2,840 = 99.0 %** |
+| not separated (2-D cannot help either) | 28 = 1.0 % |
+| HMBC cross-peaks differing per pair | median **23**, mean 33.8 |
+
+**The reason is not "2-D is more informative."** A regioisomer already *has* a different
+predicted ¹³C list. The problem is that a shift is a **continuous value requiring accurate
+prediction**, and held-out ¹³C MAE (3.44 ppm) exceeds DP4's own scale (2.306 ppm), so the
+difference cannot be exploited. An HMBC cross-peak is a **near-binary observation whose position
+follows from topology alone** — predicted exactly. 2-D evidence sidesteps the part of the
+pipeline that is failing, which is a stronger and more specific claim than "add more data".
+
+**Limits, stated rather than buried.** This measures separation in *predicted-correlation space*,
+not a false-confirmation rate against experimental HMBC: only **218 of 64,723** NMRShiftDB2
+records carry HMBC blocks (0.34 %), far too few for a held-out score. Real spectra have missing
+weak 3-bond correlations, noise and overlap, so **99.0 % is an upper bound on available
+discriminating power, not an achievable accuracy.** And HMBC topology is blind to stereochemistry
+exactly as HOSE codes are — 2-D fixes regiochemistry, not stereochemistry, which needs NOE or
+*J*-couplings. Both boundaries are pinned by tests.
+
+Direct evidence for B6.2: candidate generation should be driven by 2-D correlations rather than
+shift lists, and a deterministic correlation-constrained enumerator is the baseline any learned
+generator must beat.
+
+---
+
 ## v0.68.7 — A match five lines could have explained is no longer worth five-sixths of a match (2026-08-08)
 
 `PredictionBoundsTest` counted a matched resonance as corroboration regardless of how many other
