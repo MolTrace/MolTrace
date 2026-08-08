@@ -14,6 +14,128 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.68.9 — Five decisions answered, and the two defects answering them uncovered (2026-08-08)
+
+Five open product questions were answered by the maintainer and implemented in order. Two of them
+turned up defects that were **not** what the question was about, and those are the larger half of
+this batch.
+
+### A structure is an advantage on the FID path, not an entry fee
+
+`POST /raw-fid/{archive_id}/process` required `smiles`, which put the most valuable part of the
+product — turning a vendor FID into a phased, baseline-corrected, peak-picked spectrum — behind
+knowing the answer in advance. Now optional: with a structure, unchanged; without, identical
+processing and `analysis` / `generated_inputs` are **null** — absent rather than a placeholder
+verdict, because verification means "does this spectrum match THIS structure" and there is nothing
+to match.
+
+**The defect this uncovered is bigger than the question.** With no structure, integrals are anchored
+to the smallest resolved signal rather than to a molecule. Measured on validation fixture 33 (real
+500 MHz, MeOD), the same five leading peaks:
+
+```
+with a 6 H budget:   0.008    0.098    0.094     1.0     0.5   H
+with no budget:      1.0     14.0     13.5     123.5    84.5   H
+```
+
+The ratios are identical; the absolute values are not proton counts. **Eleven warnings were emitted
+on that spectrum and not one of them said so**, so `123.5H` in an NMR string was indistinguishable
+from a measurement. It was never confined to the route being changed — `/raw-fid/{id}/preview`
+already accepted a missing structure and said nothing, `orchestration_store` dumps the preview
+verbatim into a **downloadable artifact**, and `quality_control_store` feeds one into a QC
+assessment; neither passes a budget at all.
+
+One shared discloser (`integration_scale.py`) is applied at every producer call site rather than as
+a note per route. `tests/test_integration_scale_disclosure.py` walks the AST of every module and
+fails when a new caller neither supplies a budget nor routes through it — it found two sites that
+had been missed while the fix was being written, which is the argument for it existing.
+
+*Known limitation:* the disclosure explains the scale without changing the rendering —
+`inferred_nmr_text` still prints `123.5H`, because that lives in a file carrying unrelated in-flight
+work. The AST guard is scaffolding for that workaround, not a permanent invariant; when the
+disclosure moves into the two producers, delete it.
+
+### A candidate ranking now reports what it actually explains
+
+`rms_error_ppm` is computed over the peaks that paired within the window, so peaks the prediction
+missed badly are excluded from the error figure — which stops it responding to error. Measured on
+twelve ¹H shifts, one candidate:
+
+```
+true RMSE  0.140  ->  reported 0.118   matched 11/12
+true RMSE  0.540  ->  reported 0.203   matched  8/12
+true RMSE  2.418  ->  reported 0.154   matched  6/12
+```
+
+A **seventeen-fold** degradation in the real fit moves the reported number from 0.118 to 0.154. The
+only thing that moved was the matched count, and the row emitted `matched_peaks` with **no
+denominator**, so 6 was indistinguishable from 6 of 6.
+
+The likelihood is not blind to this — unmatched peaks take a soft `log(0.5)` penalty, so the ranking
+is defensible and still identifies the correct candidate (there is a test, because if withdrawing
+the calibration claim had also broken the ordering the honest move would have been to remove the
+feature). It is a **reporting** defect, so the fix adds `observed_peak_count`, `matched_fraction`,
+`low_coverage`, `error_basis`, `probability_is_calibrated` and `probability_basis` — and does not
+touch the arithmetic. `DP4_MIN_COVERAGE = 0.75` is taken from where the measurement decouples.
+
+**No constants were substituted, and the direction of the calibration claim was corrected.** An
+earlier note said an understated σ "saturates the posterior toward 1.0". Measured, P(top) is 0.996 at
+an injected σ of 0.05 but **0.73 at the 0.42 the predictor actually achieves**. Fitted against the
+predictor's own held-out errors (`fit_error_model`, v0.68.x), ¹H scale is 0.162 against a published
+0.185 — marginally *tighter* — and **ν ≈ 1.23 against a published 14.18**. ν is the load-bearing
+parameter: scoring a heavy-tailed predictor with a thin-tailed model drives the **correct** candidate
+toward zero. The dangerous direction is a confident false *rejection*.
+
+### Compound registry reads are owner-scoped, with shared as a setting
+
+Probed live, a second account read another account's `preferred_name`, `registry_id` and `inchikey`,
+and found the row by searching the registry id. **This reversed a deliberate, documented decision** —
+"a compound registry is a shared reference … closing reads would break the feature rather than secure
+it" — which is right for one lab and wrong as a default for a hosted product, where a compound's
+existence under a code name is confidential long before its structure is. So the single-lab case
+became `COMPOUND_REGISTRY_VISIBILITY=shared` rather than a casualty.
+
+`_require_compound` / `_require_batch` were the seam: nineteen call sites already funnelled through
+them, so scoping two functions scoped every child read. Three things only visible past the reads:
+
+* the knowledge graph needed its own handling — an edge merely *touching* another tenant's compound
+  would print that tenant's compound name, so an edge is dropped unless every compound endpoint on
+  it is visible;
+* **eight write functions** resolved their target through the same unscoped helper, so a stranger
+  could hang an alias or evidence link off a compound they could not read, with 201-vs-404
+  confirming it existed — closed here rather than in a follow-up, because scoping only the reads is
+  the half-applied guard this codebase keeps re-growing;
+* `CompoundRegistryAccessError` does not inherit `CompoundRegistryError`, so it fell through the
+  route error mapper to a bare re-raise — every correctly refused attach would have been a **500**.
+
+Refusals are 404 wherever existence is the secret, including the compound `PATCH` whose 403 was
+justified by "the rows are readable" — the exact premise this changes. Three tests that encoded the
+old behaviour are re-baselined **visibly**, including `test_reads_stay_open_across_users`, now
+`test_reads_are_owner_scoped_by_default` and carrying what it used to assert and why.
+
+### A FID run is reviewed by a colleague, not by IT
+
+All four review routes required the ADMIN role, so the chemist who ran an analysis could not have it
+reviewed unless a platform administrator did it — while the sibling SpectraCheck review route already
+used `require_access_context`, so the two surfaces disagreed. Any authenticated user may now review
+**except the run's own author**; admins and the system key keep the override.
+
+Self-review is **409, not 403**: the caller is entitled to review runs, just not this one, and a 403
+would be swallowed by the global access-denied sanitiser — which is what made the original refusal
+read as a broken feature. A run with no recorded author stays reviewable, the opposite call from
+managed files, where a NULL owner means refuse; there reading is disclosure, here refusing would
+obstruct every historical run for no gain.
+
+### Handoffs
+
+`docs/fe_handoff_spectrum_scale_disclosure.md`, `docs/fe_handoff_compound_registry_scope.md` and
+`docs/fe_handoff_dp4_ranking_coverage.md`. The scale disclosure is the urgent one: verified against a
+running app, it lands on `/nmr/raw-fid/preview` and `/nmr/raw-fid/process` — routes the frontend
+calls today — and the frontend is currently the only place `123.5H` can be made non-misleading.
+
+`schema.d.ts` was regenerated and committed with the `FIDProcessResult` change; the DP4 and registry
+changes need no regeneration.
+
 ## v0.68.8 — HMBC separates 99 % of the regioisomers ¹³C shifts get wrong (2026-08-08)
 
 v0.68.2 measured that ¹³C shift lists resolve **regioisomers at a 37.7 % false-confirmation
@@ -86,6 +208,26 @@ have propagated silently through the mean and into the posterior.
 
 `details.mean_ambiguity_weight` and a per-resonance `ambiguity_weight` / `candidate_lines` are
 recorded for audit, so a verdict reached on diluted evidence is visible as such.
+
+### A floor was added, and it cannot do what a floor is usually wanted for
+
+`_AMBIGUITY_FLOOR = 0.20` clamps the discount's tail. The value is the measured 10th percentile of
+the weight distribution (0.223 ¹³C / 0.180 ¹H), chosen because that decile is where the estimate is
+least trustworthy: the measurement runs on clean assignment data, so crowding is *understated* and
+the extreme low weights are the most extrapolated part of the curve.
+
+**Its measured effect is nil**, and that is the point worth recording. Posterior of a fully
+corroborating test: ¹³C 0.8317 → **0.8321**, ¹H 0.7645 → **0.7657**. Swept further, a floor of 0.50
+— touching 41 % of ¹³C and 51 % of ¹H matches — reaches only 0.8435 and 0.7863. **¹H stays
+`inconclusive` at every floor value.** The tail carries almost none of the aggregate; the mean is
+set by the bulk, whose median weight is 0.48–0.54.
+
+The only lever that moves the aggregate is an **affine** rescale `f + (1-f)·w`, which lifts the
+whole distribution. It restores ¹H to `consistent` at **f ≈ 0.40** (posterior 0.8040) — but that
+discards 40 % of a measured discount on *every* match, including the third that are genuinely
+unambiguous and the mid-range where the estimate is solid. Choosing `f` to recover a particular
+verdict is fitting a constant to a desired answer, so the affine form is **not** shipped; the sweep
+is in the script and the decision is left where it belongs.
 
 ### How much evidence was being over-claimed
 
