@@ -1590,3 +1590,86 @@ discover the problem when an optimization run tells them none of it counted.
 > 4. Warn at experiment-create time when `outcome_json` contains no key that
 >    maps to a typed outcome field. The mapping already exists; only the
 >    complaint is missing.
+
+---
+
+## DECISION RESULTS (2026-08-07/08) — the five questions answered
+
+The five open questions from the B-phase were answered by the maintainer and
+implemented in order. Recorded here because two of them turned up defects that
+were *not* what the question was about.
+
+### 1. Who may review a FID run — ANSWERED, SHIPPED (`653b402`)
+
+Answer: any authenticated user who is not the run's creator; admin as override.
+
+All four review routes were `Depends(require_admin)`, so a chemist could not
+have their analysis reviewed unless a platform administrator did it. The sibling
+route `POST /spectracheck/sessions/{id}/review` already used
+`require_access_context`, so the two surfaces disagreed with each other.
+
+Two calls worth keeping visible:
+
+* **The self-review refusal is 409, not 403.** The caller is entitled to review
+  runs, just not this one. A 403 would also be swallowed by the global
+  access-denied sanitiser — which is exactly what made the original refusal read
+  as a broken feature rather than a rule.
+* **A run with no recorded author stays reviewable.** This is the opposite call
+  from managed files, where a NULL owner means refuse. There, reading is
+  disclosure; here, refusing would obstruct every historical run for no gain.
+  Deliberate asymmetry, recorded so it does not read as an oversight later.
+
+### 2. Structure optional on the FID path — ANSWERED, SHIPPED
+
+Answer: "The smiles should not be a requirement but an added advantage that
+speeds up the process or makes prediction more accurate and grounded."
+
+`POST /raw-fid/{id}/process` required `smiles`, which put the most valuable part
+of the product — turning a vendor FID into a phased, baseline-corrected,
+peak-picked spectrum — behind knowing the answer in advance.
+
+Now optional. With a structure: unchanged. Without: identical processing,
+`analysis` and `generated_inputs` are `None` — absent rather than a placeholder
+verdict, because verification means "does this spectrum match THIS structure"
+and there is nothing to match.
+
+**The defect this uncovered is bigger than the question.** Measured on
+validation fixture 33 (real 500 MHz, MeOD), the same five leading peaks:
+
+```
+with a 6 H budget:   0.008    0.098    0.094     1.0     0.5   H
+with no budget:      1.0     14.0     13.5     123.5    84.5   H
+```
+
+The ratios are identical — with no structure the scale is anchored to the
+smallest resolved signal instead of to a molecule — but **eleven warnings were
+emitted on that spectrum and not one of them said so**, so `123.5H` in an NMR
+string was indistinguishable from a measurement.
+
+This predates the change and was never confined to the route being touched.
+`/raw-fid/{id}/preview` already accepted a missing structure and said nothing;
+`orchestration_store` dumps the preview verbatim into a **downloadable
+artifact** and never passes a budget at all; `quality_control_store` feeds one
+into a QC assessment the same way.
+
+Fixed with one shared discloser (`nmrcheck/integration_scale.py`) rather than a
+note per route, because a guard applied to some callers of a symmetric condition
+is the bug shape this codebase keeps re-growing.
+`tests/test_integration_scale_disclosure.py` walks the AST of every module and
+fails when a new caller neither supplies a budget nor routes through it — it
+found two sites I had missed while I was writing the fix, which is the argument
+for the guard existing at all.
+
+**Known limitation, deliberately left:** the disclosure sits at the call sites,
+not inside `parse_processed_spectrum` / `process_bruker_1d_zip` where it could
+not be bypassed. Those two files were carrying ~400 lines of unrelated staged
+work from another session at the time. When that lands, move the disclosure into
+the producers and delete the AST guard — it is scaffolding for a workaround, not
+a permanent invariant.
+
+**Still open on this path:** the disclosure explains the scale; it does not
+change the rendering. `inferred_nmr_text` still prints `123.5H`. Making the
+no-budget case render as a ratio rather than as an `H` count needs
+`spectrum.py:2326`, the same contended file.
+
+### 3-5. Registry reads, DP4 naming, corpus licence — see the sections below
