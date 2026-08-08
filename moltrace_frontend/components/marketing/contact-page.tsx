@@ -38,13 +38,20 @@ type Channel = {
   responseTime: string
 }
 
+// Every channel currently routes to one shared inbox. moltrace.co has no MX
+// records, so per-purpose addresses (sales@, support@, security@, press@)
+// bounce; a single deliverable mailbox is worth more than four that discard
+// mail. The per-channel structure is kept so restoring real routing later is a
+// one-line change per entry, not a rewrite.
+const SHARED_INBOX = "moltrace.co@gmail.com"
+
 const CHANNELS: Channel[] = [
   {
     icon: Sparkles,
     eyebrow: "Sales · Demos",
     title: "See MolTrace in action",
     description: "Walk through SpectraCheck, the Regentry, and Repho with our solutions team.",
-    email: "sales@moltrace.co",
+    email: SHARED_INBOX,
     responseTime: "Typically within 1 business day",
   },
   {
@@ -52,7 +59,7 @@ const CHANNELS: Channel[] = [
     eyebrow: "Customer support",
     title: "Open a support ticket",
     description: "Have a question about your account? Send us the details and we'll get back to you.",
-    email: "support@moltrace.co",
+    email: SHARED_INBOX,
     responseTime: "We aim to reply within 1 business day",
   },
   {
@@ -60,7 +67,7 @@ const CHANNELS: Channel[] = [
     eyebrow: "Security · Compliance",
     title: "Report a vulnerability",
     description: "Coordinated disclosure encouraged. PGP key on request. We aim to acknowledge reports promptly.",
-    email: "security@moltrace.co",
+    email: SHARED_INBOX,
     responseTime: "We aim to acknowledge promptly",
   },
   {
@@ -68,7 +75,7 @@ const CHANNELS: Channel[] = [
     eyebrow: "Press · Analysts",
     title: "Media inquiries",
     description: "For analyst briefings and regulatory commentary.",
-    email: "press@moltrace.co",
+    email: SHARED_INBOX,
     responseTime: "Typically within 2 business days",
   },
 ]
@@ -84,19 +91,19 @@ const OFFICES: Office[] = [
   {
     city: "Americas",
     region: "Remote-first team",
-    address: "Reach us anytime at hello@moltrace.co",
+    address: `Reach us anytime at ${SHARED_INBOX}`,
     hours: "Mon–Fri · ET business hours",
   },
   {
     city: "EMEA",
     region: "Remote-first team",
-    address: "Reach us anytime at hello@moltrace.co",
+    address: `Reach us anytime at ${SHARED_INBOX}`,
     hours: "Mon–Fri · GMT business hours",
   },
   {
     city: "APAC",
     region: "Remote-first team",
-    address: "Reach us anytime at hello@moltrace.co",
+    address: `Reach us anytime at ${SHARED_INBOX}`,
     hours: "Mon–Fri · SGT business hours",
   },
 ]
