@@ -51,6 +51,7 @@ from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from pydantic import ValidationError as PydanticValidationError
 from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from . import ai_evidence_store as ai_evidence_store
 from . import ai_inference_store as ai_store
@@ -60,6 +61,7 @@ from . import authz as authz
 from . import collaboration_store as collab_store
 from . import compound_registry_store as compound_store
 from . import detections as detections
+from . import error_codes as error_codes
 from . import esign as esign
 
 # build_proton_inventory exported by peak_categorization — imported alongside
@@ -2726,9 +2728,11 @@ def _sanitize_public_error_detail(value: Any) -> Any:
 
 #: 403 details that survive sanitization because a client must branch on them. Keep this tiny and
 #: keep every member a fixed machine code — never an explanation of *why* a permission failed.
-PUBLIC_MACHINE_READABLE_403_DETAILS: frozenset[str] = frozenset(
-    {module_access.MODULE_NOT_LICENSED_DETAIL}
-)
+#: Derived from the code registry rather than maintained by hand — a code declared public
+#: there is, by construction, one a client may branch on here. This was a second list of the
+#: same idea; the frontend proxy's 401/403 allowlist is a third, and should be regenerated
+#: from `error_codes.PUBLIC_CODES` rather than edited independently.
+PUBLIC_MACHINE_READABLE_403_DETAILS: frozenset[str] = error_codes.PUBLIC_CODES
 
 
 def _safe_http_exception_detail(status_code: int, detail: Any) -> Any:
@@ -15533,7 +15537,11 @@ def get_esignature_record_route(
     request: Request,
     context: AccessContext = Depends(require_access_context),
 ) -> ElectronicSignatureRecord:
-    record = validation_store.get_signature(_state(request).session_factory, signature_id)
+    record = validation_store.get_signature(
+        _state(request).session_factory,
+        signature_id,
+        owner_scope_id=_user_scope_for_context(context),
+    )
     if record is None:
         raise HTTPException(status_code=404, detail="E-signature record not found.")
     return record
@@ -15553,7 +15561,8 @@ def verify_esignature_record_route(
     # §11.70 integrity check: re-derive the stored digest (detects row tampering) and, with
     # recompute=true, re-snapshot the live record to detect post-signing content changes.
     result = validation_store.verify_record_signature(
-        _state(request).session_factory, signature_id, recompute=recompute
+        _state(request).session_factory, signature_id, recompute=recompute,
+            owner_scope_id=_user_scope_for_context(context)
     )
     if result is None:
         raise HTTPException(status_code=404, detail="E-signature record not found.")
@@ -15573,7 +15582,8 @@ def esignature_record_manifestation_route(
 ) -> ESignatureManifestation | HTMLResponse:
     # §11.50 durable manifestation. format=html returns the printable inspection-copy stamp.
     manifestation = validation_store.build_signature_manifestation(
-        _state(request).session_factory, signature_id
+        _state(request).session_factory, signature_id,
+            owner_scope_id=_user_scope_for_context(context)
     )
     if manifestation is None:
         raise HTTPException(status_code=404, detail="E-signature record not found.")
@@ -24110,6 +24120,7 @@ def download_artifact_route(
             _state(request).session_factory,
             artifact_id,
             storage_root=_orchestration_storage_root(request),
+            owner_scope_id=_user_scope_for_context(context),
         )
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
@@ -30909,9 +30920,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 },
             )
             content = _stable_unavailable_payload(request)
+            content["code"] = error_codes.UNAVAILABLE
             status_code = exc.status_code
         else:
-            content = {"detail": _safe_http_exception_detail(exc.status_code, exc.detail)}
+            # `detail` is untouched: clients branch on it today and must keep working.
+            # `code` is added beside it so they can stop.
+            content = {
+                "detail": _safe_http_exception_detail(exc.status_code, exc.detail),
+                "code": error_codes.code_for(exc.status_code, exc.detail),
+            }
             status_code = exc.status_code
         return JSONResponse(
             status_code=status_code,
@@ -30919,19 +30936,37 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             headers=exc.headers,
         )
 
+    # An unmatched route raises Starlette's HTTPException, which is the PARENT of FastAPI's —
+    # so registering only the subclass above left plain 404s with no code, the one gap a client
+    # would hit first. Same function, both classes.
+    app.add_exception_handler(StarletteHTTPException, safe_http_exception_handler)  # type: ignore[arg-type]
+
     @app.exception_handler(mfa_webauthn.MFAError)
     async def mfa_error_handler(
         request: Request, exc: mfa_webauthn.MFAError
     ) -> JSONResponse:
-        return JSONResponse(status_code=exc.status, content={"detail": exc.detail})
+        return JSONResponse(
+            status_code=exc.status,
+            content={
+                "detail": exc.detail,
+                "code": error_codes.code_for(exc.status, exc.detail),
+            },
+        )
 
     @app.exception_handler(session_store.SessionError)
     async def session_error_handler(
         request: Request, exc: session_store.SessionError
     ) -> JSONResponse:
-        # Preserve the machine code (token_invalid|token_expired|token_reuse_detected) past the
-        # safe-exception sanitizer so the SPA can react (re-login vs forced full logout).
-        return JSONResponse(status_code=exc.status, content={"detail": exc.detail})
+        # These handlers exist because the machine code had nowhere else to travel: it rode
+        # inside `detail` and the sanitizer would have replaced it. `code` now carries it
+        # properly; `detail` stays as-is until every client has moved.
+        return JSONResponse(
+            status_code=exc.status,
+            content={
+                "detail": exc.detail,
+                "code": error_codes.code_for(exc.status, exc.detail),
+            },
+        )
 
     @app.exception_handler(scim_store.SCIMError)
     async def scim_error_handler(
@@ -30960,7 +30995,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         )
         return JSONResponse(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            content={"detail": _safe_validation_errors(exc)},
+            content={
+                "detail": _safe_validation_errors(exc),
+                "code": error_codes.UNPROCESSABLE,
+            },
         )
 
     # Default-deny baseline (Security Prompt 5): every route on the main router inherits the

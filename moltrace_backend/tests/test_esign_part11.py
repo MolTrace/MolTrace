@@ -613,3 +613,89 @@ def test_an_unresolvable_target_type_still_signs_unbound(tmp_path):
         )
         assert res.status_code == 201, res.text
         assert res.json()["record_content_hash"] is None
+
+
+# --------------------------------------------------------------------------- #
+# The by-id half of the register gate.
+#
+# `list_signatures` was scoped to the signer WITHOUT these being scoped too, so
+# the list stopped enumerating other people's records while every by-id route
+# still served any of them -- and signature ids are sequential integers, so a
+# stranger only had to count. Verified by probe: a second account read another
+# user's signer identity and "approved" meaning straight off
+# GET /esignatures/records/{id}, plus /verify and /manifestation.
+#
+# That is the same half-applied-guard shape this codebase keeps producing, and
+# it was introduced by the commit that fixed the list. Pinned on all three
+# routes so the next person to scope one has to scope them all.
+# --------------------------------------------------------------------------- #
+def test_a_stranger_cannot_read_a_signature_by_id(tmp_path):
+    client = TestClient(_app(tmp_path))
+    with client:
+        alice = _signup(client, "byid-alice@example.com")
+        bob = _signup(client, "byid-bob@example.com")
+        _step_up(client, alice)
+        made = client.post(
+            "/esignatures/records",
+            headers=alice,
+            json={
+                "signer_name": "Alice",
+                "signature_meaning": "approved",
+                "target_type": "analysis",
+                "target_id": 4242,
+                "reason": "by-id scope",
+            },
+        )
+        assert made.status_code == 201, made.text
+        signature_id = made.json()["id"]
+
+        for suffix in ("", "/verify", "/manifestation"):
+            res = client.get(f"/esignatures/records/{signature_id}{suffix}", headers=bob)
+            assert res.status_code == 404, (
+                f"a stranger read /esignatures/records/{{id}}{suffix}: "
+                f"{res.status_code} {res.text[:160]}"
+            )
+
+
+def test_the_signer_still_reads_their_own_by_id(tmp_path):
+    """The gate must not close on the person it exists to protect."""
+    client = TestClient(_app(tmp_path))
+    with client:
+        alice = _signup(client, "byid-alice2@example.com")
+        _step_up(client, alice)
+        signature_id = client.post(
+            "/esignatures/records",
+            headers=alice,
+            json={
+                "signer_name": "Alice",
+                "signature_meaning": "approved",
+                "target_type": "analysis",
+                "target_id": 4242,
+                "reason": "owner path",
+            },
+        ).json()["id"]
+
+        for suffix in ("", "/verify", "/manifestation"):
+            res = client.get(f"/esignatures/records/{signature_id}{suffix}", headers=alice)
+            assert res.status_code == 200, f"the signer lost access to{suffix}: {res.text[:160]}"
+
+
+def test_the_system_key_still_reads_any_signature_by_id(tmp_path):
+    client = TestClient(_app(tmp_path))
+    with client:
+        alice = _signup(client, "byid-alice3@example.com")
+        _step_up(client, alice)
+        signature_id = client.post(
+            "/esignatures/records",
+            headers=alice,
+            json={
+                "signer_name": "Alice",
+                "signature_meaning": "approved",
+                "target_type": "analysis",
+                "target_id": 4242,
+                "reason": "oversight path",
+            },
+        ).json()["id"]
+
+        res = client.get(f"/esignatures/records/{signature_id}", headers={"x-api-key": "test-key"})
+        assert res.status_code == 200, "the system key lost its oversight view"

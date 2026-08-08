@@ -1361,12 +1361,17 @@ def verify_record_signature(
     signature_id: int,
     *,
     recompute: bool = False,
+    owner_scope_id: int | None = None,
 ) -> dict[str, Any] | None:
     """Verify a stored signature's integrity (§11.70). With ``recompute=True``, re-snapshot the
     current record and report whether the signed content has since changed. Returns None if the
     signature does not exist."""
     with session_scope(session_factory) as session:
         row = session.get(ElectronicSignatureRecordORM, signature_id)
+        if row is not None and owner_scope_id is not None and row.signer_user_id != owner_scope_id:
+            # Same gate as get_signature; a by-id read of someone
+            # else's signature is disclosure whichever route reaches it.
+            row = None
         if row is None:
             return None
         recomputed_content_hash: str | None = None
@@ -1386,10 +1391,16 @@ def verify_record_signature(
 def build_signature_manifestation(
     session_factory: sessionmaker[Session],
     signature_id: int,
+    *,
+    owner_scope_id: int | None = None,
 ) -> dict[str, Any] | None:
     """Structured §11.50 manifestation for a stored signature (the inspection-copy stamp)."""
     with session_scope(session_factory) as session:
         row = session.get(ElectronicSignatureRecordORM, signature_id)
+        if row is not None and owner_scope_id is not None and row.signer_user_id != owner_scope_id:
+            # Same gate as get_signature; a by-id read of someone
+            # else's signature is disclosure whichever route reaches it.
+            row = None
         if row is None:
             return None
         meta = _json_dict(row.metadata_json)
@@ -1453,10 +1464,28 @@ def list_signatures(
 def get_signature(
     session_factory: sessionmaker[Session],
     signature_id: int,
+    *,
+    owner_scope_id: int | None = None,
 ) -> ElectronicSignatureRecord | None:
+    """One signature record, or None when the caller may not see it.
+
+    ``list_signatures`` was scoped to the signer without this being scoped too,
+    which is the half-applied guard that keeps recurring here: the list stopped
+    enumerating other people's records while the by-id route still served any
+    of them, and signature ids are sequential integers. Verified by probe -- a
+    second account read another user's signer identity and "approved" meaning
+    straight off ``GET /esignatures/records/{id}``.
+
+    None covers both absent and not-yours so the caller returns a non-leaking
+    404: whether a given signature exists is itself disclosure.
+    """
     with session_scope(session_factory) as session:
         row = session.get(ElectronicSignatureRecordORM, signature_id)
-        return _signature_to_record(row) if row is not None else None
+        if row is None:
+            return None
+        if owner_scope_id is not None and row.signer_user_id != owner_scope_id:
+            return None
+        return _signature_to_record(row)
 
 
 def create_controlled_record(
