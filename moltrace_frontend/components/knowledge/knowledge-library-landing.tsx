@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { ArrowRight, ArrowUpRight, type LucideIcon } from "lucide-react"
+import { DestinationGrid, type Destination } from "@/components/app/destination-card"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { apiFetch } from "@/lib/api/client"
 import { formatApiError } from "@/components/spectracheck/spectracheck-helpers"
@@ -68,71 +68,39 @@ const PENDING_TASK_STATUSES = new Set(["open", "in_review", "needs_changes", "de
 const APPROVED_TASK_STATUS = "accepted"
 
 /**
- * The eleven destinations, grouped by what they are and rendered as cards.
+ * The eleven destinations, in the order the work happens: sources are ingested,
+ * extractions come off them, a human reviews those, and the reviewed output
+ * becomes records and then dataset candidates.
  *
- * The order inside the first three groups is the order the work actually happens
- * in: sources are ingested, extractions come off them, a human reviews those,
- * and the reviewed output becomes records and then dataset candidates. A flat
- * row of buttons threw that away and made "Method registry" look like a peer of
- * "Sources workspace".
+ * ONE FLAT LIST with the group as a pill, not grouped grids. A grid per group
+ * left ragged holes wherever a group's count was not a multiple of three; eleven
+ * cards now fill three full rows with two in the last, which is an ordinary
+ * ending rather than a hole in the middle.
  *
- * Each group carries one brand accent, which fills the card's left rule and
- * its icon — so the grid is scannable by colour before it is read.
- *
- * `leavesModule` is not decoration. Those three hrefs go to other modules
- * entirely, and a link that silently relocates you is worse than one that warns
- * you first — especially on a page whose own banner says extracted knowledge is
- * mid-review. They get the outward arrow; in-module cards get a forward one, so
- * the two are distinguishable at a glance rather than by reading the group label.
+ * The three under "Related work" go to other modules entirely. A link that
+ * silently relocates you is worse than one that says so first — especially on a
+ * page whose own banner says the extracted knowledge is mid-review — so those
+ * carry the outward arrow and say it in the pill.
  */
-const KNOWLEDGE_DESTINATIONS: ReadonlyArray<{
-  label: string
-  accent: string
-  ink: string
-  leavesModule?: boolean
-  items: ReadonlyArray<{ label: string; href: string; desc: string; icon: LucideIcon }>
-}> = [
-  {
-    label: "Ingest and review",
-    accent: "var(--mt-teal)",
-    ink: "var(--mt-teal-ink)",
-    items: [
-      { label: "Sources workspace", href: "/knowledge/sources", desc: "Ingested documents and where each one came from.", icon: FileStack },
-      { label: "Extractions workspace", href: "/knowledge/extractions", desc: "Extraction runs over those sources, and what each produced.", icon: Layers },
-      { label: "Review tasks", href: "/knowledge/review", desc: "Waiting on a human before anything downstream may use it.", icon: ClipboardCheck },
-    ],
-  },
-  {
-    label: "Reviewed records",
-    accent: "var(--mt-cyan)",
-    ink: "var(--mt-cyan-ink)",
-    items: [
-      { label: "Reaction records", href: "/knowledge/reactions", desc: "Reaction knowledge that has cleared review.", icon: BookText },
-      { label: "Analytical records", href: "/knowledge/analytical", desc: "Analytical knowledge that has cleared review.", icon: BarChart3 },
-      { label: "Regulatory records", href: "/knowledge/regulatory", desc: "Regulatory knowledge that has cleared review.", icon: BookMarked },
-    ],
-  },
-  {
-    label: "What those records feed",
-    accent: "var(--mt-violet)",
-    ink: "var(--mt-violet-ink)",
-    items: [
-      { label: "Dataset candidates", href: "/knowledge/datasets", desc: "Training and benchmark splits proposed from reviewed records.", icon: Database },
-      { label: "Model improvement", href: "/knowledge/model-improvement", desc: "The queue a model draws from when it is retrained.", icon: Sparkles },
-    ],
-  },
-  {
-    label: "Related work",
-    accent: "var(--mt-amber)",
-    ink: "var(--mt-amber-ink)",
-    leavesModule: true,
-    items: [
-      { label: "ML Model Factory", href: "/ml", desc: "Model training and evaluation.", icon: Cpu },
-      { label: "Validation runs", href: "/validation", desc: "Validation execution records.", icon: Library },
-      { label: "Method registry", href: "/settings/methods", desc: "Registered analytical methods.", icon: Wrench },
-    ],
-  },
+const TEAL = { accent: "var(--mt-teal)", ink: "var(--mt-teal-ink)", soft: "var(--mt-teal-soft)" }
+const CYAN = { accent: "var(--mt-cyan)", ink: "var(--mt-cyan-ink)", soft: "var(--mt-cyan-soft)" }
+const VIOLET = { accent: "var(--mt-violet)", ink: "var(--mt-violet-ink)", soft: "var(--mt-violet-soft)" }
+const AMBER = { accent: "var(--mt-amber)", ink: "var(--mt-amber-ink)", soft: "var(--mt-amber-soft)" }
+
+const KNOWLEDGE_DESTINATIONS: readonly Destination[] = [
+  { group: "Ingest and review", ...TEAL, label: "Sources workspace", href: "/knowledge/sources", desc: "Ingested documents and where each one came from.", icon: FileStack },
+  { group: "Ingest and review", ...TEAL, label: "Extractions workspace", href: "/knowledge/extractions", desc: "Extraction runs over those sources, and what each produced.", icon: Layers },
+  { group: "Ingest and review", ...TEAL, label: "Review tasks", href: "/knowledge/review", desc: "Waiting on a human before anything downstream may use it.", icon: ClipboardCheck },
+  { group: "Reviewed records", ...CYAN, label: "Reaction records", href: "/knowledge/reactions", desc: "Reaction knowledge that has cleared review.", icon: BookText },
+  { group: "Reviewed records", ...CYAN, label: "Analytical records", href: "/knowledge/analytical", desc: "Analytical knowledge that has cleared review.", icon: BarChart3 },
+  { group: "Reviewed records", ...CYAN, label: "Regulatory records", href: "/knowledge/regulatory", desc: "Regulatory knowledge that has cleared review.", icon: BookMarked },
+  { group: "What they feed", ...VIOLET, label: "Dataset candidates", href: "/knowledge/datasets", desc: "Training and benchmark splits proposed from reviewed records.", icon: Database },
+  { group: "What they feed", ...VIOLET, label: "Model improvement", href: "/knowledge/model-improvement", desc: "The queue a model draws from when it is retrained.", icon: Sparkles },
+  { group: "Related work", ...AMBER, leavesModule: true, label: "ML Model Factory", href: "/ml", desc: "Model training and evaluation.", icon: Cpu },
+  { group: "Related work", ...AMBER, leavesModule: true, label: "Validation runs", href: "/validation", desc: "Validation execution records.", icon: Library },
+  { group: "Related work", ...AMBER, leavesModule: true, label: "Method registry", href: "/settings/methods", desc: "Registered analytical methods.", icon: Wrench },
 ]
+
 
 export function KnowledgeLibraryLanding() {
   const [loading, setLoading] = useState(true)
@@ -308,65 +276,7 @@ export function KnowledgeLibraryLanding() {
           </Button>
         </div>
 
-        {KNOWLEDGE_DESTINATIONS.map((group) => (
-          <div key={group.label} className="space-y-3">
-            <p className="text-xs font-medium text-muted-foreground">
-              {group.label}
-              {group.leavesModule ? (
-                // The leading space is not decorative: ml-1.5 separates these
-                // visually but leaves the accessible name as "Related work—opens
-                // another module", run together for anyone listening to it.
-                <span className="ml-1.5 font-normal opacity-70">{" "}— opens another module</span>
-              ) : null}
-            </p>
-
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {group.items.map((item) => (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className="group relative flex h-full min-w-0 flex-col rounded-xl border bg-card p-5 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring motion-reduce:transition-none motion-reduce:hover:translate-y-0"
-                  /* The 3px left rule carries the group's colour without tinting
-                     any text — same signature as the module cards on the home
-                     page, so the two read as one system. */
-                  style={{ borderLeftWidth: "3px", borderLeftColor: group.accent }}
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex min-w-0 items-center gap-2">
-                      {/* Icons keep the vivid accent — shapes, not type, so the AA
-                          rule that pushes text to the ink tokens does not apply. */}
-                      <item.icon className="h-5 w-5 shrink-0" style={{ color: group.accent }} aria-hidden />
-                      <h3 className="min-w-0 text-sm font-semibold" style={{ color: group.ink }}>
-                        {item.label}
-                      </h3>
-                    </div>
-                    {group.leavesModule ? (
-                      <ArrowUpRight
-                        className="h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform duration-200 group-hover:-translate-y-0.5 group-hover:translate-x-0.5 motion-reduce:transition-none"
-                        aria-hidden
-                      />
-                    ) : (
-                      <ArrowRight
-                        className="h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform duration-200 group-hover:translate-x-0.5 motion-reduce:transition-none"
-                        aria-hidden
-                      />
-                    )}
-                  </div>
-
-                  {/* NO CATEGORY PILL HERE, deliberately. The reference this is
-                      modelled on uses one because it has no group headings — the
-                      pill is its only grouping signal. This layout does have
-                      headings, and they carry what a pill cannot: the order the
-                      work happens in, and the warning that a group leaves the
-                      module. Repeating the heading on all three cards beneath it
-                      would just be the same word three more times. The accent
-                      rule and icon already tie each card to its group. */}
-                  <p className="mt-3 text-sm leading-relaxed text-muted-foreground">{item.desc}</p>
-                </Link>
-              ))}
-            </div>
-          </div>
-        ))}
+        <DestinationGrid items={KNOWLEDGE_DESTINATIONS} />
       </section>
 
       {(errSources ||
