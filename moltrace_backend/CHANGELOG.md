@@ -14,6 +14,57 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.69.1 — A structure enumerator, validated against an answer it did not compute (2026-08-08)
+
+The generator half of computer-assisted structure elucidation.
+`spectroscopy/case/enumeration.py` returns **every** constitutional isomer consistent with an
+HRMS molecular formula and — optionally — the per-carbon hydrogen counts an HSQC supplies.
+Exhaustive rather than sampled, so "the true structure is not in this list" is a real statement
+instead of an artefact of how long the search ran.
+
+It is a **generator, never an arbiter**: it answers "what is consistent with the data", not
+"which is right". `verification.verify_structure` remains the sole arbiter.
+
+**Validated against a known answer, not against itself.** C₄H₁₀O yields exactly the seven
+textbook constitutional isomers — *n*-, iso-, *sec*- and *tert*-butanol, plus diethyl, methyl
+propyl and methyl isopropyl ether. Missing one would be unsound and inventing an eighth wrong,
+and both failures are silent without a case whose answer is known independently of the code.
+
+**HSQC carbon hydrogen counts are the constraint that makes this practical:**
+
+| formula | free | with HSQC C–H counts | prune |
+|---|---|---|---|
+| C₃H₆O | 9 | **1** | 9× |
+| C₄H₁₀O | 7 | **1** | 7× |
+| C₅H₁₂O | 14 | **1** | 14× |
+| C₄H₈O₂ | 122 | 15 | 8× |
+
+In four of five cases HSQC alone isolates a *single* structure. Knowing a carbon carries 3 H
+fixes it at one heavy-atom bond; 0 H fixes it at four — so HSQC converts a free-valence search
+into a degree-constrained one. This is why 2-D data matters for **generation**, not only for
+ranking, and it complements v0.68.8's finding that HMBC separates 99 % of the regioisomers ¹³C
+shifts resolve at only 37.7 %.
+
+**The cost is exponential, and the bound is measured rather than guessed:** 5 heavy atoms
+0.05 s, 6 → 0.52 s, 7 → 22.2 s — roughly 20–40× per added atom. Past the heavy-atom bound, the
+search-node budget or the candidate cap, it **refuses with a named cause and returns no
+candidates**. Returning a truncated list as if complete is the dangerous failure here: it invites
+the conclusion "the true structure is not among the candidates" when it was simply never reached.
+The budget is a **node count, not a timeout**, so an identical call gives an identical result on
+any machine at any load.
+
+Boundaries pinned by tests: stereochemistry is **not** enumerated (topological correlations
+cannot distinguish stereoisomers, so emitting them would imply evidence the inputs do not
+contain), and an element with no tabulated valence is refused rather than guessed at.
+
+**Not built:** enumeration constrained by HMBC itself. Using an observed cross-peak requires
+knowing which atom carries which shift, and assignment runs through the predictor whose error is
+the original problem. HMBC currently enters as a *filter* over enumerated candidates, not as a
+generation constraint; closing that needs assignment-free correlation matching and is its own
+change.
+
+---
+
 ## v0.69.0 — every automation task in the catalogue now records itself (2026-08-08)
 
 v0.65.0 instrumented the four priorities in the ROI handoff and left 17 of the 22 catalogue
