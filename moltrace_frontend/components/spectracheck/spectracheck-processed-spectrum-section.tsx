@@ -25,6 +25,7 @@ import {
   InferredNmrTextPanel,
   SpectraCheckEvidencePanels,
 } from "@/components/spectracheck/spectracheck-evidence-panels"
+import { findRelativeIntegralDisclosure } from "@/components/spectracheck/spectracheck-relative-integrals"
 import { SpectraCheckUseUnifiedEvidenceButton } from "@/components/spectracheck/spectracheck-use-unified-evidence-button"
 import { SpectrumResultsFullscreen } from "@/components/spectracheck/spectracheck-fullscreen-results"
 import { formatApiError } from "@/components/spectracheck/spectracheck-helpers"
@@ -312,6 +313,8 @@ export function SpectraCheckProcessedSpectrumSection({
     trackFileUploaded({
       session_id: ws?.backendSessionId ?? undefined,
       metadata: {
+        core_module: "spectracheck",
+        task_key: "nmr_processed_preview",
         file_kind: "processed_nmr",
         file_size_bytes: file.size,
         has_sha256: Boolean(rec?.sha256),
@@ -731,8 +734,22 @@ export function SpectraCheckProcessedSpectrumSection({
   )
   const warnings = useMemo(() => extractWarnings(displayPayload ?? {}), [displayPayload])
   const notes = useMemo(() => extractNotes(displayPayload ?? {}), [displayPayload])
+  // Set when no structure grounded the proton budget, so `integration_h` below
+  // holds multiples of the smallest resolved signal rather than proton counts.
+  const relativeIntegrals = useMemo(
+    () => findRelativeIntegralDisclosure(displayPayload),
+    [displayPayload],
+  )
 
-  /** Build the canonical NMR-text string for the NMR-text tab handoff. */
+  /**
+   * Build the canonical NMR-text string for the NMR-text tab handoff.
+   *
+   * The `H` suffix stays even when {@link relativeIntegrals} says the scale is
+   * ungrounded, for the same reason the backend keeps it in `inferred_nmr_text`:
+   * this string is not display copy, it is re-parsed on arrival, and the parser
+   * requires an `NH` integral — `124 rel.` raises `PeakParseError` and the
+   * handoff stops working. The card below carries the qualification instead.
+   */
   const nmrTextFromPeaks = useCallback((): string | null => {
     const rawPeaks = Array.isArray((displayPayload as { peaks?: unknown })?.peaks)
       ? ((displayPayload as { peaks: unknown[] }).peaks as Array<Record<string, unknown>>)
@@ -1487,6 +1504,24 @@ export function SpectraCheckProcessedSpectrumSection({
                       </p>
                     </div>
                   </div>
+                  {/* Only on 1H: the 13C string carries shifts alone, so there is
+                      no integral to misread. The string keeps its "H" so it stays
+                      parseable on arrival (see nmrTextFromPeaks), which is exactly
+                      why the reader has to be told here — this is the last screen
+                      where the numbers are still labelled as ratios. */}
+                  {nucleus === "1H" && relativeIntegrals ? (
+                    <p
+                      className="w-full text-[11px] leading-snug"
+                      style={{ color: "var(--mt-amber-ink)" }}
+                      data-testid="processed-send-to-nmr-text-relative-warning"
+                    >
+                      These integrals are ratios, not proton counts — no structure set a
+                      proton budget. The pushed text still writes them as{" "}
+                      <span className="font-mono">H</span> so it stays readable by the
+                      analyzer, so check them against a structure before running evidence:
+                      matched against one, they will be rejected as a proton-count mismatch.
+                    </p>
+                  ) : null}
                   <Button
                     type="button"
                     size="sm"

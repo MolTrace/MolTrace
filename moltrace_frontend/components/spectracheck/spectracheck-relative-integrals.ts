@@ -9,11 +9,25 @@
  * ``0.008 0.098 0.094 1.0 0.5`` against a 6 H structural budget and
  * ``1.0 14.0 13.5 123.5 84.5`` with no budget at all.
  *
- * The backend now says so in ``warnings[]`` on every ungrounded response
- * (``nmrcheck.integration_scale.RELATIVE_INTEGRAL_DISCLOSURE``). It cannot yet
- * fix the *rendering* — ``inferred_nmr_text`` still prints ``123.5H`` — so
- * until that lands the frontend is the only place a reader can be told that the
- * ``H`` on screen is a ratio rather than a measurement.
+ * The backend says so in ``warnings[]`` on every ungrounded response
+ * (``nmrcheck.integration_scale.RELATIVE_INTEGRAL_DISCLOSURE``), but it does not
+ * relabel the numbers themselves — ``inferred_nmr_text`` still prints ``123.5H``
+ * — and that is settled, not pending. The string is not display-only: it is fed
+ * back in as ``AnalysisInputs.nmr_text`` and re-parsed, and the parser requires
+ * an ``NH`` integral, so ``123.5 rel.`` raises ``PeakParseError``. Relabelling at
+ * source would stop the FID path producing analysable text at all — a functional
+ * regression traded for a cosmetic gain.
+ *
+ * So this module is the permanent home of that relabelling, not a stopgap
+ * awaiting a backend fix: the frontend is the only layer that can say the ``H``
+ * on screen is a ratio without also breaking the round trip. Do not delete it in
+ * anticipation of a producer-side fix. Teaching the parser a relative notation
+ * would be a core-contract change affecting every reader of NMR text.
+ *
+ * One hazard this does *not* have to defend against: ungrounded numbers pasted
+ * into a structured analysis are refused by name ("the parsed text accounts for
+ * 152H, but the structure expects 6 total H"). The backend already stops them
+ * being *used* as counts; the job here is to stop them *looking* like counts.
  */
 
 import { isRecord } from "@/components/spectracheck/spectracheck-nmr-result-parse"

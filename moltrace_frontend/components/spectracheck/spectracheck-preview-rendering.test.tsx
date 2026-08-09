@@ -1068,3 +1068,90 @@ describe("SpectraCheck preview rendering", () => {
     await waitFor(() => expect(apiFetchMock).toHaveBeenCalledWith("/nmr/raw-fid/preview", expect.any(Object)))
   })
 })
+
+describe("cross-tab NMR-text handoff — the ungrounded proton scale", () => {
+  beforeEach(() => {
+    apiFetchMock.mockReset()
+    spectrumViewerMock.mockClear()
+  })
+
+  // Verbatim `nmrcheck.integration_scale.RELATIVE_INTEGRAL_DISCLOSURE`.
+  const DISCLOSURE =
+    "These integrals are relative. With no structure to set a proton budget, the " +
+    "smallest resolved signal is set to 1 H and every other signal is reported as " +
+    "a multiple of it, so the values are ratios between signals rather than proton " +
+    "counts. Supply a valid structure to scale them to its proton budget."
+
+  /** A processed preview whose integrals are multiples of the smallest signal.
+   *  The values are the measured fixture-33 leading peaks. */
+  function previewPayload({
+    warnings,
+    nucleus = "1H",
+  }: {
+    warnings: string[]
+    nucleus?: "1H" | "13C"
+  }) {
+    return {
+      sample_id: "sample-1",
+      nucleus,
+      filename: "trace.csv",
+      point_count: 3,
+      x: [4.2, 4.1, 4],
+      y: [0, 3, 0],
+      peaks: [
+        { shift_ppm: 7.25, multiplicity: "m", integration_h: 123.5 },
+        { shift_ppm: 1.25, multiplicity: "t", integration_h: 84.5, j_values_hz: [7] },
+      ],
+      warnings,
+      notes: [],
+      metadata: {},
+    }
+  }
+
+  async function runPreview(payload: unknown, nucleus: "1H" | "13C" = "1H") {
+    apiFetchMock.mockResolvedValueOnce(payload)
+    renderWithEvidence(
+      <SpectraCheckProcessedSpectrumSection
+        sampleId="sample-1"
+        onSampleIdChange={() => {}}
+        solvent="CDCl3"
+        candidatesText=""
+      />,
+    )
+    // Nucleus is internal state, not a prop — drive the Step 1 pill toggle.
+    if (nucleus === "13C") {
+      fireEvent.click(screen.getByRole("button", { name: "13C" }))
+    }
+    fireEvent.change(screen.getByLabelText(/Processed spectrum file/i, { selector: "input" }), {
+      target: { files: [new File(["ppm,intensity\n4.2,0\n"], "trace.csv")] },
+    })
+    fireEvent.click(screen.getByRole("button", { name: /Inspect spectrum/i }))
+    await waitFor(() =>
+      expect(apiFetchMock).toHaveBeenCalledWith("/nmr/processed/preview", expect.any(Object)),
+    )
+    return screen.findByTestId("processed-send-to-nmr-text")
+  }
+
+  it("qualifies the handoff when no structure grounded the proton budget", async () => {
+    await runPreview(previewPayload({ warnings: ["Residual CDCl3 at 7.26 ppm.", DISCLOSURE] }))
+    const warning = await screen.findByTestId("processed-send-to-nmr-text-relative-warning")
+    expect(warning.textContent).toMatch(/ratios, not proton counts/i)
+  })
+
+  it("leaves a structure-grounded handoff unqualified", async () => {
+    await runPreview(previewPayload({ warnings: ["Residual CDCl3 at 7.26 ppm."] }))
+    expect(
+      screen.queryByTestId("processed-send-to-nmr-text-relative-warning"),
+    ).not.toBeInTheDocument()
+  })
+
+  it("does not qualify a 13C handoff — that string carries no integrals", async () => {
+    await runPreview(
+      previewPayload({ warnings: [DISCLOSURE], nucleus: "13C" }),
+      "13C",
+    )
+    expect(
+      screen.queryByTestId("processed-send-to-nmr-text-relative-warning"),
+    ).not.toBeInTheDocument()
+  })
+})
