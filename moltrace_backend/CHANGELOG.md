@@ -878,8 +878,10 @@ Three rules it enforces:
 
 * **Fail loud, degrade recorded.** An engine that cannot run raises; the route answers 503. It
   never substitutes a caller-supplied number for a computed one.
-* **Provenance is mandatory.** Every result carries `model_versions` (artifact id → SHA-256).
-  A result with an empty map is refused inside the adapter rather than stored with a gap.
+* **Provenance is mandatory.** Every result carries `model_versions` — each component that ran,
+  at the version it ran (a registry artifact's SHA-256 on the routed-prediction path, a pinned
+  method tag for a published algorithm like DP4). A result with an empty map is refused inside
+  the adapter rather than stored with a gap.
 * **Lazy import**, so the ~800-route app still builds without the ML extras.
 
 `nmr_shift_prediction` now routes through `InferenceRouter` (LoRA → NMRNet → HOSE, with the

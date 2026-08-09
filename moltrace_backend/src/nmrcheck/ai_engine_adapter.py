@@ -13,8 +13,11 @@ This module is the wire. Three rules, in priority order:
    :class:`EngineUnavailable`. It never substitutes a caller-supplied number for a
    computed one, and it never invents one — that is the failure mode it exists to end.
 2. **Provenance is mandatory.** Every :class:`EngineResult` carries the
-   ``model_versions`` map (artifact id → SHA-256) of everything that touched the
-   number. A result with an empty map is rejected here, not stored with a gap.
+   ``model_versions`` map of everything that touched the number: each component
+   keyed by name, mapped to the version it ran at — a registry artifact's SHA-256
+   on the routed-prediction path, a pinned method tag for a published algorithm
+   (DP4 reports ``{"dp4_scoring": "smith_goodman_2010"}``). A result with an empty
+   map is rejected here, not stored with a gap.
 3. **Lazy import.** ``moltrace.spectroscopy.ai`` pulls RDKit and optionally torch.
    Everything is imported inside the function that needs it, so the ~800-route app
    still builds in environments without the ML extras.
