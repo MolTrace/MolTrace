@@ -92,11 +92,19 @@ export default async function OpengraphImage() {
           padding: "64px",
         }}
       >
-        {/* Mark ABOVE the wordmark, not beside it. Side by side, the block sits
-            around x=335..855, so a client that crops to the right-hand square
-            loses the mark completely. Stacked, the mark sits on the horizontal
-            centre line and survives a left, centre or right crop alike — which
-            is the whole point of the change. */}
+        {/* Mark ABOVE the wordmark, not beside it. Side by side, the mark sits at
+            the block's far left, so what a preview keeps depends entirely on
+            which way the client crops. Fraction of the mark's width kept by a
+            630px square crop, measured on the docs card that still used the
+            horizontal lockup:
+
+                      left    centre   right
+              beside   100%      96%      0%    <- worst case: no mark at all
+              stacked   64%     100%     64%    <- worst case: most of the mark
+
+            Stacked is not better everywhere and is not meant to be — it gives up
+            a perfect left crop. What it buys is the worst case, which is the only
+            number that matters when you do not control the cropper. */}
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "18px" }}>
           {/* A plain <img>: next/og renders to a raster, so next/image has no
               meaning inside an ImageResponse. */}
