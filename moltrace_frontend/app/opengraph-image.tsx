@@ -30,8 +30,7 @@ export const contentType = "image/png"
  * keeps, it keeps the brand.
  */
 export default async function OpengraphImage() {
-  // The dimensional mark — the same one the favicons, the PWA icons and the docs
-  // card use.
+  // The dimensional mark.
   //
   // I briefly swapped this for a flat variant on the reasoning that bloom, bevel
   // and a gradient "m" would turn to mush once a chat client scaled the card to a
@@ -41,10 +40,39 @@ export default async function OpengraphImage() {
   // one is richer. Swapping it also made this the only surface in the product not
   // using the brand mark, which is a real cost paid for an imagined benefit.
   //
+  // HOW moltrace-mark-3d-512.png WAS DERIVED, because the master render is not in
+  // this repo and the step is not obvious. The master arrives as RGB with NO alpha
+  // channel — the mark floats on its own near-black square. Dropping that straight
+  // onto the card left a visible seam: the square stayed distinguishable from the
+  // gradient behind it however carefully the two navies were matched, because the
+  // master carries a subtle vignette (corners rgb(0,7,19), mid-edges rgb(0,12,29))
+  // and a flat backdrop cannot match a gradient at every point.
+  //
+  // Since the art is glow-on-near-black, luminance IS opacity. So alpha is derived
+  // from the greyscale channel with a contrast curve, which drops the backdrop to
+  // fully transparent while keeping the bloom's falloff intact — a hard threshold
+  // would have cut a halo ring around the glow:
+  //
+  //   const base = sharp(master).resize(420, 420, { fit: "inside" })
+  //   const rgb   = await base.clone().removeAlpha().toBuffer()
+  //   const alpha = await base.clone().greyscale().linear(2.4, -12).toBuffer()
+  //   const out = await sharp(rgb).joinChannel(alpha)
+  //     .png({ compressionLevel: 9, palette: true }).toBuffer()
+  //   writeFileSync(dest, out)   // NOT sharp(out).toFile(dest) — see below
+  //
+  // 420px is a true 2× of the 210px slot, and palette quantisation is safe on a
+  // narrow blue ramp — together they took the asset from 454KB to 81KB with no
+  // visible difference in the rendered card, which matters because the edge
+  // runtime fetches this file on every render.
+  //
+  // Write the encoded buffer directly. Handing it back to `sharp(buf).toFile()`
+  // re-encodes it under default options and silently discards the palette, which
+  // is how this first landed at 136KB — 68% over what the buffer had measured.
+  //
   // Fetched relative to this module so it works in the edge runtime, where there
   // is no filesystem.
-  const mark = await fetch(new URL("../public/icons/icon-512.png", import.meta.url)).then((res) =>
-    res.arrayBuffer(),
+  const mark = await fetch(new URL("../public/icons/moltrace-mark-3d-512.png", import.meta.url)).then(
+    (res) => res.arrayBuffer(),
   )
 
   return new ImageResponse(
@@ -72,7 +100,7 @@ export default async function OpengraphImage() {
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "18px" }}>
           {/* A plain <img>: next/og renders to a raster, so next/image has no
               meaning inside an ImageResponse. */}
-          <img src={mark as unknown as string} width={170} height={170} alt="" />
+          <img src={mark as unknown as string} width={210} height={210} alt="" />
           <div style={{ fontSize: "86px", fontWeight: 800, color: "#f4f9fc", letterSpacing: "-0.02em" }}>
             {SITE_NAME}
           </div>
