@@ -435,3 +435,81 @@ leave a 1.5x multiplier on a score that rewards incompleteness.
 Not yet checked: whether `unified_confidence.py` applies the same priors — the
 multipliers do not appear in that module, so its 2D handling is a separate
 question and should not be assumed to share this defect.
+
+---
+
+## C4 RESULT — the denominator is structural now (2026-08-09)
+
+### The tolerance question answered itself, and changed the design
+
+C4 called for a rectangular per-axis tolerance derived from the predictor's
+measured residual distribution. That measurement was done first, using the fitted
+error model from `fit_error_model` (1H scale 0.162 / ν 1.23; 13C scale 1.665 /
+ν 1.24 — heavy-tailed):
+
+```
+        90 % of predictions within      95 %
+  1H          ± 0.752 ppm            ± 1.339 ppm
+  13C         ± 7.650 ppm            ± 13.560 ppm
+```
+
+**A window holding 90 % of this predictor's 1H predictions is ±0.75 ppm** — most
+of the aliphatic region. Matching observed peaks against *predicted* shifts
+cannot work at this accuracy: the window needed to avoid false misses is wide
+enough to match almost anything.
+
+So the structure is used only for the **count** of distinct H–C environments,
+which comes from graph symmetry and is exact chemistry rather than a prediction.
+Matching stays where it already was — observed 2D peaks against *observed* 1D
+shifts, which are measured. The denominator becomes real without inheriting the
+predictor's inaccuracy. Tolerance-based per-correlation matching is deferred
+until a predictor exists that can support it (the spec's TransPeakNet is the
+candidate).
+
+### Measured, on the same probe C1 used
+
+```
+observed          evidence_score          missing_reference_count
+                 before    after          before   after
+all 7             0.8047   0.8047            0        0
+2 of 7 (5 gone)   0.8218   0.2348            0        5
+1 of 7 (6 gone)   0.6552   0.0936            0        6
+```
+
+The complete spectrum is **unchanged** — no regression on the correct case. The
+incomplete ones now fall, and `missing_reference_count` reports the truth for the
+first time.
+
+Structural coverage multiplies rather than adds. An HSQC explaining two of seven
+predicted environments is not "slightly less good" than a complete one: most of
+the molecule is unaccounted for, and every other term in the score is computed
+over the peaks that *are* present, so none of them can see the absence.
+
+### What was found while building it
+
+Symmetry collapse was first written against **predicted shifts**, and the tests
+caught it. The heuristic predictor returns 14.00 ppm for all three ibuprofen
+methyls and 129.0 for all four aromatic CH, so shift-based collapse merged
+chemically distinct environments and produced 5 expectations where a real HSQC
+shows 7 — a denominator too *small*, letting coverage exceed 100 %. Equivalence
+is a property of the molecule, so it now collapses on RDKit canonical ranks with
+`breakTies=False`. Verified: ethanol 2, benzene 1 (six equivalent atoms),
+ibuprofen 7 with equivalents `[2,1,1,1,1,2,2]`, CCl4 0.
+
+`missing_reference_count` was also **mis-named for what it computed**: observed
+correlations matching no reference — an *unexpected* peak, not a missing one.
+That is why it read 0 while six of seven were absent. With a structure it now
+means what its name says; without one it keeps the old meaning, because renaming
+a field on a live contract is a separate change.
+
+### Still open
+
+* **HMBC has no structural denominator** and deliberately so — 2- and 3-bond
+  correlations, sometimes 4 through conjugation, and 2-bond ones frequently
+  absent. A structural denominator there would punish correct structures. C5.
+* **The `nmr2d` class multipliers** (carbohydrates 1.50, flavonoids 1.40,
+  glycoproteins 1.40, alkaloids 1.30) are now multiplying a score that can fail
+  for the right reason. Whether those values are still the right ones against the
+  changed score is C8's question, not an assumption to carry.
+* **Per-correlation matching** — knowing *which* environment is missing rather
+  than how many — needs a predictor accurate enough for a usable window.

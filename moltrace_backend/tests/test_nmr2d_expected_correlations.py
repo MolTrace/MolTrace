@@ -160,3 +160,99 @@ class TestCoverageIsReportable:
             f"{full.coverage} vs {half.coverage}"
         )
         assert full.coverage == pytest.approx(1.0)
+
+
+class TestTheAnalyzerReportsStructuralCoverage:
+    """C4 step 2 — the wiring. What C1 measured as broken, asserted fixed.
+
+    The tolerance question was settled by measurement, and the answer shaped the
+    design. The predictor's fitted error model (c59ba75) is heavy-tailed —
+    1H scale 0.162 / nu 1.23, 13C scale 1.665 / nu 1.24 — so a window holding
+    90 % of its predictions is **+/- 0.75 ppm on 1H and +/- 7.7 ppm on 13C**.
+    That is wide enough to match almost any proton to almost any expectation, so
+    matching observed peaks against *predicted* shifts cannot work with this
+    predictor.
+
+    It does not need to. The structure is used only for the **count** of distinct
+    H-C environments, which comes from graph symmetry and is exact chemistry, not
+    a prediction. Matching stays where it already was — observed 2D peaks against
+    *observed* 1D shifts, which are measured. So the denominator becomes real
+    without inheriting the predictor's inaccuracy.
+    """
+
+    IBU = "CC(C)Cc1ccc(cc1)C(C)C(=O)O"
+    PROTON = ("7.22 (d, 2H), 7.10 (d, 2H), 3.70 (q, 1H), 2.45 (d, 2H), "
+              "1.85 (m, 1H), 1.50 (d, 3H), 0.90 (d, 6H)")
+    CARBON = "181.0, 141.0, 137.0, 129.3, 127.1, 45.1, 45.0, 30.2, 22.4, 18.1"
+    PAIRS = [(7.22, 129.3), (7.10, 127.1), (3.70, 45.1), (2.45, 45.0),
+             (1.85, 30.2), (1.50, 18.1), (0.90, 22.4)]
+
+    def _run(self, pairs):
+        from nmrcheck.nmr2d_analyzer import analyze_nmr2d_preview
+        from nmrcheck.nmr2d_models import (
+            NMR2DExperimentType, NMR2DPeak, NMR2DPreviewReport,
+        )
+        peaks = [
+            NMR2DPeak(f2_ppm=h, f1_ppm=c, intensity=1.0e6,
+                      experiment=NMR2DExperimentType.HSQC,
+                      f2_nucleus="1H", f1_nucleus="13C")
+            for h, c in pairs
+        ]
+        preview = NMR2DPreviewReport(
+            filename="c4.csv", experiment_detected=NMR2DExperimentType.HSQC,
+            peak_count=len(peaks), peaks=peaks,
+        )
+        return analyze_nmr2d_preview(
+            preview, proton_nmr_text=self.PROTON, carbon13_text=self.CARBON,
+            smiles=self.IBU, solvent="CDCl3",
+        )
+
+    def test_missing_correlations_are_counted(self) -> None:
+        """C1: this reported 0 while six of seven were absent."""
+        result = self._run(self.PAIRS[:1])
+        assert result.missing_reference_count >= 5, (
+            f"only {result.missing_reference_count} reported missing with one "
+            "correlation observed against a seven-environment structure"
+        )
+
+    def test_a_complete_spectrum_reports_nothing_missing(self) -> None:
+        result = self._run(self.PAIRS)
+        assert result.missing_reference_count == 0, (
+            f"a complete HSQC reported {result.missing_reference_count} missing"
+        )
+
+    def test_withholding_correlations_no_longer_scores_higher(self) -> None:
+        """The C1 headline, inverted.
+
+        Measured before this change: all 7 -> 0.8047, only 2 of 7 -> 0.8218.
+        Showing less of the molecule scored better. Score need not be strictly
+        monotonic for every pair, but a spectrum missing five of seven
+        correlations must not beat a complete one.
+        """
+        full = self._run(self.PAIRS)
+        partial = self._run(self.PAIRS[:2])
+        assert partial.evidence_score <= full.evidence_score, (
+            f"withholding five of seven correlations still scored higher: "
+            f"{partial.evidence_score} vs {full.evidence_score}"
+        )
+
+    def test_no_structure_means_no_structural_denominator(self) -> None:
+        """Without a structure there is nothing to be missing from."""
+        from nmrcheck.nmr2d_analyzer import analyze_nmr2d_preview
+        from nmrcheck.nmr2d_models import (
+            NMR2DExperimentType, NMR2DPeak, NMR2DPreviewReport,
+        )
+        peaks = [NMR2DPeak(f2_ppm=7.22, f1_ppm=129.3, intensity=1e6,
+                           experiment=NMR2DExperimentType.HSQC,
+                           f2_nucleus="1H", f1_nucleus="13C")]
+        preview = NMR2DPreviewReport(
+            filename="c4.csv", experiment_detected=NMR2DExperimentType.HSQC,
+            peak_count=1, peaks=peaks,
+        )
+        result = analyze_nmr2d_preview(
+            preview, proton_nmr_text=self.PROTON, carbon13_text=self.CARBON,
+            smiles=None, solvent="CDCl3",
+        )
+        assert result.missing_reference_count == 0, (
+            "reported missing correlations with no structure to expect them from"
+        )
