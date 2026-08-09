@@ -50,9 +50,27 @@ So `predict_msms_candidates` **cannot turn an MS/MS spectrum into structures**
 unless a caller injects its own `backend=` callable. It fails honestly rather
 than fabricating — which is the right design — but the build spec names
 "MS/MS → structure via CSI:FingerID" as a **differentiator**, and
-`fuse_candidates` is documented as combining NMR + MS/MS + RT. Checked
-2026-08-09: the whitepapers do **not** currently claim it works. Keep it that
-way until D7 changes the answer.
+`fuse_candidates` is documented as combining NMR + MS/MS + RT.
+
+**The public copy already claims it, and that is a deliberate decision — do not
+"fix" it.** Three whitepapers carry the claim (`MolTrace_White_Paper.md`,
+`_Technical.md`, `_Sales.md`). The technical one reads:
+
+> `ai/ms_models.py` integrates **CSI:FingerID** via **SIRIUS** … to predict
+> molecular fingerprints and ranked candidate structures from an MS/MS spectrum
+> … degrading to `available=False` on a host without a configured backend.
+
+That disclosure describes an *unconfigured host*, not an *unimplemented feature*
+— with a backend configured, both paths raise. The maintainer reviewed this on
+2026-08-09 and chose to leave the copy standing because the integration is being
+built. Recorded here so the gap is known while D7 is outstanding, and so a later
+session does not strip the sentence thinking it is an oversight.
+
+**Correction to an earlier version of this file**, which stated the whitepapers
+did not claim it. They do. That line came from grepping two of six whitepapers,
+no marketing pages, and treating an empty result from an unverified command as a
+finding — an empty grep is not an absence, the same rule this playbook applies to
+everything else.
 
 ---
 
@@ -212,8 +230,10 @@ every tolerance below is derived from it.
 > 3. **Withdraw the claim** from the build spec and keep the honest
 >    `CSIFingerIDUnavailable` failure.
 >
-> Whichever is chosen: **verify no public copy claims it works** before shipping
-> anything. Checked 2026-08-09 — the whitepapers are clean; the build spec is not.
+> Whichever is chosen: the public copy **already** claims it (three whitepapers,
+> see above), left standing deliberately pending the build. So option 3 is not
+> just a spec edit — it means correcting live copy. If option 1 is taken, the
+> claim becomes true and nothing needs changing; that is the plan of record.
 > Public copy is verified against backend source, never against other copy.
 
 ---
