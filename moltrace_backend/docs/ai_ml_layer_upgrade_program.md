@@ -88,7 +88,7 @@ built before the engine it was meant to record. What is missing is the wire betw
 
 ### A3. Corrections to the AI Operations Roadmap, from this checkout
 
-The roadmap is sound strategy and its ordering critique is right. Five premises have since moved:
+The roadmap is sound strategy and its ordering critique is right. Six premises have since moved:
 
 1. **"Do not train any custom models in the first 90 days"** — followed, and it worked. The
    largest accuracy gain to date (**18.6× on ¹³C uncertainty**, 35.0 → 1.88 ppm median σ) came
