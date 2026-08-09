@@ -99,8 +99,7 @@ async function buildCardMark() {
  * had, so the mark reads as a dark hexagon with a lit rim: high contrast on a
  * white header, and no dark square around it.
  */
-async function buildChromeMark() {
-  const N = 128
+async function buildChromeMark(N = 128) {
   const S = 512
   // Materialise the resize before extracting — chaining resize().extract()
   // computes the crop against the pre-resize geometry and throws.
@@ -169,6 +168,11 @@ async function buildChromeMark() {
 const outputs = [
   ["moltrace-mark-3d-512.png", await buildCardMark()],
   ["moltrace-mark-3d-hex-128.png", await buildChromeMark()],
+  // The large hex is for display sizes — the docs site's 400px splash hero. It
+  // is a separate file rather than one asset for both because the 128 is fetched
+  // in the header of every page, and shipping a 512 there to serve a 32px slot
+  // would be ~5x the bytes on the hot path to help two pages.
+  ["moltrace-mark-3d-hex-512.png", await buildChromeMark(512)],
 ]
 for (const [name, data] of outputs) {
   writeFileSync(join(ICONS, name), data)
