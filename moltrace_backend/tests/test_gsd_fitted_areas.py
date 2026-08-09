@@ -46,11 +46,19 @@ def _pseudo_voigt_area(amp: float, hwhm: float, eta: float) -> float:
     return amp * (eta * math.pi * hwhm + (1.0 - eta) * hwhm * math.sqrt(math.pi / _LN2))
 
 
-def test_the_return_type_still_carries_no_area() -> None:
-    """Pins the defect. When the fix lands this fails and is re-baselined.
+def test_the_return_type_now_carries_the_fitted_area() -> None:
+    """RE-BASELINED. This asserted `len(line) == 3` and was written to fail here.
 
-    Kept deliberately blunt: the tuple width IS the contract, and widening it is
-    the smallest change that lets a caller use the fit for quantitation.
+    Its own message said: "if it carries an area, re-baseline this test and wire
+    it into spectrum.py". That is what happened. The tuple is now
+    ``(centre, height, hwhm, area)``.
+
+    Widening the return is the whole point. Every fitted area exists at the
+    moment of the fit, where ``eta`` is in scope; dropping it forced any consumer
+    to reconstruct the area from height and width alone, which silently assumes a
+    pure Lorentzian and overstates a pseudo-Voigt line by up to ~32 %. The
+    reconstruction could not be corrected from outside the function, because the
+    parameter it needs was the one being discarded.
     """
     x = np.linspace(0.0, 2.0, 400)
     y = _lorentzian(x, 0.8, 100.0, 0.02) + _lorentzian(x, 1.2, 300.0, 0.02)
@@ -58,9 +66,60 @@ def test_the_return_type_still_carries_no_area() -> None:
         list(x), list(y), [0.8, 1.2], noise_sigma=0.5, max_lines=8
     )
     assert lines, "deconvolution declined a clean two-line region"
-    assert all(len(line) == 3 for line in lines), (
-        "deconvolve_region now returns more than (centre, height, hwhm) — if it "
-        "carries an area, re-baseline this test and wire it into spectrum.py"
+    assert all(len(line) == 4 for line in lines), (
+        f"expected (centre, height, hwhm, area) per line, got widths "
+        f"{sorted({len(line) for line in lines})}"
+    )
+    assert all(line[3] > 0.0 for line in lines), "a fitted line reported no area"
+
+
+def test_the_reported_area_is_the_analytic_pseudo_voigt_area() -> None:
+    """The area must come from inside the fit, not be re-derived outside it.
+
+    Checked against the closed form for the shape the module actually fits --
+    ``amp * (eta * Lorentzian + (1 - eta) * Gaussian)`` sharing one hwhm, so
+    ``area = amp * (eta * pi * w + (1 - eta) * w * sqrt(pi / ln 2))``. A pure
+    Lorentzian is the one case where the naive ``h * pi * w`` reconstruction is
+    also correct, so it is used here as the anchor that ties the two together.
+    """
+    x = np.linspace(0.0, 2.0, 600)
+    height, hwhm = 200.0, 0.02
+    y = _lorentzian(x, 1.0, height, hwhm)
+    lines = deconvolve_region(list(x), list(y), [1.0], noise_sigma=0.5, max_lines=4)
+    assert len(lines) == 1, f"a single clean Lorentzian resolved into {len(lines)} lines"
+
+    _, fitted_height, fitted_hwhm, area = lines[0]
+    lorentzian_area = fitted_height * math.pi * fitted_hwhm
+    assert area == pytest.approx(lorentzian_area, rel=0.05), (
+        f"reported area {area:.4g} does not match the analytic Lorentzian area "
+        f"{lorentzian_area:.4g} for the same fitted height and width"
+    )
+
+
+def test_a_gaussian_line_is_not_billed_as_a_lorentzian() -> None:
+    """The 32 % overstatement this change exists to remove.
+
+    For one height and width, a Gaussian holds ``sqrt(pi/ln2)/pi`` ~ 0.6 of a
+    Lorentzian's area. A consumer reconstructing ``h * pi * w`` from the old
+    3-tuple would bill a Gaussian line ~66 % too high; the reported area must
+    track the shape that was actually fitted.
+    """
+    x = np.linspace(0.0, 2.0, 600)
+    height, hwhm = 200.0, 0.02
+    y = height * np.exp(-_LN2 * ((x - 1.0) / hwhm) ** 2)
+    lines = deconvolve_region(list(x), list(y), [1.0], noise_sigma=0.5, max_lines=4)
+    assert len(lines) == 1, f"a single clean Gaussian resolved into {len(lines)} lines"
+
+    _, fitted_height, fitted_hwhm, area = lines[0]
+    naive_lorentzian = fitted_height * math.pi * fitted_hwhm
+    gaussian_area = fitted_height * fitted_hwhm * math.sqrt(math.pi / _LN2)
+
+    assert area == pytest.approx(gaussian_area, rel=0.10), (
+        f"reported area {area:.4g} is not the Gaussian area {gaussian_area:.4g}"
+    )
+    assert area < naive_lorentzian * 0.75, (
+        "the reported area is indistinguishable from the pure-Lorentzian "
+        "reconstruction, so eta is not reaching the area calculation"
     )
 
 

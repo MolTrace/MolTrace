@@ -64,6 +64,27 @@ _SIMPLE_MULTIPLICITY: dict[int, str] = {
 }
 
 
+def pseudo_voigt_area(amplitude: float, hwhm: float, eta: float) -> float:
+    """Analytic area of one fitted line.
+
+    Closed form for the shape :func:`_pseudo_voigt_sum` fits --
+    ``amp * (eta * Lorentzian + (1 - eta) * Gaussian)`` with a shared half-width
+    at half-maximum, so ``eta`` is the LORENTZIAN fraction::
+
+        integral of  w^2 / (x^2 + w^2)        = pi * w
+        integral of  exp(-ln2 * x^2 / w^2)    = w * sqrt(pi / ln 2)
+
+    It lives here, beside the lineshape, because ``eta`` only exists inside the
+    fit. Reconstructing an area downstream from height and width alone silently
+    assumes a pure Lorentzian and overstates a Gaussian-leaning line by up to
+    ~66 % (pi vs sqrt(pi/ln 2)) -- and the parameter needed to correct it was the
+    one being discarded, so the error could not be detected from outside.
+    """
+    return float(
+        amplitude * (eta * math.pi * hwhm + (1.0 - eta) * hwhm * math.sqrt(math.pi / _LN2))
+    )
+
+
 def _pseudo_voigt_sum(x: np.ndarray, params: np.ndarray) -> np.ndarray:
     """Sum of pseudo-Voigt lineshapes (vectorized over lines).
 
@@ -159,10 +180,10 @@ def deconvolve_region(
     *,
     noise_sigma: float,
     max_lines: int = 24,
-) -> list[tuple[float, float, float]]:
+) -> list[tuple[float, float, float, float]]:
     """Deconvolve one multiplet region into resolved pseudo-Voigt lines.
 
-    Returns ``(center_ppm, height, hwhm_ppm)`` per resolved line, sorted by
+    Returns ``(center_ppm, height, hwhm_ppm, area)`` per resolved line, sorted by
     ppm — or ``[]`` when the region is too small or the fit cannot be trusted,
     so the caller falls back to the raw local-maximum count.
     """
@@ -273,16 +294,19 @@ def deconvolve_region(
 
     if best is None:
         return []
-    lines: list[tuple[float, float, float]] = []
+    lines: list[tuple[float, float, float, float]] = []
     for index in range(0, len(best), _PARAMS_PER_LINE):
         amplitude = float(best[index])
         center = float(best[index + 1])
         hwhm = float(best[index + 2])
+        # index + 3 is eta, and it was the parameter being dropped. The area is
+        # computed here, where it is still in scope.
+        eta = float(np.clip(best[index + 3], 0.0, 1.0))
         if amplitude >= 3.0 * noise_floor and math.isfinite(center):
-            lines.append((center, amplitude, hwhm))
+            lines.append((center, amplitude, hwhm, pseudo_voigt_area(amplitude, hwhm, eta)))
     lines.sort(key=lambda line: line[0])
     # Collapse lines that converged onto the same position.
-    merged: list[tuple[float, float, float]] = []
+    merged: list[tuple[float, float, float, float]] = []
     for line in lines:
         if merged and abs(line[0] - merged[-1][0]) <= min_hwhm * 3.0:
             if line[1] > merged[-1][1]:
