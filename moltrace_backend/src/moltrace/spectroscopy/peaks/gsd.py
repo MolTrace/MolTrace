@@ -901,10 +901,14 @@ def _fit_group_with_deconvolve_region(
         )
 
     peaks: list[Peak | None] = []
-    for center, height, hwhm in resolved:
+    for center, height, hwhm, fitted_area in resolved:
         fwhm_ppm = 2.0 * abs(float(hwhm))
-        # Pure-Lorentzian area approximation (eta unknown).
-        area = float(height) * fwhm_ppm * (math.pi / 2.0)
+        # Was: `height * fwhm * pi/2` -- the pure-Lorentzian form, with the
+        # comment "eta unknown". eta is no longer unknown: deconvolve_region now
+        # returns the analytic pseudo-Voigt area computed inside the fit. The old
+        # approximation overstated a Gaussian-leaning line by up to ~66 %
+        # (pi vs sqrt(pi/ln 2)), and nothing downstream could tell.
+        area = float(fitted_area)
         peaks.append(
             _make_peak(
                 position_ppm=float(center),
