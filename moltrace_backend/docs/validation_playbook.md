@@ -1896,3 +1896,77 @@ Pinned by `TestTheOtherJobTableDoesNotNeedReaping` so it stops being an
 assumption: if analysis jobs are ever moved to a background runner, that test
 fails and names the remedy, instead of the silent hang reappearing on a table
 the reaper never looked at.
+
+---
+
+## THE ORPHANED STAGED WORK — resolved 2026-08-09
+
+Three files sat **staged and uncommitted in the shared index** for days —
+`baseline.py`, `fid.py`, `spectrum.py`, 399 lines — blocking A4 and appearing in
+every session's `git status`. They were treated as another session's in-flight
+work and routed around. They were not.
+
+**Provenance, from the session transcripts.** The distinctive symbols
+(`_bernstein_basis_matrix`, `_residual_phase_polish`) appear only in **May 2026
+worktree sessions** under `.claude/worktrees/`. No recent session discusses
+authoring them; every recent mention of these files is `git status` output, i.e.
+other sessions seeing the same staged index. Neither symbol exists in HEAD.
+Conclusion: orphaned worktree output that reached the main checkout's index and
+was never landed. Git records no session attribution for staged content, so this
+is circumstantial — but consistent across every check.
+
+Staged work nobody owns is a live hazard: one `git commit -a` sweeps 399
+unreviewed lines into an unrelated change. That is the shape that put migration
+0041 before 0040 and killed a deploy.
+
+### Split by evidence, not by file count
+
+**Landed (`b3bac71`) — provably inert.**
+
+`baseline.py` replaces per-point Python loops over the Bernstein basis with
+matrix evaluation. A/B against HEAD across 512–8192 points, 1–40 peaks,
+no-drift to extreme-drift, and a noise-free case:
+
+```
+max |delta| = 0.000e+00 on every case      (bit-identical, not just within tolerance)
+80.2 ms -> 34.0 ms on a 16k-point trace    (2.4x)
+```
+
+`spectrum.py` is the same class — 76 lines, no signature changes, loops to numpy.
+Verified the same way rather than by analogy: HEAD's version swapped in, the
+processed-spectrum parse run over a 6000-point 5-peak trace, and peak count,
+shifts to 6 dp, integrals, every preview point to 8 dp and the inferred NMR text
+compared. **Bit-identical.** Worktree restored and the restore checked with `cmp`.
+
+**Parked (`git stash`, message "orphaned: fid.py anti-negative phase polish") —
+behaviour-changing science with no validation.**
+
+`fid.py` adds `_residual_phase_polish`, applied unconditionally after primary
+auto-phase, citing MestreNova's "Global" objective (optimise the lowest point).
+It is **not** a refactor. Measured on the five real Bruker fixtures:
+
+| fixture | fired | p0 | p1 | max abs change |
+|---|---|---|---|---|
+| 33 | yes | 0.5° | −18.2° | 1.87 % of peak |
+| Pyrrolidine-…-5 | yes | 0.0° | −22.3° | 1.89 % |
+| Pyrrolidine-…-6 | yes | **14.5°** | **+198.7°** | 1.40 % |
+| Pyrrolidine-…-7 | yes | 0.0° | −1.7° | 0.14 % |
+| Pyrrolidine-…-8 | yes | 0.0° | −28.5° | 2.73 % |
+
+It fires on **every** real spectrum and moves intensities by 0.14–2.73 %. Peak
+counts are unchanged on all five, so nothing downstream visibly breaks — a first,
+coarser A/B on negative-lobe area and peak count reported 0.0 % change and would
+have been recorded as "no effect". The effect is real; the metric was insensitive.
+
+**Why it was not landed.** The 198.7° first-order correction is a large twist to
+apply on the strength of an objective that reduces negative lobes *by
+construction*. Reducing negative lobes is not evidence of better phasing — the
+same objective can be satisfied by distorting a correct spectrum. Landing it
+would mean shipping someone else's scientific judgement under this session's
+name with no invariant test and no re-baseline, which is exactly what the science
+gate exists to prevent. It has never been committed, so **production has never
+run it**; parking it makes the local tree match what actually ships.
+
+**To evaluate it properly:** restore with `git stash pop`, then measure whether
+the polish improves assignment or quantitation against the matched-pair ground
+truth — not whether it reduces negative area, which it does tautologically.
