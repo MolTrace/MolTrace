@@ -70,14 +70,88 @@ def bernstein_basis(order: int, t: float) -> list[float]:
     ]
 
 
+def _bernstein_basis_matrix(order: int, t_values: Any) -> Any:
+    """Vectorized Bernstein basis: row m, column k holds B(k,n)(t_m).
+
+    Byte-identical to ``np.asarray([bernstein_basis(order, t) for t in t_values])``
+    -- the same ``comb(n,k)·tᵏ·(1-t)ⁿ⁻ᵏ`` factors with the same operation order --
+    but assembled in a single numpy pass instead of a per-point Python loop.
+    """
+
+    import numpy as np
+
+    # np.float_power (not np.power) is used deliberately: numpy fast-paths
+    # ``power`` with a scalar exponent of 2.0 to ``x*x``, which differs from
+    # libm ``pow`` by 1 ULP on a fraction of inputs. float_power has no such
+    # fast path, so it is byte-identical to the scalar ``t_value ** k`` that
+    # the per-point ``bernstein_basis`` uses.
+    n = max(0, int(order))
+    t = np.clip(np.asarray(t_values, dtype=float), 0.0, 1.0)
+    one_minus = 1.0 - t
+    columns = [
+        float(math.comb(n, k))
+        * np.float_power(t, float(k))
+        * np.float_power(one_minus, float(n - k))
+        for k in range(n + 1)
+    ]
+    if not columns:
+        return np.zeros((int(t.size), 0), dtype=float)
+    return np.stack(columns, axis=1)
+
+
+def _evaluate_bernstein_array(coefficients: list[float], t_values: Any) -> Any:
+    """Vectorized Bernstein polynomial evaluation over an array of ``t`` values.
+
+    Byte-identical to ``[_evaluate_bernstein(coefficients, t) for t in t_values]``
+    -- identical per-term factors and identical sequential accumulation order --
+    but evaluated for every point in one numpy pass rather than point by point.
+    """
+
+    import numpy as np
+
+    t = np.clip(np.asarray(t_values, dtype=float), 0.0, 1.0)
+    if not coefficients:
+        return np.zeros(t.shape, dtype=float)
+    n = max(0, len(coefficients) - 1)
+    one_minus = 1.0 - t
+    # The scalar _evaluate_bernstein sums its terms with the builtin sum(),
+    # which on Python 3.12+ accumulates floats with Neumaier compensated
+    # summation. A plain running total drifts ~1 ULP from that, so the same
+    # compensation is reproduced term by term to stay byte-identical.
+    total = np.zeros(t.shape, dtype=float)
+    compensation = np.zeros(t.shape, dtype=float)
+    for k in range(n + 1):
+        # np.float_power (not np.power) -- see _bernstein_basis_matrix note.
+        basis_k = (
+            float(math.comb(n, k))
+            * np.float_power(t, float(k))
+            * np.float_power(one_minus, float(n - k))
+        )
+        term = coefficients[k] * basis_k
+        running = total + term
+        compensation = compensation + np.where(
+            np.abs(total) >= np.abs(term),
+            (total - running) + term,
+            (term - running) + total,
+        )
+        total = running
+    return total + compensation
+
+
 def _normalize_axis_to_unit(points: list[tuple[float, float]]) -> list[tuple[float, float, float]]:
-    xs = [x for x, _ in points]
-    lo = min(xs)
-    hi = max(xs)
+    import numpy as np
+
+    arr = np.asarray(points, dtype=float).reshape(-1, 2)
+    xs = arr[:, 0]
+    ys = arr[:, 1]
+    xs_list = xs.tolist()
+    ys_list = ys.tolist()
+    lo = float(xs.min())
+    hi = float(xs.max())
     span = hi - lo
     if abs(span) <= 1e-15:
-        return [(0.0, x, y) for x, y in points]
-    return [((x - lo) / span, x, y) for x, y in points]
+        return [(0.0, x, y) for x, y in zip(xs_list, ys_list, strict=False)]
+    return list(zip(((xs - lo) / span).tolist(), xs_list, ys_list, strict=False))
 
 
 def _mad(values: list[float]) -> float:
@@ -97,7 +171,9 @@ def _fit_bernstein_coefficients(
     try:
         import numpy as np
 
-        matrix = np.asarray([bernstein_basis(order, t) for t, _ in baseline_points], dtype=float)
+        matrix = _bernstein_basis_matrix(
+            order, np.asarray([t for t, _ in baseline_points], dtype=float)
+        )
         vector = np.asarray([y for _, y in baseline_points], dtype=float)
         coeffs, *_ = np.linalg.lstsq(matrix, vector, rcond=None)
         return [float(value) for value in coeffs]
@@ -116,19 +192,34 @@ def _select_bernstein_baseline_points(
     order: int,
     quantile: float,
 ) -> list[tuple[float, float]]:
+    import numpy as np
+
     if not normalized:
         return []
-    ordered = sorted(normalized, key=lambda item: item[0])
-    bins = max(12, min(80, int(math.sqrt(len(ordered))) or 12, (order + 1) * 8))
+    # Sort by t once. Because t_sorted is ascending, every [low, high) bin is a
+    # contiguous slice located with searchsorted -- this replaces the previous
+    # bins x N rescan of the whole spectrum while staying byte-identical.
+    arr = np.asarray(normalized, dtype=float).reshape(-1, 3)
+    sort_index = np.argsort(arr[:, 0], kind="stable")
+    t_sorted = arr[sort_index, 0]
+    y_sorted = arr[sort_index, 2]
+    n = int(t_sorted.size)
+    t_list = t_sorted.tolist()
+    y_list = y_sorted.tolist()
+    bins = max(12, min(80, int(math.sqrt(n)) or 12, (order + 1) * 8))
     selected: list[tuple[float, float]] = []
     for idx in range(bins):
         low = idx / bins
         high = (idx + 1) / bins
-        bucket = [
-            (t, y)
-            for t, _x, y in ordered
-            if (low <= t < high) or (idx == bins - 1 and math.isclose(t, 1.0))
-        ]
+        start = int(np.searchsorted(t_sorted, low, side="left"))
+        stop = int(np.searchsorted(t_sorted, high, side="left"))
+        bucket = list(zip(t_list[start:stop], y_list[start:stop], strict=False))
+        if idx == bins - 1:
+            bucket = bucket + [
+                (t_list[j], y_list[j])
+                for j in range(stop, n)
+                if math.isclose(t_list[j], 1.0)
+            ]
         if not bucket:
             continue
         cutoff = _quantile([y for _, y in bucket], quantile)
@@ -138,9 +229,8 @@ def _select_bernstein_baseline_points(
     if len(selected) >= minimum:
         return selected
 
-    values = [y for _t, _x, y in ordered]
-    cutoff = _quantile(values, min(max(quantile, 0.05), 0.5))
-    fallback = [(t, y) for t, _x, y in ordered if y <= cutoff]
+    cutoff = _quantile(y_list, min(max(quantile, 0.05), 0.5))
+    fallback = [(t_list[j], y_list[j]) for j in range(n) if y_list[j] <= cutoff]
     return fallback if len(fallback) >= minimum else []
 
 
@@ -197,12 +287,16 @@ def apply_bernstein_baseline_correction(
         metadata["qa"] = evaluate_baseline_flatness(clean, mode="bernstein").as_dict()
         return (clean, metadata, warnings)
 
+    import numpy as np
+
     candidates = baseline_points
     for _ in range(max(0, int(max_iter))):
-        residuals = [
-            y - _evaluate_bernstein(coefficients, t)
-            for t, y in candidates
-        ]
+        residuals = (
+            np.asarray([y for _t, y in candidates], dtype=float)
+            - _evaluate_bernstein_array(
+                coefficients, np.asarray([t for t, _y in candidates], dtype=float)
+            )
+        ).tolist()
         if len(residuals) < normalized_order + 1:
             break
         center = median(residuals)
@@ -226,9 +320,14 @@ def apply_bernstein_baseline_correction(
         coefficients = next_coefficients
 
     residual_offset = 0.0
+    normalized_baseline = _evaluate_bernstein_array(
+        coefficients, np.asarray([t for t, _x, _y in normalized], dtype=float)
+    )
     corrected = [
-        (x, y - _evaluate_bernstein(coefficients, t))
-        for t, x, y in normalized
+        (x, y - float(baseline_value))
+        for (_t, x, y), baseline_value in zip(
+            normalized, normalized_baseline, strict=False
+        )
     ]
     if candidates:
         candidate_by_t = {round(t, 12) for t, _y in candidates}
@@ -624,15 +723,21 @@ def estimate_baseline_points(
     *,
     fraction: float = 0.25,
 ) -> list[tuple[float, float]]:
-    clean = [
-        (float(x), float(y))
-        for x, y in points
-        if math.isfinite(float(x)) and math.isfinite(float(y))
-    ]
-    if not clean:
+    import numpy as np
+
+    raw = np.asarray(points, dtype=float)
+    if raw.size == 0:
         return []
-    cutoff = _quantile([abs(y) for _, y in clean], fraction)
-    baseline = [(x, y) for x, y in clean if abs(y) <= cutoff]
+    raw = raw.reshape(-1, 2)
+    finite = np.isfinite(raw[:, 0]) & np.isfinite(raw[:, 1])
+    xs = raw[finite, 0]
+    ys = raw[finite, 1]
+    if xs.size == 0:
+        return []
+    clean = list(zip(xs.tolist(), ys.tolist(), strict=False))
+    cutoff = _quantile(np.abs(ys).tolist(), fraction)
+    keep = (np.abs(ys) <= cutoff).tolist()
+    baseline = [pair for pair, take in zip(clean, keep, strict=False) if take]
     return baseline or clean[: max(1, min(len(clean), 25))]
 
 
