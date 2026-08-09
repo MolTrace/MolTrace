@@ -30,10 +30,22 @@ export const contentType = "image/png"
  * keeps, it keeps the brand.
  */
 export default async function OpengraphImage() {
+  // The FLAT mark, not the dimensional one. A chat client scales this card down
+  // hard, and the 3D mark's bloom, bevel and gradient "m" turn to mush at
+  // thumbnail size, while flat strokes stay crisp.
+  //
+  // A RASTER of the flat mark, not the SVG itself. Two attempts at inlining the
+  // vector failed and both are worth recording, because the second is the sort of
+  // thing that looks like it should work: base64 threw InvalidCharacterError
+  // (btoa is Latin-1 only and the file has em-dashes in its comments), and a
+  // percent-encoded data URI then hung the route outright — Satori's SVG support
+  // does not cover this drawing. The PNG is generated from that same SVG by
+  // scripts/, so the vector stays the source of truth.
+  //
   // Fetched relative to this module so it works in the edge runtime, where there
-  // is no filesystem. 512px source rendered at 190 — sharp on a 2× display.
-  const mark = await fetch(new URL("../public/icons/icon-512.png", import.meta.url)).then((res) =>
-    res.arrayBuffer(),
+  // is no filesystem.
+  const mark = await fetch(new URL("../public/icons/moltrace-mark-flat-512.png", import.meta.url)).then(
+    (res) => res.arrayBuffer(),
   )
 
   return new ImageResponse(
@@ -61,13 +73,7 @@ export default async function OpengraphImage() {
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "18px" }}>
           {/* A plain <img>: next/og renders to a raster, so next/image has no
               meaning inside an ImageResponse. */}
-          <img
-            src={mark as unknown as string}
-            width={150}
-            height={150}
-            alt=""
-            style={{ borderRadius: "28px" }}
-          />
+          <img src={mark as unknown as string} width={170} height={170} alt="" />
           <div style={{ fontSize: "86px", fontWeight: 800, color: "#f4f9fc", letterSpacing: "-0.02em" }}>
             {SITE_NAME}
           </div>
