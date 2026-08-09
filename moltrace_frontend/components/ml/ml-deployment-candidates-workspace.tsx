@@ -6,6 +6,17 @@ import { apiFetch } from "@/lib/api/client"
 import { DeveloperJsonPanel } from "@/components/spectracheck/spectracheck-result-panels"
 import { formatApiError } from "@/components/spectracheck/spectracheck-helpers"
 import { readRecordNumber, readRecordString } from "@/components/projects/project-workspace-utils"
+import {
+  buildRegistryPromotionBody,
+  EMPTY_PROMOTION_DRAFT,
+  isPromotionDraftEmpty,
+  promotionRoleLabel,
+  PROMOTION_ROLES,
+  readMetricComparison,
+  type MetricComparison,
+  type PromotionFieldErrors,
+} from "@/src/lib/ml/registry-promotion"
+import { readRefusalDetail } from "@/src/lib/api/refusal-detail"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -19,6 +30,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { Switch } from "@/components/ui/switch"
 import {
   Table,
   TableBody,
@@ -107,6 +119,14 @@ export function MlDeploymentCandidatesWorkspace() {
   const [approveLevel, setApproveLevel] = useState<string>("approved_for_internal_use")
   const [approveBusy, setApproveBusy] = useState(false)
   const [approveErr, setApproveErr] = useState("")
+  /** Off by default: approving without promoting is a legitimate and common outcome. */
+  const [promoteToServing, setPromoteToServing] = useState(false)
+  const [promotionDraft, setPromotionDraft] = useState({ ...EMPTY_PROMOTION_DRAFT })
+  const [promotionErrors, setPromotionErrors] = useState<PromotionFieldErrors>({})
+  /** A safety-critical metric regression. Shown by the metrics it is about, never as a toast. */
+  const [metricRegression, setMetricRegression] = useState("")
+  const [metricComparison, setMetricComparison] = useState<MetricComparison | null>(null)
+  const [approvedServing, setApprovedServing] = useState<boolean | null>(null)
 
   const [rejectName, setRejectName] = useState("")
   const [rejectReason, setRejectReason] = useState("")
@@ -315,21 +335,45 @@ export function MlDeploymentCandidatesWorkspace() {
   async function submitApprove() {
     if (!selected || selectedId == null) return
     setApproveErr("")
+    setPromotionErrors({})
+    setMetricRegression("")
+    setMetricComparison(null)
+    setApprovedServing(null)
     if (!canSubmitApprove) {
       setApproveErr("Approval requires a model card and a reviewer comment.")
       return
     }
+
+    // The promotion block is what makes predictions resolve to this model. It is built only
+    // when the reviewer asked for it, and never filled in on their behalf — a guessed role or
+    // data lineage would be a promotion nobody chose.
+    let promotion: Record<string, unknown> | null = null
+    if (promoteToServing) {
+      const built = buildRegistryPromotionBody(promotionDraft)
+      if (!built.ok) {
+        setPromotionErrors(built.errors)
+        setApproveErr("Complete the promotion details, or approve without promoting to serving.")
+        return
+      }
+      promotion = built.body
+    }
+
     setApproveBusy(true)
     try {
-      await apiFetch(`/ml/deployment-candidates/${selectedId}/approve`, {
+      const response = await apiFetch<unknown>(`/ml/deployment-candidates/${selectedId}/approve`, {
         method: "POST",
         body: {
           reviewer_name: approveName.trim() || "reviewer",
           reviewer_comment: approveComment.trim(),
           status: approveLevel,
           metadata_json: {},
+          ...(promotion ? { registry_promotion: promotion } : {}),
         },
       })
+      // Which of the two outcomes happened, and whether the metric check endorsed the model or
+      // simply had no opinion on it. A skipped check must not read as an endorsement.
+      setApprovedServing(promotion != null)
+      setMetricComparison(readMetricComparison(isRecord(response) ? response.notes : null))
       trackMlDeploymentCandidateApproved({
         target_module: readRecordString(selected, "target_module") || undefined,
         status: approveLevel,
@@ -337,9 +381,15 @@ export function MlDeploymentCandidatesWorkspace() {
         approval_status: selectedCard ? readRecordString(selectedCard, "approval_status") || undefined : undefined,
       })
       setApproveComment("")
+      setPromoteToServing(false)
+      setPromotionDraft({ ...EMPTY_PROMOTION_DRAFT })
       setReload((x) => x + 1)
     } catch (er) {
-      setApproveErr(formatApiError(er, "Could not record the approval."))
+      // A regression on a safety-critical metric names the metric and the delta. That belongs
+      // beside the metrics it is about, verbatim — not flattened into a generic failure.
+      const regression = readRefusalDetail(er, 400)
+      if (regression) setMetricRegression(regression)
+      else setApproveErr(formatApiError(er, "Could not record the approval."))
     } finally {
       setApproveBusy(false)
     }
@@ -622,7 +672,9 @@ export function MlDeploymentCandidatesWorkspace() {
                   <p className="text-xs text-muted-foreground">{gateChecks.oodLine}</p>
                 </div>
                 <div>
-                  <p className="text-xs font-medium text-muted-foreground">Deployment candidate status (registry)</p>
+                  {/* Not the registry's status — this is the review status of the candidate.
+                      What the registry serves is a separate fact, decided by promotion. */}
+                  <p className="text-xs font-medium text-muted-foreground">Deployment candidate status (review)</p>
                   <Badge variant="outline">{statusLabel(readRecordString(selected, "status"))}</Badge>
                 </div>
                 <div>
@@ -651,6 +703,63 @@ export function MlDeploymentCandidatesWorkspace() {
                   </div>
                 )
               })()}
+
+              {/* Sits with the evaluation, calibration and out-of-domain figures above,
+                  because it is a statement about exactly those numbers. */}
+              {metricRegression ? (
+                <Alert variant="destructive">
+                  <AlertTriangle className="h-4 w-4" aria-hidden />
+                  <AlertTitle className="text-sm">This candidate was not approved</AlertTitle>
+                  <AlertDescription className="space-y-1">
+                    <p>{metricRegression}</p>
+                    <p className="text-xs">
+                      It regresses against the model already serving this task, so approving it would
+                      replace a better one.
+                    </p>
+                  </AlertDescription>
+                </Alert>
+              ) : null}
+
+              {/* Which of the two approval outcomes actually happened. Approving without
+                  promoting is the common case, and it must not read as "deployed". */}
+              {approvedServing != null ? (
+                <Alert>
+                  <ListChecks className="h-4 w-4" aria-hidden />
+                  <AlertTitle className="text-sm">
+                    {approvedServing ? "Approved and promoted to serving" : "Approved, not serving"}
+                  </AlertTitle>
+                  <AlertDescription>
+                    {approvedServing
+                      ? "Predictions for this role now resolve to this model."
+                      : "This model is approved for the product. No prediction resolves to it until it is promoted."}
+                  </AlertDescription>
+                </Alert>
+              ) : null}
+
+              {metricComparison ? (
+                <Alert
+                  className={
+                    metricComparison.applied ? undefined : "border-amber-500/30 bg-amber-500/10"
+                  }
+                >
+                  <AlertTriangle
+                    className={`h-4 w-4 ${metricComparison.applied ? "" : "text-amber-600"}`}
+                    aria-hidden
+                  />
+                  <AlertTitle className="text-sm">
+                    {metricComparison.applied ? "Metric comparison ran" : "Metric comparison did not run"}
+                  </AlertTitle>
+                  <AlertDescription className="space-y-1">
+                    <p>{metricComparison.reason}</p>
+                    {metricComparison.applied ? null : (
+                      <p className="text-xs">
+                        Nothing was compared, so this approval carries no evidence that the model is better
+                        than what came before it.
+                      </p>
+                    )}
+                  </AlertDescription>
+                </Alert>
+              ) : null}
 
               {missingGateWarnings.length > 0 ? (
                 <Alert>
@@ -700,6 +809,197 @@ export function MlDeploymentCandidatesWorkspace() {
                         </SelectContent>
                       </Select>
                     </div>
+                    {/* Promotion is the second, narrower decision: approval is about the
+                        product, and this is about whether predictions resolve here. It needs
+                        facts the artifact row does not carry, so it asks for them rather than
+                        assuming any of them. */}
+                    <div className="space-y-3 rounded-md border p-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="space-y-1">
+                          <Label htmlFor="promote-to-serving" className="text-sm">
+                            Also promote to serving
+                          </Label>
+                          <p className="text-xs text-muted-foreground">
+                            Leave this off to approve without changing what answers predictions — a normal
+                            outcome, not an incomplete one.
+                          </p>
+                        </div>
+                        <Switch
+                          id="promote-to-serving"
+                          checked={promoteToServing}
+                          onCheckedChange={(next) => {
+                            setPromoteToServing(next)
+                            if (!next) setPromotionErrors({})
+                          }}
+                        />
+                      </div>
+
+                      {promoteToServing ? (
+                        <div className="space-y-3">
+                          <div className="space-y-2">
+                            <Label htmlFor="promotion-role">Role (required)</Label>
+                            <Select
+                              value={promotionDraft.role}
+                              onValueChange={(value) =>
+                                setPromotionDraft((draft) => ({ ...draft, role: value }))
+                              }
+                            >
+                              <SelectTrigger id="promotion-role">
+                                <SelectValue placeholder="Choose the role this artifact serves" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {PROMOTION_ROLES.map((role) => (
+                                  <SelectItem key={role} value={role}>
+                                    {promotionRoleLabel(role)}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            {promotionErrors.role ? (
+                              <p className="text-xs text-destructive">{promotionErrors.role}</p>
+                            ) : null}
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label htmlFor="promotion-nucleus">Nucleus (optional)</Label>
+                            <Input
+                              id="promotion-nucleus"
+                              value={promotionDraft.nucleus}
+                              onChange={(e) =>
+                                setPromotionDraft((draft) => ({ ...draft, nucleus: e.target.value }))
+                              }
+                              placeholder="13C"
+                            />
+                            <p className="text-xs text-muted-foreground">
+                              Leave blank for an artifact that serves every nucleus. This decides which
+                              model the promotion supersedes.
+                            </p>
+                            {promotionErrors.nucleus ? (
+                              <p className="text-xs text-destructive">{promotionErrors.nucleus}</p>
+                            ) : null}
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label htmlFor="promotion-version">Semantic version (required)</Label>
+                            <Input
+                              id="promotion-version"
+                              value={promotionDraft.semanticVersion}
+                              onChange={(e) =>
+                                setPromotionDraft((draft) => ({ ...draft, semanticVersion: e.target.value }))
+                              }
+                              placeholder="2.1.0"
+                            />
+                            {promotionErrors.semanticVersion ? (
+                              <p className="text-xs text-destructive">{promotionErrors.semanticVersion}</p>
+                            ) : null}
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label htmlFor="promotion-snapshot">Dataset snapshot hash (required)</Label>
+                            <Input
+                              id="promotion-snapshot"
+                              value={promotionDraft.datasetSnapshotHash}
+                              onChange={(e) =>
+                                setPromotionDraft((draft) => ({
+                                  ...draft,
+                                  datasetSnapshotHash: e.target.value,
+                                }))
+                              }
+                            />
+                            <p className="text-xs text-muted-foreground">
+                              The content address of the data this model was built from. A promotion with no
+                              data lineage cannot be reproduced.
+                            </p>
+                            {promotionErrors.datasetSnapshotHash ? (
+                              <p className="text-xs text-destructive">{promotionErrors.datasetSnapshotHash}</p>
+                            ) : null}
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label htmlFor="promotion-rows">Dataset row count (required)</Label>
+                            <Input
+                              id="promotion-rows"
+                              value={promotionDraft.datasetRowCount}
+                              onChange={(e) =>
+                                setPromotionDraft((draft) => ({ ...draft, datasetRowCount: e.target.value }))
+                              }
+                              inputMode="numeric"
+                            />
+                            {promotionErrors.datasetRowCount ? (
+                              <p className="text-xs text-destructive">{promotionErrors.datasetRowCount}</p>
+                            ) : null}
+                          </div>
+
+                          <div className="grid gap-3 sm:grid-cols-2">
+                            <div className="space-y-2">
+                              <Label htmlFor="promotion-dataset-tag">Dataset tag (optional)</Label>
+                              <Input
+                                id="promotion-dataset-tag"
+                                value={promotionDraft.datasetTag}
+                                onChange={(e) =>
+                                  setPromotionDraft((draft) => ({ ...draft, datasetTag: e.target.value }))
+                                }
+                              />
+                              {promotionErrors.datasetTag ? (
+                                <p className="text-xs text-destructive">{promotionErrors.datasetTag}</p>
+                              ) : null}
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="promotion-dataset-source">Dataset source (optional)</Label>
+                              <Input
+                                id="promotion-dataset-source"
+                                value={promotionDraft.datasetSource}
+                                onChange={(e) =>
+                                  setPromotionDraft((draft) => ({ ...draft, datasetSource: e.target.value }))
+                                }
+                              />
+                              {promotionErrors.datasetSource ? (
+                                <p className="text-xs text-destructive">{promotionErrors.datasetSource}</p>
+                              ) : null}
+                            </div>
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label htmlFor="promotion-sha">Artifact SHA-256 (optional)</Label>
+                            <Input
+                              id="promotion-sha"
+                              value={promotionDraft.artifactSha256}
+                              onChange={(e) =>
+                                setPromotionDraft((draft) => ({ ...draft, artifactSha256: e.target.value }))
+                              }
+                              className="font-mono text-xs"
+                            />
+                            <p className="text-xs text-muted-foreground">
+                              Falls back to the artifact&rsquo;s own digest. Promotion is refused when neither
+                              carries one.
+                            </p>
+                            {promotionErrors.artifactSha256 ? (
+                              <p className="text-xs text-destructive">{promotionErrors.artifactSha256}</p>
+                            ) : null}
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label htmlFor="promotion-band">Confidence band, ppm (LoRA adapters only)</Label>
+                            <Input
+                              id="promotion-band"
+                              value={promotionDraft.confidenceBandPpm}
+                              onChange={(e) =>
+                                setPromotionDraft((draft) => ({ ...draft, confidenceBandPpm: e.target.value }))
+                              }
+                              inputMode="decimal"
+                            />
+                            <p className="text-xs text-muted-foreground">
+                              The validated maximum prediction uncertainty at which the adapter may be used.
+                              An adapter without one is skipped.
+                            </p>
+                            {promotionErrors.confidenceBandPpm ? (
+                              <p className="text-xs text-destructive">{promotionErrors.confidenceBandPpm}</p>
+                            ) : null}
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
+
                     {approveErr ? <p className="text-sm text-destructive">{approveErr}</p> : null}
                     <Button
                       type="button"
@@ -711,13 +1011,19 @@ export function MlDeploymentCandidatesWorkspace() {
                       onClick={() => void submitApprove()}
                     >
                       {approveBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden /> : null}
-                      Submit approval record
+                      {promoteToServing ? "Approve and promote to serving" : "Submit approval record"}
                     </Button>
                     {!readRecordNumber(selected, "model_card_id") ? (
                       <p className="text-xs text-destructive">Approve action disabled until a model card is present.</p>
                     ) : null}
                     {!approveComment.trim() ? (
                       <p className="text-xs text-muted-foreground">Enter a reviewer comment to enable approval.</p>
+                    ) : null}
+                    {promoteToServing && isPromotionDraftEmpty(promotionDraft) ? (
+                      <p className="text-xs text-muted-foreground">
+                        Fill in the promotion details above, or switch off &ldquo;Also promote to serving&rdquo;
+                        to record the approval on its own.
+                      </p>
                     ) : null}
                   </div>
 
