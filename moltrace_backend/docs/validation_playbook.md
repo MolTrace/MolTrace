@@ -1970,3 +1970,85 @@ run it**; parking it makes the local tree match what actually ships.
 **To evaluate it properly:** restore with `git stash pop`, then measure whether
 the polish improves assignment or quantitation against the matched-pair ground
 truth — not whether it reduces negative area, which it does tautologically.
+
+---
+
+## A4 RESOLVED (2026-08-09) — step 1 shipped, step 2 measured and DECLINED
+
+### Step 1 — shipped (`7a54c6b`)
+
+`deconvolve_region` now returns `(centre, height, hwhm, area)`, the area computed
+inside the fit by `pseudo_voigt_area()` where `eta` is in scope. `eta` is the
+LORENTZIAN fraction — confirmed against `_pseudo_voigt_sum`, not assumed.
+
+This corrected a live overstatement rather than only adding a field. The sidecar
+`moltrace/spectroscopy/peaks/gsd.py` (reachable from `api.py:8008`, imported by
+`integration/methods.py` and `qnmr/purity.py`) was reconstructing the area as
+`height * fwhm * pi/2` under a comment reading *"Pure-Lorentzian area
+approximation (eta unknown)"*. Measured on 21 lines fitted from a real 500 MHz
+spectrum, the true area against that approximation: **median 0.844, range
+0.678–1.000** — the old value overstated by ~18 % typically and up to 47 % on the
+most Gaussian-leaning line. (n = 21 from one spectrum, not a corpus.)
+
+### Step 2 — measured, and NOT built
+
+The plan was an all-or-nothing fitted basis per spectrum. Feasibility checked
+first: singletons deconvolve reliably at 0.011 / 0.02 / 0.05 ppm widths, so the
+rule *was* achievable. Built nothing until it was worth building.
+
+Ground truth is exp 10's own trace — it is quantitative, so the trapezoid
+integral over a generous window around a cluster IS that cluster's true area,
+tails included. A cluster is emitted as ONE peak, so the only question is which
+estimate of that single number is closer:
+
+```
+region        lines      true         raw       fitted   raw err  fit err
+7.60-7.80        12   7.21e+08   7.001e+08   7.047e+08     2.9%     2.3%
+4.20-4.35         8  3.807e+08   3.626e+08   3.715e+08     4.8%     2.4%
+4.40-4.80        10  1.388e+09   1.089e+09   1.077e+09    21.5%    22.4%
+1.85-2.15         2    2.3e+08   2.182e+08   2.138e+08     5.1%     7.0%
+1.15-1.55         2  7.266e+08   6.774e+08   6.192e+08     6.8%    14.8%
+
+median raw 5.1%   median fitted 7.0%   fitted closer in 2/5 regions
+```
+
+**A blanket fitted basis is worse.** Robust to the one free parameter — the
+ground-truth window pad — across its whole range:
+
+```
+pad    median raw   median fitted   fitted better in
+0.10         1.1%            2.1%              1/5
+0.20         2.2%            4.2%              2/5
+0.40         5.1%            7.0%              2/5
+0.60         8.1%           11.0%              2/5
+1.00        29.8%           30.6%              2/5
+```
+
+Raw wins at every pad. The conclusion does not depend on the choice.
+
+**This contradicts the A4 note's own hypothesis, which is the point of measuring.**
+That note observed `fitted/raw ≈ 1.15` aggregate and read the excess as the fit
+"recovering tail area raw integration loses to neighbours". Against actual ground
+truth, much of that excess is overshoot, not recovery. A ratio between two
+estimates cannot say which is right; only the truth can, and it was available.
+
+The interpretable pattern: **fitted helps where overlap is dense** (12 lines,
+2.3 % vs 2.9 %; 8 lines, 2.4 % vs 4.8 %) **and hurts where it is sparse** (2
+lines, 7.0 % vs 5.1 % and 14.8 % vs 6.8 %). That suggests using fitted areas only
+for dense clusters — which is precisely the **mixed-basis hazard** the original
+A4 note ruled out, because the ratios between peaks would then depend on whether
+each peak happened to qualify. So the refinement the data points at is the one
+option already excluded on principle.
+
+**Decision: the integration basis stays raw.** The fitted areas landed in step 1
+remain valuable for what they already do — correcting the sidecar's quantitation
+and feeding multiplicity — but they do not become the proton-count basis.
+
+Limitation, stated plainly: 5 regions from one spectrum. A corpus could overturn
+this. What it would take is per-line ground truth inside an overlapped cluster,
+which the matched pair does not provide.
+
+**Step 4 (splitting a cluster into multiple environments) is unaffected and still
+open** — it is a different feature, needing a rule to tell "one environment,
+several J-coupled lines" from "two overlapping environments", which line
+positions alone cannot settle.
