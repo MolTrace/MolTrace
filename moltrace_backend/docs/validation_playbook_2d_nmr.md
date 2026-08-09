@@ -294,3 +294,99 @@ TOCSY**.
   valid body under `API_KEY`.
 * **Compliance language stays "designed to support".**
 * **Every accuracy figure ships with n and its denominator.**
+
+---
+
+## C1 RESULT — 2D scores its own peak list, not the structure (2026-08-09)
+
+**The spec's "Method 7: HSQC verification with rectangular prediction boxes" is
+specified, not shipped.** There is a structure-aware path, but it does not do
+what verification means.
+
+### 1. Is there structure verification? No.
+
+`analyze_nmr2d_preview` accepts `smiles`, so a structure-aware path exists. What
+it does with it (`nmr2d_analyzer.py:63`):
+
+```python
+def _proton_references(proton_nmr_text, *, smiles, solvent):
+    if not proton_nmr_text or not proton_nmr_text.strip():
+        return [], None, []          # <- SMILES never consulted
+    if smiles:
+        report = analyze_proton_evidence(smiles=..., nmr_text=..., solvent=...)
+        return [_ReferencePeak(shift_ppm=..., region=...) ...]
+```
+
+Two consequences:
+
+* **Without 1D text the structure is ignored entirely** — the early return fires
+  before `smiles` is read. A 2D spectrum plus a SMILES yields no references at all.
+* When it is used, it produces a **1D shift list**, not predicted H–C correlation
+  pairs. So the layer asks "does this cross peak sit near a known 1D shift",
+  never "does this molecule predict this correlation".
+
+### 2. Where do `matches` and `possible` come from? The observed peaks.
+
+`dimension_possible` is incremented **per observed peak** (`:256`, `:290`):
+
+```python
+if experiment == "COSY":
+    dimension_possible += 2 if proton_refs else 1
+elif experiment in {"HSQC", "HMQC"}:
+    dimension_possible += (1 if proton_refs else 0) + (1 if carbon_refs else 0)
+```
+
+The denominator is what was *found*, never what was *expected*. This is the
+self-referential shape predicted in the C1 prompt, and the same defect class as
+the DP4 coverage bug: an error statistic computed over survivors stops responding
+to error.
+
+### 3. Measured: showing LESS of the molecule scores BETTER
+
+Ibuprofen has 7 protonated carbons, so ~7 one-bond HSQC correlations. Same
+structure, same 1D text, varying only how many correlations are observed:
+
+```
+observed                     evidence_score   matched   missing_reference_count
+all 7 correlations                  0.8047          7                         0
+only 2 of 7 (5 MISSING)             0.8218          2                         0
+only 1 of 7 (6 MISSING)             0.6552          1                         0
+```
+
+**Withholding five of seven correlations produced a higher score than showing all
+seven** (0.8218 vs 0.8047). The score is not merely insensitive to missing
+correlations — it is non-monotonic in completeness.
+
+And `missing_reference_count` — a field named for exactly this — **reports 0 in
+every case**, including when six of seven are absent. The concept is present in
+the output shape; nothing computes it against a structure.
+
+For an HSQC this is the load-bearing failure: a quaternary carbon legitimately
+has no correlation, but a *protonated* carbon with none is evidence against the
+structure, and that evidence is currently unreachable.
+
+### 4. Reach and scoping
+
+* **Reaches the analysis path** — `api.py:28627` calls `analyze_nmr2d_preview`
+  after `parse_nmr2d_upload`. Whether the score can change a *verdict* rather
+  than ride alongside one is still open; C8 settles it.
+* **Owner scoping is correct.** `nmr2d_routes.py:219` derives `user_id` from the
+  context (None for the system key), passes it to `get_nmr2d_run_by_id`, and
+  returns a non-leaking `404 "2D NMR run not found."`. No action needed.
+
+### What C4 must therefore build, not validate
+
+C4 was written as "build or validate". It is **build**:
+
+1. Predict expected H–C pairs from the structure — one per protonated carbon,
+   two for diastereotopic CH2.
+2. Make `possible` the count of *expected* correlations, so the denominator stops
+   depending on what was found.
+3. Populate `missing_reference_count` from that comparison, excluding quaternary
+   carbons from the denominator rather than counting them as misses.
+4. Only then add the rectangular per-axis tolerance, derived from the measured
+   per-axis residual distribution.
+
+Until (2) lands, no 2D score should be presented as evidence for a structure, and
+any figure quoted from it needs the caveat that its denominator is the observed
+peak count. Worth checking whether public copy already quotes one.
