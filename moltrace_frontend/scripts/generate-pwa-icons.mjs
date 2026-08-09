@@ -1,10 +1,17 @@
 /**
- * Rasterizes the MolTrace mark (matches components/branding/molecule-logo-mark.tsx)
- * into public/icons/*.png for PWA / favicons.
+ * Rasterizes the drawn MolTrace mark into public/icons/*.png for PWA / favicons.
  *
- * The drawing below is a hand-mirror of that component. Change one and you must
- * change the other — a mark that disagrees with its own favicon is exactly the
- * drift the shared constants are here to prevent.
+ * THIS DRAWING IS NO LONGER A MIRROR OF molecule-logo-mark.tsx, and the old note
+ * here — "change one and you must change the other" — no longer applies. Site
+ * chrome now uses the dimensional render; favicons keep this drawing, because
+ * they are the one surface where the render fails. A favicon is specified in
+ * DEVICE pixels, so 16 means 16 with no retina multiplier, and at that size the
+ * render measures a grey smudge with no legible letter while this drawing stays
+ * crisp. The reasoning and the measurements are in molecule-logo-mark.tsx.
+ *
+ * So: this file owns the favicon, the .ico, the Apple icons and the PWA tiles,
+ * and it is self-contained. It is not drift, and it is not stale — do not
+ * "resync" it to the component.
  *
  * Run: node scripts/generate-pwa-icons.mjs
  */
