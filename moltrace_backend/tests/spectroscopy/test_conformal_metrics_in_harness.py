@@ -39,6 +39,14 @@ _SHIFTS = {"13C": [10.0, 20.0, 30.0, 40.0]}
 
 
 def _gold(n: int = 8) -> GoldSet:
+    """Record 0 carries a *wrong* structure, so ``false_confirmation_rate`` is measurable.
+
+    Without one, that metric has an empty denominator and is reported as ``None`` — which
+    is correct (see ``test_false_confirmation_denominator.py``) but would make this
+    fixture unable to exercise ``test_no_finite_metric_is_silently_dropped``, whose whole
+    point is a *fully measured* vector.
+    """
+
     return GoldSet(
         name="conformal-fixture",
         records=tuple(
@@ -47,8 +55,8 @@ def _gold(n: int = 8) -> GoldSet:
                 source="in_house",
                 true_inchikey=f"KEY{i}",
                 reference_shifts=_SHIFTS,
-                reviewer_verdict=True,
-                proposed_inchikey=f"KEY{i}",
+                reviewer_verdict=i != 0,
+                proposed_inchikey=("KWRONG" if i == 0 else f"KEY{i}"),
             )
             for i in range(n)
         ),

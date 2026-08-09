@@ -31,6 +31,7 @@ from moltrace.spectroscopy.eval.conformal import (
 from moltrace.spectroscopy.eval.harness import (
     DEFAULT_TOLERANCES,
     METRIC_DIRECTIONS,
+    NULLABLE_METRICS,
     SAFETY_CRITICAL,
     CallableBundle,
     GoldMetricVector,
@@ -52,6 +53,7 @@ __all__ = [
     "CALIBRATION_VERSION",
     "DEFAULT_TOLERANCES",
     "METRIC_DIRECTIONS",
+    "NULLABLE_METRICS",
     "SAFETY_CRITICAL",
     "CallableBundle",
     "ConformalBin",

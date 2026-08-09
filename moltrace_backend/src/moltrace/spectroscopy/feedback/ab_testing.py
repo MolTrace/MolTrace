@@ -307,6 +307,9 @@ class PromotionDecision:
                     "regressed": d.regressed,
                     "improved": d.improved,
                     "safety_critical": d.safety_critical,
+                    # Without this a refusal caused by an *unmeasured* safety metric is
+                    # indistinguishable in the promotion record from a real regression.
+                    "measured": d.measured,
                 }
                 for d in self.deltas
             ],
@@ -349,7 +352,17 @@ def evaluate_promotion(
     if not passed:
         reasons.append("no Prompt 17 dominance (regression beyond tolerance or no strict gain)")
     for d in deltas:
-        if d.safety_critical and d.regressed:
+        if not d.safety_critical:
+            continue
+        if not d.measured:
+            # Both block, but they need different remedies: a regression means fix the
+            # model, an unmeasured metric means fix the evaluation. Reporting the second
+            # as the first sends the operator to the wrong place.
+            reasons.append(
+                f"{d.metric} was not measured on both evaluations, so the metric that may "
+                "never regress could not be compared; re-run the evaluation reporting it"
+            )
+        elif d.regressed:
             reasons.append(f"safety-critical regression on {d.metric}")
     if not override_ok:
         reasons.append(

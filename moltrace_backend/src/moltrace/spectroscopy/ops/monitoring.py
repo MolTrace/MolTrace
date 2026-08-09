@@ -732,8 +732,18 @@ def check_dominance(
     if incumbent_metrics is None:
         return GateCheck("dominance", True, "no incumbent — first model is promotable")
     passed, deltas = dominates(candidate_metrics, incumbent_metrics, tolerances)
-    regressions = [d.metric for d in deltas if d.regressed]
-    detail = "dominates incumbent" if passed else f"regressed / no strict gain: {regressions}"
+    # "Not measured" also sets `regressed` so every gate blocks on it, but it is a
+    # different failure and needs a different fix — the evaluation, not the model.
+    unmeasured = [d.metric for d in deltas if not d.measured]
+    regressions = [d.metric for d in deltas if d.regressed and d.measured]
+    if passed:
+        detail = "dominates incumbent"
+    elif unmeasured:
+        detail = f"not measured on both evaluations: {unmeasured}"
+        if regressions:
+            detail += f"; regressed: {regressions}"
+    else:
+        detail = f"regressed / no strict gain: {regressions}"
     return GateCheck("dominance", passed, detail)
 
 

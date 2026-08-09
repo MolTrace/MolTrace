@@ -79,6 +79,7 @@ from moltrace.spectroscopy.data.datasets_pipeline import (
 )
 from moltrace.spectroscopy.eval.harness import (
     METRIC_DIRECTIONS,
+    NULLABLE_METRICS,
     GoldMetricVector,
     GoldSet,
     ModelBundle,
@@ -846,13 +847,27 @@ def finetune_lora(
 def _vector_from_snapshot(metric_snapshot: Mapping[str, float]) -> GoldMetricVector | None:
     """Rebuild a comparable :class:`GoldMetricVector` from a stored metric snapshot.
 
-    Returns ``None`` unless every comparable metric is present (an incomplete
-    snapshot can't be a valid dominance incumbent).
+    Metrics a run may legitimately leave unmeasured (:data:`NULLABLE_METRICS`) are
+    rebuilt as ``None``; :func:`dominates` then applies its own rule to them — skipped
+    when ordinary, refused when safety-critical. Returns ``None`` only when a metric that
+    is *always* measured is missing, i.e. the snapshot really is unusable.
+
+    Requiring every :data:`METRIC_DIRECTIONS` key here was a fail-**open**. Since the
+    nullable metrics joined that mapping, ``metric_items()`` omits them whenever they were
+    not measured, so no real snapshot carried all of them: this returned ``None`` for
+    every incumbent, and the caller reads ``None`` as "no incumbent — nothing to beat"
+    and promotes without comparing anything at all.
     """
 
-    if not all(name in metric_snapshot for name in METRIC_DIRECTIONS):
+    required = [name for name in METRIC_DIRECTIONS if name not in NULLABLE_METRICS]
+    if not all(name in metric_snapshot for name in required):
         return None
-    return GoldMetricVector(**{name: float(metric_snapshot[name]) for name in METRIC_DIRECTIONS})
+    return GoldMetricVector(
+        **{
+            name: (float(metric_snapshot[name]) if name in metric_snapshot else None)
+            for name in METRIC_DIRECTIONS
+        }
+    )
 
 
 def _resolve_incumbent(
