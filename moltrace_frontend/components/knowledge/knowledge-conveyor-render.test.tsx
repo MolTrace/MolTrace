@@ -221,7 +221,7 @@ describe("KnowledgeDeploymentConveyor", () => {
 
   it("does not offer promotion straight off a passed check", async () => {
     apiFetchMock.mockImplementation(async () => [
-      candidate({ status: "gate_passed", gate_verdict_json: { promotable: true, requires_human_signoff: true, rollback_available: true, reasons: ["Eligible: no safety regression and metric-vector dominance — human sign-off required."], excluded_metrics: [], blocking_metric_name: "citation_support_recall" } }),
+      candidate({ status: "gate_passed", gate_verdict_json: { promotable: true, requires_human_signoff: true, rollback_available: true, reasons: ["Eligible: Citation support recall did not regress and the metric vector dominates — human sign-off required."], excluded_metrics: [], blocking_metric_name: "citation_support_recall" } }),
     ])
     const { KnowledgeDeploymentConveyor } = await import(
       "@/components/knowledge/knowledge-deployment-conveyor"
@@ -240,7 +240,9 @@ describe("KnowledgeDeploymentConveyor", () => {
   })
 
   it("shows a refusal's reasons verbatim rather than summarising them", async () => {
-    const reason = "Safety-flag recall is missing or out of range [0, 1]; failing closed."
+    // The measure named in the prose is this candidate's own, matching the label the panel
+    // shows beside it. A reason naming some other model's measure is one a reader cannot act on.
+    const reason = "Citation support recall is missing or out of range [0, 1]; failing closed."
     apiFetchMock.mockImplementation(async () => [
       candidate({
         status: "gate_failed",
