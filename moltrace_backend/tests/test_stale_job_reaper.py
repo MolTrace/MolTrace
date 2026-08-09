@@ -241,3 +241,44 @@ class TestTheReaperRunsWithoutAnyInfrastructure:
 
         assert job_id in first
         assert second == [], "a second sweep re-reaped an already-failed job"
+
+class TestTheOtherJobTableDoesNotNeedReaping:
+    """`GET /jobs` returns two job types. Only one can be abandoned.
+
+    `analysis_jobs` is served by the same endpoint as `jobs`, so "did you cover
+    both?" is the obvious question — and the answer is that they are not the
+    same shape. `create_analysis_job` runs the work **synchronously inside the
+    request**, moving queued -> running -> succeeded/failed within one
+    transaction, so there is no runner that can be killed while a row waits on
+    it. Probed: a created analysis job comes back already settled with
+    `finished_at` set and nothing left unsettled.
+
+    This test exists so that stops being an assumption. If analysis jobs are ever
+    moved to a background runner, this fails and says what to do about it —
+    rather than the silent hang reappearing on a table the reaper never looked
+    at.
+    """
+
+    def test_an_analysis_job_settles_before_the_response_returns(
+        self, client, api_headers
+    ) -> None:
+        res = client.post("/jobs", headers=api_headers, json={"job_type": "processed_spectrum_parse"})
+        assert res.status_code == 201, res.text
+
+        body = res.json()
+        assert body["status"] in {"succeeded", "failed", "canceled"}, (
+            f"an analysis job returned unsettled as {body['status']!r}. If these now run in "
+            "the background, they can be abandoned exactly like batch jobs and "
+            "reap_stale_jobs must be extended to cover the analysis_jobs table."
+        )
+        assert body.get("finished_at") is not None
+
+    def test_no_analysis_job_is_left_running(self, client, api_headers) -> None:
+        client.post("/jobs", headers=api_headers, json={"job_type": "processed_spectrum_parse"})
+        with _engine(client).begin() as conn:
+            unsettled = conn.execute(
+                sa_text("SELECT COUNT(*) FROM analysis_jobs WHERE status IN ('queued','running')")
+            ).scalar_one()
+        assert unsettled == 0, (
+            f"{unsettled} analysis job(s) left unsettled — the reaper does not cover this table"
+        )
