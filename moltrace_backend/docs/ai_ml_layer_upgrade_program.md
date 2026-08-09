@@ -114,6 +114,43 @@ The roadmap is sound strategy and its ordering critique is right. Five premises 
    `spectroscopy/audit/` cannot cover. **Recommendation: keep the in-repo implementations, and
    spend the tooling budget on GPU for Layer 1 instead.**
 
+6. **The 16-dataset table overstates NP-MRD by ~75× and omits a disqualifying licence.**
+   Checked 2026-08-08 against the [2025 NAR update](https://academic.oup.com/nar/article/53/D1/D700/7906838).
+   The roadmap lists NP-MRD as "~280,000 NPs · Natural products NMR · Open". All three are
+   wrong in the way that matters:
+
+   | | roadmap | actual |
+   |---|---|---|
+   | scale | ~280,000 | **~3,700 compounds** with experimental data (19,045 spectra) |
+   | | | 282,000 is the **predicted**-spectra count (5,043,694 spectra) |
+   | licence | "Open" | **CC BY-NC** |
+
+   The 280,000 figure is another model's *output*, not measurement, so it is worthless as
+   training data for a shift predictor and actively harmful as an evaluation set. And
+   **CC BY-NC is disqualifying regardless of scale**: MolTrace is BUSL 1.1 with commercial
+   production use, so non-commercial data cannot enter a knowledge base that ships as deployed
+   state. Same licence-consequence reasoning as B0a's CC BY-SA / CC BY 4.0 split.
+
+   **Do not ingest NP-MRD.** The risk this correction exists to stop is someone planning from
+   the table, spending weeks on an ingest, and discovering the licence at the end — or worse,
+   not discovering it.
+
+   Checked alongside it: **BMRB metabolomics is real but small.** Entries do ship genuine
+   per-atom assignments (`_Atom_chem_shift` loop: `Atom_ID`, `Atom_type`, `Atom_isotope_number`,
+   `Val`) paired with `.mol`/`.sdf`, at ~3,400 compounds against NMRShiftDB2's 49,618 — ~7 % more
+   molecules, though in metabolite chemical space NMRShiftDB2 covers thinly, so it would deepen
+   *different* HOSE buckets. The blocker is mapping: `Atom_ID` is a name string (`C2`, `H8`) and
+   MOL V2000 carries no atom names, only file order. Entry `bmse000001` already shows why that is
+   dangerous — `Atom_ID=C2` with `Auth_atom_ID=C1`, and the next row the reverse. **A wrong
+   mapping does not give a worse table, it gives a table of confidently wrong references**, which
+   is worse than no table.
+
+   **Consequence for L1.** NMRShiftDB2 is effectively the ceiling for open, commercially-usable,
+   per-atom-assigned ¹H/¹³C data. There is no large second corpus to pour in, which *strengthens*
+   the case for D2 (Δ-learning): if coverage cannot be bought with data, it has to be earned by
+   generalising from the 495,215 assignments already held — which is exactly the sphere ≤ 2
+   population where the lookup has never seen the environment.
+
 ### A4. Model IDs are stale
 
 | Site | Pinned | Status |
