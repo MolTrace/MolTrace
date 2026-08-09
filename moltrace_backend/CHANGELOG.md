@@ -14,6 +14,43 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.69.3 — Conformal coverage becomes a promotion metric (2026-08-08)
+
+v0.68.0 measured conformal coverage; nothing gated on it. `GoldMetricVector` now carries
+`conformal_coverage_deficit` (largest shortfall below the stated target) and
+`conformal_interval_width` (mean half-width), both lower-is-better. Coverage is expressed as a
+*shortfall* precisely so "more is better" can never apply to it — over-coverage is not a win, it is
+paid for in width.
+
+Adding a metric to the harness changes what can ship, so two failure modes are closed in the same
+commit.
+
+**An unmeasured metric must not read as a perfect one.** A `0.0` default deficit is the *best
+possible score*, so a model issuing no intervals would have compared as perfectly calibrated
+against one that measured itself. Both fields are `None` when unmeasured, `metric_items()` omits
+them, and `dominates` therefore skips them in either direction. Non-finite values are dropped too.
+
+**A third safety-critical metric would refuse every promotion during rollout.** The deployment
+gate refuses when one evaluation reports a safety-critical metric and the other does not — the
+anti-asymmetry rule added in v0.67.0. So coverage ships with a **zero tolerance** — the same
+strictness — but deliberately stays out of `SAFETY_CRITICAL` until evaluations report it across the
+board. The docstring records the condition for promoting it.
+
+`_is_number` in the adapter now rejects NaN. It passed `isinstance` while every comparison against
+it was False, so a NaN metric looked *present* to the asymmetry check while registering neither a
+regression nor an improvement — a gate reporting itself as applied while guarding nothing.
+
+The width tolerance is **0.16 ppm = 3 % of 5.371 ppm**, the count-weighted mean half-width measured
+on held-out NMRShiftDB2 (6.952 over 36,844 ¹³C, 0.714 over 12,508 ¹H). Three per cent is the same
+fraction of scale that `shift_mae_13c`'s 0.10 tolerance is of its 3.44 ppm measured MAE, so the
+convention is the file's own rather than a new one.
+
+`Prediction` gains an `intervals` field. A per-shift `nan` marks an atom the calibration declined to
+bound and is excluded from coverage rather than counted as a miss — refusing to answer must not look
+like answering wrongly.
+
+---
+
 ## v0.69.2 — The promotion gate now names the measure it actually blocked on (2026-08-08)
 
 The corpus conveyor reuses Repho's dominance gate rather than growing a second one, which is

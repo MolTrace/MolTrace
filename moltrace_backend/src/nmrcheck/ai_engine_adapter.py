@@ -27,6 +27,7 @@ This module owns no science — the confidence scale lives in
 
 from __future__ import annotations
 
+import math
 import weakref
 from collections.abc import Mapping, MutableMapping, Sequence
 from dataclasses import dataclass, field
@@ -683,4 +684,14 @@ def dominance_verdict(
 
 
 def _is_number(value: Any) -> bool:
-    return isinstance(value, int | float) and not isinstance(value, bool)
+    """A value the promotion gate can actually compare.
+
+    NaN is excluded deliberately: it passes ``isinstance`` but every comparison
+    against it is False, so a NaN metric would look *present* to the asymmetry check
+    while silently registering neither a regression nor an improvement — a gate that
+    reports itself as applied while guarding nothing.
+    """
+
+    if not isinstance(value, int | float) or isinstance(value, bool):
+        return False
+    return math.isfinite(float(value))

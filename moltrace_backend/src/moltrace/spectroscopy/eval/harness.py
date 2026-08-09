@@ -92,6 +92,8 @@ METRIC_DIRECTIONS: dict[str, MetricDirection] = {
     "reviewer_agreement_rate": _HI,
     "latency_p50_ms": _LO,
     "latency_p95_ms": _LO,
+    "conformal_coverage_deficit": _LO,
+    "conformal_interval_width": _LO,
 }
 
 # Safety-critical metrics may NOT regress at all (tolerance 0): passing a wrong
@@ -113,6 +115,15 @@ DEFAULT_TOLERANCES: dict[str, float] = {
     "reviewer_agreement_rate": 0.005,
     "latency_p50_ms": 10.0,
     "latency_p95_ms": 25.0,
+    # Zero, for the same reason the safety-critical metrics are zero: a stated
+    # coverage guarantee that is not kept is not a tuning trade. Deliberately NOT
+    # added to SAFETY_CRITICAL yet -- see the note on GoldMetricVector.
+    "conformal_coverage_deficit": 0.0,
+    # 0.16 ppm = 3 % of the measured count-weighted mean half-width across both
+    # nuclei (5.371 ppm: 6.952 over 36,844 13C and 0.714 over 12,508 1H). Three per
+    # cent is the same fraction of scale that shift_mae_13c's 0.10 tolerance is of
+    # its 3.44 ppm measured MAE, so the convention is the file's own, not a new one.
+    "conformal_interval_width": 0.16,
 }
 
 
@@ -202,6 +213,14 @@ class Prediction:
     retrieved: tuple[str, ...] = ()  # retrieved InChIKeys, for recall@k
     uncertainty: float = 0.0  # higher = less certain (for error-vs-uncertainty AUROC)
     latency_ms: float | None = None  # measured if None
+    intervals: Mapping[str, Sequence[float]] | None = None
+    """Conformal half-widths (ppm), aligned 1:1 with :attr:`predicted_shifts`.
+
+    ``None`` means the model issues no interval, which is different from issuing a
+    wide one -- see :class:`GoldMetricVector`. A per-shift ``nan`` marks an atom the
+    calibration declined to bound (an abstention) and is excluded rather than counted
+    as a miss.
+    """
 
 
 @runtime_checkable
@@ -243,6 +262,23 @@ class GoldMetricVector:
     reviewer_agreement_rate: float
     latency_p50_ms: float
     latency_p95_ms: float
+    conformal_coverage_deficit: float | None = None
+    """Largest shortfall below the stated coverage target; 0.0 when every nucleus meets it.
+
+    ``None`` means **not measured** -- the model issued no intervals -- and is omitted
+    from :meth:`metric_items`, so :func:`dominates` skips it rather than reading an
+    unmeasured model as perfectly calibrated. That distinction is the whole reason the
+    field is nullable instead of defaulting to 0.0.
+
+    Not in :data:`SAFETY_CRITICAL` **yet**, deliberately. The promotion gate refuses
+    when one evaluation reports a safety-critical metric and the other does not, so
+    adding a third would refuse every promotion until incumbents report it too. It
+    carries a zero tolerance instead -- the same strictness without the rollout trap --
+    and joins the safety set once evaluations report it across the board.
+    """
+    conformal_interval_width: float | None = None
+    """Mean half-width (ppm). Coverage alone is not quality: an infinite interval covers
+    everything, so narrower **at equal coverage** is the only honest definition of sharper."""
     # metadata
     model_versions: Mapping[str, str] = field(default_factory=dict)
     gold_checksum: str = ""
@@ -252,9 +288,22 @@ class GoldMetricVector:
     timestamp: str | None = None
 
     def metric_items(self) -> dict[str, float]:
-        """The comparable metric fields only (the keys of METRIC_DIRECTIONS)."""
+        """The comparable metric fields that were actually measured.
 
-        return {name: float(getattr(self, name)) for name in METRIC_DIRECTIONS}
+        A metric left ``None`` is omitted rather than coerced to 0.0, so a model that
+        did not measure it is never compared as though it had scored perfectly.
+        """
+
+        out: dict[str, float] = {}
+        for name in METRIC_DIRECTIONS:
+            value = getattr(self, name)
+            if value is None:
+                continue
+            value = float(value)
+            if not math.isfinite(value):
+                continue
+            out[name] = value
+        return out
 
     def as_dict(self) -> dict[str, Any]:
         out: dict[str, Any] = self.metric_items()
@@ -341,6 +390,7 @@ def evaluate(
     k: int = 5,
     perturb: Callable[[GoldRecord], GoldRecord] = default_perturb,
     n_ece_bins: int = 10,
+    conformal_target: float = 0.90,
     timestamp: str | None = None,
 ) -> GoldMetricVector:
     """Compute the ten metrics for ``bundle`` on ``gold_set``.
@@ -369,6 +419,9 @@ def evaluate(
     reviewer_match = 0
     robust_match = 0
     latencies: list[float] = []
+    covered = 0
+    interval_n = 0
+    interval_widths: list[float] = []
 
     for rec in records:
         t0 = time.perf_counter()
@@ -385,6 +438,20 @@ def evaluate(
             prd = pred.predicted_shifts.get(nucleus) or []
             for a, b in zip(prd, ref, strict=False):
                 bucket.append(abs(float(a) - float(b)))
+
+            # Conformal coverage, when the model issues intervals. A non-finite
+            # half-width is an abstention -- the calibration declined to bound that
+            # atom -- and is excluded rather than scored as a miss, which would make
+            # refusing to answer look like answering wrongly.
+            half_widths = (pred.intervals or {}).get(nucleus) or []
+            for a, b, half in zip(prd, ref, half_widths, strict=False):
+                half = float(half)
+                if not math.isfinite(half) or half < 0.0:
+                    continue
+                interval_n += 1
+                interval_widths.append(half)
+                if abs(float(a) - float(b)) <= half:
+                    covered += 1
 
         confidences.append(float(pred.confidence))
         correct.append(top1)
@@ -412,6 +479,10 @@ def evaluate(
     ece = (
         expected_calibration_error(confidences, correct, n_bins=n_ece_bins) if confidences else 0.0
     )
+    # None, not 0.0, when nothing issued an interval: see GoldMetricVector.
+    coverage_deficit = (
+        max(0.0, float(conformal_target) - covered / interval_n) if interval_n else None
+    )
     return GoldMetricVector(
         top1_accuracy=top1_hits / n,
         top3_accuracy=top3_hits / n,
@@ -425,6 +496,8 @@ def evaluate(
         reviewer_agreement_rate=reviewer_match / n,
         latency_p50_ms=_percentile(latencies, 50.0),
         latency_p95_ms=_percentile(latencies, 95.0),
+        conformal_coverage_deficit=coverage_deficit,
+        conformal_interval_width=_mean(interval_widths) if interval_widths else None,
         model_versions=dict(bundle.model_versions),
         gold_checksum=checksum,
         gold_name=gold_set.name,
