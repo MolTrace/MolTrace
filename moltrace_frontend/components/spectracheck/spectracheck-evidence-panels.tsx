@@ -193,13 +193,18 @@ export function RelativeIntegralNotice({
           </p>
         ) : null}
         {/* Names the remedy's location, not just the remedy. Both the raw-FID
-            and processed paths take their structure from the same Step 2
+            and processed paths take their structure from the same session-level
             field, so one sentence is correct on either. Deliberately prose
             rather than an anchor — the panels also render outside the
-            workspace, where that anchor would be dead. */}
+            workspace, where that anchor would be dead.
+
+            The "Session ·" prefix is load-bearing and matches that card's
+            eyebrow verbatim. Both tabs number their own steps, and on each one
+            "Step 2" is the Run card — so an unqualified "Step 2" would send a
+            reader to the button they just pressed. */}
         <p className="text-[11px] leading-snug text-muted-foreground">
-          Add one under <span className="font-medium text-foreground">Step 2 · Candidate
-          structures</span> and re-run to scale these to its proton budget.
+          Add one under <span className="font-medium text-foreground">Session · Step 2 ·
+          Candidates</span> and re-run to scale these to its proton budget.
         </p>
       </div>
     </div>
@@ -408,7 +413,10 @@ function InferredNmrTextPanelImpl({
   const relativeIntegrals = useMemo(() => findRelativeIntegralDisclosure(payload), [payload])
   // The only client-side rewrite this panel performs, and only when the backend
   // has said the scale is ungrounded: the string's "123.5H" is a multiple of the
-  // smallest resolved signal, and the producer cannot yet label it at source.
+  // smallest resolved signal. The producer deliberately does not label it at
+  // source — the same string is re-parsed as AnalysisInputs.nmr_text, and the
+  // parser requires an "NH" integral — so this rewrite is permanent, not a
+  // stopgap. See spectracheck-relative-integrals.ts.
   const text = useMemo(
     () => (raw !== null && relativeIntegrals ? relabelRelativeIntegrals(raw) : raw),
     [raw, relativeIntegrals],
