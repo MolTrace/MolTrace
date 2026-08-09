@@ -47,6 +47,7 @@ from moltrace.spectroscopy.infra.eval import expected_calibration_error
 __all__ = [
     "DEFAULT_TOLERANCES",
     "METRIC_DIRECTIONS",
+    "NULLABLE_METRICS",
     "SAFETY_CRITICAL",
     "CallableBundle",
     "GoldMetricVector",
@@ -99,6 +100,14 @@ METRIC_DIRECTIONS: dict[str, MetricDirection] = {
 # Safety-critical metrics may NOT regress at all (tolerance 0): passing a wrong
 # structure, or mis-calibrated confidence, is never an acceptable trade.
 SAFETY_CRITICAL: frozenset[str] = frozenset({"false_confirmation_rate", "ece"})
+
+# Metrics an evaluation may legitimately leave unmeasured, and which `metric_items()`
+# therefore omits. Anything reconstructing a vector from a stored snapshot must treat
+# these as optional -- requiring them makes a *real* snapshot unreadable, and a caller
+# that reads "unreadable incumbent" as "no incumbent" then promotes without comparing.
+NULLABLE_METRICS: frozenset[str] = frozenset(
+    {"false_confirmation_rate", "conformal_coverage_deficit", "conformal_interval_width"}
+)
 
 # Default per-metric tolerances (how much regression counts as "noise, not a
 # real regression"). Safety-critical metrics are pinned to 0.
@@ -255,7 +264,20 @@ class GoldMetricVector:
     shift_mae_1h: float
     shift_mae_13c: float
     ece: float
-    false_confirmation_rate: float
+    false_confirmation_rate: float | None
+    """Share of *wrong* proposed structures the model confirmed.
+
+    ``None`` means **not measured** -- the gold set contained no wrong structures, so
+    there was no denominator. Zero evidence is not a perfect score, and 0.0 here is the
+    best possible value on a metric that may never regress; a gold set that never showed
+    the model a wrong answer has not tested it. See ``n_wrong_structures`` for the
+    denominator, and ``eval/false_confirmation.py`` for the same rule one layer down.
+
+    Unlike the nullable conformal metrics, this one is **safety-critical**, so
+    :func:`dominates` *refuses* rather than skips when either side leaves it unmeasured.
+    Skipping would be worse than the 0.0 it replaced: the metric would vanish from the
+    promotion record entirely instead of merely being wrong.
+    """
     recall_at_k: float
     uncertainty_auroc: float
     robustness: float
@@ -284,6 +306,11 @@ class GoldMetricVector:
     gold_checksum: str = ""
     gold_name: str = ""
     n_records: int = 0
+    n_wrong_structures: int = 0
+    """Gold records whose proposed structure is wrong — the denominator of
+    ``false_confirmation_rate``. 0 means the rate could not be measured at all. Metadata,
+    deliberately **not** a :data:`METRIC_DIRECTIONS` entry: it describes coverage, and a
+    denominator is not something a model can be better or worse at."""
     k: int = 5
     timestamp: str | None = None
 
@@ -313,6 +340,7 @@ class GoldMetricVector:
                 "gold_checksum": self.gold_checksum,
                 "gold_name": self.gold_name,
                 "n_records": self.n_records,
+                "n_wrong_structures": self.n_wrong_structures,
                 "k": self.k,
                 "timestamp": self.timestamp,
             }
@@ -489,7 +517,11 @@ def evaluate(
         shift_mae_1h=_mean(abs_err_1h),
         shift_mae_13c=_mean(abs_err_13c),
         ece=float(ece),
-        false_confirmation_rate=(false_confirms / wrong_total) if wrong_total else 0.0,
+        # None, not 0.0, when the gold set held no wrong structures: a rate over an empty
+        # denominator is the best possible score on a metric that may never regress,
+        # earned by measuring nothing. n_wrong_structures carries the denominator so the
+        # difference is visible rather than inferred.
+        false_confirmation_rate=(false_confirms / wrong_total) if wrong_total else None,
         recall_at_k=recall_hits / n,
         uncertainty_auroc=_auroc(uncertainties, is_error),
         robustness=robust_match / n,
@@ -502,6 +534,7 @@ def evaluate(
         gold_checksum=checksum,
         gold_name=gold_set.name,
         n_records=n,
+        n_wrong_structures=wrong_total,
         k=k,
         timestamp=timestamp if timestamp is not None else datetime.now(UTC).isoformat(),
     )
@@ -513,15 +546,22 @@ def evaluate(
 @dataclass(frozen=True)
 class MetricDelta:
     metric: str
-    candidate: float
-    incumbent: float
-    delta: float  # raw candidate - incumbent
-    improvement: float  # signed so positive = better (direction-aware)
+    candidate: float | None
+    incumbent: float | None
+    delta: float | None  # raw candidate - incumbent; None when not comparable
+    improvement: float | None  # signed so positive = better; None when not comparable
     direction: MetricDirection
     tolerance: float
-    regressed: bool  # worse than incumbent by more than tolerance
+    regressed: bool  # worse than incumbent by more than tolerance, OR not comparable
     improved: bool  # strictly better than incumbent
     safety_critical: bool
+    measured: bool = True
+    """False when one or both sides never reported this metric.
+
+    Distinct from ``regressed``, which it also sets: a reader needs to tell "this got
+    worse" from "this could not be compared", and both block. Defaults True so existing
+    constructions keep their meaning.
+    """
 
 
 def dominates(
@@ -535,6 +575,14 @@ def dominates(
     strictly better on **at least one**, and with **no** regression beyond
     tolerance on the safety-critical metrics (which default to tolerance 0).
     Returns ``(passed, deltas)`` — ``deltas`` is the per-metric promotion record.
+
+    **Absence is not agreement.** A metric missing from either side is skipped when it is
+    ordinary and *refused* when it is safety-critical, in all three directions —
+    candidate missing, incumbent missing, or neither reporting it. Skipping a
+    safety-critical metric would make dropping it a way to stop being measured on it, and
+    would do so invisibly: the metric would not even appear in ``deltas``. The refusal is
+    recorded as a delta with ``measured=False`` and ``regressed=True`` so every existing
+    consumer of ``regressed`` blocks without an edit, and the reason is still legible.
     """
 
     tol_map = {**DEFAULT_TOLERANCES, **(dict(tolerances) if tolerances else {})}
@@ -545,10 +593,36 @@ def dominates(
     any_regressed = False
     any_improved = False
     for name, direction in METRIC_DIRECTIONS.items():
-        if name not in cand or name not in inc:
-            continue
         is_safety = name in SAFETY_CRITICAL
         tol = 0.0 if is_safety else float(tol_map.get(name, 0.0))
+        if name not in cand or name not in inc:
+            # A non-safety metric nobody measured is simply not compared — the rollout
+            # accommodation the nullable conformal metrics ship with. A safety-critical
+            # one *blocks*: skipping it would let an unmeasured model promote over a
+            # measured one, which is how dropping a metric becomes a way to stop being
+            # measured on it. Emitted as a delta rather than omitted so the refusal
+            # names its cause instead of the metric quietly vanishing from the record.
+            # Matches nmrcheck.ai_engine_adapter.dominance_verdict's anti-asymmetry rule,
+            # and additionally covers the case where *neither* side reported it.
+            if not is_safety:
+                continue
+            any_regressed = True
+            deltas.append(
+                MetricDelta(
+                    metric=name,
+                    candidate=cand.get(name),
+                    incumbent=inc.get(name),
+                    delta=None,
+                    improvement=None,
+                    direction=direction,
+                    tolerance=tol,
+                    regressed=True,
+                    improved=False,
+                    safety_critical=True,
+                    measured=False,
+                )
+            )
+            continue
         c = cand[name]
         i = inc[name]
         raw = c - i
