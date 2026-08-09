@@ -1835,3 +1835,64 @@ it had separated (0.203 vs 0.540) and never recovered.
 FE relabelling is handed off in `docs/fe_handoff_dp4_ranking_coverage.md`. No
 contract change — `dp4_ranking` is untyped `list[dict[str, Any]]`, so the new keys
 are additive and `schema.d.ts` needs no regeneration.
+
+---
+
+## BACKGROUND JOBS — verified without Redis (2026-08-08)
+
+The standing note said "any feature that enqueues background work has no
+consumer on production". **That was wrong**, and it was repeated to the
+maintainer before being checked. `enqueue_job_processing` *falls back* to FastAPI
+`BackgroundTasks` when `redis_url` is unset — jobs run in-process rather than
+being dropped.
+
+Verified end to end on the no-Redis path:
+
+```
+POST /jobs/submit          -> 202   queue_backend: fastapi-background
+GET  /jobs/1               -> status=completed  3/3
+GET  /jobs/1/items         -> 200, n=3
+reap_stale_jobs on it      -> []    (a finished job is left alone)
+```
+
+**So the testing phase runs correctly with no Redis.** Memorystore at ~$35/mo
+against a ~$9/mo baseline was deferred; the decision stands.
+
+### The real defect, and why it is not about Redis
+
+`BackgroundTasks` run **after the response is sent**, and the service deploys
+`--min-instances 0` with no `--no-cpu-throttling`, so CPU is allocated during
+request processing only and the instance can be reclaimed. A killed batch raises
+nothing, so `process_job_items`'s `except` never fires. Before `cf1c045` the row
+stayed `processing` with partial results saved, forever, and there was no reaper
+anywhere in the codebase.
+
+Fixed independently of Redis (`cf1c045`): a per-job deadline scaled by
+`total_items`, swept on read from `GET /jobs` and `GET /jobs/{id}` because a cron
+needs an always-on process this deployment deliberately does not have.
+
+**The budget is deliberately generous and that is the design.** One item measures
+0.9 ms (ethanol) to 50 ms (an erythromycin-sized structure); the shipped budget
+is 30 s per item, ~600x the measured worst case. The error directions are not
+symmetric — a lingering dead job costs nothing, a killed live batch is destroyed
+— and under CPU throttling real throughput is not merely slower than local but
+effectively unbounded, so no measured multiple of local speed would be a safe
+ceiling. It is a floor on patience, not a duration model.
+
+No migration was added. An `updated_at` heartbeat would have been the cleaner
+design and would also have meant numbering against two uncommitted migrations in
+another session's tree — the race that broke a prod deploy once already.
+
+### The second job table does NOT need reaping — probed, not assumed
+
+`GET /jobs` serves two types, so "did you cover both?" is the obvious question.
+`analysis_jobs` is a different shape: `create_analysis_job` runs the work
+**synchronously inside the request**, moving queued → running → succeeded/failed
+in one transaction. Probed: a created analysis job returns already settled with
+`finished_at` set and **zero** rows left unsettled. There is no runner that can
+be killed while a row waits on it.
+
+Pinned by `TestTheOtherJobTableDoesNotNeedReaping` so it stops being an
+assumption: if analysis jobs are ever moved to a background runner, that test
+fails and names the remedy, instead of the silent hang reappearing on a table
+the reaper never looked at.
