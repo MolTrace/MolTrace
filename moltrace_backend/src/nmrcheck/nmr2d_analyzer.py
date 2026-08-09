@@ -11,6 +11,7 @@ from .chemistry import mol_from_smiles
 from .dept import find_dept_type_for_shift
 from .exceptions import PeakParseError, StructureParseError
 from .models import DeptAptPeak
+from .nmr2d_expected import expected_hsqc_correlations
 from .nmr2d_models import (
     NMR2DAnalysisReport,
     NMR2DAnalyzeResult,
@@ -415,16 +416,63 @@ def analyze_nmr2d_preview(
             4,
         )
         dept_adjustment = 0.06 * (dept_apt_carbon_type_score - 0.5)
+    matched_correlation_count = sum(1 for item in correlations if item.matched_1h_peak is not None or item.matched_13c_peak is not None)
+
+    # Structural coverage: how much of what the STRUCTURE predicts was seen.
+    #
+    # The count comes from graph symmetry (exact chemistry), never from the shift
+    # predictor. That distinction is load-bearing: the predictor's fitted error
+    # model is heavy-tailed (1H scale 0.162 / nu 1.23, 13C scale 1.665 / nu 1.24),
+    # so a window holding 90 % of its predictions is +/- 0.75 ppm on 1H and
+    # +/- 7.7 ppm on 13C -- wide enough to match almost any proton to almost any
+    # expectation. Matching therefore stays against the OBSERVED 1D shifts, which
+    # are measured; only the denominator is structural.
+    # One-bond only: HMBC's expected set is 2-3 bonds (sometimes 4 through
+    # conjugation) and 2-bond correlations are frequently absent, so a structural
+    # denominator there would punish correct structures. See playbook C5.
+    expected_environment_count = 0
+    if smiles and any(
+        str(peak.experiment) in {"HSQC", "HMQC"} for peak in preview.peaks
+    ):
+        expected_environment_count = len(expected_hsqc_correlations(smiles))
+
+    if expected_environment_count:
+        # A distinct observed environment can satisfy at most one expectation.
+        observed_environments = min(matched_correlation_count, expected_environment_count)
+        structural_coverage = observed_environments / expected_environment_count
+        missing_reference_count = expected_environment_count - observed_environments
+    else:
+        structural_coverage = None
+        # Without a structure there is nothing to be missing FROM, so this falls
+        # back to its historical meaning: observed correlations that matched no
+        # reference shift. The name has always been wrong for that quantity --
+        # it is an unexpected peak, not a missing one -- but renaming a field on
+        # a live contract is a separate change.
+        missing_reference_count = (
+            sum(1 for item in correlations if item.matched_1h_peak is None and item.matched_13c_peak is None)
+            if (proton_refs or carbon_refs)
+            else 0
+        )
+    # Structural coverage multiplies rather than adds. An HSQC that explains two
+    # of seven predicted environments is not "a bit less good" than a complete
+    # one -- most of the molecule is unaccounted for, and every other term here
+    # is computed over the peaks that ARE present and so cannot see that.
+    # Measured before this change: 2 of 7 correlations scored 0.8218 against
+    # 0.8047 for all seven, i.e. showing less scored better.
+    coverage_factor = 1.0 if structural_coverage is None else structural_coverage
     evidence_score = round(
         _clamp(
-            0.30 * dimension_match_score
-            + 0.27 * correlation_quality_score
-            + 0.20 * reference_support_score
-            + 0.23 * experiment_specific_score
-            + dept_adjustment
-            - artifact_penalty
-            - duplicate_penalty
-            - suspicious_penalty
+            (
+                0.30 * dimension_match_score
+                + 0.27 * correlation_quality_score
+                + 0.20 * reference_support_score
+                + 0.23 * experiment_specific_score
+                + dept_adjustment
+                - artifact_penalty
+                - duplicate_penalty
+                - suspicious_penalty
+            )
+            * coverage_factor
         ),
         4,
     )
@@ -449,12 +497,7 @@ def analyze_nmr2d_preview(
         )
     notes.append("2D NMR correlations are supporting evidence only; human review remains required.")
 
-    matched_correlation_count = sum(1 for item in correlations if item.matched_1h_peak is not None or item.matched_13c_peak is not None)
-    missing_reference_count = (
-        sum(1 for item in correlations if item.matched_1h_peak is None and item.matched_13c_peak is None)
-        if (proton_refs or carbon_refs)
-        else 0
-    )
+
     extra_correlation_count = sum(
         1
         for item in correlations
@@ -479,6 +522,10 @@ def analyze_nmr2d_preview(
         "carbon13_reference_count": len(carbon_refs),
         "matched_correlation_count": matched_correlation_count,
         "missing_reference_count": missing_reference_count,
+        "expected_environment_count": expected_environment_count,
+        "structural_coverage": (
+            round(structural_coverage, 4) if structural_coverage is not None else None
+        ),
         "extra_correlation_count": extra_correlation_count,
         "suspicious_peak_count": suspicious_count,
         "dept_apt_supported_correlations": dept_supported_count,
