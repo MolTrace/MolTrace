@@ -23,7 +23,6 @@ from .fid_pipeline_adapter import (
     build_prompt_pipeline_sidecar,
     build_prompt_pipeline_validation_report,
 )
-from .integration_scale import disclose_relative_integrals
 from .models import FIDPreviewReport
 
 REPORT_VERSION = "raw_fid_prompt_sidecar_fixture_report_v1"
@@ -1089,16 +1088,13 @@ def _validate_fixture(fixture: Mapping[str, Any], *, strict: bool) -> dict[str, 
     validation: dict[str, Any] | None = None
 
     try:
-        legacy_report = disclose_relative_integrals(
-            process_bruker_1d_zip(
+        legacy_report = process_bruker_1d_zip(
                 filename=archive_path.name,
                 content=content,
                 nucleus=nucleus,
                 solvent=solvent,
                 settings=fid_settings_from_preset(selected_preset="balanced"),
-            ),
-            expected_total_h=None,
-        )
+            )
     except Exception as exc:
         if strict:
             raise

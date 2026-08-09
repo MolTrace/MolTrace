@@ -31,6 +31,7 @@ from .gsd import deconvolve_region, multiplicity_from_lines
 from .impurities import match_h1_impurity_shifts, partner_shifts_for_compound
 from .solvents import get_solvent_profile, solvent_exchanges_labile_protons
 from .nmr_tables import solvent_windows
+from .integration_scale import disclose_relative_integrals
 from .parser import ReferencePeakAssignment, normalize_multiplicity, normalize_nmr_text, parse_j_values_hz, parse_reference_nmr_text
 
 _FLOAT_RE = re.compile(r"[-+]?\d*\.?\d+(?:[eE][-+]?\d+)?")
@@ -2996,7 +2997,13 @@ def parse_processed_spectrum(
         point_limit=preview_limit,
     )
 
-    return SpectrumPreviewReport(
+    # The scale disclosure lives HERE, in the producer, not at the call sites.
+    # It was attached by callers while this file was carrying unrelated in-flight
+    # work; the AST guard that stood in for real enforcement has been deleted
+    # along with that workaround. Nothing can reach a preview without passing
+    # through this return.
+    return disclose_relative_integrals(
+        SpectrumPreviewReport(
         filename=filename,
         format_detected=ext or "unknown",
         source_mode=source_mode,
@@ -3072,4 +3079,6 @@ def parse_processed_spectrum(
             ),
             **peak_meta,
         },
+    ),
+        expected_total_h=expected_total_h,
     )

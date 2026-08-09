@@ -203,8 +203,8 @@ from .fid import (
     available_fid_presets,
     fid_settings_from_preset,
     normalize_phase_mode,
+    process_bruker_1d_zip,
 )
-from .fid import process_bruker_1d_zip as _process_bruker_1d_zip_upstream
 from .fid_pipeline_adapter import (
     attach_prompt_pipeline_sidecar,
     build_prompt_pipeline_analysis_guidance,
@@ -215,7 +215,6 @@ from .fid_pipeline_adapter import (
 )
 from .fragmentation_tree import MSMSFragmentationTreeError, build_msms_fragmentation_tree
 from .hrms import HRMSError, match_hrms_candidates, search_formulas_by_hrms
-from .integration_scale import disclose_relative_integrals
 from .lcms_confidence_bridge import (
     LCMSConfidenceBridgeError,
     score_lcms_candidates_against_consensus,
@@ -1033,8 +1032,7 @@ from .spectral_similarity import (
     score_nmr2d_similarity,
     score_similarity_request,
 )
-from .spectrum import SpectrumParseError
-from .spectrum import parse_processed_spectrum as _parse_processed_spectrum_upstream
+from .spectrum import SpectrumParseError, parse_processed_spectrum
 from .unified_confidence import (
     UnifiedConfidenceError,
     build_unified_candidate_confidence,
@@ -2196,28 +2194,6 @@ def _estimate_hours_saved(settings: Settings, *, parsed_peak_count: int) -> floa
         return round(settings.default_validation_minutes_saved / 60.0, 2)
     scaled = baseline_minutes + min(parsed_peak_count, 12) * 0.25
     return round(scaled / 60.0, 2)
-
-
-def parse_processed_spectrum(*args: Any, **kwargs: Any) -> Any:
-    """:func:`nmrcheck.spectrum.parse_processed_spectrum`, plus the scale disclosure.
-
-    Wrapping the producer rather than annotating each route: ten call sites in
-    this module can reach a spectrum with no structural budget, and a guard
-    applied to some callers of a symmetric condition is the bug shape this
-    codebase keeps re-growing.
-    """
-    return disclose_relative_integrals(
-        _parse_processed_spectrum_upstream(*args, **kwargs),
-        expected_total_h=kwargs.get("expected_total_h"),
-    )
-
-
-def process_bruker_1d_zip(*args: Any, **kwargs: Any) -> Any:
-    """:func:`nmrcheck.fid.process_bruker_1d_zip`, plus the scale disclosure."""
-    return disclose_relative_integrals(
-        _process_bruker_1d_zip_upstream(*args, **kwargs),
-        expected_total_h=kwargs.get("expected_total_h"),
-    )
 
 
 def _spectrum_structure_targets(smiles: str | None) -> tuple[int | None, int | None]:
