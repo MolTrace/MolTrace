@@ -30,22 +30,21 @@ export const contentType = "image/png"
  * keeps, it keeps the brand.
  */
 export default async function OpengraphImage() {
-  // The FLAT mark, not the dimensional one. A chat client scales this card down
-  // hard, and the 3D mark's bloom, bevel and gradient "m" turn to mush at
-  // thumbnail size, while flat strokes stay crisp.
+  // The dimensional mark — the same one the favicons, the PWA icons and the docs
+  // card use.
   //
-  // A RASTER of the flat mark, not the SVG itself. Two attempts at inlining the
-  // vector failed and both are worth recording, because the second is the sort of
-  // thing that looks like it should work: base64 threw InvalidCharacterError
-  // (btoa is Latin-1 only and the file has em-dashes in its comments), and a
-  // percent-encoded data URI then hung the route outright — Satori's SVG support
-  // does not cover this drawing. The PNG is generated from that same SVG by
-  // scripts/, so the vector stays the source of truth.
+  // I briefly swapped this for a flat variant on the reasoning that bloom, bevel
+  // and a gradient "m" would turn to mush once a chat client scaled the card to a
+  // thumbnail. That was an assertion, not a measurement, and it did not survive
+  // being checked: rendered at 120px and 200px — the widths a compact preview
+  // actually uses — the two are indistinguishable, and at 360px the dimensional
+  // one is richer. Swapping it also made this the only surface in the product not
+  // using the brand mark, which is a real cost paid for an imagined benefit.
   //
   // Fetched relative to this module so it works in the edge runtime, where there
   // is no filesystem.
-  const mark = await fetch(new URL("../public/icons/moltrace-mark-flat-512.png", import.meta.url)).then(
-    (res) => res.arrayBuffer(),
+  const mark = await fetch(new URL("../public/icons/icon-512.png", import.meta.url)).then((res) =>
+    res.arrayBuffer(),
   )
 
   return new ImageResponse(
