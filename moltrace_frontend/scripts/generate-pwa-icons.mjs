@@ -2,6 +2,10 @@
  * Rasterizes the MolTrace mark (matches components/branding/molecule-logo-mark.tsx)
  * into public/icons/*.png for PWA / favicons.
  *
+ * The drawing below is a hand-mirror of that component. Change one and you must
+ * change the other — a mark that disagrees with its own favicon is exactly the
+ * drift the shared constants are here to prevent.
+ *
  * Run: node scripts/generate-pwa-icons.mjs
  */
 
@@ -16,17 +20,23 @@ const ICONS_DIR = join(__dirname, "..", "public", "icons")
 
 /** Matches `molecule-logo-mark.tsx` */
 const LOGO_BACKGROUND_DARK_BLUE = "#051f3a"
-/** Honeycomb stroke color. */
+/** Honeycomb + trace-line stroke — the "Trace" cyan from the wordmark. */
 const HONEYCOMB_BRIGHT_BLUE = "#26C6FF"
-/** Engraved m fill — white carving floor inside the cube. */
-const M_ENGRAVED_WHITE = "#FFFFFF"
-/** Engraved m bevels — use cube-face colors so generated icons match the live SVG. */
-const M_ENGRAVE_EDGE_LIGHT = "#2E78AC"
-const M_ENGRAVE_EDGE_DARK = "#062337"
+/** The neon tube's hot core, where the cyan blows out toward white. */
+const NEON_CORE_WHITE = "#CDF0FF"
+/** The prism's far edge, catching light at a glancing angle. */
+const PRISM_SHELL_BLUE = "#7FD8FF"
+/** Rim light along the raised m. */
+const M_RIM_LIGHT = "#8FDCFF"
+/** The m's lit face, cooling from white at the top to a pale steel below. */
+const M_FACE_TOP = "#FFFFFF"
+const M_FACE_BOTTOM = "#B9D8EC"
+/** The shadow the raised m casts onto the prism floor. */
+const M_CAST_SHADOW = "#020C17"
 const WORDMARK_FILL = "#111827"
 
-/** Flat-top hex in 64x64 viewBox - matches `LOGO_HEX_CLIP` in molecule-logo-mark.tsx */
-const LOGO_HEX_POLYGON_POINTS = "16,0 48,0 64,32 48,64 16,64 0,32"
+/** Room left around the hexagon for the bloom, in viewBox units. */
+const HEX_GLOW_INSET = 3.5
 
 function flatTopHexPoints(cx, cy, R) {
   const pts = []
@@ -39,20 +49,36 @@ function flatTopHexPoints(cx, cy, R) {
   return pts.join(" ")
 }
 
+/** The mark's outer hexagon, inset so the neon bloom has somewhere to fall. */
+function markHexPoints(inset) {
+  const r = 32 - inset
+  const h = r / 2
+  return [
+    `${32 - h},${32 - r}`,
+    `${32 + h},${32 - r}`,
+    `${32 + r},32`,
+    `${32 + h},${32 + r}`,
+    `${32 - h},${32 + r}`,
+    `${32 - r},32`,
+  ].join(" ")
+}
+
+const HEX_OUTER_POINTS = markHexPoints(HEX_GLOW_INSET)
+
 function buildLogoMarkSvg() {
   return `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" fill="none" role="img" aria-labelledby="moltrace-mark-title">
   <title id="moltrace-mark-title">MolTrace logo</title>
   <defs>
     <clipPath id="moltrace-mark-hex" clipPathUnits="userSpaceOnUse">
-      <polygon points="${LOGO_HEX_POLYGON_POINTS}"/>
+      <polygon points="${HEX_OUTER_POINTS}"/>
     </clipPath>
     <mask id="moltrace-mark-cutout" maskUnits="userSpaceOnUse" x="0" y="0" width="64" height="64">
       <rect width="64" height="64" fill="#fff"/>
       <text x="32" y="32" dy="0.33em"
         font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
-        font-size="40" font-weight="900" text-anchor="middle"
-        text-rendering="geometricPrecision" fill="#000">m</text>
+        font-size="34" font-weight="900" text-anchor="middle"
+        text-rendering="geometricPrecision" fill="#000" stroke="#000" stroke-width="1.5">m</text>
     </mask>
     <filter id="moltrace-mark-glow" x="-50%" y="-50%" width="200%" height="200%">
       <feGaussianBlur in="SourceGraphic" stdDeviation="1.1" result="blur"/>
@@ -64,39 +90,37 @@ function buildLogoMarkSvg() {
         <feMergeNode in="SourceGraphic"/>
       </feMerge>
     </filter>
-    <filter id="moltrace-mark-engrave" x="-20%" y="-20%" width="140%" height="140%">
-      <feGaussianBlur in="SourceAlpha" stdDeviation="0.8" result="blur"/>
-      <feOffset in="blur" dy="1.4" result="offsetDown"/>
-      <feComposite in="SourceAlpha" in2="offsetDown" operator="out" result="topRing"/>
-      <feFlood flood-color="#000" flood-opacity="0.9" result="darkColor"/>
-      <feComposite in="darkColor" in2="topRing" operator="in" result="topShadow"/>
-      <feOffset in="blur" dy="-1.4" result="offsetUp"/>
-      <feComposite in="SourceAlpha" in2="offsetUp" operator="out" result="bottomRing"/>
-      <feFlood flood-color="#9DD7F2" flood-opacity="0.6" result="lightColor"/>
-      <feComposite in="lightColor" in2="bottomRing" operator="in" result="bottomHighlight"/>
+    <filter id="moltrace-mark-bloom" x="-75%" y="-75%" width="250%" height="250%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="2.6" result="wide"/>
+      <feFlood flood-color="${HONEYCOMB_BRIGHT_BLUE}" flood-opacity="0.9" result="flood"/>
+      <feComposite in="flood" in2="wide" operator="in" result="coloredBlur"/>
       <feMerge>
-        <feMergeNode in="SourceGraphic"/>
-        <feMergeNode in="bottomHighlight"/>
-        <feMergeNode in="topShadow"/>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="coloredBlur"/>
       </feMerge>
     </filter>
-    <linearGradient id="moltrace-mark-mrecess" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="${M_ENGRAVED_WHITE}"/>
-      <stop offset="100%" stop-color="${M_ENGRAVED_WHITE}"/>
+    <filter id="moltrace-mark-cast" x="-40%" y="-40%" width="180%" height="180%">
+      <feDropShadow dx="0.9" dy="1.3" stdDeviation="0.9" flood-color="${M_CAST_SHADOW}" flood-opacity="0.85"/>
+    </filter>
+    <linearGradient id="moltrace-mark-mface" x1="0" y1="0" x2="0.25" y2="1">
+      <stop offset="0%" stop-color="${M_FACE_TOP}"/>
+      <stop offset="55%" stop-color="${M_FACE_TOP}"/>
+      <stop offset="100%" stop-color="${M_FACE_BOTTOM}"/>
     </linearGradient>
     <linearGradient id="moltrace-mark-topface" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#2E78AC"/>
-      <stop offset="100%" stop-color="#0F3A5C"/>
+      <stop offset="0%" stop-color="#14425F"/>
+      <stop offset="100%" stop-color="#0A2A45"/>
     </linearGradient>
     <linearGradient id="moltrace-mark-rightface" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#194C70"/>
-      <stop offset="100%" stop-color="#062337"/>
+      <stop offset="0%" stop-color="#0F3552"/>
+      <stop offset="100%" stop-color="#061C2E"/>
     </linearGradient>
     <linearGradient id="moltrace-mark-leftface" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#0D3050"/>
-      <stop offset="100%" stop-color="#021326"/>
+      <stop offset="0%" stop-color="#0A2438"/>
+      <stop offset="100%" stop-color="#03101E"/>
     </linearGradient>
   </defs>
+  <polygon points="${HEX_OUTER_POINTS}" fill="none" stroke="${HONEYCOMB_BRIGHT_BLUE}" stroke-width="2.4" stroke-linejoin="miter" filter="url(#moltrace-mark-bloom)" opacity="0.75"/>
   <g clip-path="url(#moltrace-mark-hex)">
     <rect width="64" height="64" fill="${LOGO_BACKGROUND_DARK_BLUE}"/>
     <g mask="url(#moltrace-mark-cutout)">
@@ -104,7 +128,7 @@ function buildLogoMarkSvg() {
       <polygon points="48,0 64,32 48,64 32,32" fill="url(#moltrace-mark-rightface)"/>
       <polygon points="32,32 48,64 16,64 0,32" fill="url(#moltrace-mark-leftface)"/>
     </g>
-    <g mask="url(#moltrace-mark-cutout)" filter="url(#moltrace-mark-glow)" stroke-width="1.2" stroke-linejoin="miter" stroke-linecap="butt" fill="none">
+    <g mask="url(#moltrace-mark-cutout)" filter="url(#moltrace-mark-glow)" stroke-width="1.1" stroke-linejoin="miter" stroke-linecap="butt" fill="none">
       <g transform="translate(24 14) matrix(1 0 -0.5 1 0 0) translate(-24 -14)">
         <polygon points="${flatTopHexPoints(24, 14, 4)}" stroke="${HONEYCOMB_BRIGHT_BLUE}"/>
       </g>
@@ -115,24 +139,25 @@ function buildLogoMarkSvg() {
         <polygon points="${flatTopHexPoints(27, 53, 4)}" stroke="${HONEYCOMB_BRIGHT_BLUE}"/>
       </g>
     </g>
-    <g mask="url(#moltrace-mark-cutout)" filter="url(#moltrace-mark-glow)" stroke="${HONEYCOMB_BRIGHT_BLUE}" stroke-width="1.4" stroke-linecap="round" fill="none">
+    <g mask="url(#moltrace-mark-cutout)" filter="url(#moltrace-mark-glow)" stroke="${HONEYCOMB_BRIGHT_BLUE}" stroke-width="1.3" stroke-linecap="round" fill="none">
       <line x1="32" y1="32" x2="48" y2="0"/>
       <line x1="32" y1="32" x2="48" y2="64"/>
       <line x1="32" y1="32" x2="0" y2="32"/>
     </g>
-    <g
-      font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
-      font-size="40"
-      font-weight="900"
-      text-anchor="middle"
-      text-rendering="geometricPrecision"
-    >
-      <text x="32" y="32" dy="0.33em" fill="url(#moltrace-mark-mrecess)" filter="url(#moltrace-mark-engrave)">m</text>
-      <text x="31.6" y="31.1" dy="0.33em" fill="none" stroke="${M_ENGRAVE_EDGE_LIGHT}" stroke-width="1.05" opacity="0.58">m</text>
-      <text x="32.7" y="33.1" dy="0.33em" fill="none" stroke="${M_ENGRAVE_EDGE_DARK}" stroke-width="2.1" opacity="0.72">m</text>
-    </g>
   </g>
-  <polygon points="${LOGO_HEX_POLYGON_POINTS}" fill="none" stroke="${HONEYCOMB_BRIGHT_BLUE}" stroke-width="4" stroke-linejoin="miter"/>
+  <polygon points="${markHexPoints(HEX_GLOW_INSET - 1.15)}" fill="none" stroke="${PRISM_SHELL_BLUE}" stroke-width="0.7" stroke-linejoin="miter" opacity="0.4"/>
+  <polygon points="${HEX_OUTER_POINTS}" fill="none" stroke="${HONEYCOMB_BRIGHT_BLUE}" stroke-width="2.3" stroke-linejoin="miter"/>
+  <polygon points="${HEX_OUTER_POINTS}" fill="none" stroke="${NEON_CORE_WHITE}" stroke-width="0.85" stroke-linejoin="miter" opacity="0.9"/>
+  <g
+    font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
+    font-size="34"
+    font-weight="900"
+    text-anchor="middle"
+    text-rendering="geometricPrecision"
+  >
+    <text x="32" y="32" dy="0.33em" fill="url(#moltrace-mark-mface)" filter="url(#moltrace-mark-cast)">m</text>
+    <text x="32" y="32" dy="0.33em" fill="none" stroke="${M_RIM_LIGHT}" stroke-width="0.9" stroke-linejoin="round" opacity="0.95">m</text>
+  </g>
 </svg>`
 }
 

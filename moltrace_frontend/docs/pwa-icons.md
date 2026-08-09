@@ -15,5 +15,10 @@ Notes:
 
 - Keep artwork synchronized with `components/branding/molecule-logo-mark.tsx`.
 - Run `node scripts/generate-pwa-icons.mjs` after logo geometry changes.
+- **Bump `PWA_ASSET_VERSION` in the same change** — it is declared in *both*
+  `app/manifest.ts` and `app/layout.tsx` and must match. It is the `?v=` on every icon
+  URL, so new artwork at an unchanged version is served from cache: browsers keep the old
+  favicon and an installed PWA keeps the old home-screen icon. A redraw nobody sees is
+  the failure mode this exists to prevent.
 - Avoid embedding sensitive or environment-specific data in image metadata.
 - Maskable icon should include adequate safe padding for Android adaptive icon cropping.
