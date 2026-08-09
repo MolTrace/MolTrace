@@ -41,10 +41,10 @@ permanent banner, so it is safe to render prominently.
 1. **Surface this warning where the integrals are rendered, not in a generic
    warnings drawer.** It qualifies the numbers on screen; a reader who does not
    see it next to `123.5H` has been told nothing.
-2. **When it is present, stop printing the `H` suffix** — or render it as
-   "×  smallest signal" / "rel." The backend cannot fix the rendering yet
-   (`inferred_nmr_text` is built in a contended file, see §5), so the FE is the
-   only place this can currently be made non-misleading.
+2. **When it is present, stop printing the `H` suffix in the UI** — render it as
+   "× smallest signal", "rel.", or just the bare ratio. **The frontend is the
+   only place this can be fixed, permanently — not just for now.** See §5: the
+   backend cannot change the string, and that is settled, not pending.
 3. **Prompt for a structure at the point of pain.** The warning names the
    remedy — supplying `candidates_text` (raw-FID routes) or `smiles`
    (processed routes) converts the ratios into proton counts. That is the single
@@ -95,15 +95,39 @@ If you do build it: self-review returns **409** with a specific message
 deliberately not 403 — a 403 would be stripped by the `/api/backend` proxy's
 401/403 sanitiser and would read as a broken feature. Render the 409 `detail`.
 
-## 5. What the backend deliberately did NOT do
+## 5. Why the backend cannot fix the string — measured, and settled
 
-Change the rendering. `inferred_nmr_text` still prints `123.5H` because it is
-built in `spectrum.py:2326`, which was carrying ~400 lines of unrelated in-flight
-work from another session. The disclosure is attached at the call sites with an
-AST guard (`tests/test_integration_scale_disclosure.py`) standing in for the
-enforcement the producer would give for free. When that work lands, the backend
-should move the disclosure into the producer, fix the rendering, and delete the
-guard — at which point item 2 above becomes redundant.
+`inferred_nmr_text` still prints `123.5H`, and it will keep doing so. This was
+originally deferred as "blocked on a contended file"; that block is gone
+(`c369314` moved the disclosure inside the producers and deleted the AST guard
+that stood in for enforcement). The rendering was then attempted properly and
+**the parser will not allow it**:
+
+```
+"3.65 (q, J = 7.1 Hz), 1.26 (t)"            -> PeakParseError
+"3.65 (q, 123.5 rel), 1.26 (t, 84.5 rel)"   -> PeakParseError
+```
+
+The parser requires an `NH` integral, and `inferred_nmr_text` is not display-only
+— it is fed back in as `AnalysisInputs.nmr_text` (`api.py:7882`, `api.py:12442`)
+and re-parsed. Changing the suffix would stop the FID path producing analysable
+text at all: a functional regression traded for a cosmetic gain.
+
+So **item 2 is permanent frontend work, not a stopgap.** Teaching the parser a
+relative notation would be a core-contract change affecting everything that reads
+NMR text, and is its own piece of work if it is ever wanted.
+
+**One hazard you do not need to defend against.** If a user copies ungrounded
+text into a structured analysis, the relative numbers are *not* silently accepted
+as protons — the validator refuses by name:
+
+```
+SMILES / 1H NMR mismatch: the parsed text accounts for 152H,
+but the structure expects 6 total H.
+```
+
+So the FE job is to stop the number *looking* like a proton count on screen. The
+backend already stops it *being used* as one.
 
 ## 6. Verify
 
