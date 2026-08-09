@@ -256,3 +256,79 @@ class TestTheAnalyzerReportsStructuralCoverage:
         assert result.missing_reference_count == 0, (
             "reported missing correlations with no structure to expect them from"
         )
+
+
+class TestHMBCGetsNoStructuralDenominator:
+    """C5 — a guard against the obvious wrong "consistency" fix.
+
+    HSQC now has a structural denominator (C4). The tempting next move is to
+    give HMBC one too, for symmetry. That would be wrong, and this pins why.
+
+    An HSQC one-bond correlation is **expected**: every protonated carbon must
+    show one, so its absence is evidence against the structure. An HMBC
+    correlation is not. HMBC shows 2- and 3-bond couplings, sometimes 4 through
+    conjugation, and **2-bond correlations are frequently weak or entirely
+    absent even for the correct structure** — they depend on dihedral angle and
+    on the delay tuning of the experiment.
+
+    So absence is uninformative and only presence is evidence. Scoring an absent
+    HMBC correlation as a miss would produce a confident false rejection of a
+    correct structure, which is the direction that matters most — the same
+    asymmetry recorded for DP4's heavy tails and for the fragment scorer in the
+    MS playbook.
+
+    Measured while writing this: with a structure supplied, HMBC-only previews
+    report `expected_environment_count = None` and `missing_reference_count = 0`
+    whether six, three or one correlation is observed.
+    """
+
+    IBU = "CC(C)Cc1ccc(cc1)C(C)C(=O)O"
+    PROTON = ("7.22 (d, 2H), 7.10 (d, 2H), 3.70 (q, 1H), 2.45 (d, 2H), "
+              "1.85 (m, 1H), 1.50 (d, 3H), 0.90 (d, 6H)")
+    CARBON = "181.0, 141.0, 137.0, 129.3, 127.1, 45.1, 45.0, 30.2, 22.4, 18.1"
+    HMBC = [(7.22, 141.0), (7.10, 137.0), (3.70, 181.0),
+            (2.45, 141.0), (1.50, 181.0), (0.90, 45.0)]
+
+    def _run(self, pairs):
+        from nmrcheck.nmr2d_analyzer import analyze_nmr2d_preview
+        from nmrcheck.nmr2d_models import (
+            NMR2DExperimentType, NMR2DPeak, NMR2DPreviewReport,
+        )
+        peaks = [
+            NMR2DPeak(f2_ppm=h, f1_ppm=c, intensity=1.0e6,
+                      experiment=NMR2DExperimentType.HMBC,
+                      f2_nucleus="1H", f1_nucleus="13C")
+            for h, c in pairs
+        ]
+        preview = NMR2DPreviewReport(
+            filename="c5.csv", experiment_detected=NMR2DExperimentType.HMBC,
+            peak_count=len(peaks), peaks=peaks,
+        )
+        return analyze_nmr2d_preview(
+            preview, proton_nmr_text=self.PROTON, carbon13_text=self.CARBON,
+            smiles=self.IBU, solvent="CDCl3",
+        )
+
+    @pytest.mark.parametrize("count", [6, 3, 1])
+    def test_hmbc_never_gets_an_expected_environment_count(self, count) -> None:
+        result = self._run(self.HMBC[:count])
+        assert result.metadata.get("expected_environment_count") in (0, None), (
+            "HMBC acquired a structural denominator. One-bond expectations do not "
+            "transfer: a 2-bond HMBC correlation is often absent for a CORRECT "
+            "structure, so counting absence as a miss rejects correct answers."
+        )
+
+    @pytest.mark.parametrize("count", [6, 3, 1])
+    def test_absent_hmbc_correlations_are_never_counted_as_missing(self, count) -> None:
+        result = self._run(self.HMBC[:count])
+        assert result.missing_reference_count == 0, (
+            f"{result.missing_reference_count} HMBC correlations reported missing "
+            "with a structure supplied — absence is uninformative here"
+        )
+
+    def test_the_report_says_hmbc_is_long_range_not_attachment(self) -> None:
+        """A reader must not take an HMBC cross peak for a direct bond."""
+        result = self._run(self.HMBC)
+        blob = " ".join(result.notes).lower()
+        assert "long-range" in blob or "long range" in blob
+        assert "review" in blob

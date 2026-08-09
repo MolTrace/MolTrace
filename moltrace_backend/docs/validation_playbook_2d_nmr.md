@@ -513,3 +513,63 @@ a field on a live contract is a separate change.
   changed score is C8's question, not an assumption to carry.
 * **Per-correlation matching** — knowing *which* environment is missing rather
   than how many — needs a predictor accurate enough for a usable window.
+
+---
+
+## C5 RESULT — partial: the guard is in, the measurement waits on C0
+
+### Done: HMBC gets no structural denominator, and that is now pinned
+
+Checked first rather than assumed. The HMBC branch (`nmr2d_analyzer.py:340`)
+scores observed peaks against observed 1D reference shifts and has **no
+expectation set at all**, so absence was never penalised. C4 did not change that
+— the structural denominator is gated to HSQC/HMQC.
+
+Measured with a structure supplied, HMBC-only previews:
+
+```
+observed        evidence_score   missing_reference_count   expected_environment_count
+6 of 6              0.6918                 0                        None
+3 of 6              0.7951                 0                        None
+1 of 6              0.5729                 0                        None
+```
+
+`missing_reference_count` stays 0 and no structural expectation is formed,
+whatever is observed. Correct.
+
+**The reason this needed a guard rather than a note.** C4 gave HSQC a structural
+denominator. The natural next move for anyone tidying up is to give HMBC one for
+symmetry — and that would reject correct structures. An HSQC one-bond correlation
+is *expected*: every protonated carbon must show one. An HMBC correlation is not.
+2-bond couplings are frequently weak or absent even when the structure is right,
+depending on dihedral angle and on how the experiment's delay was tuned. Absence
+is uninformative; only presence is evidence. Three tests now pin this with the
+reason attached.
+
+Note the score still moves with peak count through the other terms (0.6918 /
+0.7951 / 0.5729 above) because quality and artifact terms average over the peaks
+present. That is **not** asserted as monotonic in either direction — for HMBC,
+observing more correlations genuinely does not mean the structure is more likely
+right, since a wrong structure can also produce many. No claim is made here that
+the evidence does not support.
+
+### Not done, and why
+
+The rest of C5 needs real spectra with hand-derived correlations, i.e. **C0**,
+which has not been run — the fixtures are not staged. Specifically outstanding:
+
+* **How much HMBC narrows the candidate set.** The deliverable C5 asks for is a
+  measured statement, and there is nothing honest to measure without ground
+  truth. Fabricating it from synthetic peaks would produce a number about the
+  fixture generator, not about HMBC.
+* **Reporting how many structures a correlation set is consistent with.** Needs a
+  candidate enumerator that does not exist yet; scope it before building.
+* **Recording the n-bond assumption per correlation.** A correlation counted as
+  3-bond under one reading and 2-bond under another supports different skeletons,
+  and nothing currently records which was assumed.
+
+**C0 is now the blocking phase for the rest of C.** C2 (parser fidelity), C3
+(artifact rejection), C6 (COSY diagonal) and C8 (does 2D change a verdict) all
+need real 2D data with known answers. The synthetic probes used for C1/C4/C5 were
+enough to expose a denominator defect and pin a design decision, but they cannot
+establish accuracy against reality.
