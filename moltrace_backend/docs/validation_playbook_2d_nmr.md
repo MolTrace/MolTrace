@@ -390,3 +390,48 @@ C4 was written as "build or validate". It is **build**:
 Until (2) lands, no 2D score should be presented as evidence for a structure, and
 any figure quoted from it needs the caveat that its denominator is the observed
 peak count. Worth checking whether public copy already quotes one.
+
+### C1 addendum — the score is weighted most where it is least validated
+
+Traced after the finding above, because a score that cannot fail only matters if
+something consumes it. It does.
+
+`candidate.py:101` takes **the exact field probed above**:
+
+```python
+global_2d_score = nmr2d_result.evidence_score if nmr2d_result else None
+```
+
+and feeds it into candidate comparison with base weight **0.14**
+(`candidate.py:115`), which is then multiplied by the per-class prior
+(`apply_compound_class_weights`, `candidate.py:117`).
+
+The `nmr2d` multipliers in `compound_class_priors.py`:
+
+| class | nmr2d multiplier | the comment in the table |
+|---|---|---|
+| carbohydrates | **1.50** | "Anomeric 1H + 13C are uniquely diagnostic; HSQC near-mandatory" |
+| flavonoids | 1.40 | "2D for ring linkages and sugar attach" |
+| glycoproteins | 1.40 | "2D primary evidence" |
+| alkaloids | 1.30 | "2D resolves N-adjacent stereochemistry" |
+
+**The chemistry is right and that is the problem.** HSQC genuinely is
+near-mandatory for carbohydrates (Duus et al. 2000, cited in the technical
+whitepaper) — the weighting reflects real practice. But the quantity being
+up-weighted is a score whose denominator is the observed peak count, which the
+measurement above shows can rise when correlations go missing. So the component
+carrying the most weight on carbohydrates, flavonoids, glycoproteins and
+alkaloids is the one that cannot currently detect the failure it exists to catch.
+
+Carbohydrates are also the class this codebase has invested the most 1D work in
+(anomeric caps, benzylidene acetals, the aminoglycoside paths), which makes it
+the most likely place for a confident 2D-driven wrong answer to be believed.
+
+**This raises C4 from "next phase" to the blocking one.** Until `possible` counts
+expected correlations, the honest options are (a) fix the denominator, or (b)
+drop the `nmr2d` weight to 0 for the up-weighted classes and say why. Do not
+leave a 1.5x multiplier on a score that rewards incompleteness.
+
+Not yet checked: whether `unified_confidence.py` applies the same priors — the
+multipliers do not appear in that module, so its 2D handling is a separate
+question and should not be assumed to share this defect.
