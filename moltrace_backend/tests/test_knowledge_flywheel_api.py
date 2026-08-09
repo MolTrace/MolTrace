@@ -702,7 +702,44 @@ def test_the_gate_blocks_when_the_blocking_measure_is_missing(client, api_header
         "a missing blocking measure must block; an absent number is not a passing one, "
         "however good the rest of the vector looks"
     )
-    assert gated.json()["gate_verdict_json"]["promotable"] is False
+    verdict = gated.json()["gate_verdict_json"]
+    assert verdict["promotable"] is False
+    # The reasons are shown verbatim, so an unnamed measure still has to read as a sentence.
+    assert verdict["reasons"][0] == (
+        "The blocking measure is missing or out of range [0, 1]; failing closed."
+    )
+    assert not any("Safety-flag recall" in reason for reason in verdict["reasons"])
+
+
+def test_the_gate_names_this_candidates_blocking_measure_in_its_reasons(client, api_headers):
+    # The conveyor reuses Repho's gate, and the reason lands beside a panel naming the
+    # measure. If the two disagree, a reviewer cannot tell a near miss from a missing number.
+    version = _approved_dataset_version(client, api_headers)
+    made = client.post(
+        "/knowledge/deployment-candidates",
+        headers=api_headers,
+        json={
+            "dataset_version_id": version["id"], "model_version": "v5",
+            "metrics_json": {"accuracy": 0.99}, "incumbent_metrics_json": {"accuracy": 0.80},
+            "metric_directions_json": {"accuracy": "higher"},
+            "blocking_metric_name": "citation_support_recall",
+            "blocking_metric_value": 0.80, "incumbent_blocking_metric_value": 0.90,
+        },
+    )
+    assert made.status_code == 201, made.text
+    gated = client.post(
+        f"/knowledge/deployment-candidates/{made.json()['id']}/gate", headers=api_headers
+    )
+    assert gated.status_code == 200, gated.text
+    verdict = gated.json()["gate_verdict_json"]
+    assert gated.json()["status"] == "gate_failed"
+    assert verdict["reasons"][0] == "Citation support recall regressed (0.8 < 0.9); blocked."
+    assert not any("Safety-flag recall" in reason for reason in verdict["reasons"]), (
+        "naming the reaction model's measure here points the reader at a number that is "
+        "not on this screen"
+    )
+    # The wire key is untouched — the label is display prose, not a rename.
+    assert verdict["blocking_metric_name"] == "citation_support_recall"
 
 
 def test_a_dataset_version_cannot_be_born_already_approved(client, api_headers):

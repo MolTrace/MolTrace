@@ -14,6 +14,40 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.69.2 — The promotion gate now names the measure it actually blocked on (2026-08-08)
+
+The corpus conveyor reuses Repho's dominance gate rather than growing a second one, which is
+right — but the gate wrote its refusals in prose fixed to the reaction model. A blocked corpus
+candidate rendered "Measure treated as the blocking one: **Citation support recall**" directly
+above "**Safety-flag recall** is missing or out of range [0, 1]; failing closed." Two names for
+one measure, one of them belonging to a different model.
+
+Nothing was computed wrongly: the correct value was compared, the fail-closed behaviour held,
+and the verdict was right in every case. What was wrong was the sentence a reviewer reads while
+deciding whether a refusal was a near miss or a missing number — the exact distinction the
+frontend is under contract to preserve by showing `reasons[]` verbatim. It could not be fixed
+downstream: rewriting the string client-side is the summarising that contract forbids, and it
+would put the frontend in the business of authoring why a candidate was refused.
+
+`evaluate_ab_promotion` now takes a keyword-only `blocking_metric_label`, defaulting to
+`"Safety-flag recall"` so the two Repho call sites — the A/B endpoint and the CI promotion
+gate — say exactly what they said before. The conveyor passes its candidate's own
+`blocking_metric_name`, humanized the way the review panel humanizes the same key, and falls
+back to "The blocking measure" when none was recorded (that candidate is still gated; its
+refusal now reads as a sentence). `blocking_metric_name` stays on the wire untouched: this is
+a display label, never a rename. **The decision itself is unchanged** — same rule, same
+tolerance handling, same fail-closed behaviour, only the noun differs.
+
+The prose was unguarded until now, which is how it drifted. Four tests close that: the default
+label still produces the Repho text verbatim, a conveyor candidate names *its* measure and
+never "Safety-flag recall", an unnamed measure still yields a readable refusal, and the verdict
+triple is identical whatever the label says.
+
+`gate_verdict_json` is already `dict[str, Any]`, so **no contract regeneration** — the text
+rides in a field that is typed, and `schema.d.ts` does not change.
+
+---
+
 ## v0.69.1 — A structure enumerator, validated against an answer it did not compute (2026-08-08)
 
 The generator half of computer-assisted structure elucidation.

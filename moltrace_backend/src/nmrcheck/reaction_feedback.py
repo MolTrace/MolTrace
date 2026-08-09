@@ -394,26 +394,35 @@ def evaluate_ab_promotion(
     *,
     directions: Mapping[str, str] | None = None,
     tolerance: float = 0.0,
+    blocking_metric_label: str = "Safety-flag recall",
 ) -> PromotionVerdict:
-    """Gate a challenger for promotion: safety-recall must not regress AND it must dominate.
+    """Gate a challenger for promotion: the blocking measure must not regress AND it must dominate.
 
     Promotion is **never automatic**: ``requires_human_signoff`` is always true and a champion
-    pointer is always rollback-able. This mirrors the platform-wide v0.14 dominance gate, scoped
-    to reaction models with safety-flag recall as the hard, blocking dimension.
+    pointer is always rollback-able. This mirrors the platform-wide v0.14 dominance gate.
+
+    Reaction models carry safety-flag recall as the hard, blocking dimension, which is why the
+    field is named for it and why that is the default label. Other callers reuse this same gate
+    with a blocking measure of their own (the corpus conveyor's varies by model), so the measure's
+    **display name** is a parameter: ``reasons`` reach a user's screen verbatim, and a reason that
+    names a different model's measure than the panel beside it is a refusal the reader cannot act
+    on. The rule applied is identical for every caller; only the noun changes.
     """
 
     reasons: list[str] = []
-    # The safety gate is exact and fail-closed: a missing / non-finite / out-of-range recall blocks,
-    # and the metric `tolerance` is NEVER applied here — safety-flag recall must not regress at all.
+    # The blocking gate is exact and fail-closed: a missing / non-finite / out-of-range value
+    # blocks, and the metric `tolerance` is NEVER applied here — no regression is tolerated.
     champion_ok = _valid_recall(champion.safety_flag_recall)
     challenger_ok = _valid_recall(challenger.safety_flag_recall)
     if not (champion_ok and challenger_ok):
         safety_regression = True
-        reasons.append("Safety-flag recall is missing or out of range [0, 1]; failing closed.")
+        reasons.append(
+            f"{blocking_metric_label} is missing or out of range [0, 1]; failing closed."
+        )
     elif challenger.safety_flag_recall < champion.safety_flag_recall:
         safety_regression = True
         reasons.append(
-            "Safety-flag recall regressed "
+            f"{blocking_metric_label} regressed "
             f"({challenger.safety_flag_recall:g} < {champion.safety_flag_recall:g}); blocked."
         )
     else:
@@ -428,7 +437,8 @@ def evaluate_ab_promotion(
     promotable = (not safety_regression) and dom
     if promotable:
         reasons.append(
-            "Eligible: no safety regression and metric-vector dominance — human sign-off required."
+            f"Eligible: {blocking_metric_label} did not regress and the metric vector "
+            "dominates — human sign-off required."
         )
     return PromotionVerdict(
         promotable=promotable,
