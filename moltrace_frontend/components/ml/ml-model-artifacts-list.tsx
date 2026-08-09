@@ -5,6 +5,8 @@ import { useCallback, useEffect, useState } from "react"
 import { apiFetch } from "@/lib/api/client"
 import { formatApiError } from "@/components/spectracheck/spectracheck-helpers"
 import { readRecordNumber, readRecordString } from "@/components/projects/project-workspace-utils"
+import { statusLabel } from "@/lib/ui/status"
+import { nucleusScopeLabel, readServingState } from "@/src/lib/ml/registry-serving"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -87,7 +89,7 @@ export function MlModelArtifactsList() {
         eyebrow="Artifacts"
         title="Artifacts"
         icon={Boxes}
-        description="Produced by completed training runs."
+        description="Produced by completed training runs. Approval is the product decision; serving is what predictions actually resolve to — an artifact can be approved without answering anything."
       >
         <div className="table-scroll min-w-0">
           {loading ? (
@@ -103,13 +105,18 @@ export function MlModelArtifactsList() {
                   <TableHead>Model version</TableHead>
                   <TableHead>Task type</TableHead>
                   <TableHead>Model family</TableHead>
-                  <TableHead>Status</TableHead>
+                  <TableHead>Approval</TableHead>
+                  <TableHead>Serving</TableHead>
                   <TableHead className="w-[100px]" />
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {rows.map((row, idx) => {
                   const id = readRecordNumber(row, "id")
+                  // Two independent facts, deliberately in two columns: the registry is
+                  // authoritative for "is this live", so where the two disagree this cell
+                  // is the one to believe.
+                  const serving = readServingState(row)
                   return (
                     <TableRow key={id != null ? `a-${id}` : `a-${idx}`}>
                       <TableCell className="font-mono text-xs">{id ?? "—"}</TableCell>
@@ -118,7 +125,24 @@ export function MlModelArtifactsList() {
                       <TableCell className="font-mono text-xs">{readRecordString(row, "task_key") ?? "—"}</TableCell>
                       <TableCell className="font-mono text-xs">{readRecordString(row, "model_family") ?? "—"}</TableCell>
                       <TableCell>
-                        <Badge variant="outline">{readRecordString(row, "status") ?? "—"}</Badge>
+                        <Badge variant="outline">{statusLabel(readRecordString(row, "status")) || "—"}</Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="space-y-1">
+                          <Badge variant={serving.serving ? "default" : "outline"} title={serving.detail}>
+                            {serving.label}
+                          </Badge>
+                          {serving.role ? (
+                            <p className="font-mono text-[10px] text-muted-foreground">
+                              {serving.role} · {nucleusScopeLabel(serving.nucleus)}
+                            </p>
+                          ) : null}
+                          {serving.contradictsApproval ? (
+                            <p className="text-[10px] text-amber-700 dark:text-amber-500">
+                              Approved, not answering predictions.
+                            </p>
+                          ) : null}
+                        </div>
                       </TableCell>
                       <TableCell>
                         {id != null ? (

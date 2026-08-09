@@ -6,6 +6,8 @@ import { apiFetch } from "@/lib/api/client"
 import { formatApiError } from "@/components/spectracheck/spectracheck-helpers"
 import { statusLabel } from "@/lib/ui/status"
 import { readRecordString } from "@/components/projects/project-workspace-utils"
+import { readConfidence, readPredictionProvenance } from "@/src/lib/ai/prediction-confidence"
+import { readRefusalDetail } from "@/src/lib/api/refusal-detail"
 import {
   trackAiPredictionRunCompleted,
   trackAiPredictionRunStarted,
@@ -96,6 +98,8 @@ export function AiPredictionsWorkspace() {
   const [formErr, setFormErr] = useState("")
   const [formOk, setFormOk] = useState("")
   const [submitBusy, setSubmitBusy] = useState(false)
+  /** An engine that could not run. The request was valid, so this is retried, not corrected. */
+  const [engineUnavailable, setEngineUnavailable] = useState("")
 
   const jsonWarningVisible = useMemo(() => Object.keys(inputSummary).length > 0, [inputSummary])
 
@@ -133,6 +137,7 @@ export function AiPredictionsWorkspace() {
   async function submitRunPrediction() {
     setFormErr("")
     setFormOk("")
+    setEngineUnavailable("")
     // The service key is the only thing the request carries: the server derives the module and
     // task from it, so requiring them here blocked a submission on fields it never sends. They
     // stay on the form as display, and still label the analytics events below.
@@ -185,7 +190,11 @@ export function AiPredictionsWorkspace() {
       setFormOk(createdId ? `Prediction submitted (${createdId}).` : "Prediction submitted.")
       setReloadToken((x) => x + 1)
     } catch (err) {
-      setFormErr(formatApiError(err, "Could not run prediction."))
+      // The engine failing to run is not a bad request. Nothing about the submission needs
+      // changing, so this is separated from the form errors and offered as a retry.
+      const engineDetail = readRefusalDetail(err, 503)
+      if (engineDetail) setEngineUnavailable(engineDetail)
+      else setFormErr(formatApiError(err, "Could not run prediction."))
     } finally {
       setSubmitBusy(false)
     }
@@ -246,6 +255,23 @@ export function AiPredictionsWorkspace() {
         <div className="space-y-4">
           {formErr ? <p className="text-sm text-destructive">{formErr}</p> : null}
           {formOk ? <p className="text-sm text-emerald-700">{formOk}</p> : null}
+
+          {engineUnavailable ? (
+            <Alert className="border-amber-500/30 bg-amber-500/10">
+              <AlertTriangle className="h-4 w-4 text-amber-600" />
+              <AlertTitle>The prediction engine could not run</AlertTitle>
+              <AlertDescription className="space-y-2">
+                <p>{engineUnavailable}</p>
+                <p className="text-xs text-muted-foreground">
+                  Your request was accepted as valid — there is nothing to correct. Retry it.
+                </p>
+                <Button type="button" variant="outline" size="sm" disabled={submitBusy} onClick={() => void submitRunPrediction()}>
+                  {submitBusy ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
+                  Retry prediction
+                </Button>
+              </AlertDescription>
+            </Alert>
+          ) : null}
 
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
@@ -355,6 +381,7 @@ export function AiPredictionsWorkspace() {
                 <TableHead>Service key</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Confidence</TableHead>
+                <TableHead>Produced by</TableHead>
                 <TableHead>OOD</TableHead>
                 <TableHead>Created</TableHead>
                 <TableHead>Detail</TableHead>
@@ -363,7 +390,10 @@ export function AiPredictionsWorkspace() {
             <TableBody>
               {predictions.slice(0, 25).map((row, idx) => {
                 const id = readRecordString(row, "prediction_id") ?? readRecordString(row, "id") ?? String(idx + 1)
-                const confidence = readRecordString(row, "confidence") ?? readRecordString(row, "confidence_score") ?? "-"
+                // Figure and scale travel together: the same number on the two scales in use
+                // does not mean the same thing, so neither is shown without the other.
+                const confidence = readConfidence(row)
+                const provenance = readPredictionProvenance(row)
                 const ood = statusLabel(readRecordString(row, "ood_status") ?? readRecordString(row, "is_ood"))
                 return (
                   <TableRow key={`${id}-${idx}`}>
@@ -372,7 +402,31 @@ export function AiPredictionsWorkspace() {
                     <TableCell>
                       <Badge variant="outline">{statusLabel(readRecordString(row, "status"))}</Badge>
                     </TableCell>
-                    <TableCell>{confidence}</TableCell>
+                    <TableCell>
+                      <span className={confidence.value == null ? "text-xs text-muted-foreground" : "font-mono text-sm"}>
+                        {confidence.display}
+                      </span>
+                      {confidence.scale ? (
+                        <p className="text-[10px] text-muted-foreground" title={confidence.scale.meaning}>
+                          {confidence.scale.label}
+                        </p>
+                      ) : null}
+                    </TableCell>
+                    <TableCell>
+                      {provenance ? (
+                        <span
+                          className="font-mono text-[10px] text-muted-foreground"
+                          title={provenance.components
+                            .map((component) => `${component.name}: ${component.version}`)
+                            .join("\n")}
+                        >
+                          {provenance.engine?.split(".").pop() ?? "—"}
+                          {provenance.components.length > 0 ? ` · ${provenance.components.length} component${provenance.components.length === 1 ? "" : "s"}` : ""}
+                        </span>
+                      ) : (
+                        <span className="text-[10px] text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
                     <TableCell>{ood}</TableCell>
                     <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
                       {formatWhen(readRecordString(row, "created_at") ?? readRecordString(row, "timestamp"))}
@@ -387,7 +441,7 @@ export function AiPredictionsWorkspace() {
               })}
               {predictions.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7}>
+                  <TableCell colSpan={8}>
                     <Empty>
                       <EmptyHeader>
                         <EmptyMedia variant="icon">

@@ -8,6 +8,7 @@ import { apiFetch } from "@/lib/api/client"
 import { DeveloperJsonPanel } from "@/components/spectracheck/spectracheck-result-panels"
 import { formatApiError } from "@/components/spectracheck/spectracheck-helpers"
 import { readRecordNumber, readRecordString } from "@/components/projects/project-workspace-utils"
+import { nucleusScopeLabel, readServingState } from "@/src/lib/ml/registry-serving"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
@@ -316,9 +317,35 @@ export function MlModelArtifactDetail() {
                 <p className="break-all font-mono text-xs">{readRecordString(artifact, "model_hash") ?? "—"}</p>
               </div>
               <div>
-                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Status</p>
-                <Badge variant="secondary">{readRecordString(artifact, "status") ?? "—"}</Badge>
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Approval status</p>
+                <Badge variant="secondary">{statusLabel(readRecordString(artifact, "status")) || "—"}</Badge>
               </div>
+              {(() => {
+                // Approval and serving are separate decisions, and only the registry knows
+                // the second. Showing them side by side is the point: "approved" on its own
+                // never meant a prediction would resolve here.
+                const serving = readServingState(artifact)
+                return (
+                  <div>
+                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      Serving status
+                    </p>
+                    <Badge variant={serving.serving ? "default" : "outline"}>{serving.label}</Badge>
+                    <p className="mt-1 text-xs text-muted-foreground">{serving.detail}</p>
+                    {serving.registryModelId ? (
+                      <p className="mt-1 break-all font-mono text-[10px] text-muted-foreground">
+                        Registry entry {serving.registryModelId}
+                        {serving.role ? ` · ${serving.role} · ${nucleusScopeLabel(serving.nucleus)}` : ""}
+                      </p>
+                    ) : null}
+                    {serving.contradictsApproval ? (
+                      <p className="mt-1 text-xs text-amber-700 dark:text-amber-500">
+                        Approved for the product, but not answering predictions. Promote it to serve traffic.
+                      </p>
+                    ) : null}
+                  </div>
+                )
+              })()}
             </div>
           </ModuleCard>
 

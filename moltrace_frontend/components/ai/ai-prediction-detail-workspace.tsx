@@ -8,6 +8,13 @@ import { apiFetch } from "@/lib/api/client"
 import { formatApiError } from "@/components/spectracheck/spectracheck-helpers"
 import { statusLabel } from "@/lib/ui/status"
 import { readRecordNumber, readRecordString } from "@/components/projects/project-workspace-utils"
+import {
+  readConfidence,
+  readPredictionProvenance,
+  readPredictionWarnings,
+  readUncertainty,
+  uncertaintyFacts,
+} from "@/src/lib/ai/prediction-confidence"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { AlertCard } from "@/components/dashboard/alert-card"
@@ -15,6 +22,7 @@ import { ModuleCard } from "@/components/dashboard/module-card"
 import {
   Activity,
   ArrowRight,
+  Fingerprint,
   Gauge,
   MessageSquare,
   Sparkles,
@@ -115,11 +123,17 @@ export function AiPredictionDetailWorkspace({ predictionId }: { predictionId: st
     }
   }, [predictionId])
 
-  const warnings = useMemo(() => (prediction ? readWarnings(prediction) : []), [prediction])
-  const confidence = prediction ? readRecordNumber(prediction, "confidence") ?? readRecordNumber(prediction, "confidence_score") : null
-  const uncertainty = prediction
-    ? readRecordNumber(prediction, "uncertainty") ?? readRecordNumber(prediction, "uncertainty_score")
-    : null
+  // The server's own warnings, which name the cause of a review flag. Read them from the
+  // response rather than re-deriving a threshold here: the screening rule lives on the
+  // server, and a second copy of it in the interface would be a second, divergent rule.
+  const warnings = useMemo(
+    () => (prediction ? [...new Set([...readPredictionWarnings(prediction), ...readWarnings(prediction)])] : []),
+    [prediction],
+  )
+  const confidence = useMemo(() => readConfidence(prediction), [prediction])
+  const uncertainty = useMemo(() => readUncertainty(prediction), [prediction])
+  const uncertaintyRows = useMemo(() => uncertaintyFacts(uncertainty), [uncertainty])
+  const provenance = useMemo(() => readPredictionProvenance(prediction), [prediction])
   const isOod =
     prediction != null ? readBoolLike(prediction, ["is_ood", "out_of_domain"]) : null
   const humanReviewRequired = prediction != null ? readBoolLike(prediction, ["human_review_required", "review_required"]) : null
@@ -199,12 +213,21 @@ export function AiPredictionDetailWorkspace({ predictionId }: { predictionId: st
             />
           </div>
 
-          {confidence != null && confidence < 0.5 ? (
+          {/* A confidence the engine declined to report is a result, not a blank. It happens
+              when the figure would carry no information — a posterior over a single candidate
+              is 1.0 by construction — so the reason is shown instead of a gauge. */}
+          {confidence.declined ? (
             <AlertCard
               variant="warning"
-              title="Low confidence"
-              description="This prediction has low confidence and requires review."
+              title="The engine reported no confidence for this prediction"
+              description={
+                warnings.length > 0
+                  ? warnings.join(" ")
+                  : "The engine ran and declined to report a confidence figure, so this prediction cannot be screened automatically and requires review."
+              }
             />
+          ) : warnings.length > 0 ? (
+            <AlertCard variant="warning" title="Review signals" description={warnings.join(" ")} />
           ) : null}
 
           {isOod === true ? (
@@ -226,12 +249,47 @@ export function AiPredictionDetailWorkspace({ predictionId }: { predictionId: st
               <p>
                 <span className="font-medium">Prediction result:</span> {summarizeValue(prediction.prediction_result ?? prediction.result)}
               </p>
-              <p>
-                <span className="font-medium">Confidence:</span> {confidence == null ? "-" : confidence}
-              </p>
-              <p>
-                <span className="font-medium">Uncertainty:</span> {uncertainty == null ? "-" : uncertainty}
-              </p>
+              {/* The figure is never shown alone: the scale is what makes it mean anything, and
+                  the two scales in use are not comparable to each other. */}
+              <div className="rounded-md border p-3">
+                <div className="flex flex-wrap items-baseline gap-2">
+                  <span className="font-medium">Confidence:</span>
+                  <span className={confidence.value == null ? "text-muted-foreground" : "font-mono"}>
+                    {confidence.display}
+                  </span>
+                  {confidence.scale ? (
+                    <Badge variant="outline">{confidence.scale.label}</Badge>
+                  ) : confidence.value != null ? (
+                    <Badge variant="outline">Scale not reported</Badge>
+                  ) : null}
+                </div>
+                {confidence.scale ? (
+                  <p className="mt-1 text-xs text-muted-foreground">{confidence.scale.meaning}</p>
+                ) : confidence.value != null ? (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    This figure arrived without the scale it was measured on, so it cannot be compared
+                    against another prediction&rsquo;s confidence.
+                  </p>
+                ) : null}
+              </div>
+              {uncertaintyRows.length > 0 ? (
+                <div>
+                  <p className="font-medium">Uncertainty</p>
+                  <dl className="mt-1 grid gap-x-4 gap-y-1 sm:grid-cols-2">
+                    {uncertaintyRows.map((fact) => (
+                      <div key={fact.label} className="flex flex-wrap justify-between gap-2 text-xs">
+                        <dt className="text-muted-foreground">{fact.label}</dt>
+                        <dd className="font-mono">{fact.value}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                </div>
+              ) : (
+                <p>
+                  <span className="font-medium">Uncertainty:</span>{" "}
+                  <span className="text-muted-foreground">Not reported for this prediction.</span>
+                </p>
+              )}
               <p>
                 <span className="font-medium">Out-of-domain status:</span>{" "}
                 {oodDisplay(prediction)}
@@ -251,6 +309,43 @@ export function AiPredictionDetailWorkspace({ predictionId }: { predictionId: st
               </p>
             </div>
           </ModuleCard>
+
+          {/* The audit answer to "which model produced this number". Rendered only when the
+              response carries it — an absent block here means this response does not include
+              provenance, not that nothing was recorded, so it must not claim the latter. */}
+          {provenance ? (
+            <ModuleCard
+              accent="teal"
+              eyebrow="Provenance"
+              title="What produced this number"
+              icon={Fingerprint}
+              description="Every component that contributed to this prediction, at the version it ran."
+            >
+              <div className="space-y-3 text-sm">
+                {provenance.engine ? (
+                  <div>
+                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Engine</p>
+                    <p className="break-all font-mono text-xs">{provenance.engine}</p>
+                  </div>
+                ) : null}
+                {provenance.components.length > 0 ? (
+                  <div>
+                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      Component versions
+                    </p>
+                    <dl className="mt-1 space-y-1">
+                      {provenance.components.map((component) => (
+                        <div key={component.name} className="flex flex-wrap justify-between gap-2 text-xs">
+                          <dt className="font-mono text-muted-foreground">{component.name}</dt>
+                          <dd className="break-all font-mono">{component.version}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                  </div>
+                ) : null}
+              </div>
+            </ModuleCard>
+          ) : null}
 
           <ModuleCard
             accent="teal"
