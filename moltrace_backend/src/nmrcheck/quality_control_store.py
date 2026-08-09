@@ -11,7 +11,6 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from .analytics_store import record_automation_event
 from .database import session_scope
-from .integration_scale import disclose_relative_integrals
 from .models import (
     QualityAssessment,
     QualityAssessmentRequest,
@@ -634,9 +633,8 @@ def _build_file_assessment(
         else:
             try:
                 # QC never has a structure here, so the integrals are ratios.
-                preview = disclose_relative_integrals(
-                    parse_processed_spectrum(filename=row.original_filename, content=file_bytes),
-                    expected_total_h=None,
+                preview = parse_processed_spectrum(
+                    filename=row.original_filename, content=file_bytes
                 )
             except SpectrumParseError as exc:
                 findings.append(_finding(severity="warning", code="processed_parse_warning", title="Processed spectrum not parsed", message=str(exc), recommendation="Review the processed file export format."))

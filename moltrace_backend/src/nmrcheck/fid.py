@@ -41,6 +41,7 @@ from .models import (
 from .compound_class_priors import diagnostic_regions_for
 from .fid_pipeline_adapter import build_prompt_pipeline_runtime_contract
 from .nmr_tables import canonical_solvent
+from .integration_scale import disclose_relative_integrals
 from .parser import ReferencePeakAssignment, normalize_nmr_text, parse_reference_nmr_text
 from .solvents import SOLVENT_PROFILES
 from .raw_vault import RawVaultError, build_raw_upload_provenance, load_raw_archive_bytes
@@ -2828,7 +2829,9 @@ def process_bruker_1d_zip(
         raw_upload_provenance=raw_upload_provenance,
     )
     if cached_report is not None:
-        return cached_report
+        return disclose_relative_integrals(
+            cached_report, expected_total_h=expected_total_h
+        )
     inspection = inspect_zip_members(processing_content, filename=filename)
     warnings: list[str] = []
     # Do not mutate raw vendor files or immutable raw archive.
@@ -3492,7 +3495,10 @@ def process_bruker_1d_zip(
                 }
             }
         )
-        return _store_raw_fid_process_cache(cache_key, report)
+        return disclose_relative_integrals(
+            _store_raw_fid_process_cache(cache_key, report),
+            expected_total_h=expected_total_h,
+        )
 
 
 def process_raw_fid_zip_to_spectrum(
