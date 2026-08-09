@@ -211,6 +211,59 @@ def test_metric_tolerance_does_not_widen_the_safety_gate():
     assert verdict.promotable is False
 
 
+# --- the reason prose names the measure that was actually gated ------------------------------
+# `reasons` reach a reviewer's screen verbatim (the frontend is under contract not to summarise
+# them), so which measure they name is part of the gate's output, not incidental wording.
+def test_repho_reasons_still_name_safety_flag_recall_by_default():
+    # The label is a parameter now; for the two Repho call sites, which pass nothing, the text
+    # must be unchanged. This is what keeps it a parameterisation and not a silent rename.
+    champion = _mm("v1", yield_percent=70, e_factor=12, recall=0.95)
+    blocked = evaluate_ab_promotion(champion, _mm("v2", yield_percent=85, e_factor=9, recall=0.90))
+    assert blocked.reasons[0] == (
+        "Safety-flag recall regressed (0.9 < 0.95); blocked."
+    )
+
+    failed_closed = evaluate_ab_promotion(
+        champion, _mm("v2", yield_percent=85, e_factor=9, recall=float("nan"))
+    )
+    assert failed_closed.reasons[0] == (
+        "Safety-flag recall is missing or out of range [0, 1]; failing closed."
+    )
+
+    eligible = evaluate_ab_promotion(champion, _mm("v2", yield_percent=82, e_factor=10, recall=0.97))
+    assert eligible.promotable is True
+    assert eligible.reasons[0] == (
+        "Eligible: Safety-flag recall did not regress and the metric vector dominates — "
+        "human sign-off required."
+    )
+
+
+def test_a_caller_with_a_different_blocking_measure_gets_its_name_in_the_reasons():
+    # The corpus conveyor reuses this gate with a blocking measure of its own. Naming the
+    # reaction model's measure in its refusal would tell the reader to go look at a number
+    # that is not on the screen.
+    champion = _mm("v1", yield_percent=70, e_factor=12, recall=0.95)
+    challenger = _mm("v2", yield_percent=85, e_factor=9, recall=0.90)
+    verdict = evaluate_ab_promotion(
+        champion, challenger, blocking_metric_label="Citation support recall"
+    )
+    assert verdict.reasons[0] == "Citation support recall regressed (0.9 < 0.95); blocked."
+    assert not any("Safety-flag recall" in reason for reason in verdict.reasons)
+
+
+def test_the_label_never_changes_the_decision():
+    # Only the noun changes: same inputs, same verdict, whatever the measure is called.
+    champion = _mm("v1", yield_percent=70, e_factor=12, recall=0.95)
+    challenger = _mm("v2", yield_percent=85, e_factor=9, recall=0.90)
+    default = evaluate_ab_promotion(champion, challenger)
+    labelled = evaluate_ab_promotion(champion, challenger, blocking_metric_label="F1 on citations")
+    assert (default.promotable, default.safety_regression, default.dominates) == (
+        labelled.promotable,
+        labelled.safety_regression,
+        labelled.dominates,
+    )
+
+
 def test_unsafe_tag_on_non_reject_routes_to_safety_and_is_excluded():
     # A contradictory accept/edit + "unsafe" must still route to R6 and stay out of preference.
     for decision in ("accept", "edit"):

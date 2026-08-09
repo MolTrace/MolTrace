@@ -203,6 +203,20 @@ def _humanize_fields(fields: Sequence[str]) -> str:
     return ", ".join(field.replace("_", " ") for field in fields)
 
 
+def _blocking_metric_label(name: str | None) -> str:
+    """`citation_support_recall` -> "Citation support recall", for a sentence-initial position.
+
+    Matches how the review panel labels the same key, so the refusal's reason and the measure
+    named beside it read as one measure rather than two. A candidate may have no blocking
+    measure recorded; the gate still refuses it, and the refusal has to say so readably.
+    """
+    words = (name or "").replace("_", " ").split()
+    if not words:
+        return "The blocking measure"
+    label = " ".join(words)
+    return label[:1].upper() + label[1:]
+
+
 def _write_source_revision(
     session: Session,
     row: KnowledgeSourceORM,
@@ -1587,8 +1601,13 @@ def evaluate_deployment_candidate(
             ),
             directions=directions or None,
             tolerance=tolerance,
+            # The gate writes its reasons in prose a reviewer reads, so it has to be told
+            # what this candidate's blocking measure is called. Left to the default it would
+            # name the reaction model's safety-flag recall next to a panel naming this one.
+            blocking_metric_label=_blocking_metric_label(row.blocking_metric_name),
         )
         payload = verdict.as_dict()
+        # The raw key stays on the wire; the label above is display prose, not a rename.
         payload["blocking_metric_name"] = row.blocking_metric_name
         row.gate_verdict_json = _json_dump(payload)
         row.status = "gate_passed" if verdict.promotable else "gate_failed"

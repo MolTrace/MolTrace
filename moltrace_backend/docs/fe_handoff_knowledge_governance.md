@@ -281,3 +281,8 @@ blocking_metric_name}`. Two rules for displaying it:
 
 `blocking_metric_name` names which measure was treated as the hard one (it differs by
 model — e.g. `citation_support_recall`). Humanize it for display; it is a wire key.
+
+The `reasons[]` prose names that same measure, humanized the same way ("Citation support
+recall regressed …"), so the reason and the measure shown beside it agree. A candidate with
+no `blocking_metric_name` recorded is still gated — its reason says "The blocking measure".
+Nothing to do on the frontend beyond continuing to render `reasons[]` verbatim.
