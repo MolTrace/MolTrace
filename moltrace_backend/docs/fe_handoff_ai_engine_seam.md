@@ -72,9 +72,12 @@ declined to report a confidence (e.g. DP4 over a single candidate, where the pos
 construction). Those responses come back `status: "requires_review"` with a warning that names the
 cause. Show the warning; do not render an empty gauge or "—".
 
-**3.4 — Show provenance.** `metadata_json.provenance.model_versions` maps artifact id → SHA-256 for
-everything that touched the number. This is the audit answer to "which model produced this", and
-there is nowhere in the UI showing it today.
+**3.4 — Show provenance.** `metadata_json.provenance.model_versions` maps each component that
+touched the number to the version it ran at — a registry artifact's SHA-256 on the routed-prediction
+path, a pinned method tag elsewhere (DP4 ranking reports `dp4_scoring: smith_goodman_2010`). Render
+it as name/version pairs; the value is not always a hash, so do not label the column "checksum" or
+truncate it like one. This is the audit answer to "which model produced this", and there is nowhere
+in the UI showing it today.
 
 **3.5 — Two new refusals to render.**
 - `POST /ai/predictions` → **503** when the engine cannot run. The caller's request was valid;
