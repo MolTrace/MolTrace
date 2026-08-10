@@ -156,6 +156,19 @@ export function StackedDeck({ items, label }: StackedDeckProps) {
   useEffect(() => {
     const node = stageRef.current
     if (!node) return
+
+    // FEATURE-DETECT, and fall back to "visible" rather than to nothing.
+    // Calling this unguarded threw `IntersectionObserver is not defined` in
+    // jsdom and took down the homepage render test — the same guard
+    // hero-molecule-background.tsx already carries, which is why that one never
+    // broke. The on-screen check is an OPTIMISATION: it stops a timer running
+    // for a section nobody is looking at. Losing the optimisation must not lose
+    // the feature, so where the API is missing the deck simply plays.
+    if (typeof IntersectionObserver === "undefined") {
+      setOnScreen(true)
+      return
+    }
+
     const observer = new IntersectionObserver(
       ([entry]) => setOnScreen(entry.isIntersecting),
       { threshold: 0.4 },
