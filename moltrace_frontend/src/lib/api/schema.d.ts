@@ -3493,7 +3493,16 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Fid Runs */
+        /**
+         * Fid Runs
+         * @description FID runs this caller may read.
+         *
+         *     Until now this was strictly the caller's own runs for anybody who was not an admin,
+         *     which made peer review unreachable for the people it was built for: the reviewer could
+         *     record a verdict on a run but could never find one. A colleague's run is now listed
+         *     while it is an open review item — see ``fid_run_visibility_filter`` for the rule and
+         *     for what deliberately stays invisible.
+         */
         get: operations["fid_runs_fid_runs_get"];
         put?: never;
         post?: never;
@@ -21076,6 +21085,16 @@ export interface components {
              * @default 0
              */
             review_decision_count: number;
+            /**
+             * Viewer Is Author
+             * @default false
+             */
+            viewer_is_author: boolean;
+            /**
+             * Viewer Can Review
+             * @default false
+             */
+            viewer_can_review: boolean;
         };
         /** FIDRunReport */
         FIDRunReport: {
@@ -28828,6 +28847,8 @@ export interface components {
         };
         /** NMRRawFIDProcessResponse */
         NMRRawFIDProcessResponse: {
+            /** Fid Run Id */
+            fid_run_id?: number | null;
             /** Sample Id */
             sample_id?: string | null;
             /** Filename */
@@ -52022,6 +52043,8 @@ export interface operations {
         parameters: {
             query?: {
                 limit?: number;
+                /** @description Which runs to return: everything you can see, only the ones you produced, or only the ones awaiting a review from someone other than their author. */
+                scope?: "all" | "mine" | "review_queue";
                 access_token?: string | null;
             };
             header?: {

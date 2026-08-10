@@ -8,9 +8,11 @@
  * *whose* run this is legible, and has to explain a refusal rather than swallow it
  * — see `selfReviewMessage`.
  *
- * Scope limits live in `lib/fid/fid-run-review.ts`; the short version is that run
- * discovery is still owner-scoped, so for anyone who is not an administrator this
- * lists their own runs and the decisions colleagues have recorded on them.
+ * The scope rule lives in `lib/fid/fid-run-review.ts`; the short version is that this
+ * lists the caller's own runs plus their team's open review queue — a colleague's run
+ * while it still awaits a verdict, and anything the caller has already signed. A user
+ * on no team sees only their own runs, which is correct rather than broken: there are
+ * no colleagues to review for.
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react"

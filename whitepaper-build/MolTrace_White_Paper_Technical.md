@@ -244,7 +244,9 @@ The raw-FID vault is the heart of MolTrace's ALCOA+ posture. The full lifecycle:
 - The derived spectrum metadata (point count, x/y arrays, reference / solvent context, picked peaks)
 - The reviewer status (`pending_review` → `approved` / `rejected`)
 
-Re-processing the same archive with a different recipe creates a **new** `fid_runs` row with a new recipe hash; the original run record is never overwritten. The mapping raw → recipe → derived is therefore a deterministic DAG that an inspector can replay.
+Re-processing the same archive with a different recipe creates a **new** `fid_runs` row with a new recipe hash; the original run record is never overwritten. The mapping raw → recipe → derived is therefore a deterministic DAG that an inspector can replay. `POST /nmr/raw-fid/process` reports the row it created as `fid_run_id`, so a client can bind review to the run it just produced rather than re-identifying it from a list.
+
+**Who may advance that status.** Sign-off is a second-qualified-person act, not an administrative one: `POST /fid/runs/{run_id}/review|approve|reject|request-changes` are open to any authenticated colleague, and the run's own author is refused with `409` — segregation of duties, so the refusal is a conflict of role rather than a lack of privilege. Read access is scoped to match that duty exactly, because a reviewer who cannot open a run cannot review it: `GET /fid/runs` returns a run when the caller produced it, when it is an **open** item (`pending_review` / `needs_revision`) produced by somebody sharing an active organization with them, or when they have already recorded a decision on it. The third clause is what lets a reviewer re-open what they signed — a Part 11 signature the signer cannot revisit is not evidence — and the second is what makes this a review queue rather than a team-wide share, since a colleague's approved run leaves the list once the duty is discharged. The write routes enforce the same predicate, so a run the caller cannot read returns the same non-leaking `404` on `POST`; a run with no team, or no recorded author, is reachable only by an administrator.
 
 ### 4.4 Audit Export
 
