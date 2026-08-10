@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react"
 import { ArrowRight, Check } from "lucide-react"
 import dynamic from "next/dynamic"
-import Link from "next/link"
 import { useSlidingIndicator } from "@/components/app/use-sliding-indicator"
 
 // The three "Explore Module" overlays live in a separate chunk and are pulled in
@@ -64,8 +63,6 @@ const modules = [
        needs a colour it can put in a style prop, not a class name. */
     accent: "var(--mt-teal)",
     title: "Spectroscopy Intelligence",
-    overviewHref: "/spectroscopy",
-    overviewLabel: "How SpectraCheck works",
     desc: "Interpret raw FID files, resolve multiplets and integrals from 1H/13C/2D NMR, and build fragmentation trees from LC-MS/MS. Deterministic methods, human-verified.",
     badge: "Start Here",
     color: {
@@ -91,8 +88,6 @@ const modules = [
        needs a colour it can put in a style prop, not a class name. */
     accent: "var(--mt-cyan)",
     title: "Regulatory Intelligence Hub",
-    overviewHref: "/regulatory-hub",
-    overviewLabel: "How Regentry works",
     desc: "Dossier assembly designed to support ICH requirements, impurity threshold monitoring, nitrosamine CPCA assessment, and jurisdiction-specific requirement tracking.",
     badge: null,
     color: {
@@ -118,8 +113,6 @@ const modules = [
        needs a colour it can put in a style prop, not a class name. */
     accent: "var(--mt-violet)",
     title: "Reaction Optimization",
-    overviewHref: "/reaction-optimization",
-    overviewLabel: "How Repho works",
     desc: "Bayesian multi-objective optimization of reaction conditions with uncertainty quantification, regulatory impurity constraints, and human-in-the-loop validation.",
     badge: null,
     color: {
@@ -175,37 +168,36 @@ export function ModuleCards() {
           <p className="mb-4 text-xs font-bold uppercase tracking-[0.2em] text-muted-foreground">
             Platform
           </p>
+          {/* Heading only. Two things were removed from under it.
+
+              The subhead ("purpose-built for scientific rigour, with transparent
+              AI reasoning and mandatory human oversight…") said in general terms
+              what the panel below says specifically, module by module.
+
+              THE THREE "How X works" LINKS WERE THE CRAWL PATH, and that is why
+              their removal needed checking rather than judging by eye. They were
+              added because the homepage published no in-body link to any module
+              marketing page: the tabs and "Explore Module" are buttons —
+              correctly, since they switch and toggle rather than navigate — and
+              the overlay's launch links point at the app, which robots.txt
+              disallows.
+
+              That premise is now stale. The footer renders on this page and
+              links all three (/spectroscopy, /regulatory-hub,
+              /reaction-optimization), as does the header dropdown, so each page
+              keeps two crawlable paths from the homepage rather than three.
+              Nothing becomes unreachable; what is given up is in-content link
+              prominence, which is a weaker signal than a nav or footer link
+              existing at all.
+
+              The guarantee moved rather than disappeared: app/page.test.tsx now
+              asserts the homepage links all three module pages with no
+              interaction. That is the invariant worth holding — it survives
+              wherever the links live, where the old component-level test only
+              held this component's implementation of it. */}
           <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">
             Three modules. One unified platform.
           </h2>
-          <p className="mx-auto mt-4 max-w-xl text-base text-muted-foreground">
-            Each module is purpose-built for scientific rigour, with transparent AI reasoning
-            and mandatory human oversight at every decision point.
-          </p>
-
-          {/* Followable links to each module's overview page.
-              These sit in the always-rendered header rather than inside a
-              module panel, because the panel below is a TAB: only the active
-              module renders, so a link in there would reach neither a reader
-              on another tab nor a crawler, which never clicks.
-              Before this, the homepage published no in-body link to any
-              marketing page at all. The tabs and "Explore Module" are buttons
-              — correctly so, since they switch and toggle rather than navigate
-              — and the launch links inside the overlay point at the app, which
-              robots.txt disallows. The three highest-value pages on the site
-              were reachable only through the header dropdown. */}
-          <div className="mt-6 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm">
-            {modules.map((mod) => (
-              <Link
-                key={mod.overviewHref}
-                href={mod.overviewHref}
-                className="inline-flex items-center gap-1.5 font-medium text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline"
-              >
-                {mod.overviewLabel}
-                <ArrowRight className="h-3 w-3" aria-hidden />
-              </Link>
-            ))}
-          </div>
         </div>
 
         {/* Tab selectors.
