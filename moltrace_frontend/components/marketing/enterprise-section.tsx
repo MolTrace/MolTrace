@@ -1,7 +1,33 @@
-import { FileCheck, KeyRound, Lock, PackageCheck, ShieldCheck, Users } from "lucide-react"
-import { AccentCard } from "./accent-card"
+// The deck is interactive, and `features` hands it Lucide components — which are
+// functions, and functions cannot cross the server/client boundary ("Functions
+// cannot be passed directly to Client Components"). Marking the section itself
+// keeps the icons on one side of the line. The alternative, passing pre-rendered
+// icon elements from the server, buys nothing here: everything below is static
+// strings that Next still server-renders into the HTML.
+"use client"
 
-const CYAN = { accent: "var(--mt-cyan)", ink: "var(--mt-cyan-ink)", soft: "var(--mt-cyan-soft)" }
+import { FileCheck, KeyRound, Lock, PackageCheck, ShieldCheck, Users } from "lucide-react"
+import { StackedDeck } from "./stacked-deck"
+
+/**
+ * One brand family per control, so the deck reads as six distinct things rather
+ * than six shades of the same thing.
+ *
+ * The colours are not decoration — moving through the deck re-tints the stage
+ * behind it, so the hue is how you tell at a glance that the card changed. They
+ * are assigned by subject, not cycled: identity and access are the violet/cyan
+ * pair, the two infrastructure controls take teal and amber, and the two
+ * attestation controls take green and slate.
+ *
+ * Every family resolves through its `-ink` token for type. The vivid tokens sit
+ * at 2-3:1 on the light card and fail AA as text; green-ink and slate-ink were
+ * added for this and measure 5.02:1 and 7.58:1 light, 8.63:1 and 7.67:1 dark.
+ */
+const family = (name: string) => ({
+  accent: `var(--mt-${name})`,
+  ink: `var(--mt-${name}-ink)`,
+  soft: `var(--mt-${name}-soft)`,
+})
 
 /**
  * Enterprise controls, each traced to the code or the pipeline that implements
@@ -36,6 +62,7 @@ const features = [
     title: "Roles that gate actions",
     pill: "Access",
     desc: "Five roles across eight actions, resolved per project and per team. A reviewer can approve but cannot upload a run; a scientist can upload but cannot approve.",
+    ...family("violet"),
   },
   {
     // "HMAC-chained" was wrong, and the truth is the better claim. Per-entry
@@ -47,6 +74,7 @@ const features = [
     title: "Tamper-evident audit trail",
     pill: "Audit",
     desc: "Analyses, reviews and approvals are hash-chained with SHA-256 and server-timestamped, so the trail re-verifies without a secret and exports as an inspection package.",
+    ...family("cyan"),
   },
   {
     // "Customer-managed keys available for enterprise deployments" came out:
@@ -56,24 +84,28 @@ const features = [
     title: "No public database interface",
     pill: "Encryption",
     desc: "PostgreSQL runs on a private IP with no public interface, reached over Direct VPC egress. Credentials come from Secret Manager, and field encryption uses Cloud KMS.",
+    ...family("teal"),
   },
   {
     icon: KeyRound,
     title: "MFA, passkeys and step-up",
     pill: "Identity",
     desc: "TOTP and WebAuthn passkeys, with step-up re-authentication before sensitive actions. Enterprise SSO over OIDC, with SCIM provisioning.",
+    ...family("amber"),
   },
   {
     icon: ShieldCheck,
     title: "Designed for SOC 2 Type II",
     pill: "Compliance",
     desc: "Access control, audit trail, secret scanning and dependency scanning run as controls in the pipeline — the evidence a Type II audit samples.",
+    ...family("green"),
   },
   {
     icon: PackageCheck,
     title: "Verified supply chain",
     pill: "Provenance",
     desc: "Each release carries a software bill of materials and signed build provenance, and the deploy is blocked unless both verify.",
+    ...family("slate"),
   },
 ]
 
@@ -99,11 +131,12 @@ export function EnterpriseSection() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {features.map((f) => (
-            <AccentCard key={f.title} {...f} {...CYAN} />
-          ))}
-        </div>
+        {/* A deck rather than the 3x2 grid this replaces. Six cards laid out flat
+            gave every control the same weight, so the section had no subject and
+            a reader's eye had nowhere to start. The grid is still the right
+            answer wherever items are meant to be compared — it is wrong here,
+            where these are six independent assurances read one at a time. */}
+        <StackedDeck items={features} label="Enterprise controls" />
 
       </div>
     </section>
