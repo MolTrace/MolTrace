@@ -1,5 +1,6 @@
 import { BookMarked, FileSignature, Link2 } from "lucide-react"
 import { AccentCard } from "./accent-card"
+import { ConstellationBackdrop } from "./constellation-backdrop"
 
 /**
  * The section a reader lands on after clicking "See how the evidence trail
@@ -86,9 +87,21 @@ const mechanics = [
   },
 ]
 
+/**
+ * THE BAND IS DARK IN BOTH THEMES, and the `dark` class on the section is how
+ * rather than a wall of hard-coded hexes. Adding it re-points every design token
+ * inside this subtree — `--card`, `--muted-foreground`, `--mt-*-ink` — at the
+ * values the .dark block already defines, which are the ones that clear AA on a
+ * near-black background. On a page that is already dark it is a no-op.
+ *
+ * Hard-coding the colours instead would have meant maintaining a second palette
+ * that silently stops matching the first, and would have taken the teal eyebrow
+ * below AA the moment anyone retuned the token.
+ */
 export function EvidenceSection() {
   return (
-    <section className="border-y bg-muted/30 py-24" id="solutions">
+    <section className="dark relative isolate overflow-hidden py-28 text-foreground" id="solutions">
+      <ConstellationBackdrop />
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="max-w-3xl">
           {/* Eyebrow deliberately not "Evidence-First AI" — that was a
@@ -111,13 +124,13 @@ export function EvidenceSection() {
 
         <div className="mt-14 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {mechanics.map((m) => (
-            <AccentCard key={m.title} {...m} {...TEAL} />
+            <AccentCard key={m.title} {...m} {...TEAL} tone="glass" />
           ))}
         </div>
 
         {/* The limit of the claim, stated on the page that makes it rather than
             only in an FAQ answer three sections down. */}
-        <p className="mt-14 max-w-3xl border-t pt-8 text-sm leading-relaxed text-muted-foreground">
+        <p className="mt-14 max-w-3xl border-t border-white/10 pt-8 text-sm leading-relaxed text-muted-foreground">
           Overall confidence is a total, not a verdict. It is decision support for a qualified
           reviewer — not proof of identity, and not a calibrated probability that the structure is
           correct. A human signs off, every time.

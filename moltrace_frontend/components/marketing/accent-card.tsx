@@ -5,9 +5,15 @@ import type { LucideIcon } from "lucide-react"
  * as a set: a 3px rule down the left edge in the section's accent, an icon and
  * title on one line, a tinted pill, then the point itself.
  *
- * Shared by the evidence and enterprise sections so the two can never drift into
- * slightly different cards — the hero's version is a <Link> with a navigation
- * glyph and stays separate on purpose.
+ * Used by the evidence section. (It was shared with the enterprise section until
+ * that became a stacked deck; the hero's version is a <Link> with a navigation
+ * glyph and has always been separate on purpose.)
+ *
+ * TWO SURFACES. `surface` is the ordinary card on a page background. `glass` is
+ * for the constellation band, where an opaque card would punch a hole in the sky
+ * — it is translucent and blurred so the stars carry through, with a light
+ * border instead of the theme's. Everything else about the card is identical, so
+ * the two cannot drift apart.
  *
  * DELIBERATELY NOT INTERACTIVE. There is no hover lift and no arrow here: both
  * are affordances that promise a destination, and these cards have none. A card
@@ -29,12 +35,27 @@ export type AccentCardProps = {
   accent: string
   ink: string
   soft: string
+  tone?: "surface" | "glass"
 }
 
-export function AccentCard({ icon: Icon, title, pill, desc, accent, ink, soft }: AccentCardProps) {
+export function AccentCard({
+  icon: Icon,
+  title,
+  pill,
+  desc,
+  accent,
+  ink,
+  soft,
+  tone = "surface",
+}: AccentCardProps) {
   return (
     <div
-      className="relative h-full min-w-0 rounded-xl border bg-card p-5"
+      className={
+        "relative h-full min-w-0 rounded-xl border p-5 " +
+        (tone === "glass"
+          ? "border-white/10 bg-white/[0.04] backdrop-blur-md"
+          : "bg-card")
+      }
       style={{ borderLeftWidth: "3px", borderLeftColor: accent }}
     >
       <div className="flex min-w-0 items-center gap-2">
