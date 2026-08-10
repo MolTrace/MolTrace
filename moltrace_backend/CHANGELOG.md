@@ -14,6 +14,74 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.69.4 — A safety metric with no denominator is not a perfect score (2026-08-09)
+
+`false_confirmation_rate` is `SAFETY_CRITICAL` with a zero tolerance — it may never
+regress. `evaluate` returned **0.0** for it whenever the gold set held no wrong
+structures: the best possible value on that metric, earned by measuring nothing. It is
+now `None`, and `n_wrong_structures` carries the denominator so "not measured" is visible
+rather than inferred. This is the rule `eval/false_confirmation.py` already stated for
+itself — "zero evidence is not a perfect score" — applied to the vector the gate reads.
+
+**Nullable alone would have been worse than the bug.** `dominates` skipped any metric
+absent from either side, so a candidate that simply stopped reporting the metric promoted
+over an incumbent that measured it — and the metric did not appear in the deltas at all.
+That converts a wrong record into no record. Absence is therefore **fail-closed for
+safety-critical metrics in all three directions** (candidate missing, incumbent missing,
+neither reporting), emitted as a `MetricDelta` with `measured=False` and `regressed=True`
+so every existing consumer of `regressed` blocks without an edit. Ordinary metrics keep
+skipping — that accommodation is what `conformal_coverage_deficit` ships with, and it is
+now pinned by test so the two rules do not get merged later.
+
+Three consumers moved in the same commit, or the guard would have been half-applied.
+`feedback/ab_testing.py` and `ops/monitoring.py` both rendered an unmeasured metric as a
+*"safety-critical regression"*, which sends an operator to the model when the fix is the
+gold set; `PromotionDecision.as_dict` now emits `measured`. And `ai/finetune.py`'s
+`_vector_from_snapshot` required every `METRIC_DIRECTIONS` key while `metric_items()`
+omits unmeasured ones — so it returned `None` for *every real snapshot* and the caller
+reads `None` as "no incumbent" and promotes without comparing anything. That fail-open
+predates this change and widens with each nullable metric added; `NULLABLE_METRICS` is
+now the single source of truth for which ones are optional.
+
+**`eval/verifier_margin.py` — the arbiter's own false-confirmation rate.** B5.2 measured
+**38.1 %** for a ¹³C shift list through DP4 and said in its own docstring that it was not
+the multi-test verifier. This scores the same decoys through `verify_structure`. Measured
+on the 13 real Bruker ¹³C fixtures: **11 scored pairs, 10 truth wins, 1 decoy win, 0 ties
+— 9.1 % false confirmation, median margin +0.485 log-odds** (p25 +0.275, min −0.701),
+with the verifier calling truth *and* decoy "consistent" in 2 of 11. The arbiter is
+markedly better than the shift-list layer alone, which is the point of combining tests.
+**n is 11 and 9 of the 13 fixtures leak into the training split — this is a pilot, not a
+publishable rate**, and nothing in the claim-integrity register may cite it yet.
+
+Margins are **log-odds, not posterior confidence**: measured on one thioester pair the
+posterior margin moves 0.435 → 0.353 → 0.149 at priors 0.2/0.5/0.8 while the log-odds
+margin is 1.906755 at all three, because the shared prior logit cancels. A zero margin is
+bucketed by cause — no evidence, identical prediction, or a genuine tie — because a
+broken spectrum otherwise reads as a perfect tie. An exact tie is credited to neither
+side, unlike `false_confirmation.py:217`, whose `>` comparison silently scores a 0.5/0.5
+DP4 tie as a win for the truth — biasing the 38.1 % optimistically, in exactly the
+population under study. That is recorded, not yet fixed.
+
+**The spectrum is a required caller input, because synthesising one was refuted.**
+Building a ¹³C spectrum at each record's experimental shift positions runs on the whole
+corpus and is 40× cheaper. Paired against the real fixtures it does not transfer:
+*r* = −0.106, **35 % of pairs ranked in the opposite direction**, false confirmation 0.355
+against 0.129. The fixed −10..230 ppm window over 16,384 points makes a linewidth ~3.4
+points wide, so `gsd_peak_pick` saturates its 220-peak cap on 13 of 13 spectra with ~96 %
+spurious peaks, `_exp_units` admits every one unfiltered, and the verifier becomes a
+near-universal acceptor (decoy "consistent" 94 % synthetic vs 45 % real).
+`simulate_spectrum` is retained only to reproduce that refutation, with the numbers in
+its docstring.
+
+**Open, deliberately.** `nmrcheck.ai_engine_adapter.dominance_verdict` still passes when
+*neither* side reports a safety-critical metric — its check is
+`_is_number(cand) != _is_number(inc)`, false when both are absent — so the platform's two
+promotion gates still diverge in that one direction. And a gold set with zero wrong
+structures now blocks every promotion, which is the intended forcing function, but no
+reason string tells the operator to fix the gold set rather than the model.
+
+---
+
 ## v0.69.3 — Conformal coverage becomes a promotion metric (2026-08-08)
 
 v0.68.0 measured conformal coverage; nothing gated on it. `GoldMetricVector` now carries
