@@ -109,17 +109,13 @@ export function EvidenceSection() {
           <p className="mb-4 text-xs font-bold uppercase tracking-[0.2em]" style={{ color: "var(--mt-teal-ink)" }}>
             Reading the evidence
           </p>
+          {/* Heading, then straight to the cards. The paragraph that sat here
+              restated in prose exactly what the three cards say — chained,
+              cited, signed — so a reader met the same argument twice before
+              reaching the substance. */}
           <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">
             What makes the trail checkable.
           </h2>
-          {/* This paragraph used to say the score "is a total produced by four
-              independent tests". See the note above the cards: that engine does
-              not run in the shipped image, so the page cannot say it does. */}
-          <p className="mt-4 text-base leading-relaxed text-muted-foreground">
-            The claim is not that our numbers are right because we say so. It is that the record
-            behind a result is chained, cited and signed — and that each of those is something you
-            can check rather than take on trust.
-          </p>
         </div>
 
         <div className="mt-14 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -128,13 +124,38 @@ export function EvidenceSection() {
           ))}
         </div>
 
-        {/* The limit of the claim, stated on the page that makes it rather than
-            only in an FAQ answer three sections down. */}
-        <p className="mt-14 max-w-3xl border-t border-white/10 pt-8 text-sm leading-relaxed text-muted-foreground">
-          Overall confidence is a total, not a verdict. It is decision support for a qualified
-          reviewer — not proof of identity, and not a calibrated probability that the structure is
-          correct. A human signs off, every time.
-        </p>
+        {/* THE CLOSING DISCLAIMER WAS REMOVED, and this note is the check that
+            it was safe to remove rather than a decision made by eye.
+            It read: "Overall confidence is a total, not a verdict. It is
+            decision support for a qualified reviewer — not proof of identity,
+            and not a calibrated probability that the structure is correct. A
+            human signs off, every time."
+
+            It had become orphaned HERE. It qualified a confidence score, and
+            this section stopped discussing confidence when the verifier cards
+            were replaced by the three above — chaining, references, signatures.
+            A disclaimer standing next to no claim is clutter, and clutter is
+            how a page teaches readers to skip its disclaimers.
+
+            What it qualified, and where that qualification now lives:
+              - the 87.3% figure is the hero's card, which carries its own
+                caption directly beneath it: "Illustrative example of a MolTrace
+                result — not a measured sample" (hero.tsx).
+              - "a human decides" is HOME_FAQS on this same page — "Does
+                MolTrace's AI make the analytical or regulatory decisions?" —
+                answered No, AI is strictly advisory.
+              - "not a calibrated probability" is the SpectraCheck module FAQ
+                (lib/seo/modules.ts) and the product surface itself, where
+                spectracheck-evidence-panels.tsx gates the word "probability" on
+                the backend's own probability_is_calibrated flag.
+
+            The one thing the homepage no longer states in so many words is
+            "not a calibrated probability" — acceptable only because the single
+            confidence figure on it is labelled illustrative. If a REAL, measured
+            confidence number ever appears on this page, that line has to come
+            back next to it. See also the note at the top of this file: the word
+            "calibrated" must not be reintroduced as a claim without a measured
+            ECE behind it. */}
       </div>
     </section>
   )
