@@ -1,6 +1,6 @@
 import { render, screen, fireEvent, waitFor } from "@testing-library/react"
 import { describe, expect, it } from "vitest"
-import { ModuleCards } from "@/components/marketing/module-cards"
+import { ModuleCards, staggerDelay } from "@/components/marketing/module-cards"
 
 // The three "Explore Module" overlays were split into a lazily-loaded chunk
 // (module-explore-interfaces.tsx, pulled in via next/dynamic) so they stay out
@@ -86,5 +86,67 @@ describe("ModuleCards", () => {
     fireEvent.click(screen.getAllByRole("button", { name: /Explore Module/i })[0])
     const link = await screen.findByRole("link", { name: new RegExp(label, "i") }, { timeout: 4000 })
     expect(link).toHaveAttribute("href", href)
+  })
+})
+
+/**
+ * The tab indicator slides, so the tabs read as animated. The panel they control
+ * did not — switching modules only changes the strings inside the existing
+ * nodes, so React reuses every element and the content swaps with no transition
+ * at all. The fix is a `key`, and a `key` is exactly the kind of thing a later
+ * cleanup removes as redundant, because nothing about the rendered output looks
+ * wrong without it. These tests are the tripwire.
+ */
+describe("ModuleCards — panel transition", () => {
+  const panel = (container: HTMLElement) => container.querySelector(".mt-panel-in")
+
+  it("REMOUNTS the panel on a module switch rather than mutating it in place", () => {
+    const { container } = render(<ModuleCards />)
+    const before = panel(container)
+    expect(before).not.toBeNull()
+
+    fireEvent.click(screen.getByRole("button", { name: "MODULE 02" }))
+    const after = panel(container)
+
+    // A different DOM node — which is what lets the entrance animation run
+    // again. Same node with new text is the bug this guards.
+    expect(after).not.toBe(before)
+    expect(after?.textContent).toContain("Regulatory")
+  })
+
+  it("remounts when the explore overlay is toggled too, not only on tab change", () => {
+    const { container } = render(<ModuleCards />)
+    const before = panel(container)
+    fireEvent.click(screen.getAllByRole("button", { name: /Explore Module/i })[0])
+    expect(panel(container)).not.toBe(before)
+  })
+
+  it("staggers the capability rows in order", () => {
+    const { container } = render(<ModuleCards />)
+    const delays = Array.from(container.querySelectorAll<HTMLElement>(".mt-stagger-in")).map((li) =>
+      Number.parseInt(li.style.animationDelay, 10),
+    )
+    expect(delays.length).toBeGreaterThan(3)
+    expect([...delays].sort((a, b) => a - b)).toEqual(delays)
+    expect(delays).toEqual(delays.map((_, i) => staggerDelay(i)))
+  })
+
+  it("caps the stagger so a longer list would not crawl", () => {
+    // Tested through the function, not the rendered rows: every module carries
+    // exactly six capabilities today, so `index` never reaches the clamp and
+    // asserting on the DOM passes whether or not the clamp exists — which is
+    // how the first version of this test missed a mutation that removed it.
+    expect(staggerDelay(0)).toBeLessThan(staggerDelay(5))
+    expect(staggerDelay(7)).toBe(staggerDelay(6))
+    expect(staggerDelay(40)).toBe(staggerDelay(6))
+    expect(staggerDelay(40)).toBeLessThanOrEqual(330)
+  })
+
+  it("keeps the panel's animation class, which the reduced-motion rule switches off", () => {
+    // globals.css disables .mt-panel-in and .mt-stagger-in under
+    // prefers-reduced-motion. That only works if the classes are actually here.
+    const { container } = render(<ModuleCards />)
+    expect(panel(container)?.className).toContain("mt-panel-in")
+    expect(container.querySelector(".mt-stagger-in")).not.toBeNull()
   })
 })

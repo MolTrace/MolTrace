@@ -354,6 +354,44 @@
   }
 }
 
+/* Module panel entrance (components/marketing/module-cards.tsx).
+
+   The tab indicator slid, so the tabs LOOKED animated while the panel they
+   control swapped its text in place with no transition at all — the more
+   polished the tabs got, the more abrupt the panel felt by comparison.
+
+   An entrance rather than a cross-fade: the two panels are different heights,
+   so holding both mounted to fade between them would either clip one or make
+   the section jump twice. Fading the arriving panel in over a static background
+   reads as a change of subject and costs nothing. */
+@keyframes mt-panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.mt-panel-in {
+  animation: mt-panel-in 360ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Same motion, delayed per item, so a capability list arrives as a list being
+   written rather than as a block appearing. Delays are set inline by index. */
+.mt-stagger-in {
+  animation: mt-panel-in 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mt-panel-in,
+  .mt-stagger-in {
+    animation: none;
+  }
+}
+
 /* Scientific grid background */
 .scientific-grid {
   background-image: 
