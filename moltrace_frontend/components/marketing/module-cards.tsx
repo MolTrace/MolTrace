@@ -141,6 +141,21 @@ const modules = [
   },
 ]
 
+/**
+ * Entrance delay for capability row `index`.
+ *
+ * The clamp does nothing today — all three modules carry exactly six
+ * capabilities, so `index` never exceeds 5. It is here for the edit that adds a
+ * seventh: uncapped, a twelve-row list would still be arriving two thirds of a
+ * second after the panel, which reads as the card struggling rather than as the
+ * list being written. Extracted from the JSX so that guard can actually be
+ * tested at an index no module currently reaches — inline, it was unreachable
+ * code with a test that could not fail.
+ */
+export function staggerDelay(index: number) {
+  return 90 + Math.min(index, 6) * 40
+}
+
 export function ModuleCards() {
   const [active, setActive] = useState(0)
   const { containerRef: tabsRef, rect: indicator } = useSlidingIndicator<HTMLDivElement>(String(active))
@@ -241,7 +256,16 @@ export function ModuleCards() {
         {/* Active module panel — each module's "Explore Module" button toggles
             into a richer in-place overlay (Spectroscopy carousel · Regulatory
             QA-RAG chat · Reaction 3D response surface). The standard 2-column
-            view (info + Capabilities card) is the default. */}
+            view (info + Capabilities card) is the default.
+
+            THE KEY IS WHAT MAKES IT ANIMATE. Switching modules only changes the
+            strings inside these nodes, so React reuses every element and the
+            panel updates with no transition — which is why the tabs looked
+            animated and the thing they control did not. Keying on the panel's
+            identity forces a remount, which lets the entrance animation run.
+            It covers `exploreOpen` too, so opening and closing the overlay gets
+            the same treatment rather than only module switches. */}
+        <div key={`${active}-${exploreOpen}`} className="mt-panel-in">
         {exploreOpen && active === 0 ? (
           <SpectroscopyExploreInterface onClose={() => setExploreOpen(false)} />
         ) : exploreOpen && active === 1 ? (
@@ -293,7 +317,13 @@ export function ModuleCards() {
               </p>
               <ul className="divide-y divide-border">
                 {m.features.map((feat, fi) => (
-                  <li key={fi} className="flex items-start gap-3 py-3 first:pt-0 last:pb-0">
+                  <li
+                    key={fi}
+                    // Staggered so the list reads as being written out rather
+                    // than appearing as a block.
+                    className="mt-stagger-in flex items-start gap-3 py-3 first:pt-0 last:pb-0"
+                    style={{ animationDelay: `${staggerDelay(fi)}ms` }}
+                  >
                     <Check className={`mt-0.5 h-3.5 w-3.5 shrink-0 ${m.color.check}`} strokeWidth={2.5} />
                     <span className="text-sm leading-snug text-foreground">{feat}</span>
                   </li>
@@ -315,6 +345,7 @@ export function ModuleCards() {
             </button>
           </div>
         )}
+        </div>
       </div>
     </section>
   )
