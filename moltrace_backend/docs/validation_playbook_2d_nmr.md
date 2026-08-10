@@ -665,3 +665,50 @@ share-alike corpus is handled here.
 **Record the licence per source in the corpus manifest before ingest, and fail
 closed on anything unread.** That is the standing rule and it is what turned this
 search from "here are four datasets" into "one is usable today".
+
+### C0 SEARCH RESULT — no 2D raw data is available yet (2026-08-09)
+
+Searched rather than assumed, and the answer is a clean negative that saves the
+next session the same hour.
+
+**In-house (`~/My Business /NMR Test Samples`): 1D only.** Four `acqus` files,
+all 1D — e.g. `zgpg30` (power-gated-decoupled 13C). **Zero** `ser`, `acqu2s` or
+`2rr` anywhere in the tree. The compounds are exactly the right ones (pyrrolidine
+sulfamates, napamine, tobramycin — structures known with certainty), but no 2D
+was acquired.
+
+**MetaboLights recent CC0: NMR is sparse, and what there is is 1D.** Scanned the
+60 most recent public studies via the API:
+
+* **Every one is `CC0 1.0 Universal`.** The April-2025 cutoff is real and
+  holding, and `datasetLicense` is exposed as a field — so the licence gate this
+  playbook demands can be *automated*, not eyeballed.
+* Only **2 of ~60** are NMR at all (`MTBLS15218`, `MTBLS15091`). Metabolomics
+  deposition is MS-dominated.
+* `MTBLS15218`'s raw Bruker folders are **1D**: one `fid`, one `acqus`, no `ser`.
+  Pulse program `noesypr1d`.
+
+**A trap worth recording: `noesypr1d` is a 1D experiment.** It uses a NOESY pulse
+element for solvent suppression and has "NOESY" in its name. Any search filtering
+on "NOESY" to find 2D data will collect 1D metabolomics spectra by the thousand.
+
+### What this means for C0
+
+Raw 2D has to be *sourced*, and the options split by which phase they serve:
+
+| need | source | status |
+|---|---|---|
+| **C2** parser fidelity (needs real `ser`, `acqu2s`, per-axis referencing) | targeted MetaboLights search, or acquire in-house | not yet found |
+| **C4/C5** correlation work (needs peak lists + assignments) | 2DNMRGym, 479 expert-annotated | blocked on CC BY-NC permission |
+
+**The strongest option is probably to acquire one.** The in-house compounds
+already have certain structures — an HSQC and an HMBC on the pyrrolidine
+sulfamate or napamine would give ground truth no public corpus can match, because
+the structure is known rather than inferred, and it is licence-clean by
+construction. One overnight run on a known sample unblocks C2, C3, C4 and C6
+together.
+
+Failing that, a targeted MetaboLights scan filtering assay files for HSQC/HMBC
+experiment types (rather than scanning by recency) is the next cheapest search —
+the metabolomics 2D literature exists, so the deposits likely do too, just not in
+the most recent 60.
