@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import type { LucideIcon } from "lucide-react"
 
 import { cn } from "@/lib/utils"
@@ -42,10 +42,61 @@ export type DeckItem = {
  * visually forward — the depth is presentation, not content. Only the active
  * card is tabbable (roving tabindex), because six tab stops that merely change
  * which card is in front is noise; arrows move between them, which is the
- * standard composite-widget contract. There is deliberately no auto-advance:
- * content that moves on its own is a well-documented accessibility problem and
- * nothing here is time-sensitive.
+ * standard composite-widget contract.
+ *
+ * AUTO-ADVANCE, AND THE FOUR THINGS THAT STOP IT. Content that moves on its own
+ * is the classic carousel accessibility failure, and WCAG 2.2.2 (Pause, Stop,
+ * Hide) makes it a hard AA requirement: anything auto-moving for more than five
+ * seconds needs "a mechanism for the user to pause, stop, or hide it". So:
+ *
+ *   1. TOUCHING THE DECK STOPS IT, permanently. A pointer down anywhere on the
+ *      stage — a card, the gap between cards, the card already in front — ends
+ *      autoplay and does not resume. This is the mechanism 2.2.2 asks for.
+ *   2. Hovering suspends it, so it cannot slide out from under a reader mid-
+ *      sentence. Temporary: moving away resumes.
+ *   3. Focus anywhere inside suspends it, the keyboard equivalent — and an arrow
+ *      key, being a deliberate choice, stops it for good like a tap.
+ *   4. It only runs while the deck is on screen, so a reader arrives at the
+ *      first card rather than wherever a timer wandered to while the section was
+ *      three screens down.
+ *
+ * THERE IS NO PLAY/PAUSE BUTTON, and that was a deliberate call. A dedicated
+ * control is the belt-and-braces reading of 2.2.2; the criterion's actual text
+ * asks for a mechanism, and "put your finger on it and it stops" is one that
+ * every pointer and touch user already knows without being told. The case rests
+ * on stopping being available WITHOUT having to change what you are reading —
+ * hence rule 1 covering the front card and the empty space, not just the cards
+ * you would be choosing between. What it gives up is discoverability: nothing on
+ * screen announces that the deck can be stopped. If that is ever judged too
+ * thin, the fix is to put the button back, not to weaken rule 1.
+ *
+ * Under prefers-reduced-motion it never starts at all.
+ *
+ * There is no aria-live region. Nothing is being inserted or removed; all six
+ * cards are present the whole time and only their depth changes, so announcing
+ * on each tick would narrate a purely visual event over whatever the reader is
+ * actually doing.
  */
+
+/**
+ * Long enough to read a card. The descriptions run 25-40 words, which is around
+ * 8 seconds of reading — this is deliberately a little shorter, because hovering
+ * pauses it and a deck that waits for the slowest reader reads as broken.
+ */
+const AUTO_ADVANCE_MS = 6500
+
+/** Tracks the OS "reduce motion" setting, including a change while open. */
+function usePrefersReducedMotion() {
+  const [reduced, setReduced] = useState(false)
+  useEffect(() => {
+    const query = window.matchMedia("(prefers-reduced-motion: reduce)")
+    const update = () => setReduced(query.matches)
+    update()
+    query.addEventListener("change", update)
+    return () => query.removeEventListener("change", update)
+  }, [])
+  return reduced
+}
 
 /** Signed shortest way round a ring of `count` — 0, ±1, ±2, then the far side. */
 export function ringOffset(index: number, active: number, count: number) {
@@ -92,10 +143,50 @@ type StackedDeckProps = {
 export function StackedDeck({ items, label }: StackedDeckProps) {
   const [active, setActive] = useState(0)
   const cardRefs = useRef<Array<HTMLButtonElement | null>>([])
+  const stageRef = useRef<HTMLDivElement>(null)
 
+  const reducedMotion = usePrefersReducedMotion()
+  /** False once the reader has touched the deck or chosen a card. Never resumes. */
+  const [autoplay, setAutoplay] = useState(true)
+  /** Temporary: pointer over the deck, or focus inside it. */
+  const [suspended, setSuspended] = useState(false)
+  const [onScreen, setOnScreen] = useState(false)
+
+  // Only run while the section is actually being looked at.
+  useEffect(() => {
+    const node = stageRef.current
+    if (!node) return
+    const observer = new IntersectionObserver(
+      ([entry]) => setOnScreen(entry.isIntersecting),
+      { threshold: 0.4 },
+    )
+    observer.observe(node)
+    return () => observer.disconnect()
+  }, [])
+
+  const running = autoplay && !suspended && onScreen && !reducedMotion
+
+  useEffect(() => {
+    if (!running) return
+    // Advances state directly rather than through `select`, which is reserved
+    // for deliberate input — routing the timer through it would have the deck
+    // switch itself off on its own first tick.
+    const id = window.setInterval(
+      () => setActive((current) => (current + 1) % items.length),
+      AUTO_ADVANCE_MS,
+    )
+    return () => window.clearInterval(id)
+  }, [running, items.length])
+
+  /**
+   * Deliberate selection — a card, a dot, an arrow key. Always ends autoplay:
+   * once a reader has said which card they want, moving it again is the single
+   * most irritating thing a carousel does.
+   */
   const select = useCallback((next: number, moveFocus: boolean) => {
     const wrapped = (next + items.length) % items.length
     setActive(wrapped)
+    setAutoplay(false)
     if (moveFocus) cardRefs.current[wrapped]?.focus()
   }, [items.length])
 
@@ -122,8 +213,23 @@ export function StackedDeck({ items, label }: StackedDeckProps) {
           the content width and get clipped, which is the effect — without it
           they would widen the page instead. */}
       <div
+        ref={stageRef}
         className="relative isolate flex h-[22rem] items-center justify-center overflow-hidden sm:h-[20rem]"
         onKeyDown={onKeyDown}
+        // Hover and focus only SUSPEND — they do not switch autoplay off, so
+        // moving the pointer away or tabbing out resumes it. Only a deliberate
+        // choice is permanent.
+        onMouseEnter={() => setSuspended(true)}
+        onMouseLeave={() => setSuspended(false)}
+        onFocus={() => setSuspended(true)}
+        onBlur={() => setSuspended(false)}
+        // Touching the deck ANYWHERE stops it for good — this is the 2.2.2
+        // mechanism, so it deliberately covers the gaps between cards and the
+        // card already in front, not only the cards you might be choosing
+        // between. Stopping must not require changing what you are reading.
+        // pointerdown rather than click: it fires on touch without waiting to
+        // see whether the gesture becomes a scroll.
+        onPointerDown={() => setAutoplay(false)}
         role="group"
         aria-label={label}
       >
@@ -236,6 +342,9 @@ export function StackedDeck({ items, label }: StackedDeckProps) {
             onClick={() => select(index, false)}
             aria-label={item.title}
             aria-current={index === active ? "true" : undefined}
+            // A stable hook: "a button with no heading inside" used to identify
+            // a dot, until the pause control became one too.
+            data-deck-dot=""
             className="group flex w-6 items-center justify-center rounded-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
           >
             {/* Each dot carries its own card's colour even when it is not the

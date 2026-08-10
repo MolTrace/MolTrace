@@ -1,6 +1,6 @@
-import { fireEvent, render, screen, within } from "@testing-library/react"
+import { act, fireEvent, render, screen, within } from "@testing-library/react"
 import { FileCheck, KeyRound, Lock, PackageCheck, ShieldCheck, Users } from "lucide-react"
-import { describe, expect, it } from "vitest"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 import { StackedDeck, ringOffset, type DeckItem } from "./stacked-deck"
 
@@ -35,6 +35,40 @@ const ITEMS: DeckItem[] = [
   { icon: ShieldCheck, title: "Echo", pill: "E", desc: "fifth", ...COLOURS[4] },
   { icon: PackageCheck, title: "Foxtrot", pill: "F", desc: "sixth", ...COLOURS[5] },
 ]
+
+/** jsdom has no matchMedia; the deck reads it for prefers-reduced-motion. */
+function stubMatchMedia(reduced: boolean) {
+  vi.stubGlobal("matchMedia", (query: string) => ({
+    matches: reduced && query.includes("prefers-reduced-motion"),
+    media: query,
+    addEventListener: () => {},
+    removeEventListener: () => {},
+  }))
+}
+
+/** The deck only advances while on screen, which needs a real observer here. */
+function stubIntersectionObserver(intersecting: boolean) {
+  vi.stubGlobal(
+    "IntersectionObserver",
+    class {
+      constructor(private cb: (e: Array<{ isIntersecting: boolean }>) => void) {}
+      observe() {
+        this.cb([{ isIntersecting: intersecting }])
+      }
+      disconnect() {}
+    },
+  )
+}
+
+beforeEach(() => {
+  stubMatchMedia(false)
+  stubIntersectionObserver(true)
+})
+
+afterEach(() => {
+  vi.unstubAllGlobals()
+  vi.useRealTimers()
+})
 
 function renderDeck() {
   const view = render(<StackedDeck items={ITEMS} label="Test deck" />)
@@ -149,16 +183,14 @@ describe("StackedDeck", () => {
 
   it("gives every dot an accessible name, so the control row is not six blanks", () => {
     const { container } = renderDeck()
-    const dots = Array.from(container.querySelectorAll("button")).filter(
-      (b) => !b.querySelector("h3"),
-    )
+    const dots = Array.from(container.querySelectorAll("[data-deck-dot]"))
     expect(dots).toHaveLength(ITEMS.length)
     expect(dots.map((d) => d.getAttribute("aria-label"))).toEqual(ITEMS.map((i) => i.title))
   })
 
   it("tracks the front card from the dots too", () => {
     const { container, activeTitle } = renderDeck()
-    const dots = Array.from(container.querySelectorAll("button")).filter((b) => !b.querySelector("h3"))
+    const dots = Array.from(container.querySelectorAll<HTMLButtonElement>("[data-deck-dot]"))
     fireEvent.click(dots[5])
     expect(activeTitle()).toBe("Foxtrot")
     expect(dots[5].getAttribute("aria-current")).toBe("true")
@@ -172,6 +204,114 @@ describe("StackedDeck", () => {
     const front = stage.querySelector<HTMLButtonElement>(":scope > button")!
     expect(within(front).getByRole("heading", { name: "Alpha" })).toHaveStyle({ color: COLOURS[0].ink })
     expect(front.querySelector("svg")).toHaveStyle({ color: COLOURS[0].accent })
+  })
+
+  it("advances on its own", () => {
+    vi.useFakeTimers()
+    const { activeTitle } = renderDeck()
+    expect(activeTitle()).toBe("Alpha")
+    act(() => void vi.advanceTimersByTime(6500))
+    expect(activeTitle()).toBe("Bravo")
+    act(() => void vi.advanceTimersByTime(6500))
+    expect(activeTitle()).toBe("Charlie")
+  })
+
+  it("wraps round rather than stopping at the last card", () => {
+    vi.useFakeTimers()
+    const { activeTitle } = renderDeck()
+    act(() => void vi.advanceTimersByTime(6500 * 6))
+    expect(activeTitle()).toBe("Alpha")
+  })
+
+  it("stops for good once the reader picks a card", () => {
+    // The single most irritating carousel behaviour is moving the card away
+    // after someone has chosen it.
+    vi.useFakeTimers()
+    const { cards, activeTitle } = renderDeck()
+    fireEvent.click(cards()[4])
+    expect(activeTitle()).toBe("Echo")
+    act(() => void vi.advanceTimersByTime(6500 * 3))
+    expect(activeTitle()).toBe("Echo")
+  })
+
+  it("stops for good on an arrow key too, not just a click", () => {
+    vi.useFakeTimers()
+    const { stage, activeTitle } = renderDeck()
+    fireEvent.keyDown(stage, { key: "ArrowRight" })
+    expect(activeTitle()).toBe("Bravo")
+
+    // Blur FIRST. Arrowing moves focus onto the newly-front card, which
+    // suspends autoplay all by itself — without this line the test passes
+    // whether or not selection stops autoplay permanently, which is the wrong
+    // reason to be green. Mutation-checked: removing setAutoplay(false) must
+    // fail this test as well as the click one.
+    fireEvent.blur(stage)
+    act(() => void vi.advanceTimersByTime(6500 * 2))
+    expect(activeTitle()).toBe("Bravo")
+  })
+
+  it("pauses while hovered, and resumes when the pointer leaves", () => {
+    vi.useFakeTimers()
+    const { stage, activeTitle } = renderDeck()
+    fireEvent.mouseEnter(stage)
+    act(() => void vi.advanceTimersByTime(6500 * 2))
+    expect(activeTitle()).toBe("Alpha") // held still under the pointer
+    fireEvent.mouseLeave(stage)
+    act(() => void vi.advanceTimersByTime(6500))
+    expect(activeTitle()).toBe("Bravo") // ...and picks up again
+  })
+
+  it("stops on a tap anywhere, WITHOUT changing which card is shown", () => {
+    // This is the WCAG 2.2.2 mechanism now that there is no play/pause button,
+    // so it has to work on the empty stage and on the front card — not only on
+    // the cards you would be choosing between. Being forced to change what you
+    // are reading in order to stop it is not a way to stop it.
+    vi.useFakeTimers()
+    const { stage, activeTitle } = renderDeck()
+    fireEvent.pointerDown(stage)
+    fireEvent.mouseLeave(stage) // rule out hover doing the work
+    act(() => void vi.advanceTimersByTime(6500 * 3))
+    expect(activeTitle()).toBe("Alpha")
+  })
+
+  it("stops when the card already in front is tapped", () => {
+    // Fires both events, because a real tap does. That means this one passes
+    // via `select` even if pointerDown were removed — the test above is the one
+    // that isolates the pointerDown path. What this asserts is the end-to-end
+    // gesture: tapping what you are already reading stops the deck and leaves
+    // it exactly where it was.
+    vi.useFakeTimers()
+    const { cards, activeTitle } = renderDeck()
+    fireEvent.pointerDown(cards()[0])
+    fireEvent.click(cards()[0])
+    fireEvent.mouseLeave(screen.getByRole("group", { name: "Test deck" }))
+    act(() => void vi.advanceTimersByTime(6500 * 3))
+    expect(activeTitle()).toBe("Alpha")
+  })
+
+  it("has no play/pause control", () => {
+    // Removed deliberately — the tap mechanism above replaces it. Asserted so
+    // the two decisions cannot silently drift apart.
+    renderDeck()
+    expect(screen.queryByRole("button", { name: /^(Pause|Play) / })).toBeNull()
+  })
+
+  it("never starts under prefers-reduced-motion", () => {
+    vi.useFakeTimers()
+    stubMatchMedia(true)
+    const { activeTitle } = renderDeck()
+    act(() => void vi.advanceTimersByTime(6500 * 4))
+    expect(activeTitle()).toBe("Alpha")
+  })
+
+  it("does not advance while the deck is off screen", () => {
+    // Otherwise a reader scrolling down arrives at whichever card a timer
+    // wandered to while the section was three screens away.
+    vi.useFakeTimers()
+    stubIntersectionObserver(false)
+    const { activeTitle } = renderDeck()
+    act(() => void vi.advanceTimersByTime(6500 * 4))
+    expect(activeTitle()).toBe("Alpha")
   })
 
   it("gives every card its own colour rather than one shared accent", () => {
