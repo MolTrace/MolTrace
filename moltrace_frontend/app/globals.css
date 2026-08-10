@@ -292,6 +292,13 @@
      darkens it to 5.68:1 while holding the hue (~38°, against the vivid 36°),
      which puts it between cyan-ink and teal-ink rather than off on its own. */
   --mt-amber-ink: #8F5C00;
+  /* Green and slate had accents and tints but no ink, so neither could carry
+     type. Measured against the light card (#FFF): 5.02:1 and 7.58:1. Green is
+     the tightest of the whole set and still clears the 4.5:1 bar for 16px
+     semibold — darkening it further leaves the hue reading as forest rather
+     than as the green of the vivid token. */
+  --mt-green-ink: #15803D;
+  --mt-slate-ink: #475569;
 }
 
 .dark {
@@ -303,6 +310,11 @@
   /* Amber behaves like teal and cyan here, not like violet: the vivid token is
      already 8.92:1 on the dark page, so it stays put. */
   --mt-amber-ink: #E8A030;
+  /* Both lighten against the dark card (rgb(6,12,17)): 8.63:1 and 7.67:1. Slate
+     has to move furthest — the vivid #64748B is a mid grey and would sit at
+     roughly 3:1 either way, legible on neither page. */
+  --mt-green-ink: #22C55E;
+  --mt-slate-ink: #94A3B8;
 }
 
 /* Scientific grid background */
