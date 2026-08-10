@@ -304,6 +304,18 @@ describe("StackedDeck", () => {
     expect(activeTitle()).toBe("Alpha")
   })
 
+  it("still plays where IntersectionObserver does not exist", () => {
+    // jsdom has none, and neither do some older browsers. Calling it unguarded
+    // threw and took down the homepage render test in CI. The on-screen check
+    // is an optimisation — losing it must not lose the feature, so the deck
+    // falls back to playing rather than to silence.
+    vi.useFakeTimers()
+    vi.stubGlobal("IntersectionObserver", undefined)
+    const { activeTitle } = renderDeck()
+    act(() => void vi.advanceTimersByTime(6500))
+    expect(activeTitle()).toBe("Bravo")
+  })
+
   it("does not advance while the deck is off screen", () => {
     // Otherwise a reader scrolling down arrives at whichever card a timer
     // wandered to while the section was three screens away.
