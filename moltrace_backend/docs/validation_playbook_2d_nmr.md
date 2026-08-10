@@ -573,3 +573,95 @@ which has not been run — the fixtures are not staged. Specifically outstanding
 need real 2D data with known answers. The synthetic probes used for C1/C4/C5 were
 enough to expose a denominator defect and pin a design decision, but they cannot
 establish accuracy against reality.
+
+---
+
+## C0 SOURCES — real 2D data, searched and licence-checked (2026-08-09)
+
+The gap blocking C2/C3/C6/C8 is real 2D spectra with known answers. Four
+candidates, checked for licence first because that is what killed the last one.
+
+### The licence position, stated once
+
+**"We are only testing, not distributing" resolves share-alike. It does not
+resolve NonCommercial.** Those are different clauses:
+
+* **CC-BY-SA** (NMRShiftDB2) restricts *redistribution* — the obligation is to
+  license derivatives alike. Internal use is unaffected, which is exactly why the
+  existing gate withholds structures from API responses rather than banning the
+  corpus.
+* **CC BY-NC** restricts *use*: "You may not use the material for commercial
+  purposes", where commercial means primarily directed toward commercial
+  advantage. Developing and validating a product sold under a commercial licence
+  is plausibly commercial use **even with nothing redistributed**.
+
+That is a reading, not a legal opinion, and it is worth one email rather than an
+argument — see 2DNMRGym below, whose authors explicitly invite exactly that.
+
+### 1. 2DNMRGym — the best scientific fit, blocked on licence
+
+~22,000 HSQC spectra with molecular graphs and SMILES. Critically it carries a
+**dual-layer annotation**: algorithm-generated "silver" labels for the bulk, plus
+**479 spectra / 7,310 peaks manually annotated and cross-validated by three
+domain experts** — a gold-standard subset.
+
+That 479-spectrum subset is precisely what C0 asks for and better than
+hand-deriving one compound here, because it is expert-labelled and
+cross-validated rather than derived by whoever is running the phase.
+
+**Licence: code MIT, data CC BY-NC 4.0.** The README states: *"If you wish to use
+the dataset for commercial purposes, please contact the authors."* So the route
+is explicit and cheap. **Do not ingest it until that permission exists in
+writing**, and record the reply next to the corpus manifest.
+
+Distributed via Hugging Face; peak lists and annotations rather than raw FIDs, so
+it serves C4-style correlation work but not C2 (parser fidelity), which needs raw
+`ser` files.
+
+### 2. MetaboLights (EMBL-EBI) — the usable one, and it has raw data
+
+**Licence: CC0 for submissions from April 2025**, i.e. public domain dedication,
+commercial reuse permitted, no attribution required. Submissions *before* April
+2025 fall under EBI terms of use and must be checked per study.
+
+It holds **raw Bruker data including `ser` files** — study `MTBLS1` is the
+canonical public example — and since June 2025 raw NMR folders are deposited as
+ZIPs. That makes it the only candidate here that can serve **C2**, since parser
+fidelity needs the real acquisition files, not a peak list.
+
+Caveat to check per study before use: metabolomics 2D is usually a *mixture*
+(biofluid, extract), not a single pure compound. Mixtures are excellent for C3
+(artifact rejection under real crowding) and poor for C4 (a structural
+denominator assumes one known structure). Filter for studies on characterised
+single compounds or spike-in standards.
+
+### 3. BMRB — public domain, but check the fit
+
+Public-domain licensing, and the scope explicitly includes natural products,
+metabolomics and small molecules alongside its protein core. Good for reference
+chemical shifts. Weaker for this phase specifically because the raw 2D holdings
+skew biomolecular — and the technical whitepaper already records that
+protein-trained assumptions are not transferable, which applies to the data as
+much as to model weights.
+
+### 4. NMRShiftDB2 — already in the tree, already gated
+
+CC-BY-SA, and the redistribution gate for it already exists
+(`_REDISTRIBUTABLE_LICENCES`, empty and failing closed). Predominantly 1D
+assignments, so it does not solve the 2D gap, but it is the precedent for how a
+share-alike corpus is handled here.
+
+### Recommended C0 sequence
+
+1. **Start with MetaboLights**, filtered to post-April-2025 CC0 studies with raw
+   2D and a single characterised compound. Unblocks C2 immediately and needs no
+   permission.
+2. **Email the 2DNMRGym authors** in parallel. The 479-spectrum expert subset is
+   worth waiting for and the ask is one message.
+3. Keep the maintainer's own `~/My Business /NMR Test Samples` as the in-house
+   set — it is already licence-clean, and it is the only source where the
+   structure is known with certainty rather than inferred.
+
+**Record the licence per source in the corpus manifest before ingest, and fail
+closed on anything unread.** That is the standing rule and it is what turned this
+search from "here are four datasets" into "one is usable today".
