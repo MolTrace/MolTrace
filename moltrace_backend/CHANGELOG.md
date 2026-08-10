@@ -14,6 +14,55 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.69.5 — A reviewer can now find the run they are asked to sign off (2026-08-09)
+
+`653b402` opened the four FID review routes from admin-only to any authenticated user who
+is not the run's author, so a senior chemist rather than an IT admin could approve an
+analysis. It opened only the **write** side. Discovery still ran through
+`_user_scope_for_context`, so `GET /fid/runs` returned a non-admin nothing but their own
+runs and `GET /fid/runs/{id}` gave them a non-leaking 404 on everybody else's. A peer
+could record a verdict on a run they could not list, open, or read the history of — the
+capability was unreachable for exactly the population it was built for, and the cross-user
+review queue was populated for admins only.
+
+**Read access is now defined to be co-extensive with the review duty.** A run is visible
+when you wrote it, when it is an *open* item (`pending_review` / `needs_revision`) produced
+by somebody who shares an active organization with you, or when you have already recorded
+a decision on it. The third clause is not a convenience: without it a reviewer loses the
+evidence at the instant they approve it, which for a Part 11 signature is backwards. The
+second is what keeps this a review queue rather than a silent conversion of every FID run
+into a team-shared resource — a colleague's *approved* run drops back out of view, because
+the duty that justified the disclosure is discharged. `fid_runs` needed no schema change:
+it already carried `user_id`, and membership resolves through `org_membership`, the same
+lookup dossier and campaign team access already funnel through.
+
+**The write side was narrowed in the same change, and that is a reversal of `653b402`.**
+Leaving the POST ungated meant a caller could write a verdict onto a run in another
+customer's tenant by guessing an integer id, while being unable to read it — reviewing
+what you cannot see is not a capability. You may now review exactly what you may open;
+anything else 404s on POST as it does on GET. Two consequences are deliberate: a run whose
+author is on no team reaches no peer, and a run with a **NULL author** reaches no peer
+either. `653b402` allowed the latter, reasoning that refusing was obstruction with no
+upside; with a tenancy rule in place the premise is gone, because "allow" no longer means
+"allow a colleague" — it means allow anyone, anywhere. An admin remains the path, and
+`test_fid_run_review_separation.py` was re-baselined to say so rather than quietly edited.
+
+Segregation of duties is unchanged and the gate order is what preserves it: the author
+passes the visibility check — it is their run — and lands on the **409**, not a 404 that
+would tell them their own run does not exist. Every other reader of a run moved in the
+same commit, or the guard would have been half applied: `/fid/runs/{id}/report`,
+`report.html`, `/package` and `review-decisions` all share one rule, because the report
+*is* the material being signed off. The write gate deliberately uses a lightweight
+existence check rather than materialising the record, so a permission decision can never
+fail on a stored preview payload that no longer deserializes.
+
+Contract: `FIDRunRecord` gains `viewer_is_author` and `viewer_can_review` (per-request,
+never stored) so a now-mixed list can distinguish "mine" from "awaiting me" and show the
+self-review refusal before the POST; `GET /fid/runs` gains `scope=all|mine|review_queue`;
+and `NMRRawFIDProcessResponse` gains `fid_run_id`, which it never reported despite always
+having persisted a run — that omission is why the Raw FID tab listed runs instead of
+binding to the one just processed.
+
 ## v0.69.4 — A safety metric with no denominator is not a perfect score (2026-08-09)
 
 `false_confirmation_rate` is `SAFETY_CRITICAL` with a zero tolerance — it may never

@@ -6,13 +6,15 @@ import json
 import re
 from collections.abc import Iterable
 from contextlib import contextmanager
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any, Iterator
 
-from sqlalchemy import create_engine, delete, func, select, update
+from sqlalchemy import and_, create_engine, delete, false, func, or_, select, update
 from sqlalchemy.engine import Connection, Engine
 from sqlalchemy.orm import Session, sessionmaker
 
+from . import org_membership
 from .models import (
     AdminSystemSummary,
     AdminUserRecord,
@@ -2022,18 +2024,132 @@ def save_fid_run(
         return _fid_run_to_record(row)
 
 
+#: Review states in which a run is still an *open item* — the work is not finished and
+#: somebody other than the author still has to act. These are the only states in which a
+#: run is visible to a colleague who has no other connection to it (see
+#: :func:`fid_run_visibility_filter`). ``approved`` and ``rejected`` are terminal: the
+#: decision is made, so there is no review duty left to justify the disclosure.
+FID_OPEN_REVIEW_STATUSES = frozenset({"pending_review", "needs_revision"})
+
+
+@dataclass(frozen=True)
+class FIDRunViewer:
+    """Who is asking for a FID run, and whether owner scoping applies to them.
+
+    ``user_id`` is the caller's own id and is populated *even when unrestricted*, so an
+    admin's own runs can still be labelled as theirs. ``unrestricted`` is the system api
+    key / admin override and is the single privileged flag — derived once from
+    ``_user_scope_for_context`` at the route so this module and :mod:`authz` cannot drift
+    apart on what "privileged" means.
+    """
+
+    user_id: int | None = None
+    unrestricted: bool = False
+
+
+def _fid_reviewed_run_ids(session: Session, reviewer_user_id: int | None) -> set[int]:
+    """Runs on which ``reviewer_user_id`` has personally recorded a decision."""
+    if reviewer_user_id is None:
+        return set()
+    rows = session.scalars(
+        select(FIDRunReviewDecisionORM.run_id).where(
+            FIDRunReviewDecisionORM.reviewer_user_id == reviewer_user_id
+        )
+    ).all()
+    return {int(row) for row in rows}
+
+
+def fid_run_visibility_filter(session: Session, viewer: FIDRunViewer) -> Any:
+    """The SQL predicate for "FID runs ``viewer`` may read", or ``None`` for unrestricted.
+
+    Reviewing a run you cannot open is not a capability, it is a dead end, so read access
+    is defined to be exactly co-extensive with the review duty. A restricted caller sees a
+    run when **any** of three things is true:
+
+    1. **They wrote it.** ``fid_runs.user_id == viewer``. This was the whole rule before,
+       and it is unchanged — nobody loses sight of their own work.
+    2. **It is an open item on their team's queue.** The author shares an active
+       organization with the caller (:func:`org_membership.colleague_user_ids`) *and* the
+       run is in :data:`FID_OPEN_REVIEW_STATUSES`. The visibility is granted *because*
+       there is a review to perform, and it lapses when the review is finished — a
+       colleague's approved run does not stay browsable, so this opens a review queue
+       rather than converting a private resource into a team-shared one.
+    3. **They are a reviewer of record.** They have already recorded a decision on the
+       run, whatever its status is now. Without this clause a reviewer would lose the
+       evidence at the exact instant they approved it, which for a Part 11 signature is
+       backwards: the person who signed must be able to see what they signed.
+
+    Two consequences are deliberate and worth stating, because both look like bugs:
+
+    - **A run whose author is on no team is visible only to its author and to admins.**
+      No team, no colleagues, nothing to derive. A solo account correctly gets an empty
+      review queue rather than everyone else's runs.
+    - **A run with a NULL author (predating attribution) reaches no peer.** There is no
+      author to resolve a team from, and the choice is between "any authenticated caller
+      on the internet may act on it" and "an admin may". This reverses the asymmetry
+      recorded in ``653b402``, which allowed it on the grounds that refusing was
+      obstruction with no upside. That premise no longer holds: there is now an upside
+      (no cross-tenant reach) and there is still a path (admin).
+    """
+    if viewer.unrestricted:
+        return None
+    clauses = [FIDRunORM.user_id == viewer.user_id] if viewer.user_id is not None else []
+    colleagues = org_membership.colleague_user_ids(session, viewer.user_id)
+    if colleagues:
+        clauses.append(
+            and_(
+                FIDRunORM.user_id.in_(sorted(colleagues)),
+                FIDRunORM.review_status.in_(sorted(FID_OPEN_REVIEW_STATUSES)),
+            )
+        )
+    reviewed = _fid_reviewed_run_ids(session, viewer.user_id)
+    if reviewed:
+        clauses.append(FIDRunORM.id.in_(sorted(reviewed)))
+    if not clauses:
+        # A caller with no id and no privilege matches nothing, rather than everything.
+        return false()
+    return or_(*clauses)
+
+
 def list_fid_runs(
     session_factory: sessionmaker[Session],
     *,
     limit: int = 20,
-    user_id: int | None = None,
+    viewer: FIDRunViewer | None = None,
+    review_scope: str = "all",
 ) -> list[FIDRunRecord]:
+    """FID runs ``viewer`` may read, newest first.
+
+    ``review_scope`` narrows *within* what is already visible; it grants nothing.
+    ``"mine"`` is the caller's own runs, ``"review_queue"`` is the open items awaiting
+    somebody else's verdict (excluding the caller's own, which they may not review), and
+    ``"all"`` is both. The queue is a first-class filter because the two populations answer
+    different questions — "what have I run" and "what is waiting on me" — and a single
+    ``limit``-bounded page ordered by id would let a busy author's runs crowd the queue out
+    of view entirely.
+    """
+    viewer = viewer or FIDRunViewer()
     with session_scope(session_factory) as session:
-        stmt = select(FIDRunORM).order_by(FIDRunORM.id.desc()).limit(limit)
-        if user_id is not None:
-            stmt = stmt.where(FIDRunORM.user_id == user_id)
-        rows = list(session.scalars(stmt).all())
-        return [_fid_run_to_record(row) for row in rows]
+        stmt = select(FIDRunORM).order_by(FIDRunORM.id.desc())
+        visibility = fid_run_visibility_filter(session, viewer)
+        if visibility is not None:
+            stmt = stmt.where(visibility)
+        if review_scope == "mine":
+            # A caller with no user id has no "mine". Guarded explicitly because
+            # ``== None`` would compile to ``IS NULL`` and quietly return the
+            # unattributed legacy runs instead of nothing.
+            if viewer.user_id is None:
+                return []
+            stmt = stmt.where(FIDRunORM.user_id == viewer.user_id)
+        elif review_scope == "review_queue":
+            stmt = stmt.where(FIDRunORM.review_status.in_(sorted(FID_OPEN_REVIEW_STATUSES)))
+            if viewer.user_id is not None:
+                # A run you wrote is never on *your* queue — you cannot review it.
+                stmt = stmt.where(
+                    or_(FIDRunORM.user_id.is_(None), FIDRunORM.user_id != viewer.user_id)
+                )
+        rows = list(session.scalars(stmt.limit(limit)).all())
+        return [_fid_run_to_record(row, viewer=viewer) for row in rows]
 
 
 def list_fid_runs_for_raw_archive(
@@ -2062,15 +2178,48 @@ def get_fid_run_by_id(
     session_factory: sessionmaker[Session],
     run_id: int,
     *,
-    user_id: int | None = None,
+    viewer: FIDRunViewer | None = None,
 ) -> FIDRunRecord | None:
+    """One run, or ``None`` when it does not exist *or* ``viewer`` may not read it.
+
+    The two cases are deliberately indistinguishable here so the caller can only ever
+    raise a non-leaking 404 — whether a run exists is itself owner-scoped information.
+    Visibility is :func:`fid_run_visibility_filter`, applied as a query predicate rather
+    than re-implemented in Python so the single-row and list paths cannot disagree.
+    """
+    viewer = viewer or FIDRunViewer()
     with session_scope(session_factory) as session:
-        row = session.get(FIDRunORM, run_id)
+        stmt = select(FIDRunORM).where(FIDRunORM.id == run_id)
+        visibility = fid_run_visibility_filter(session, viewer)
+        if visibility is not None:
+            stmt = stmt.where(visibility)
+        row = session.scalars(stmt).first()
         if row is None:
             return None
-        if user_id is not None and row.user_id != user_id:
-            return None
-        return _fid_run_to_record(row)
+        return _fid_run_to_record(row, viewer=viewer)
+
+
+def fid_run_is_visible(
+    session_factory: sessionmaker[Session],
+    *,
+    run_id: int,
+    viewer: FIDRunViewer | None = None,
+) -> bool:
+    """Whether ``viewer`` may see run ``run_id`` — the same rule, without building the record.
+
+    Kept separate from :func:`get_fid_run_by_id` so the *write* gate never has to
+    deserialize ``preview_json``. An authorization decision that can fail on a malformed
+    payload blob is fragile in the wrong direction: a run whose stored preview no longer
+    parses would become unreviewable rather than merely unrenderable, and the failure would
+    surface as a 500 on a permission check.
+    """
+    viewer = viewer or FIDRunViewer()
+    with session_scope(session_factory) as session:
+        stmt = select(FIDRunORM.id).where(FIDRunORM.id == run_id)
+        visibility = fid_run_visibility_filter(session, viewer)
+        if visibility is not None:
+            stmt = stmt.where(visibility)
+        return session.scalars(stmt).first() is not None
 
 
 def list_fid_run_review_decisions(
@@ -2201,9 +2350,16 @@ def build_fid_run_report(
     session_factory: sessionmaker[Session],
     *,
     run_id: int,
-    user_id: int | None = None,
+    viewer: FIDRunViewer | None = None,
 ) -> FIDRunReport | None:
-    run = get_fid_run_by_id(session_factory, run_id, user_id=user_id)
+    """The full evidence report for a run, or ``None`` when it is not visible to ``viewer``.
+
+    Shares :func:`get_fid_run_by_id`'s gate rather than carrying its own: a reviewer who
+    can list a run has to be able to read its report and package, because that *is* the
+    material they are signing off. Scoping the report more tightly than the list would
+    hand a reviewer a row they cannot open.
+    """
+    run = get_fid_run_by_id(session_factory, run_id, viewer=viewer)
     if run is None:
         return None
     decisions = list_fid_run_review_decisions(session_factory, run_id=run_id, limit=200)
@@ -2468,7 +2624,17 @@ def _raw_archive_to_record(row: RawArchiveORM) -> RawArchiveRecord:
     )
 
 
-def _fid_run_to_record(row: FIDRunORM) -> FIDRunRecord:
+def _fid_run_to_record(row: FIDRunORM, *, viewer: FIDRunViewer | None = None) -> FIDRunRecord:
+    """Map a row to its record, stamping the two facts that depend on *who is asking*.
+
+    ``viewer_is_author`` and ``viewer_can_review`` are per-request, not stored: they let the
+    review panel disable self-review before the POST instead of explaining a 409 afterwards,
+    and they let one mixed list distinguish "my run" from "a colleague's run awaiting me"
+    without the client having to know its own user id. With no viewer supplied the answer is
+    "not the author, cannot review" — the conservative reading for an unattributed caller.
+    """
+    viewer = viewer or FIDRunViewer()
+    viewer_is_author = viewer.user_id is not None and row.user_id == viewer.user_id
     preview = FIDPreviewReport.model_validate_json(row.preview_json)
     try:
         metadata = FIDProcessingMetadata.model_validate_json(row.metadata_json)
@@ -2505,6 +2671,10 @@ def _fid_run_to_record(row: FIDRunORM) -> FIDRunRecord:
         processing_recipe=_json_dict(row.processing_recipe_json),
         derived_spectrum_metadata=_json_dict(row.derived_spectrum_metadata_json),
         review_decision_count=len(row.decisions or []),
+        viewer_is_author=viewer_is_author,
+        # An admin may review anything, including their own run — the override is the
+        # point of the flag. Everyone else is refused their own work (409 at the route).
+        viewer_can_review=viewer.unrestricted or not viewer_is_author,
     )
 
 

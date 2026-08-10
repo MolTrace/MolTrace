@@ -12,7 +12,7 @@ a disabled member is not a member.
 
 from __future__ import annotations
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from .orm import TeamMemberORM, UserORM
@@ -61,3 +61,44 @@ def user_shares_org(session: Session, user_id: int | None, organization_id: int 
     if organization_id is None or user_id is None:
         return False
     return organization_id in active_org_ids_for_user(session, user_id)
+
+
+def active_member_user_ids(session: Session, org_ids: set[int] | frozenset[int]) -> set[int]:
+    """User ids of every *active* member of any organization in ``org_ids``.
+
+    The inverse direction of :func:`active_org_ids_for_user`: given the teams a caller is on,
+    who are their colleagues. Needed where the access rule is stated over *people* rather than
+    over a record's stamped ``organization_id`` — a FID run has no organization column, so
+    "runs my colleagues produced" has to be resolved through the authors.
+
+    ``team_members`` is keyed by email and ``users.email`` is not guaranteed normalized, so the
+    join is on lowered email on both sides — the same normalization :func:`email_for_user` and
+    :func:`active_org_ids_for_email` already apply, kept here rather than at each call site so
+    a membership lookup cannot silently miss a mixed-case address.
+    """
+    if not org_ids:
+        return set()
+    rows = session.execute(
+        select(UserORM.id)
+        .join(
+            TeamMemberORM,
+            func.lower(func.trim(TeamMemberORM.user_email)) == func.lower(func.trim(UserORM.email)),
+        )
+        .where(TeamMemberORM.status == "active")
+        .where(TeamMemberORM.organization_id.in_(sorted(int(o) for o in org_ids)))
+    ).all()
+    return {int(row[0]) for row in rows}
+
+
+def colleague_user_ids(session: Session, user_id: int | None) -> set[int]:
+    """Everyone who shares at least one active organization with ``user_id``, including them.
+
+    Returns an empty set when the user is on no team — a solo account has no colleagues, so
+    every team-scoped rule built on this correctly grants nothing rather than everything.
+    """
+    if user_id is None:
+        return set()
+    org_ids = active_org_ids_for_user(session, user_id)
+    if not org_ids:
+        return set()
+    return active_member_user_ids(session, org_ids)

@@ -82,6 +82,22 @@ blocked and audited as `raw_fid.integrity_failure`. FID evidence packages are av
 `raw_archive_export_manifest.json`, and the original archive when it is still
 available in immutable storage.
 
+A FID run is signed off by a second qualified person, not by a platform
+administrator: `POST /fid/runs/{run_id}/review|approve|reject|request-changes`
+are open to any authenticated colleague, and the run's own author is refused
+with `409` — segregation of duties, not a privilege failure. Read access is
+scoped to match that duty. `GET /fid/runs` returns a run when you produced it,
+when it is still an open item (`pending_review` or `needs_revision`) produced by
+somebody who shares an active organization with you, or when you have already
+recorded a decision on it, so a colleague's approved run stops being listed once
+the review is finished while the reviewer of record keeps access to what they
+signed. `scope=review_queue` narrows the list to runs awaiting somebody else's
+verdict. The write routes enforce the same rule, so a run you cannot open
+returns the same non-leaking `404` on `POST`; a run whose author is on no team,
+or has no recorded author at all, is reachable only by an administrator. Users
+who belong to no organization see only their own runs, which is the intended
+result rather than a fault — a review queue needs colleagues to populate it.
+
 Raw FID beta processing defaults to automatic phase correction followed by
 Bernstein polynomial baseline correction, order 3. Phase and baseline correction
 settings, p0/p1, phase score, Bernstein coefficients, baseline QA, warnings, and

@@ -722,6 +722,14 @@ class NMRRawFIDPreviewResponse(BaseModel):
 class NMRRawFIDProcessResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
+    # The run this processing was persisted as. ``POST /nmr/raw-fid/process`` has always
+    # called ``save_fid_run``, but did not report the id back, and this model is
+    # ``extra="forbid"`` -- so the Raw FID tab had no way to anchor review to the run the
+    # user had just created and had to fall back on listing runs and matching by eye.
+    # ``FIDPreviewReport`` (the vault route's response) already carried the same field;
+    # this closes the asymmetry between the two process paths. Optional because a caller
+    # should not break if a future path returns a preview without persisting one.
+    fid_run_id: int | None = None
     sample_id: str | None = None
     filename: str
     raw_sha256: str = Field(min_length=64, max_length=64)
@@ -903,6 +911,28 @@ class FIDRunRecord(BaseModel):
     processing_recipe: dict[str, Any] = Field(default_factory=dict)
     derived_spectrum_metadata: dict[str, Any] = Field(default_factory=dict)
     review_decision_count: int = 0
+    # The two fields below describe the CALLER's relationship to this run, not the run
+    # itself, so they are recomputed per request and never stored. They exist because the
+    # review list is now mixed -- the caller's own runs alongside colleagues' runs awaiting
+    # a verdict -- and a client should not have to compare `user_id` against its own
+    # identity to tell those apart, nor discover the segregation-of-duties refusal by
+    # posting and reading a 409 back.
+    viewer_is_author: bool = False
+    """Whether the caller created this run. True for an admin who is also the author."""
+    viewer_can_review: bool = False
+    """Whether the caller may record a decision on this run. False for the author (the
+    segregation-of-duties rule), except for an admin or the system api key, for whom the
+    override is the point."""
+
+
+#: Which slice of the *already visible* FID runs to list. Narrows only — it grants nothing.
+#:
+#: ``review_queue`` is the population the review surface exists for: open runs awaiting
+#: somebody else's verdict, with the caller's own excluded because they may not review them.
+#: It is a server-side filter rather than a client-side one because a single ``limit``-bounded
+#: page ordered newest-first would otherwise let a prolific author's own runs push the queue
+#: out of view entirely.
+FIDRunReviewScope = Literal["all", "mine", "review_queue"]
 
 
 class FIDRunReport(BaseModel):

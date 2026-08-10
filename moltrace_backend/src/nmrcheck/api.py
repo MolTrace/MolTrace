@@ -133,6 +133,7 @@ from .chemistry import structure_summary_from_smiles
 from .compound_classes import normalize_compound_class
 from .database import (
     FIDRunSelfReviewError,
+    FIDRunViewer,
     audit_event,
     authenticate_user,
     build_evidence_report,
@@ -151,6 +152,7 @@ from .database import (
     export_history_csv,
     export_job_csv,
     export_job_json,
+    fid_run_is_visible,
     get_admin_system_summary,
     get_analysis_by_id,
     get_fid_run_by_id,
@@ -406,6 +408,7 @@ from .models import (
     FIDRunReport,
     FIDRunReviewCreate,
     FIDRunReviewDecisionRecord,
+    FIDRunReviewScope,
     FileNormalizationRequest,
     FileNormalizationRun,
     FileRecord,
@@ -12019,6 +12022,9 @@ async def nmr_raw_fid_process_route(
     )
 
     return NMRRawFIDProcessResponse(
+        # The run this was persisted as, so the caller can anchor review to what they
+        # just processed instead of finding it again in the run list.
+        fid_run_id=fid_run.id,
         sample_id=sample_id,
         filename=filename,
         raw_sha256=raw_sha256,
@@ -12549,10 +12555,13 @@ def raw_fid_archive_export(
     )
     latest_report = None
     if runs:
+        # Reached only through an archive the caller owns, and the run list above is already
+        # owner-filtered, so this is the author path either way — but it goes through the
+        # same viewer as every other run read so the two can never drift apart.
         latest_report = build_fid_run_report(
             _state(request).session_factory,
             run_id=runs[0].id,
-            user_id=user_id,
+            viewer=_fid_run_viewer(context),
         )
     original_archive_bytes = _load_raw_archive_bytes_for_request(
         request,
@@ -12891,10 +12900,38 @@ def _fid_user_scope_for_context(context: AccessContext) -> int | None:
     return _user_scope_for_context(context)
 
 
+def _fid_run_viewer(context: AccessContext) -> FIDRunViewer:
+    """Who this caller is, for the FID run visibility rule.
+
+    ``unrestricted`` is derived from :func:`_user_scope_for_context` rather than by
+    re-testing ``system_api_key or is_admin`` inline, so "privileged" keeps one definition
+    shared with :mod:`authz`. ``user_id`` is carried even when unrestricted, because an
+    admin's own runs should still be labelled as theirs.
+    """
+    return FIDRunViewer(
+        user_id=context.user_id,
+        unrestricted=_fid_user_scope_for_context(context) is None,
+    )
+
+
 def _get_visible_fid_run(request: Request, run_id: int, context: AccessContext) -> FIDRunRecord:
-    user_id = _fid_user_scope_for_context(context)
-    run = get_fid_run_by_id(_state(request).session_factory, run_id=run_id, user_id=user_id)
+    """The run, or a non-leaking 404 — whether it exists is itself owner-scoped.
+
+    The rule is :func:`database.fid_run_visibility_filter`: your own runs, your team's open
+    review queue, and anything you have already reviewed. A denial is reported to the
+    cross-tenant detector for the same reason dossiers and managed files are — a caller
+    walking run ids is the signal, and it is invisible in the 404 itself.
+    """
+    run = get_fid_run_by_id(
+        _state(request).session_factory, run_id=run_id, viewer=_fid_run_viewer(context)
+    )
     if run is None:
+        detections.emit_cross_tenant_denied(
+            request,
+            context,
+            resource_type="fid_run",
+            resource_id=str(run_id),
+        )
         raise HTTPException(status_code=404, detail="FID run not found.")
     return run
 
@@ -12906,9 +12943,28 @@ def fid_runs(
     request: Request,
     context: AccessContext = Depends(require_access_context),
     limit: int = Query(default=20, ge=1, le=200),
+    scope: FIDRunReviewScope = Query(
+        default="all",
+        description=(
+            "Which runs to return: everything you can see, only the ones you produced, or "
+            "only the ones awaiting a review from someone other than their author."
+        ),
+    ),
 ) -> list[FIDRunRecord]:
-    user_id = _fid_user_scope_for_context(context)
-    return list_fid_runs(_state(request).session_factory, limit=limit, user_id=user_id)
+    """FID runs this caller may read.
+
+    Until now this was strictly the caller's own runs for anybody who was not an admin,
+    which made peer review unreachable for the people it was built for: the reviewer could
+    record a verdict on a run but could never find one. A colleague's run is now listed
+    while it is an open review item — see ``fid_run_visibility_filter`` for the rule and
+    for what deliberately stays invisible.
+    """
+    return list_fid_runs(
+        _state(request).session_factory,
+        limit=limit,
+        viewer=_fid_run_viewer(context),
+        review_scope=scope,
+    )
 
 
 @router.get(
@@ -12946,9 +13002,32 @@ def _submit_fid_run_review(
     context: AccessContext,
     action: str,
 ) -> FIDRunReviewDecisionRecord:
+    """Record a verdict, after proving the caller may see the run at all.
+
+    ``653b402`` opened these routes to any authenticated user who is not the author and
+    left them ungated otherwise, because at the time there was no reviewer scope to gate
+    on — the effect was that a caller could write a verdict onto a run in another
+    customer's tenant by guessing an integer id, while being unable to read it. Now that
+    reviewer visibility is defined, write access is defined to be the same set: you may
+    review exactly what you may open. A run you cannot see 404s here as it does on the
+    read routes, and the author still reaches the separation-of-duties refusal below
+    because their own run is, and always was, visible to them.
+
+    The gate is ``fid_run_is_visible`` rather than ``_get_visible_fid_run`` so that
+    deciding *may this caller review* never depends on the stored preview payload
+    deserializing — a run with a payload the current models cannot parse should still be
+    reviewable, and a permission check should not be able to raise a 500.
+    """
+    if not fid_run_is_visible(
+        _state(request).session_factory, run_id=run_id, viewer=_fid_run_viewer(context)
+    ):
+        detections.emit_cross_tenant_denied(
+            request, context, resource_type="fid_run", resource_id=str(run_id)
+        )
+        raise HTTPException(status_code=404, detail="FID run not found.")
     # A system api key or an admin overrides the separation rule; everyone else
     # must be someone other than the run's author.
-    privileged = bool(context.system_api_key or (context.user and context.user.is_admin))
+    privileged = _fid_run_viewer(context).unrestricted
     try:
         decision = submit_fid_run_review_decision(
             _state(request).session_factory,
@@ -13067,9 +13146,13 @@ def fid_run_report(
     request: Request,
     context: AccessContext = Depends(require_access_context),
 ) -> FIDRunReport:
-    user_id = _fid_user_scope_for_context(context)
-    report = build_fid_run_report(_state(request).session_factory, run_id=run_id, user_id=user_id)
+    report = build_fid_run_report(
+        _state(request).session_factory, run_id=run_id, viewer=_fid_run_viewer(context)
+    )
     if report is None:
+        detections.emit_cross_tenant_denied(
+            request, context, resource_type="fid_run", resource_id=str(run_id)
+        )
         raise HTTPException(status_code=404, detail="FID run report not found.")
     _audit_from_context(
         request,
@@ -13092,9 +13175,13 @@ def fid_run_report_html(
     request: Request,
     context: AccessContext = Depends(require_access_context),
 ) -> HTMLResponse:
-    user_id = _fid_user_scope_for_context(context)
-    report = build_fid_run_report(_state(request).session_factory, run_id=run_id, user_id=user_id)
+    report = build_fid_run_report(
+        _state(request).session_factory, run_id=run_id, viewer=_fid_run_viewer(context)
+    )
     if report is None:
+        detections.emit_cross_tenant_denied(
+            request, context, resource_type="fid_run", resource_id=str(run_id)
+        )
         raise HTTPException(status_code=404, detail="FID run report not found.")
     _audit_from_context(
         request,
@@ -13116,9 +13203,13 @@ def fid_run_package(
     request: Request,
     context: AccessContext = Depends(require_access_context),
 ) -> StreamingResponse:
-    user_id = _fid_user_scope_for_context(context)
-    report = build_fid_run_report(_state(request).session_factory, run_id=run_id, user_id=user_id)
+    report = build_fid_run_report(
+        _state(request).session_factory, run_id=run_id, viewer=_fid_run_viewer(context)
+    )
     if report is None:
+        detections.emit_cross_tenant_denied(
+            request, context, resource_type="fid_run", resource_id=str(run_id)
+        )
         raise HTTPException(status_code=404, detail="FID run report not found.")
     payload, original_included = _build_fid_run_package(report)
     _audit_from_context(

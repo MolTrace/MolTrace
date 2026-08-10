@@ -12,9 +12,9 @@ The product already had the right model and bypassed it here —
 `POST /spectracheck/sessions/{id}/review` uses `require_access_context`, so the
 two surfaces disagreed with each other.
 
-Now: any authenticated user may review, **except the run's own creator**, with
-admin and the system key as overrides. `fid_runs` already carried `user_id`
-(creator) alongside `reviewer_user_id`, so the check needed no schema change.
+Now: a **colleague** may review, except the run's own creator, with admin and the system
+key as overrides. `fid_runs` already carried `user_id` (creator) alongside
+`reviewer_user_id`, so the check needed no schema change.
 
 The self-review refusal is **409, not 403**. It is not a privilege failure —
 the caller is perfectly entitled to review runs, just not this one — and a 403
@@ -22,6 +22,17 @@ here would be both semantically wrong and swallowed by the global
 `PUBLIC_ACCESS_DENIED_DETAIL` sanitiser, which is what made the original
 "You do not have access to perform this action" so unhelpful. A reviewer reading
 that concludes the feature is broken.
+
+**Re-baselined when reviewer visibility landed.** This file originally asserted that
+*any* authenticated user could review any run, and that an unattributed run was reviewable
+by anyone. Both were written before there was a reviewer scope to gate on, and together
+they meant a caller could write a verdict onto another customer's run by guessing an
+integer id — a cross-tenant write, reachable while the run itself stayed unreadable to
+them. Read access is now scoped to your team's open review queue, and write access is
+defined to be the same set: you may review exactly what you may open. The two tests below
+carry the change; `test_fid_run_reviewer_visibility.py` holds the full rule and its
+negatives. What has *not* changed is everything this file was protecting — a non-admin can
+still review, the author still cannot, and the refusal is still a 409 that says why.
 """
 
 from __future__ import annotations
@@ -62,6 +73,30 @@ def _seed_run(client: TestClient, owner_id: int) -> int:
         return int(conn.execute(sa_text("SELECT MAX(id) FROM fid_runs")).scalar_one())
 
 
+def _same_team(client: TestClient, *emails: str, name: str) -> None:
+    """Put ``emails`` on one organization as active members.
+
+    Review is a team act now: the reviewer has to be a colleague, not merely somebody
+    other than the author. See ``test_fid_run_reviewer_visibility.py``.
+    """
+    from nmrcheck.orm import OrganizationORM, TeamMemberORM
+
+    with client.app.state.session_factory() as session:
+        org = OrganizationORM(name=name)
+        session.add(org)
+        session.flush()
+        for email in emails:
+            session.add(
+                TeamMemberORM(
+                    organization_id=org.id,
+                    user_email=email.strip().lower(),
+                    role="scientist",
+                    status="active",
+                )
+            )
+        session.commit()
+
+
 def _user_id(client: TestClient, headers: dict[str, str]) -> int:
     res = client.get("/auth/me", headers=headers)
     assert res.status_code == 200, res.text
@@ -70,9 +105,17 @@ def _user_id(client: TestClient, headers: dict[str, str]) -> int:
 
 @pytest.mark.parametrize("action", ["review", "approve", "reject", "request-changes"])
 def test_a_colleague_can_review_without_being_an_admin(client, api_headers, action):
-    """The whole point: a lab reviewer is a chemist, not IT."""
-    author = _signup(client, f"sep-author-{action}@example.com")
-    colleague = _signup(client, f"sep-colleague-{action}@example.com")
+    """The whole point: a lab reviewer is a chemist, not IT.
+
+    Re-baselined: the colleague is now put on the author's team. This test used to pass
+    with two unrelated accounts, which is what revealed the problem — "somebody else" was
+    being read as *anybody* else, so the reviewer did not have to be a colleague at all.
+    """
+    author_email = f"sep-author-{action}@example.com"
+    colleague_email = f"sep-colleague-{action}@example.com"
+    author = _signup(client, author_email)
+    colleague = _signup(client, colleague_email)
+    _same_team(client, author_email, colleague_email, name=f"sep-lab-{action}")
     run_id = _seed_run(client, _user_id(client, author))
 
     res = client.post(
@@ -132,13 +175,19 @@ def test_an_admin_may_still_review_anything(client, api_headers):
     assert res.status_code == 200, res.text
 
 
-def test_an_unowned_legacy_run_is_reviewable(client, api_headers):
-    """A run with no recorded creator predates attribution.
+def test_an_unowned_legacy_run_is_reviewable_only_by_an_admin(client, api_headers):
+    """A run with no recorded creator predates attribution — and now reaches no peer.
 
-    Unlike a file, where NULL owner means "refuse", here it means the
-    separation check has nothing to compare against — and blocking review of
-    every historical run would be a worse outcome than allowing it. Recorded as
-    a deliberate asymmetry rather than an oversight.
+    **Reversed.** This originally asserted that any authenticated user could review such a
+    run: the separation check has nothing to compare against, and blocking review of every
+    historical run seemed worse than allowing it, on the reasoning that refusing was
+    obstruction with no upside.
+
+    That premise did not survive the introduction of a reviewer scope. With no author there
+    is no team to derive, so "allow" no longer means "allow a colleague" — it means allow
+    *any* authenticated caller anywhere, on a run they cannot read. There is now an upside
+    to refusing (no cross-tenant reach) and there is still a path (admin), so the asymmetry
+    with managed files — where a NULL owner means refuse — is gone rather than deliberate.
     """
     from sqlalchemy import text as sa_text
 
@@ -150,5 +199,12 @@ def test_an_unowned_legacy_run_is_reviewable(client, api_headers):
             sa_text("UPDATE fid_runs SET user_id = NULL WHERE id = :i"), {"i": run_id}
         )
 
-    res = client.post(f"/fid/runs/{run_id}/review", headers=reviewer, json={"comment": "ok"})
-    assert res.status_code == 200, res.text
+    peer = client.post(f"/fid/runs/{run_id}/review", headers=reviewer, json={"comment": "ok"})
+    assert peer.status_code == 404, (
+        f"a peer acted on a run with no recorded author: {peer.status_code} {peer.text[:200]}"
+    )
+
+    ops = client.post(f"/fid/runs/{run_id}/review", headers=api_headers, json={"comment": "ok"})
+    assert ops.status_code == 200, (
+        f"an unattributed run became unreviewable by anyone at all: {ops.text[:200]}"
+    )

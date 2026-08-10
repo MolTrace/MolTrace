@@ -7,25 +7,29 @@
  * is a senior chemist, not IT — so the check is now "somebody else", not "an
  * administrator".
  *
- * Two limits of the current backend shape the surface built on this, and both are
- * read-side. They are recorded here because neither is visible from the route
- * list, and a reader who does not know them will read the result as a bug:
+ * Both read-side limits recorded here previously are now closed backend-side. What
+ * replaced them is a scoped rule, not an open door, and the shape of it is what a
+ * reader of this surface needs to know:
  *
- * 1. **Discovery is owner-scoped.** `GET /fid/runs` and `GET /fid/runs/{id}` run
- *    through `_user_scope_for_context`, which returns the caller's own id for
- *    anyone who is not an admin or a system key. A non-admin therefore lists only
- *    their own runs and gets a non-leaking 404 on anybody else's. So a non-admin
- *    peer cannot *find* a colleague's run to review, even though the POST would
- *    accept their verdict — `_submit_fid_run_review` never calls
- *    `_get_visible_fid_run`. Until the read scope is opened, the cross-user review
- *    queue is populated for admins only; for everyone else this surface is their
- *    own runs plus the decisions others have recorded on them.
- * 2. **The SpectraCheck raw-FID tab cannot anchor to a run.**
- *    `NMRRawFIDProcessResponse` (what `POST /nmr/raw-fid/process` returns) has no
- *    `fid_run_id` and is `extra="forbid"`. Only `FIDPreviewReport`, returned by the
- *    vault route `POST /raw-fid/{archive_id}/process`, carries one. That is why
- *    this surface is driven by the run *list* rather than hung off the process
- *    response — the list is the only place the ids exist today.
+ * 1. **Discovery is team-scoped, and only while a review is owed.** `GET /fid/runs`
+ *    returns a run when you wrote it, when it is an *open* item (`pending_review` or
+ *    `needs_revision`) produced by somebody who shares an active organization with
+ *    you, or when you have already recorded a decision on it. So the queue fills
+ *    with colleagues' runs awaiting a verdict, a colleague's *approved* run drops
+ *    back out of view, and a run you signed stays reachable to you forever. An
+ *    empty queue for a user on no team is correct, not a fault — there are no
+ *    colleagues to review for, and the panel should say so rather than look broken.
+ *    The write routes enforce the same rule: a run you cannot open 404s on POST too.
+ * 2. **The process response now names its run.** `NMRRawFIDProcessResponse` carries
+ *    `fid_run_id`, so the Raw FID tab can anchor review to the run the user just
+ *    created instead of finding it again in the list. The list remains the entry
+ *    point for the *queue* — reviewing a colleague's work starts from the list, by
+ *    definition, since you did not process it.
+ *
+ * Two per-request fields on `FIDRunRecord` carry the caller's relationship to a run,
+ * because the list is now mixed: `viewer_is_author` separates "mine" from "awaiting
+ * me", and `viewer_can_review` is false for the author, so the segregation-of-duties
+ * refusal can be shown before the POST rather than read back out of a 409.
  */
 
 import { ApiError, apiFetch } from "@/lib/api/client"
