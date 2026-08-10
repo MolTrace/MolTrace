@@ -33,6 +33,7 @@ import {
   InferredNmrTextPanel,
   SpectraCheckEvidencePanels,
 } from "@/components/spectracheck/spectracheck-evidence-panels"
+import { SpectraCheckFidRunReview } from "@/components/spectracheck/spectracheck-fid-run-review"
 import {
   MetadataKeyValueCard,
   ProcessingParametersCard,
@@ -2195,6 +2196,14 @@ export function SpectraCheckRawFidSection({
                 <InferredNmrTextPanel payload={displayPayload} />
                 <EnrichedPickedPeaksPanel payload={displayPayload} />
                 <SpectraCheckEvidencePanels payload={displayPayload} />
+                {/* Review sits after the evidence, on the Raw FID tab because this
+                    is where processing runs are produced — no new navigation for a
+                    step that belongs to the run you just made. It lists runs rather
+                    than binding to this one: the response from processing here
+                    carries no run id (NMRRawFIDProcessResponse has no such field
+                    and forbids extras), so the run list is the only place the ids
+                    exist. See lib/fid/fid-run-review.ts. */}
+                <SpectraCheckFidRunReview />
               </>
             ) : null}
 

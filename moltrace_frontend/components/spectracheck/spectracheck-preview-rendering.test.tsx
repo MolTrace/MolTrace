@@ -499,7 +499,15 @@ describe("SpectraCheck preview rendering", () => {
 
     await screen.findByText(/Processed FID output/i)
     await waitFor(() => expect(apiFetchMock).toHaveBeenCalledWith("/nmr/raw-fid/process", expect.any(Object)))
-    expect(apiFetchMock).toHaveBeenCalledTimes(2)
+    // The guard is "no duplicate spectrum work", so count the spectrum calls
+    // rather than every call — and name them, which is stricter than the bare
+    // total this replaced. The run-review panel mounts with the process results
+    // and loads the run list; that is a different endpoint and must not be able
+    // to satisfy, or trip, an assertion about spectrum processing.
+    expect(calledPaths().filter((path) => path.startsWith("/nmr/"))).toEqual([
+      "/nmr/raw-fid/preview",
+      "/nmr/raw-fid/process",
+    ])
   })
 
   it("raw FID preview renders a trace-only spectrum even when payload contains peaks", async () => {
