@@ -1,0 +1,84 @@
+{
+  "_comment": [
+    "Contract-shape fixture for the structure-aware CD3OD branch of",
+    "/nmr/processed/analyze. As with the no-structure fixture, the SHAPE came from a",
+    "live capture and the MAGNITUDES are neutral stand-ins, because the originals",
+    "were measured from a private sample.",
+    "Four relations are load-bearing and every edit must keep them:",
+    "  1. deltas[k] == observed[k] - expected[k], for the keys expected carries.",
+    "  2. There is a warning for exactly the keys the panel must paint amber",
+    "     (aromatic, aliphatic, non_labile, total) and NONE for labile -- a negative",
+    "     labile delta in a deuterated protic solvent is expected, not a defect, and",
+    "     this fixture is the regression guard for a client-side |delta| >= 1.0 rule",
+    "     that used to flag it anyway.",
+    "  3. anomeric_cap.limit is 0, not null. 0 is falsy, so a truthy check silently",
+    "     degrades the label -- that is the bug this branch pins.",
+    "  4. expected.labile == 2 with observed.labile == 0, so the exchange note is",
+    "     the positive-channel counterpart to the warnings."
+  ],
+  "proton_inventory": {
+    "nucleus": "1H",
+    "integration_basis": "spectrum",
+    "observed": {
+      "aromatic": 9.5,
+      "anomeric_or_olefinic": 0.0,
+      "carbohydrate_sugar": 0.0,
+      "aldehyde": 0.0,
+      "carboxylic_acid": 0.0,
+      "labile": 0.0,
+      "aliphatic": 12.0,
+      "non_labile": 21.5,
+      "total": 21.5
+    },
+    "expected": {
+      "aromatic": 5,
+      "anomeric_or_olefinic": 0,
+      "aldehyde": 0,
+      "aliphatic": 6,
+      "labile": 2,
+      "non_labile": 11,
+      "total": 13,
+      "oh": 0,
+      "nh": 2,
+      "sh": 0,
+      "labile_subset": "NH"
+    },
+    "deltas": {
+      "aromatic": 4.5,
+      "anomeric_or_olefinic": 0.0,
+      "aldehyde": 0.0,
+      "aliphatic": 6.0,
+      "labile": -2.0,
+      "non_labile": 10.5,
+      "total": 8.5
+    },
+    "warnings": [
+      "Observed aromatic integration is +4.5 H above the structural expectation (5 H) — likely overlap, impurity, or unresolved multiplet.",
+      "Observed aliphatic integration is +6.0 H above the structural expectation (6 H) — likely overlap, impurity, or unresolved multiplet.",
+      "Observed non_labile integration is +10.5 H above the structural expectation (11 H) — likely overlap, impurity, or unresolved multiplet.",
+      "Observed total integration is +8.5 H above the structural expectation (13 H) — likely overlap, impurity, or unresolved multiplet."
+    ],
+    "notes": [
+      "CD3OD exchanges NH/OH/SH protons for deuterium, so the 2 labile H are expected to be absent from the 1H spectrum. Observed 0.0 H — consistent with exchange."
+    ],
+    "anomeric_cap": {
+      "applied": true,
+      "limit": 0,
+      "method": "structural_anomeric_olefinic_budget",
+      "reassigned_h": 3.0
+    },
+    "bucket_hierarchy": {
+      "carbohydrate_sugar": "aliphatic",
+      "carboxylic_acid": "labile"
+    },
+    "reconciliation": {
+      "applied": false,
+      "reason": "no_reference_nmr_text"
+    },
+    "integration_scale": {
+      "basis": "data_derived",
+      "independent_total": true,
+      "raw_estimated_total_h": 21.837
+    }
+  }
+}
