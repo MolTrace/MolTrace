@@ -226,12 +226,13 @@ describe("proton inventory panel — CD3OD aromatic-protected aminoglycoside", (
     expect(row.textContent).toContain("1.0") // observed, no longer permanently "—"
   })
 
-  it("renders a REAL /nmr/processed/analyze payload (1-Napamine 1H, no SMILES)", async () => {
-    // Captured live from the backend against a 43k-point processed spectrum. This is
-    // the no-structure case: expected/deltas are empty and anomeric_cap.applied is
-    // false with limit null — precisely where the old hardcoded label wrongly said
-    // "(structure-capped)".
-    const fixture = (await import("./__fixtures__/napamine-1h-inventory.json")).default
+  it("renders a real /nmr/processed/analyze payload shape (1H, no SMILES)", async () => {
+    // The payload SHAPE is a live backend capture; the integrals are neutral
+    // stand-ins (see the fixture's _comment — the originals measured a private
+    // sample). This is the no-structure case: expected/deltas are empty and
+    // anomeric_cap.applied is false with limit null — precisely where the old
+    // hardcoded label wrongly said "(structure-capped)".
+    const fixture = (await import("./__fixtures__/proton-inventory-no-structure.json")).default
     const { container } = render(<ProtonInventoryPanel payload={fixture} />)
 
     // 1. No cap is claimed, because none was applied — and no "capped at null H".
@@ -252,22 +253,22 @@ describe("proton inventory panel — CD3OD aromatic-protected aminoglycoside", (
     expect(screen.queryByTestId("proton-inventory-notes")).toBeNull()
 
     // 4. Observed integrals still render on the inventory scale.
-    expect(screen.getByTestId("proton-inventory-aromatic").textContent).toContain("9.0")
-    expect(screen.getByTestId("proton-inventory-total").textContent).toContain("36.5")
+    expect(screen.getByTestId("proton-inventory-aromatic").textContent).toContain("5.0")
+    expect(screen.getByTestId("proton-inventory-total").textContent).toContain("15.0")
   })
 
-  it("renders a REAL structure-aware CD3OD payload end-to-end (1-Napamine + SMILES)", async () => {
-    // Captured live from /nmr/processed/analyze on the same 43k-point spectrum with
-    // candidates_text=NCCc1cccc2ccccc12 and solvent=CD3OD. This single payload
-    // exercises every change in the handoff at once.
-    const fixture = (await import("./__fixtures__/napamine-1h-cd3od-structure.json")).default
+  it("renders a structure-aware CD3OD payload end-to-end (with SMILES)", async () => {
+    // Same provenance as above: live capture for the shape, neutral stand-ins for
+    // the magnitudes. This single payload exercises every change in the handoff at
+    // once — the cap label, the exchange note, and the amber/neutral split.
+    const fixture = (await import("./__fixtures__/proton-inventory-cd3od-structure.json")).default
     render(<ProtonInventoryPanel payload={fixture} />)
 
     // §1 — the cap WAS applied here, with limit 0. `0` is falsy, so a truthy check
     // would have silently degraded this to a vague "structural budget" claim.
     const anomeric = screen.getByTestId("proton-inventory-anomeric_or_olefinic")
     expect(anomeric.textContent).toContain("capped at 0 H")
-    expect(anomeric.textContent).toContain("9.0 H reassigned")
+    expect(anomeric.textContent).toContain("3.0 H reassigned")
 
     // §3 — the CD3OD exchange confirmation renders in the positive channel.
     const notes = screen.getByTestId("proton-inventory-notes")

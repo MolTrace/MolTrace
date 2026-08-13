@@ -185,21 +185,28 @@ class TestFlipAngleModel:
 class TestAgainstMeasuredSpectra:
     """Pinned to a real matched pair, not to the model's own arithmetic.
 
-    naw-1-244-54pt: one sample, one probe, two acquisitions differing only in
-    relaxation delay — 22.005 s + 7.995 s AQ = 30.00 s recycle, and 1.000 s +
-    3.998 s AQ = 5.00 s — both zg30 on a 500 MHz instrument. Integrating
+    The pair is one sample on one probe, two acquisitions differing only in
+    relaxation delay — a 30 s recycle and a 5 s recycle, both zg30. Integrating
     identical ppm windows in the two processed spectra, the per-window ratio
-    between them spread by a factor of 1.141. That is a MEASUREMENT of
-    differential saturation at a 5 s recycle, and the model has to be
-    consistent with it.
+    between them spread by the factor recorded below. That is a MEASUREMENT of
+    differential saturation at a 5 s recycle, and the model has to be consistent
+    with it.
+
+    The acquisition settings written into the two cases below are representative
+    rather than transcribed: they reproduce the same two recycle times through
+    the same arithmetic (recycle = D1 + TD / 2·SW), which is all these two cases
+    exercise. The spectra themselves are the maintainer's unpublished work, and
+    a per-sample parameter set is part of that record, so it is not reproduced
+    here. See tests/fixture_pointer.py.
     """
 
     def test_the_fully_relaxed_acquisition_is_called_quantitative(self) -> None:
         from nmrcheck.acquisition_quality import assess_1h_acquisition
 
+        # 26.0 s D1 + 65536/(2·8192) = 4.0 s AQ = 30.0 s recycle.
         result = assess_1h_acquisition(
-            relaxation_delay_s=22.00461, td=131072,
-            sw_hz=16.3881000708626 * 500.16300096, scans=16, pulse_program="zg30",
+            relaxation_delay_s=26.0, td=65536,
+            sw_hz=8192.0, scans=16, pulse_program="zg30",
         )
         assert result.level == LEVEL_QUANTITATIVE
         assert result.parameters["recycle_time_s"] == pytest.approx(30.0, abs=0.01)
@@ -207,9 +214,10 @@ class TestAgainstMeasuredSpectra:
     def test_the_routine_acquisition_is_flagged_but_not_condemned(self) -> None:
         from nmrcheck.acquisition_quality import assess_1h_acquisition
 
+        # Same AQ, D1 dropped to 1.0 s — the only difference in the real pair.
         result = assess_1h_acquisition(
             relaxation_delay_s=1.0, td=65536,
-            sw_hz=16.3881000708626 * 500.16300096, scans=16, pulse_program="zg30",
+            sw_hz=8192.0, scans=16, pulse_program="zg30",
         )
         assert result.level == LEVEL_SEMI
         assert result.parameters["recycle_time_s"] == pytest.approx(5.0, abs=0.01)

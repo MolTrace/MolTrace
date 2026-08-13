@@ -1,17 +1,28 @@
 {
+  "_comment": [
+    "Contract-shape fixture for the no-structure branch of /nmr/processed/analyze.",
+    "The SHAPE is authoritative: it is exactly what the backend returned on a live",
+    "capture -- every field, type, null-vs-absent choice and cross-field relation is",
+    "preserved (non_labile = aromatic + anomeric + aldehyde + aliphatic; total =",
+    "non_labile + labile). The MAGNITUDES are neutral stand-ins. The original",
+    "capture's integrals were measured from a private sample, and an integral table",
+    "describes that sample as surely as its name would, so it is not published here.",
+    "Anything asserting on shape stays valid; do not read these numbers as a",
+    "measurement of anything."
+  ],
   "proton_inventory": {
     "nucleus": "1H",
     "integration_basis": "spectrum",
     "observed": {
-      "aromatic": 9.0,
-      "anomeric_or_olefinic": 16.0,
+      "aromatic": 5.0,
+      "anomeric_or_olefinic": 2.0,
       "carbohydrate_sugar": 0.0,
       "aldehyde": 0.0,
       "carboxylic_acid": 0.0,
       "labile": 0.0,
-      "aliphatic": 11.5,
-      "non_labile": 36.5,
-      "total": 36.5
+      "aliphatic": 8.0,
+      "non_labile": 15.0,
+      "total": 15.0
     },
     "expected": {},
     "deltas": {},
@@ -34,26 +45,26 @@
     "integration_scale": {
       "basis": "data_derived",
       "independent_total": true,
-      "raw_estimated_total_h": 29.314
+      "raw_estimated_total_h": 15.204
     }
   },
   "impurity_candidates": [
     {
-      "shift_ppm": 0.055,
+      "shift_ppm": 0.09,
       "integration_h": 0.5,
       "reason": "trace-level integration; isolated singlet-like pattern",
       "score": null,
       "library_match": null
     },
     {
-      "shift_ppm": 2.109,
+      "shift_ppm": 1.56,
       "integration_h": 0.5,
       "reason": "trace-level integration; isolated singlet-like pattern",
       "score": null,
       "library_match": null
     },
     {
-      "shift_ppm": 8.066,
+      "shift_ppm": 7.26,
       "integration_h": 0.5,
       "reason": "trace-level integration; isolated singlet-like pattern",
       "score": null,

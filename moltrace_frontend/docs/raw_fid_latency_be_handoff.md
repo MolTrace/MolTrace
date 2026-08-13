@@ -5,7 +5,8 @@ one item that is genuinely backend work.
 
 The user reported "spectrum generation and processing/analysis takes too long for the raw FID".
 Everything below was measured against the live backend on `localhost:8000` with a real Bruker
-folder (`1-Napamine/Nap/Raw`, 75 files, 3.5 MB zip).
+folder (75 files, 3.5 MB zip). The sample is not named here — real sample
+identities are not published, and no number below depends on which one it was.
 
 ## 1. The headline number, and a correction worth reading
 

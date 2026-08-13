@@ -50,22 +50,16 @@ import pytest
 
 pytest.importorskip("nmrglue")
 
-FIXTURE = (
-    Path(__file__).resolve().parent.parent
-    / "validation_fixtures"
-    / "bruker"
-    / "naw-1-244-54pt"
-    / "10"
-    / "pdata"
-    / "1"
-)
+from fixture_pointer import fixture_reason, resolve_fixture
+
+# Referenced by ROLE, never by directory name: the directory name is the
+# maintainer's sample code, and this repository is public. See fixture_pointer.
+_ROLE = "quantitative_pair_relaxed"
+FIXTURE = resolve_fixture(_ROLE) or Path("/nonexistent")
 
 pytestmark = pytest.mark.skipif(
     not (FIXTURE / "1r").exists(),
-    reason=(
-        "matched-pair Bruker fixture absent (gitignored real spectra); "
-        "stage validation_fixtures/bruker/naw-1-244-54pt to run A1"
-    ),
+    reason=fixture_reason(_ROLE),
 )
 
 #: Median relative error between each peak's share of the reported proton total

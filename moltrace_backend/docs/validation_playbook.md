@@ -60,17 +60,24 @@ Use `access_token` as `authorization: Bearer <token>`.
 
 ### Fixtures
 
-`validation_fixtures/` (gitignored), staged from the user's own Bruker data:
+`validation_fixtures/` (gitignored), staged from the maintainer's own Bruker data.
 
-| Fixture | Solvent | Recycle | Scans | Raw FID | Processed 1r |
-|---|---|---|---|---|---|
-| `naw-1-244-54pt/10` | CDCl₃ | 30.0 s | 16 | yes | yes |
-| `naw-1-244-54pt/11` | CDCl₃ | 5.0 s | 16 | yes | yes |
-| `MH0143-…-5/6/7/8` | D₂O | 5.0 s | 128 | yes | no |
-| `33` | MeOD | 5.0 s | 64 | yes | yes |
+Fixtures are named here by **role**, never by directory. The directory name is a
+sample code, this repository is public, and the maintainer's compounds and the
+spectra derived from them are unpublished. `tests/fixture_pointer.py` resolves a
+role to a directory through `validation_fixtures/fixture_map.json`, which is
+gitignored; tracked code and docs only ever say the role.
 
-`10` and `11` are the same sample at two recycle delays — the only true matched
-pair, and the anchor for every quantitation claim.
+| Role | What it is | Raw FID | Processed 1r |
+|---|---|---|---|
+| `quantitative_pair_relaxed` | fully relaxed arm — long recycle | yes | yes |
+| `quantitative_pair_routine` | routine arm — short recycle, same sample and probe | yes | yes |
+| `aqueous_series` | four acquisitions in a deuterated protic solvent | yes | no |
+| `protic_processed` | one acquisition with vendor processing alongside | yes | yes |
+
+The two `quantitative_pair_*` roles are the same sample at two recycle delays —
+the only true matched pair, and the anchor for every quantitation claim. Per-role
+acquisition parameters live in the gitignored map next to the paths, not here.
 
 Regenerate with `validation_fixtures/inventory.json`. Parse Bruker delays from
 the `##$D= (0..63)` **array**, not a `##$D1=` scalar — that scalar does not
@@ -138,7 +145,7 @@ exist and reading it yields `D1 = 0` for every dataset.
 Path is `fully_implemented` and works end to end. `POST /fid/preview`,
 `POST /fid/process`, `GET /fid/runs/{id}/report`.
 
-Verified on `naw-1-244-54pt/10`: Bruker zip detected, 131072 points, group-delay
+Verified on `quantitative_pair_relaxed`: Bruker zip detected, 131072 points, group-delay
 correction, zero-fill ×2, 0.3 Hz exponential apodization, auto-phase −11.625°,
 Bernstein-polynomial baseline, nmrglue. Acquisition gating correctly returned
 **quantitative** (recycle 30.0 s, 30° pulse) and read `d1 = 22.00461` from acqus.
@@ -161,7 +168,7 @@ Bernstein-polynomial baseline, nmrglue. Acquisition gating correctly returned
    baseline swing as highly as a real peak, and returned one (−4.6e8).
    Fixed: take the tallest **positive** line in the window.
 
-Measured effect on `naw-1-244-54pt/10`: axis error corrected from **+0.024 ppm
+Measured effect on `quantitative_pair_relaxed`: axis error corrected from **+0.024 ppm
 to 0.0000 ppm**; solvent resolves to CDCl₃; residual and water regions now
 masked; impurity candidates 1 → 6.
 
@@ -193,7 +200,7 @@ masked; impurity candidates 1 → 6.
 
 **Prompt:**
 
-> Run both arms over `naw-1-244-54pt/10` and `MH0143-…-5`, toggling
+> Run both arms over `quantitative_pair_relaxed` and `aqueous_series`, toggling
 > `MOLTRACE_STRUCTURE_ASSIGNMENT`.
 >
 > Before comparing, fix the **A/B input asymmetry**: legacy `observed.total`
@@ -249,7 +256,7 @@ masked; impurity candidates 1 → 6.
 > (`tests/test_gsd_prompt3_fe_ab_envelope.py:200-219`). Adding one is part of
 > this phase.
 >
-> Validate against `naw-1-244-54pt/10` (30 s recycle — the cleanest
+> Validate against `quantitative_pair_relaxed` (the cleanest
 > quantitative data available). For a resolved multiplet, fitted areas must
 > reproduce integration ratios within a stated tolerance.
 >
@@ -352,7 +359,7 @@ masked; impurity candidates 1 → 6.
 
 **Prompt:**
 
-> Drive the full loop on `naw-1-244-54pt/10`: upload → analyze → review →
+> Drive the full loop on `quantitative_pair_relaxed`: upload → analyze → review →
 > report. Fix what breaks.
 >
 > Known obstacles, confirm each:
@@ -926,7 +933,7 @@ the case overlapped multiplets present.
 
 ### Measured stake on real data — with a caveat that matters
 
-`naw-1-244-54pt/10`, comparing raw trapezoid integration against the sum of
+`quantitative_pair_relaxed`, comparing raw trapezoid integration against the sum of
 fitted line areas:
 
 ```
@@ -1322,7 +1329,7 @@ A4's rather than pretending to answer it.
 
 ## B1 LOOP RESULT — SpectraCheck end to end on a real FID (2026-08-06)
 
-Driven on `naw-1-244-54pt/10` (the fully relaxed half of the matched pair),
+Driven on `quantitative_pair_relaxed` (the fully relaxed half of the matched pair),
 auth enforced, as an ordinary non-admin user.
 
 ### The loop closes, and produces real artefacts
