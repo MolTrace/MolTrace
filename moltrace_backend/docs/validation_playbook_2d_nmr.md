@@ -673,9 +673,8 @@ next session the same hour.
 
 **In-house (`~/My Business /NMR Test Samples`): 1D only.** Four `acqus` files,
 all 1D — e.g. `zgpg30` (power-gated-decoupled 13C). **Zero** `ser`, `acqu2s` or
-`2rr` anywhere in the tree. The compounds are exactly the right ones (pyrrolidine
-sulfamates, napamine, tobramycin — structures known with certainty), but no 2D
-was acquired.
+`2rr` anywhere in the tree. The compounds are the right ones — in-house
+material whose structures are known with certainty — but no 2D was acquired.
 
 **MetaboLights recent CC0: NMR is sparse, and what there is is 1D.** Scanned the
 60 most recent public studies via the API:
@@ -702,8 +701,8 @@ Raw 2D has to be *sourced*, and the options split by which phase they serve:
 | **C4/C5** correlation work (needs peak lists + assignments) | 2DNMRGym, 479 expert-annotated | blocked on CC BY-NC permission |
 
 **The strongest option is probably to acquire one.** The in-house compounds
-already have certain structures — an HSQC and an HMBC on the pyrrolidine
-sulfamate or napamine would give ground truth no public corpus can match, because
+already have certain structures — an HSQC and an HMBC on one of them would give
+ground truth no public corpus can match, because
 the structure is known rather than inferred, and it is licence-clean by
 construction. One overnight run on a known sample unblocks C2, C3, C4 and C6
 together.
@@ -720,10 +719,9 @@ to MetaboLights. A Drive archive supplied afterwards contains the missing data.
 
 **Structure:** `A400`, `A600`, `B500` (spectrometers) → dated sessions → sample
 names → Bruker experiment numbers. `B500` alone holds **14 sessions** from
-2026-06-05 to 2026-08-06, on the `Apr.N3` / `Apr.NAc` series — the same
-pyrrolidine/sulfamate chemistry as the existing 1D fixtures.
+2026-06-05 to 2026-08-06, on the the same in-house chemistry as the existing 1D fixtures.
 
-**Confirmed 2D**, at `B500 / 06-05-2026 / Apr.N3.2 / 12`:
+**Confirmed 2D**, at a `B500` session (path withheld):
 
 ```
 ##$PULPROG= <cosydfphpp>      double-quantum-filtered phase-sensitive COSY
@@ -738,9 +736,9 @@ and **C6** (the COSY diagonal and symmetry).
 
 **Two caveats, both material:**
 
-* **Experiment numbers do not indicate dimensionality.** `Apr.N3.2/12` is a
-  COSY, but `Apr.N3.1-TBDPS/20` — a higher number in a later session — is
-  `zg30`, a 1D proton. Any inventory must read `PULPROG` from `acqus`, or check
+* **Experiment numbers do not indicate dimensionality.** one sample's experiment `12` is a
+  COSY, while a HIGHER-numbered experiment `20` in a later session is `zg30`,
+  a 1D proton. Any inventory must read `PULPROG` from `acqus`, or check
   for `ser` versus `fid`. Guessing from the folder number will mis-sort the
   corpus.
 * **HSQC/HMBC not yet located.** COSY is homonuclear, so it serves C6 but **not
