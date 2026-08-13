@@ -12,7 +12,8 @@
 * :mod:`.ms_models` -- the MS / structure pretrained layer (Prompt 21):
   CSI:FingerID (MS/MS -> structure), METLIN retention-time corroboration, and
   DP4-AI candidate ranking (reusing the in-house ``dp4_scoring``), fused into one
-  calibrated candidate ranking that the Prompt 7 verifier arbitrates.
+  combined candidate ranking — a relative ordering of the candidates supplied,
+  not a calibrated probability — that the Prompt 7 verifier arbitrates.
 * :mod:`.rag` -- retrieval-augmented reasoning (Prompt 14): Anthropic Claude
   wrapped in a retrieval layer over the Prompt 8 similarity index. Candidate
   structures are grounded in retrieved precedent (cite-or-drop hallucination
