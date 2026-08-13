@@ -7,6 +7,7 @@ import { SpectraCheckRawFidSection } from "@/components/spectracheck/spectrachec
 import { SpectraCheckEvidenceProvider } from "@/src/lib/spectracheck/useSpectraCheckEvidence"
 import { clearSpectraCheckRuntimeState } from "@/src/lib/spectracheck/spectracheck-runtime-reset"
 import { SpectraCheckTabStateProvider } from "@/components/spectracheck/spectracheck-tab-state-context"
+import { stackTraceColor } from "@/components/science/SpectrumStackViewer"
 import { allowConsole } from "@/src/test/setup"
 
 vi.mock("@/lib/api/client", async () => {
@@ -90,6 +91,13 @@ function routeAnalysisSequence(steps: Array<() => unknown>) {
     index += 1
     return step() as never
   })
+}
+
+/** jsdom reports style colours as rgb(); the palette is authored as hex. */
+function asRgb(hex: string): string {
+  const value = hex.replace("#", "")
+  const n = parseInt(value, 16)
+  return `rgb(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255})`
 }
 
 /** Never resolves until the test says so — lets a run be inspected mid-flight. */
@@ -501,5 +509,65 @@ describe("queue copy", () => {
     const queue = screen.getByTestId("raw-fid-queue")
     expect(queue).toHaveTextContent(/one at a time/i)
     expect(queue.textContent ?? "").not.toMatch(/POST |http|backend|_json|endpoint|\b4\d\d\b/i)
+  })
+})
+
+describe("analysis stays bound to the dataset it was run on", () => {
+  it("drops the experimental analysis when a newly processed archive replaces the surface", async () => {
+    // The reset used to key on the queue SELECTION alone. Processing a freshly attached archive
+    // swaps the whole results surface without changing the selection, so dataset a's peak table,
+    // multiplets and J-couplings stayed on screen under dataset b's spectrum.
+    routeAnalysisSequence([() => processResponse(), () => processResponse({ point_count: 128 })])
+    renderSection()
+    dropArchives([archive("a.zip")])
+    fireEvent.click(screen.getByTestId("raw-fid-queue-run-all"))
+    await waitFor(() => expect(screen.getByText("Done")).toBeInTheDocument())
+
+    apiFetchMock.mockImplementation(async (path: string) => {
+      if (String(path) === "/spectrum/analyze/gsd") {
+        return { peaks: [{ position_ppm: 7.26, intensity: 10 }], backend: "gsd_prompt3" } as never
+      }
+      if (String(path).startsWith("/nmr/raw-fid/")) return processResponse({ point_count: 128 }) as never
+      return [] as never
+    })
+    fireEvent.click(screen.getByRole("radio", { name: "GSD" }))
+    fireEvent.click(screen.getByRole("button", { name: /Run GSD analysis/i }))
+    await waitFor(() => expect(screen.getByTestId("raw-fid-gsd-results-surface")).toBeInTheDocument())
+
+    // Attach a DIFFERENT archive and process it from the single-dataset controls. The queue
+    // selection never changes, but the spectrum on screen does.
+    fireEvent.click(screen.getByRole("radio", { name: /Legacy/ }))
+    dropArchives([archive("b.zip")])
+    fireEvent.click(screen.getByRole("button", { name: /Process FID/i }))
+
+    await waitFor(() =>
+      expect(screen.queryByTestId("raw-fid-gsd-results-surface")).not.toBeInTheDocument(),
+    )
+  })
+
+  it("gives a row the same colour as its line in the stacked plot", async () => {
+    // Colour is the only thing linking a table row to a trace. The table used to colour by row
+    // index while the plot coloured by position among DRAWN traces, so any row that produced no
+    // line — still queued, failed, or finished with no spectrum — shifted every colour after it.
+    routeAnalysisSequence([
+      () => processResponse({ x: [], y: [], point_count: 0 }),
+      () => processResponse(),
+    ])
+    renderSection()
+    dropArchives([archive("no-trace.zip"), archive("has-trace.zip")])
+    fireEvent.click(screen.getByTestId("raw-fid-queue-run-all"))
+    await waitFor(() => expect(screen.getAllByText("Done")).toHaveLength(2))
+
+    const rows = within(screen.getByTestId("raw-fid-queue-table"))
+    const dotOf = (label: string) => {
+      const row = rows.getByText(label).closest("tr") as HTMLElement
+      return (row.querySelector("span[aria-hidden]") as HTMLElement).style.backgroundColor
+    }
+
+    // The first row produced no spectrum, so it owns no colour in the stack...
+    expect(dotOf("no-trace.zip")).toBe("var(--mt-slate)")
+    // ...and the one that DID draw wears the first stack colour, not the second. Keyed off the
+    // exported palette so the test tracks the plot rather than restating a hex value.
+    expect(dotOf("has-trace.zip")).toBe(asRgb(stackTraceColor(0)))
   })
 })

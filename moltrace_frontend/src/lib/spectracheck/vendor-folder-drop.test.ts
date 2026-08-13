@@ -15,13 +15,14 @@ function entry(path: string, bytes = 8): VendorFolderEntry {
   return { path, file: new File([new Uint8Array(bytes)], path.split("/").pop() ?? path) }
 }
 
-/** Layout of a real Bruker acquisition folder (mirrors the 1-Napamine test data). */
+/** Layout of a real Bruker acquisition folder. The folder name is a neutral
+ * stand-in: real sample names are not published, and nothing here depends on it. */
 const BRUKER = [
-  "Nap/34/fid",
-  "Nap/34/acqus",
-  "Nap/34/acqu",
-  "Nap/34/pulseprogram.precomp",
-  "Nap/34/pdata/1/procs",
+  "Sample/34/fid",
+  "Sample/34/acqus",
+  "Sample/34/acqu",
+  "Sample/34/pulseprogram.precomp",
+  "Sample/34/pdata/1/procs",
 ]
 
 describe("vendor dataset detection", () => {
@@ -30,7 +31,7 @@ describe("vendor dataset detection", () => {
     expect(d.usable).toBe(true)
     expect(d.kind).toBe("bruker")
     expect(d.experiments).toHaveLength(1)
-    expect(d.experiments[0].dir).toBe("Nap/34")
+    expect(d.experiments[0].dir).toBe("Sample/34")
     expect(d.reason).toBeNull()
   })
 
@@ -63,11 +64,11 @@ describe("vendor dataset detection", () => {
 
   it("ignores OS junk so it neither counts nor reaches the archive", () => {
     const d = detectVendorDataset([
-      entry("Nap/34/fid"),
-      entry("Nap/34/acqus"),
-      entry("Nap/.DS_Store"),
-      entry("Nap/._fid"),
-      entry("__MACOSX/Nap/34/fid"),
+      entry("Sample/34/fid"),
+      entry("Sample/34/acqus"),
+      entry("Sample/.DS_Store"),
+      entry("Sample/._fid"),
+      entry("__MACOSX/Sample/34/fid"),
     ])
     expect(d.usable).toBe(true)
     expect(d.fileCount).toBe(2)
@@ -82,7 +83,7 @@ describe("vendor dataset detection", () => {
 
 describe("archive naming", () => {
   it("names the archive after the dropped root folder", () => {
-    expect(archiveNameForEntries(BRUKER.map((p) => entry(p)))).toBe("Nap.zip")
+    expect(archiveNameForEntries(BRUKER.map((p) => entry(p)))).toBe("Sample.zip")
   })
 
   it("sanitises spaces and punctuation out of the name", () => {
@@ -93,33 +94,33 @@ describe("archive naming", () => {
 describe("client-side zipping", () => {
   it("produces a zip that PRESERVES relative paths (the backend groups members per directory)", async () => {
     const file = await zipVendorFolder(BRUKER.map((p) => entry(p)))
-    expect(file.name).toBe("Nap.zip")
+    expect(file.name).toBe("Sample.zip")
     expect(file.type).toBe("application/zip")
 
     const bytes = new Uint8Array(await file.arrayBuffer())
     const members = Object.keys(unzipSync(bytes)).sort()
     // Paths must survive intact — a flattened archive would break dataset detection.
-    expect(members).toContain("Nap/34/fid")
-    expect(members).toContain("Nap/34/acqus")
-    expect(members).toContain("Nap/34/pdata/1/procs")
+    expect(members).toContain("Sample/34/fid")
+    expect(members).toContain("Sample/34/acqus")
+    expect(members).toContain("Sample/34/pdata/1/procs")
   })
 
   it("omits OS junk from the archive", async () => {
     const file = await zipVendorFolder([
-      entry("Nap/34/fid"),
-      entry("Nap/34/acqus"),
-      entry("Nap/.DS_Store"),
-      entry("__MACOSX/Nap/34/fid"),
+      entry("Sample/34/fid"),
+      entry("Sample/34/acqus"),
+      entry("Sample/.DS_Store"),
+      entry("__MACOSX/Sample/34/fid"),
     ])
     const members = Object.keys(unzipSync(new Uint8Array(await file.arrayBuffer())))
-    expect(members.sort()).toEqual(["Nap/34/acqus", "Nap/34/fid"])
+    expect(members.sort()).toEqual(["Sample/34/acqus", "Sample/34/fid"])
   })
 
   it("reports progress and refuses a folder with nothing usable", async () => {
     const seen: number[] = []
     await zipVendorFolder(BRUKER.map((p) => entry(p)), { onProgress: (d) => seen.push(d) })
     expect(seen).toEqual([1, 2, 3, 4, 5])
-    await expect(zipVendorFolder([entry("Nap/.DS_Store")])).rejects.toThrow(/no usable files/i)
+    await expect(zipVendorFolder([entry("Sample/.DS_Store")])).rejects.toThrow(/no usable files/i)
   })
 })
 
@@ -135,7 +136,7 @@ describe("splitting a dropped folder into one archive per experiment", () => {
 
   it("keeps a Bruker experiment's nested pdata files with their experiment", () => {
     const [bundle] = splitVendorFolderByExperiment(BRUKER.map((p) => entry(p)))
-    expect(bundle.entries.map((e) => e.path)).toContain("Nap/34/pdata/1/procs")
+    expect(bundle.entries.map((e) => e.path)).toContain("Sample/34/pdata/1/procs")
     expect(bundle.fileCount).toBe(5)
   })
 
@@ -167,12 +168,12 @@ describe("splitting a dropped folder into one archive per experiment", () => {
 
   it("keeps OS junk out of the bundles and out of their counts", () => {
     const [bundle] = splitVendorFolderByExperiment([
-      entry("Nap/34/fid"),
-      entry("Nap/34/acqus"),
-      entry("Nap/34/.DS_Store"),
-      entry("__MACOSX/Nap/34/fid"),
+      entry("Sample/34/fid"),
+      entry("Sample/34/acqus"),
+      entry("Sample/34/.DS_Store"),
+      entry("__MACOSX/Sample/34/fid"),
     ])
-    expect(bundle.entries.map((e) => e.path).sort()).toEqual(["Nap/34/acqus", "Nap/34/fid"])
+    expect(bundle.entries.map((e) => e.path).sort()).toEqual(["Sample/34/acqus", "Sample/34/fid"])
     expect(bundle.fileCount).toBe(2)
   })
 
@@ -214,15 +215,15 @@ describe("splitting a dropped folder into one archive per experiment", () => {
   it("zips one bundle at a time into an archive the server can still read", async () => {
     const [bundle] = splitVendorFolderByExperiment(BRUKER.map((p) => entry(p)))
     const file = await zipVendorFolder(bundle.entries, { name: bundle.archiveName })
-    expect(file.name).toBe("Nap_34.zip")
+    expect(file.name).toBe("Sample_34.zip")
     const members = Object.keys(unzipSync(new Uint8Array(await file.arrayBuffer()))).sort()
-    expect(members).toEqual(["Nap/34/acqu", "Nap/34/acqus", "Nap/34/fid", "Nap/34/pdata/1/procs", "Nap/34/pulseprogram.precomp"])
+    expect(members).toEqual(["Sample/34/acqu", "Sample/34/acqus", "Sample/34/fid", "Sample/34/pdata/1/procs", "Sample/34/pulseprogram.precomp"])
   })
 })
 
 describe("per-experiment archive naming", () => {
   it("flattens the directory path so the name says which experiment it is", () => {
-    expect(experimentArchiveName("Nap/Raw/34")).toBe("Nap_Raw_34.zip")
+    expect(experimentArchiveName("Sample/Raw/34")).toBe("Sample_Raw_34.zip")
   })
 
   it("keeps a Varian .fid directory suffix readable", () => {
@@ -244,8 +245,8 @@ describe("per-experiment archive naming", () => {
 describe("folder picker input", () => {
   it("uses webkitRelativePath so a picked folder keeps its structure", () => {
     const f = new File([new Uint8Array(4)], "fid")
-    Object.defineProperty(f, "webkitRelativePath", { value: "Nap/34/fid" })
-    expect(vendorFolderEntriesFromFileList([f])[0].path).toBe("Nap/34/fid")
+    Object.defineProperty(f, "webkitRelativePath", { value: "Sample/34/fid" })
+    expect(vendorFolderEntriesFromFileList([f])[0].path).toBe("Sample/34/fid")
   })
 
   it("falls back to the bare name when the browser omits a relative path", () => {
@@ -259,5 +260,39 @@ describe("formatBytes", () => {
     expect(formatBytes(900)).toBe("900 B")
     expect(formatBytes(1536)).toBe("1.5 KB")
     expect(formatBytes(4.6 * 1024 * 1024)).toBe("4.6 MB")
+  })
+})
+
+describe("experiment ordering", () => {
+  it("queues Bruker expnos in numeric order, not lexicographic", () => {
+    // A chemist numbers expnos as numbers. Sorted as strings, experiment 10 lands above
+    // experiment 2 and a straightforward series comes back looking shuffled.
+    const entries = ["1", "2", "10", "11", "3"].flatMap((expno) => [
+      entry(`Sample/${expno}/fid`),
+      entry(`Sample/${expno}/acqus`),
+    ])
+
+    const bundles = splitVendorFolderByExperiment(entries)
+
+    expect(bundles.map((b) => b.dir)).toEqual([
+      "Sample/1",
+      "Sample/2",
+      "Sample/3",
+      "Sample/10",
+      "Sample/11",
+    ])
+  })
+
+  it("orders zero-padded and mixed-width names the way a reader expects", () => {
+    const entries = ["A/007", "A/8", "A/70"].flatMap((dir) => [
+      entry(`${dir}/fid`),
+      entry(`${dir}/procpar`),
+    ])
+
+    expect(splitVendorFolderByExperiment(entries).map((b) => b.dir)).toEqual([
+      "A/007",
+      "A/8",
+      "A/70",
+    ])
   })
 })

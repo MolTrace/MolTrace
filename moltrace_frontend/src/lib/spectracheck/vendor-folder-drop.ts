@@ -12,7 +12,7 @@ import { zip, type Zippable } from "fflate"
 
 /** One file from a dropped folder, with its path RELATIVE to the dropped root. */
 export type VendorFolderEntry = {
-  /** e.g. "Nap/Raw/34/acqus" — POSIX separators, no leading slash. */
+  /** e.g. "Sample/Raw/34/acqus" — POSIX separators, no leading slash. */
   path: string
   file: File
 }
@@ -53,6 +53,41 @@ function isIgnoredPath(path: string): boolean {
   return parts.some((p) => p === "__MACOSX")
 }
 
+/**
+ * Compare two dataset paths the way a chemist reads them: digit runs as numbers, everything else
+ * as case-insensitive text. `Sample/2` sorts before `Sample/10`, which a plain `localeCompare` reverses.
+ */
+export function compareNaturalPath(a: string, b: string): number {
+  const chunks = (value: string) => value.split(/(\d+)/).filter((part) => part !== "")
+  const left = chunks(a)
+  const right = chunks(b)
+  for (let i = 0; i < Math.min(left.length, right.length); i++) {
+    const x = left[i]
+    const y = right[i]
+    const xNumeric = /^\d+$/.test(x)
+    const yNumeric = /^\d+$/.test(y)
+    if (xNumeric && yNumeric) {
+      // Compare as numbers, but fall back to length/text for runs too long for a safe integer.
+      const nx = Number(x)
+      const ny = Number(y)
+      if (Number.isSafeInteger(nx) && Number.isSafeInteger(ny)) {
+        if (nx !== ny) return nx - ny
+        continue
+      }
+      const stripped = (v: string) => v.replace(/^0+(?=\d)/, "")
+      const sx = stripped(x)
+      const sy = stripped(y)
+      if (sx.length !== sy.length) return sx.length - sy.length
+      if (sx !== sy) return sx < sy ? -1 : 1
+      continue
+    }
+    if (xNumeric !== yNumeric) return xNumeric ? -1 : 1
+    const compared = x.localeCompare(y, undefined, { sensitivity: "base" })
+    if (compared !== 0) return compared
+  }
+  return left.length - right.length
+}
+
 function dirOf(path: string): string {
   const i = path.lastIndexOf("/")
   return i < 0 ? "" : path.slice(0, i)
@@ -91,7 +126,10 @@ export function detectVendorDataset(entries: VendorFolderEntry[]): VendorFolderD
       files: [...names].sort(),
     })
   }
-  experiments.sort((a, b) => a.dir.localeCompare(b.dir))
+  // Natural order, so Bruker expnos run 1, 2, 10 rather than 1, 10, 2. A chemist numbers expnos
+  // as numbers, and the queue order is the order the results appear in — a plain string sort puts
+  // experiment 10 above experiment 2 and makes a series look shuffled.
+  experiments.sort((a, b) => compareNaturalPath(a.dir, b.dir))
 
   const kinds = new Set(experiments.map((e) => e.kind))
   const kind: VendorKind = kinds.size === 1 ? [...kinds][0]! : experiments.length > 0 ? "unknown" : "unknown"
@@ -198,7 +236,7 @@ export function splitVendorFolderByExperiment(
     const base = experimentArchiveName(experiment.dir)
     const seen = usedNames.get(base) ?? 0
     usedNames.set(base, seen + 1)
-    // The sanitizer is many-to-one ("Nap 1" and "Nap#1" both flatten to Nap_1), so distinctness
+    // The sanitizer is many-to-one ("Sample 1" and "Sample#1" both flatten to Sample_1), so distinctness
     // has to be enforced here rather than assumed from the path being distinct.
     const archiveName = seen === 0 ? base : base.replace(/\.zip$/, `-${seen + 1}.zip`)
     bundles.push({
