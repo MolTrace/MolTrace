@@ -113,6 +113,106 @@ export function detectVendorDataset(entries: VendorFolderEntry[]): VendorFolderD
   return { kind, experiments, fileCount: kept.length, totalBytes, usable: true, reason: null }
 }
 
+/** One experiment from a dropped folder, packaged as its own upload. */
+export type VendorExperimentBundle = {
+  /** The experiment directory this bundle came from ("" when it sat at the dropped root). */
+  dir: string
+  kind: VendorKind
+  /** Every file that belongs to this experiment, relative paths untouched. */
+  entries: VendorFolderEntry[]
+  fileCount: number
+  /** Uncompressed bytes — the figure the server measures during extraction. */
+  totalBytes: number
+  /** Distinct, filesystem-safe archive name derived from the FULL dir path. */
+  archiveName: string
+}
+
+/**
+ * Which experiment owns a file — the LONGEST matching experiment directory.
+ *
+ * "Most specific wins" is what keeps a nested dataset out of its parent's archive. Matching on
+ * `dir + "/"` (separator included) also stops `Raw/3` from claiming `Raw/34/fid`. A root-level
+ * experiment (`dir === ""`) owns everything no deeper experiment claims, which is how a Bruker
+ * `pdata/1/procs` — its own directory bucket, never an experiment itself — still rides along.
+ */
+function ownerDirFor(path: string, dirs: readonly string[]): string | null {
+  let best: string | null = null
+  for (const dir of dirs) {
+    if (dir !== "" && !path.startsWith(`${dir}/`)) continue
+    if (best === null || dir.length > best.length) best = dir
+  }
+  return best
+}
+
+/**
+ * Name a per-experiment archive from its FULL directory path.
+ *
+ * The leaf alone collides the moment two roots share an experiment number (`A/1` and `B/1` both
+ * become `1.zip`), and the archive name is what the chemist reads in the queue — so it has to
+ * say which experiment it is. `/` is outside the allowed class, so the sanitizer flattens the
+ * path and cannot emit a traversal. The clamp keeps the TAIL because that is the specific end.
+ */
+export function experimentArchiveName(dir: string, fallback = "raw_fid_experiment"): string {
+  const flattened = dir.replace(/[^A-Za-z0-9._-]+/g, "_").replace(/^[_.]+|[_.]+$/g, "")
+  const clamped = flattened.length > 120 ? flattened.slice(flattened.length - 120) : flattened
+  return `${clamped || fallback}.zip`
+}
+
+/**
+ * Split one dropped folder into ONE BUNDLE PER EXPERIMENT — the MestReNova behaviour, where a
+ * folder of twenty expnos opens as twenty spectra rather than one.
+ *
+ * This matters beyond convenience: the server keeps only the single best-scoring dataset in an
+ * archive and picks it by path depth then lexicographic order, so every other experiment in a
+ * combined archive is silently invisible, and a mixed-vendor folder routes them all through one
+ * vendor reader. One archive per experiment removes both problems, and keeps each upload under
+ * the server's per-archive extraction caps.
+ *
+ * Zipping is deliberately NOT done here — the caller zips one bundle at a time so a large folder
+ * never has every archive resident at once.
+ */
+export function splitVendorFolderByExperiment(
+  entries: VendorFolderEntry[],
+): VendorExperimentBundle[] {
+  const kept = entries.filter((e) => !isIgnoredPath(e.path))
+  const detection = detectVendorDataset(entries)
+  if (detection.experiments.length === 0) return []
+
+  const dirs = detection.experiments.map((x) => x.dir)
+  const grouped = new Map<string, VendorFolderEntry[]>()
+  for (const entry of kept) {
+    const owner = ownerDirFor(entry.path, dirs)
+    // A file under no experiment at all (stray notes beside the datasets) is not part of any
+    // dataset and is left out rather than padding an arbitrary neighbour's archive.
+    if (owner === null) continue
+    const bucket = grouped.get(owner)
+    if (bucket) bucket.push(entry)
+    else grouped.set(owner, [entry])
+  }
+
+  const usedNames = new Map<string, number>()
+  const bundles: VendorExperimentBundle[] = []
+  for (const experiment of detection.experiments) {
+    const own = grouped.get(experiment.dir) ?? []
+    if (own.length === 0) continue
+    const base = experimentArchiveName(experiment.dir)
+    const seen = usedNames.get(base) ?? 0
+    usedNames.set(base, seen + 1)
+    // The sanitizer is many-to-one ("Nap 1" and "Nap#1" both flatten to Nap_1), so distinctness
+    // has to be enforced here rather than assumed from the path being distinct.
+    const archiveName = seen === 0 ? base : base.replace(/\.zip$/, `-${seen + 1}.zip`)
+    bundles.push({
+      dir: experiment.dir,
+      kind: experiment.kind,
+      entries: own,
+      fileCount: own.length,
+      totalBytes: own.reduce((sum, e) => sum + e.file.size, 0),
+      archiveName,
+    })
+  }
+  return bundles
+}
+
 /** Recursively read a dropped directory entry into flat, relative-path entries. */
 async function readDirectoryEntry(
   entry: FileSystemDirectoryEntry,

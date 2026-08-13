@@ -23,6 +23,11 @@ import {
   type ReactNode,
 } from "react"
 import { registerSpectraCheckRuntimeReset } from "@/src/lib/spectracheck/spectracheck-runtime-reset"
+import {
+  abortRawFidBatchRun,
+  type RawFidBatchItem,
+  type RawFidBatchMode,
+} from "@/src/lib/spectracheck/raw-fid-batch"
 
 export type RawFidNucleus = "1H" | "13C"
 export type RawFidVendor = "auto" | "bruker" | "agilent"
@@ -111,6 +116,25 @@ export type RawFidTabState = {
   // keep independent payloads so switching modes does not destroy prior work.
   activeResultMode: RawFidResultMode | null
 
+  /**
+   * Multi-dataset queue.
+   *
+   * Held here so a long run survives a tab switch (the runtime cache below keeps it), but
+   * deliberately NOT written to storage — the items hold live File handles, which cannot be
+   * serialized, and N complete analyses would blow the storage budget and silently take the rest
+   * of this state down with them. Same trade the single `selectedFile` already makes.
+   */
+  batchItems: RawFidBatchItem[]
+  batchMode: RawFidBatchMode
+  /** Queue row currently feeding the single-spectrum controls and the evidence panels. */
+  batchActiveId: string | null
+  /**
+   * True while the queue is being worked. Lives here rather than in the section because the
+   * section unmounts on a tab switch while the run carries on — a local flag would come back
+   * false and offer to start a second run on top of the first.
+   */
+  batchRunning: boolean
+
   // UI helpers
   advancedOpen: boolean
   sessionRawFileIdChoice: string
@@ -162,6 +186,10 @@ const defaultRawFid: RawFidTabState = {
   previewSpectrumLoading: false,
   previewSpectrumError: "",
   activeResultMode: null,
+  batchItems: [],
+  batchMode: "process",
+  batchActiveId: null,
+  batchRunning: false,
   advancedOpen: false,
   sessionRawFileIdChoice: "",
   jobActionError: "",
@@ -223,6 +251,11 @@ function readPersistedTabState(): PersistedSpectraCheckTabState | null {
   }
 }
 
+/**
+ * What survives a reload. `selectedFile` and the whole `batch*` group are omitted on purpose:
+ * File handles do not serialize, and N stored analyses would exceed the storage budget — which
+ * fails silently and would take the rest of this state down with it.
+ */
 function serializeRawFid(state: RawFidTabState): Partial<RawFidTabState> {
   return {
     linkedFromSource: state.linkedFromSource,
@@ -326,6 +359,11 @@ function hydrateRawFidState(state: unknown): RawFidTabState {
     ...defaultRawFid,
     ...patch,
     selectedFile: null,
+    // Never rehydrated from storage — a persisted blob written before these were excluded could
+    // otherwise restore item shells whose File handles are long gone.
+    batchItems: [],
+    batchActiveId: null,
+    batchRunning: false,
     previewLoading: false,
     processLoading: false,
     previewSpectrumLoading: false,
@@ -350,6 +388,12 @@ function initialRawFidState(): RawFidTabState {
       previewLoading: false,
       processLoading: false,
       previewSpectrumLoading: false,
+      // The runtime cache DOES carry the queue across a tab switch — that is the whole point of
+      // it — but a run cannot still be in flight through a remount, so no row stays "running".
+      batchRunning: false,
+      batchItems: runtimeRawFidState.batchItems.map((item) =>
+        item.status === "running" ? { ...item, status: "cancelled" as const } : item,
+      ),
     }
   }
   return hydrateRawFidState(readPersistedTabState()?.rawFid)
@@ -382,6 +426,15 @@ registerSpectraCheckRuntimeReset(clearSpectraCheckTabStatePersistence)
 export type SpectraCheckTabStateContextValue = {
   rawFid: RawFidTabState
   setRawFid: (patch: Partial<RawFidTabState>) => void
+  /**
+   * Patch computed from the LATEST state rather than from the caller's render.
+   *
+   * `setRawFid` merges a value the caller worked out earlier, which is safe for a control the
+   * user just touched and unsafe for anything written from a long-running async loop: two writes
+   * to the same array would each be built on a snapshot that no longer exists, and the second
+   * would silently undo the first. The batch queue writes through this.
+   */
+  updateRawFidWith: (updater: (prev: RawFidTabState) => Partial<RawFidTabState>) => void
   resetRawFid: () => void
 
   processed: ProcessedTabState
@@ -418,9 +471,24 @@ export function SpectraCheckTabStateProvider({ children }: { children: ReactNode
     [],
   )
 
+  /**
+   * A raw-FID queue run writes into the state held right here, so it must not outlive this
+   * provider. Leaving the workspace mid-batch would otherwise strand the run: it would keep
+   * uploading datasets into state nobody can see, and — because a run holds an exclusive claim —
+   * every Run button on the next visit would silently do nothing until it happened to drain.
+   */
+  useEffect(() => abortRawFidBatchRun, [])
+
   const setRawFid = useCallback((patch: Partial<RawFidTabState>) => {
     setRawFidState((prev) => ({ ...prev, ...patch }))
   }, [])
+
+  const updateRawFidWith = useCallback(
+    (updater: (prev: RawFidTabState) => Partial<RawFidTabState>) => {
+      setRawFidState((prev) => ({ ...prev, ...updater(prev) }))
+    },
+    [],
+  )
 
   const resetRawFid = useCallback(() => {
     setRawFidState(defaultRawFid)
@@ -438,6 +506,7 @@ export function SpectraCheckTabStateProvider({ children }: { children: ReactNode
     () => ({
       rawFid,
       setRawFid,
+      updateRawFidWith,
       resetRawFid,
       processed,
       setProcessed,
@@ -448,6 +517,7 @@ export function SpectraCheckTabStateProvider({ children }: { children: ReactNode
     [
       rawFid,
       setRawFid,
+      updateRawFidWith,
       resetRawFid,
       processed,
       setProcessed,
@@ -488,6 +558,8 @@ export function useSpectraCheckTabLink(): (link: PendingTabLink) => void {
 export function useRawFidTabState(): {
   state: RawFidTabState
   update: (patch: Partial<RawFidTabState>) => void
+  /** Patch derived from the latest state — see `updateRawFidWith`. */
+  updateWith: (updater: (prev: RawFidTabState) => Partial<RawFidTabState>) => void
   reset: () => void
 } {
   const ctx = useContext(SpectraCheckTabStateContext)
@@ -504,6 +576,17 @@ export function useRawFidTabState(): {
     [ctx],
   )
 
+  const updateWith = useCallback(
+    (updater: (prev: RawFidTabState) => Partial<RawFidTabState>) => {
+      if (ctx) {
+        ctx.updateRawFidWith(updater)
+      } else {
+        setLocal((prev) => ({ ...prev, ...updater(prev) }))
+      }
+    },
+    [ctx],
+  )
+
   const reset = useCallback(() => {
     if (ctx) {
       ctx.resetRawFid()
@@ -515,6 +598,7 @@ export function useRawFidTabState(): {
   return {
     state: ctx ? ctx.rawFid : local,
     update,
+    updateWith,
     reset,
   }
 }

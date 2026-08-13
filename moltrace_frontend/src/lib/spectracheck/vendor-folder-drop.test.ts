@@ -3,7 +3,9 @@ import { unzipSync } from "fflate"
 import {
   archiveNameForEntries,
   detectVendorDataset,
+  experimentArchiveName,
   formatBytes,
+  splitVendorFolderByExperiment,
   vendorFolderEntriesFromFileList,
   zipVendorFolder,
   type VendorFolderEntry,
@@ -118,6 +120,124 @@ describe("client-side zipping", () => {
     await zipVendorFolder(BRUKER.map((p) => entry(p)), { onProgress: (d) => seen.push(d) })
     expect(seen).toEqual([1, 2, 3, 4, 5])
     await expect(zipVendorFolder([entry("Nap/.DS_Store")])).rejects.toThrow(/no usable files/i)
+  })
+})
+
+describe("splitting a dropped folder into one archive per experiment", () => {
+  it("gives every experiment its own bundle instead of merging them into one", () => {
+    const bundles = splitVendorFolderByExperiment(
+      ["Raw/33/fid", "Raw/33/acqus", "Raw/34/fid", "Raw/34/acqus"].map((p) => entry(p)),
+    )
+    expect(bundles.map((b) => b.dir)).toEqual(["Raw/33", "Raw/34"])
+    expect(bundles.map((b) => b.archiveName)).toEqual(["Raw_33.zip", "Raw_34.zip"])
+    expect(bundles.every((b) => b.fileCount === 2)).toBe(true)
+  })
+
+  it("keeps a Bruker experiment's nested pdata files with their experiment", () => {
+    const [bundle] = splitVendorFolderByExperiment(BRUKER.map((p) => entry(p)))
+    expect(bundle.entries.map((e) => e.path)).toContain("Nap/34/pdata/1/procs")
+    expect(bundle.fileCount).toBe(5)
+  })
+
+  it("does not let a sibling with a shorter number steal the deeper one's files", () => {
+    const bundles = splitVendorFolderByExperiment(
+      ["Raw/3/fid", "Raw/3/acqus", "Raw/34/fid", "Raw/34/acqus"].map((p) => entry(p)),
+    )
+    const three = bundles.find((b) => b.dir === "Raw/3")
+    expect(three?.entries.map((e) => e.path).sort()).toEqual(["Raw/3/acqus", "Raw/3/fid"])
+  })
+
+  it("gives a nested dataset to the deepest experiment that contains it, not its parent", () => {
+    const bundles = splitVendorFolderByExperiment(
+      ["run/fid", "run/acqus", "run/inner/fid", "run/inner/acqus"].map((p) => entry(p)),
+    )
+    const outer = bundles.find((b) => b.dir === "run")
+    const inner = bundles.find((b) => b.dir === "run/inner")
+    expect(outer?.entries.map((e) => e.path).sort()).toEqual(["run/acqus", "run/fid"])
+    expect(inner?.entries.map((e) => e.path).sort()).toEqual(["run/inner/acqus", "run/inner/fid"])
+  })
+
+  it("handles a dataset sitting at the dropped root, where the directory is empty", () => {
+    const bundles = splitVendorFolderByExperiment([entry("fid"), entry("acqus"), entry("pdata/1/procs")])
+    expect(bundles).toHaveLength(1)
+    expect(bundles[0].dir).toBe("")
+    expect(bundles[0].entries.map((e) => e.path).sort()).toEqual(["acqus", "fid", "pdata/1/procs"])
+    expect(bundles[0].archiveName).toBe("raw_fid_experiment.zip")
+  })
+
+  it("keeps OS junk out of the bundles and out of their counts", () => {
+    const [bundle] = splitVendorFolderByExperiment([
+      entry("Nap/34/fid"),
+      entry("Nap/34/acqus"),
+      entry("Nap/34/.DS_Store"),
+      entry("__MACOSX/Nap/34/fid"),
+    ])
+    expect(bundle.entries.map((e) => e.path).sort()).toEqual(["Nap/34/acqus", "Nap/34/fid"])
+    expect(bundle.fileCount).toBe(2)
+  })
+
+  it("leaves files that belong to no experiment out of every bundle", () => {
+    const bundles = splitVendorFolderByExperiment(
+      ["Raw/34/fid", "Raw/34/acqus", "Raw/notes.txt"].map((p) => entry(p)),
+    )
+    expect(bundles).toHaveLength(1)
+    expect(bundles[0].entries.map((e) => e.path)).not.toContain("Raw/notes.txt")
+  })
+
+  it("reports the uncompressed size the server will measure", () => {
+    const bundles = splitVendorFolderByExperiment([
+      entry("Raw/34/fid", 1000),
+      entry("Raw/34/acqus", 24),
+    ])
+    expect(bundles[0].totalBytes).toBe(1024)
+  })
+
+  it("returns nothing when the folder holds no dataset at all", () => {
+    expect(splitVendorFolderByExperiment([entry("notes/readme.txt")])).toEqual([])
+  })
+
+  it("names archives from the full path so two roots sharing an expno stay distinct", () => {
+    const bundles = splitVendorFolderByExperiment(
+      ["A/1/fid", "A/1/acqus", "B/1/fid", "B/1/acqus"].map((p) => entry(p)),
+    )
+    expect(bundles.map((b) => b.archiveName)).toEqual(["A_1.zip", "B_1.zip"])
+  })
+
+  it("still separates two experiments whose names sanitise to the same string", () => {
+    const bundles = splitVendorFolderByExperiment(
+      ["My 1/fid", "My 1/acqus", "My#1/fid", "My#1/acqus"].map((p) => entry(p)),
+    )
+    expect(new Set(bundles.map((b) => b.archiveName)).size).toBe(2)
+    expect(bundles.map((b) => b.archiveName)).toContain("My_1-2.zip")
+  })
+
+  it("zips one bundle at a time into an archive the server can still read", async () => {
+    const [bundle] = splitVendorFolderByExperiment(BRUKER.map((p) => entry(p)))
+    const file = await zipVendorFolder(bundle.entries, { name: bundle.archiveName })
+    expect(file.name).toBe("Nap_34.zip")
+    const members = Object.keys(unzipSync(new Uint8Array(await file.arrayBuffer()))).sort()
+    expect(members).toEqual(["Nap/34/acqu", "Nap/34/acqus", "Nap/34/fid", "Nap/34/pdata/1/procs", "Nap/34/pulseprogram.precomp"])
+  })
+})
+
+describe("per-experiment archive naming", () => {
+  it("flattens the directory path so the name says which experiment it is", () => {
+    expect(experimentArchiveName("Nap/Raw/34")).toBe("Nap_Raw_34.zip")
+  })
+
+  it("keeps a Varian .fid directory suffix readable", () => {
+    expect(experimentArchiveName("proton01.fid")).toBe("proton01.fid.zip")
+  })
+
+  it("never emits a path traversal or a bare extension", () => {
+    expect(experimentArchiveName("../../etc")).toBe("etc.zip")
+    expect(experimentArchiveName("...")).toBe("raw_fid_experiment.zip")
+  })
+
+  it("clamps an very deep path but keeps the specific tail", () => {
+    const name = experimentArchiveName(`${"a/".repeat(200)}34`)
+    expect(name.length).toBeLessThanOrEqual(124)
+    expect(name.endsWith("_34.zip")).toBe(true)
   })
 })
 

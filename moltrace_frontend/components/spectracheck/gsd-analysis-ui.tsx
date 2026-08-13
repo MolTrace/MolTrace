@@ -895,7 +895,12 @@ function ExperimentalBadgeWithTelemetry() {
   const state = useGsdTelemetry(true)
   const summary = state.status === "ready" ? state.summary : null
   const invocations = summary?.invocations ?? null
-  const target = summary?.flip_readiness_policy.min_invocations ?? null
+  // Guard the nested object, not just `summary`. A partial summary (hostile
+  // proxy, primed cache, backend drift) otherwise throws here, and this badge
+  // sits inside the Raw FID controls — an unhandled throw unmounts the whole
+  // tab, not just the badge. `gsd-telemetry-panel.tsx` already guards this same
+  // field for the same reason; this reader was the one that never got it.
+  const target = summary?.flip_readiness_policy?.min_invocations ?? null
   const verdict = summary?.flip_readiness_verdict
   const targetSuffix =
     invocations != null && target != null
