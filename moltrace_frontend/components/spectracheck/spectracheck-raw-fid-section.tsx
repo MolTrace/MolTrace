@@ -5,8 +5,9 @@ import { useOptionalSpectraCheckWorkspaceSession } from "@/components/spectrache
 import {
   useRawFidTabState,
   useSpectraCheckTabLink,
+  type RawFidTabState,
 } from "@/components/spectracheck/spectracheck-tab-state-context"
-import { apiFetch } from "@/lib/api/client"
+import { apiFetch, isModuleNotIncludedError } from "@/lib/api/client"
 import { AnalysisJobTimeline } from "@/src/components/spectracheck/AnalysisJobTimeline"
 import {
   COMPOUND_CLASS_UNSPECIFIED,
@@ -15,16 +16,34 @@ import {
 } from "@/src/lib/spectracheck/compound-classes"
 import type { SessionFileRecord } from "@/src/lib/spectracheck/session-file-record"
 import { SPECTRACHECK_RAW_FID_ACCEPT, isRawFidArchiveFilename } from "@/src/lib/spectracheck/spectrum-file-formats"
+import { registerSpectraCheckRuntimeReset } from "@/src/lib/spectracheck/spectracheck-runtime-reset"
 import {
-  archiveNameForEntries,
   dataTransferHasDirectory,
   detectVendorDataset,
   formatBytes,
+  splitVendorFolderByExperiment,
   vendorFolderEntriesFromDataTransfer,
   vendorFolderEntriesFromFileList,
   zipVendorFolder,
   type VendorFolderDetection,
 } from "@/src/lib/spectracheck/vendor-folder-drop"
+import { SpectraCheckRawFidBatch } from "@/components/spectracheck/spectracheck-raw-fid-batch"
+import {
+  RAW_FID_BATCH_MAX_ITEMS,
+  abortRawFidBatchRun,
+  beginRawFidBatchRun,
+  classifyRawFidBatchFailure,
+  createBlockedRawFidBatchItem,
+  createRawFidBatchItem,
+  endRawFidBatchRun,
+  isRawFidBatchItemRunnable,
+  isRawFidBatchRunCurrent,
+  preflightRawFidArchive,
+  rawFidBatchRun,
+  stopRawFidBatchRun,
+  type RawFidBatchItem,
+  type RawFidBatchMode,
+} from "@/src/lib/spectracheck/raw-fid-batch"
 import { useAnalysisJob } from "@/src/lib/spectracheck/useAnalysisJob"
 import { SpectrumViewer } from "@/components/science/SpectrumViewer"
 import { DeveloperJsonPanel } from "@/components/spectracheck/spectracheck-result-panels"
@@ -133,6 +152,11 @@ const PRESETS = [
 ] as const
 
 const EMPTY_SPECTRUM_PEAKS: never[] = []
+
+// Signing out (or a test starting fresh) must not leave a run holding the claim — nothing would
+// ever release it, and every later run would decline to start. The run itself lives in
+// raw-fid-batch.ts so the workspace can tear it down on unmount without importing this section.
+registerSpectraCheckRuntimeReset(abortRawFidBatchRun)
 
 type PromptSidecarConsistencySummary = {
   status: string
@@ -382,7 +406,7 @@ export function SpectraCheckRawFidSection({
   registerDev,
 }: Props) {
   const fileRef = useRef<HTMLInputElement>(null)
-  const { state, update } = useRawFidTabState()
+  const { state, update, updateWith } = useRawFidTabState()
   const {
     nucleus,
     vendor,
@@ -402,6 +426,10 @@ export function SpectraCheckRawFidSection({
     selectedFile,
     selectedFileName,
     advancedOpen,
+    batchItems,
+    batchMode,
+    batchActiveId,
+    batchRunning,
   } = state
 
   // Setter shims keep the rest of the JSX/handler code untouched while the
@@ -463,6 +491,20 @@ export function SpectraCheckRawFidSection({
   // solvent prop. Canonicalized against the catalog when it arrives.
   const [gsdSolvent, setGsdSolvent] = useState(solvent)
 
+  /**
+   * A GSD analysis belongs to the dataset it was run on.
+   *
+   * Moving to another row in the queue swaps the whole results surface, and the experimental GSD
+   * panels below it are separate state — left alone, they would keep showing the previous
+   * dataset's peaks, multiplets and integrals beside a different spectrum. Attributing one
+   * dataset's analysis to another is the worst thing this surface could do, so the GSD output is
+   * cleared with the selection and the reviewer re-runs it deliberately.
+   */
+  useEffect(() => {
+    setGsdResult(null)
+    setGsdError("")
+  }, [batchActiveId])
+
   const ws = useOptionalSpectraCheckWorkspaceSession()
   const analysisJob = useAnalysisJob()
   const sendTabLink = useSpectraCheckTabLink()
@@ -497,10 +539,90 @@ export function SpectraCheckRawFidSection({
     }
   }, [selectedFile])
 
+  // ── Multi-dataset queue ────────────────────────────────────────────────
+  //
+  // Every queue write goes through `updateWith`, which derives the patch from the LATEST state.
+  // That matters because the runner is a long async loop: this section unmounts whenever the user
+  // switches tab (Radix drops inactive tabs), so a loop started before a switch outlives the
+  // component that started it. A patch built from that dead render's snapshot would quietly undo
+  // whatever happened while it was away.
+  const [batchNotice, setBatchNotice] = useState<string | null>(null)
+
+  const patchBatchItem = useCallback(
+    (id: string, patch: Partial<RawFidBatchItem>) => {
+      updateWith((prev) => ({
+        // A dataset removed mid-run simply is not found, and the patch becomes a no-op.
+        batchItems: prev.batchItems.map((item) => (item.id === id ? { ...item, ...patch } : item)),
+      }))
+    },
+    [updateWith],
+  )
+
+  const addBatchItems = useCallback(
+    (created: RawFidBatchItem[]) => {
+      if (created.length === 0) return
+      updateWith((prev) => {
+        const room = RAW_FID_BATCH_MAX_ITEMS - prev.batchItems.length
+        if (room <= 0) {
+          setFolderError(
+            `The queue already holds ${RAW_FID_BATCH_MAX_ITEMS} datasets. Clear some before adding more.`,
+          )
+          return {}
+        }
+        const admitted = created.slice(0, room)
+        if (admitted.length < created.length) {
+          setFolderError(
+            `Added ${admitted.length} of ${created.length} datasets — the queue holds ${RAW_FID_BATCH_MAX_ITEMS} at a time.`,
+          )
+        }
+        return { batchItems: [...prev.batchItems, ...admitted] }
+      })
+    },
+    [updateWith],
+  )
+
+  /**
+   * Bring a finished dataset into the analysis surface below.
+   *
+   * The queue does not own a second results view — it feeds the one that already exists. Writing
+   * the item's response into the ordinary result state lights up every panel (evidence, peaks,
+   * multiplets, review) for that dataset, and pointing `selectedFile` at it means the
+   * single-dataset controls act on the row the reviewer is looking at.
+   */
+  const selectionPatchFor = useCallback((prev: RawFidTabState, id: string): Partial<RawFidTabState> => {
+    const item = prev.batchItems.find((entry) => entry.id === id)
+    if (!item || item.status !== "done") return {}
+    const asProcess = item.mode === "process"
+    return {
+      batchActiveId: id,
+      selectedFile: item.file,
+      selectedFileName: item.label,
+      activeResultMode: asProcess ? "process" : "preview",
+      processResult: asProcess ? item.result : null,
+      previewResult: asProcess ? null : item.result,
+      processError: "",
+      previewError: "",
+      previewSpectrum: null,
+      previewSpectrumError: "",
+      previewSpectrumLoading: false,
+    }
+  }, [])
+
+  const selectBatchItem = useCallback(
+    (id: string) => {
+      updateWith((prev) => selectionPatchFor(prev, id))
+    },
+    [selectionPatchFor, updateWith],
+  )
+
   /**
    * Accept a dropped/selected vendor dataset FOLDER (Bruker, Varian/Agilent) the way MestReNova
-   * does: inspect it, zip it in the browser preserving relative paths, and hand the archive to
-   * the normal upload path. The server contract is unchanged — it still receives one archive.
+   * does — except that a folder holding several experiments now becomes several datasets rather
+   * than one.
+   *
+   * That is not just convenience. The analyzer keeps only the single best-scoring dataset in an
+   * archive and picks it by path depth and name order, so every other experiment in a combined
+   * archive was silently invisible. One archive per experiment is what makes them all real.
    */
   async function attachVendorFolder(entries: Awaited<ReturnType<typeof vendorFolderEntriesFromDataTransfer>>) {
     setFolderError(null)
@@ -512,19 +634,83 @@ export function SpectraCheckRawFidSection({
       setFolderError(detection.reason ?? "That folder does not contain a readable dataset.")
       return
     }
+    const bundles = splitVendorFolderByExperiment(entries)
+    if (bundles.length === 0) {
+      setFolderError(detection.reason ?? "That folder does not contain a readable dataset.")
+      return
+    }
     try {
-      setFolderBusy(`Packaging ${detection.fileCount} files…`)
-      const archive = await zipVendorFolder(entries, {
-        name: archiveNameForEntries(entries),
-        onProgress: (done, total) => setFolderBusy(`Packaging ${done}/${total} files…`),
-      })
-      attachFile(archive)
+      const created: RawFidBatchItem[] = []
+      for (let index = 0; index < bundles.length; index++) {
+        const bundle = bundles[index]
+        const label = bundle.dir || bundle.archiveName
+        // Check the size rules BEFORE packaging. Zipping an experiment we already know will be
+        // refused wastes the one part of this that is slow, and can be enough to exhaust the tab.
+        const preflight = preflightRawFidArchive({
+          name: bundle.archiveName,
+          size: Math.max(1, bundle.totalBytes),
+          uncompressedBytes: bundle.totalBytes,
+          fileCount: bundle.fileCount,
+        })
+        if (!preflight.ok) {
+          created.push(
+            createBlockedRawFidBatchItem({
+              label,
+              reason: preflight.reason,
+              sourceDir: bundle.dir || null,
+              fileCount: bundle.fileCount,
+              uncompressedBytes: bundle.totalBytes,
+            }),
+          )
+          continue
+        }
+        setFolderBusy(
+          bundles.length > 1
+            ? `Packaging ${label} — ${index + 1} of ${bundles.length}…`
+            : `Packaging ${bundle.fileCount} files…`,
+        )
+        // One at a time: a folder of twenty experiments must never have twenty archives being
+        // built at once.
+        const archive = await zipVendorFolder(bundle.entries, { name: bundle.archiveName })
+        created.push(
+          createRawFidBatchItem({
+            file: archive,
+            label,
+            sourceDir: bundle.dir || null,
+            fileCount: bundle.fileCount,
+            uncompressedBytes: bundle.totalBytes,
+          }),
+        )
+      }
+      addBatchItems(created)
+      const firstRunnable = created.find((item) => item.status === "queued")
+      if (firstRunnable) attachFile(firstRunnable.file)
     } catch (err) {
       setFolderError(err instanceof Error ? err.message : "Could not package that folder.")
     } finally {
       setFolderBusy(null)
     }
   }
+
+  /** Admit archives picked or dropped directly, one queue row each. */
+  const enqueueArchives = useCallback(
+    (files: File[]) => {
+      if (files.length === 0) return
+      const created = files.map((file) => createRawFidBatchItem({ file }))
+      addBatchItems(created)
+      const firstRunnable = created.find((item) => item.status === "queued")
+      if (firstRunnable) {
+        attachFile(firstRunnable.file)
+      } else {
+        // Nothing usable arrived. Leave the picker holding a file the analysis would only
+        // refuse — the queue rows already say why each one was turned away.
+        clearSelectedFile()
+      }
+    },
+    // attachFile / clearSelectedFile are function declarations in this component body — they are
+    // re-created each render but never close over anything that changes their behaviour.
+    [addBatchItems],
+  )
 
   function attachFile(file: File) {
     setSelectedFile(file)
@@ -569,34 +755,61 @@ export function SpectraCheckRawFidSection({
   // The direct Preview/Process calls below are the working path. Restore from git history if
   // the backend gains an adapter.
 
-  function appendSharedSessionGuidance(fd: FormData) {
-    const ccParam = compoundClassForRequest(compoundClass)
+  /**
+   * Everything a request carries besides the archive itself.
+   *
+   * Captured as a value so a queue run can freeze it once at the start: these are read from
+   * props and tab state, so a control nudged while twenty datasets are still to go would
+   * otherwise apply to some of them and not others, with nothing on screen saying so.
+   */
+  type RawFidRequestSettings = {
+    sampleId: string
+    solvent: string
+    nucleus: "1H" | "13C"
+    vendor: string
+    preset: string
+    compoundClass: CompoundClassValue
+    candidatesText: string
+    protonText: string
+    carbonText: string
+  }
+
+  function currentRequestSettings(): RawFidRequestSettings {
+    return { sampleId, solvent, nucleus, vendor, preset, compoundClass, candidatesText, protonText, carbonText }
+  }
+
+  function appendSharedSessionGuidance(fd: FormData, settings: RawFidRequestSettings = currentRequestSettings()) {
+    const ccParam = compoundClassForRequest(settings.compoundClass)
     if (ccParam) fd.append("compound_class", ccParam)
     // Shared session inputs — drives peak enrichment + evidence panels on
     // the response (parity with /nmr/processed/analyze).
-    const cand = candidatesText.trim()
+    const cand = settings.candidatesText.trim()
     if (cand) fd.append("candidates_text", cand)
-    const sharedProton = protonText.trim()
+    const sharedProton = settings.protonText.trim()
     if (sharedProton) fd.append("proton_nmr_text", sharedProton)
-    const sharedCarbon = carbonText.trim()
+    const sharedCarbon = settings.carbonText.trim()
     if (sharedCarbon) fd.append("carbon13_text", sharedCarbon)
   }
 
-  function buildFormData(file: File, withProcess: boolean) {
+  function buildFormData(
+    file: File,
+    withProcess: boolean,
+    settings: RawFidRequestSettings = currentRequestSettings(),
+  ) {
     const fd = new FormData()
     fd.append("file", file)
-    fd.append("sample_id", sampleId)
-    fd.append("solvent", solvent)
-    fd.append("nucleus", nucleus)
-    fd.append("vendor", vendor)
+    fd.append("sample_id", settings.sampleId)
+    fd.append("solvent", settings.solvent)
+    fd.append("nucleus", settings.nucleus)
+    fd.append("vendor", settings.vendor)
     if (withProcess) {
-      fd.append("processing_preset", preset)
+      fd.append("processing_preset", settings.preset)
       fd.append("preserve_raw", "true")
     } else {
       fd.append("processing_preset", "safe_automatic")
       fd.append("include_spectrum", "true")
     }
-    appendSharedSessionGuidance(fd)
+    appendSharedSessionGuidance(fd, settings)
     return fd
   }
 
@@ -747,6 +960,125 @@ export function SpectraCheckRawFidSection({
   }
 
   /**
+   * Work the queue — ONE DATASET AT A TIME.
+   *
+   * Not a throttle we chose: the analysis runs inline on the server's request loop, so several at
+   * once do not overlap. They would queue anyway, hold the whole service while they did, and
+   * finish no sooner. Sequential is both the honest shape and the fast one.
+   *
+   * Settings are frozen for the whole run, each dataset gets its own cancellation handle, and a
+   * refusal that would repeat identically for every remaining dataset ends the run instead of
+   * failing fifty rows one by one.
+   */
+  async function runBatchItems(plan: { id: string; file: File }[], mode: RawFidBatchMode) {
+    const generation = beginRawFidBatchRun()
+    if (generation == null) return
+    setBatchNotice(null)
+    update({ batchRunning: true })
+    // Frozen for the whole run: the plan carries each dataset's own archive, and these settings
+    // apply to all of them, so a control nudged halfway through cannot split the batch in two.
+    const settings = currentRequestSettings()
+    try {
+      for (const step of plan) {
+        // Also false once this run has been abandoned — the workspace unmounted mid-batch, so
+        // every write from here lands in state nobody will ever see. Stop rather than spend the
+        // remaining uploads on it.
+        if (!isRawFidBatchRunCurrent(generation)) break
+
+        const controller = new AbortController()
+        rawFidBatchRun.controller = controller
+        const startedAt = Date.now()
+        patchBatchItem(step.id, { status: "running", startedAt, durationMs: null, error: null })
+
+        try {
+          const data = await apiFetch<unknown>(
+            mode === "process" ? "/nmr/raw-fid/process" : "/nmr/raw-fid/preview",
+            {
+              method: "POST",
+              body: buildFormData(step.file, mode === "process", settings),
+              signal: controller.signal,
+            },
+          )
+          updateWith((prev) => {
+            const next: Partial<RawFidTabState> = {
+              batchItems: prev.batchItems.map((item) =>
+                item.id === step.id
+                  ? {
+                      ...item,
+                      status: "done" as const,
+                      mode,
+                      result: data,
+                      error: null,
+                      durationMs: Date.now() - startedAt,
+                    }
+                  : item,
+              ),
+            }
+            // Show the reviewer something as soon as there is something to show — but never
+            // steal the surface out from under a row they chose themselves.
+            if (prev.batchActiveId) return next
+            return { ...next, ...selectionPatchFor({ ...prev, ...next } as RawFidTabState, step.id) }
+          })
+          // One snapshot per dataset. The developer panel cannot drop keys, so a long queue must
+          // not keep adding to it.
+          pushDev(`raw_fid_batch:${step.id}`, data)
+        } catch (err) {
+          const message = isMissingNmrEndpoint(err)
+            ? RAW_FID_BACKEND_MSG
+            : formatApiError(err, "That dataset could not be analyzed.")
+          const verdict = classifyRawFidBatchFailure(err, message)
+          patchBatchItem(step.id, {
+            status: verdict.status,
+            error: verdict.message,
+            durationMs: Date.now() - startedAt,
+          })
+          if (verdict.stopsRun || isModuleNotIncludedError(err) || isMissingNmrEndpoint(err)) {
+            setBatchNotice(`${verdict.message} The datasets after it were left untouched.`)
+            break
+          }
+        } finally {
+          if (rawFidBatchRun.controller === controller) rawFidBatchRun.controller = null
+        }
+      }
+    } finally {
+      // Only if this run still holds the claim. An abandoned loop finishing late must not clear
+      // the flags of a run the user started after coming back to the workspace.
+      endRawFidBatchRun(generation)
+      update({ batchRunning: false })
+    }
+  }
+
+  function runBatchAll() {
+    void runBatchItems(
+      batchItems.filter(isRawFidBatchItemRunnable).map((item) => ({ id: item.id, file: item.file })),
+      batchMode,
+    )
+  }
+
+  function runBatchOne(id: string) {
+    const item = batchItems.find((entry) => entry.id === id)
+    if (!item || !isRawFidBatchItemRunnable(item)) return
+    void runBatchItems([{ id: item.id, file: item.file }], batchMode)
+  }
+
+  function stopBatch() {
+    stopRawFidBatchRun()
+  }
+
+  function removeBatchItem(id: string) {
+    updateWith((prev) => ({
+      batchItems: prev.batchItems.filter((item) => item.id !== id),
+      ...(prev.batchActiveId === id ? { batchActiveId: null } : {}),
+    }))
+  }
+
+  function clearBatch() {
+    stopBatch()
+    update({ batchItems: [], batchActiveId: null })
+    setBatchNotice(null)
+  }
+
+  /**
    * Safely pull `field_mhz` from a preview/process response payload.
    * Both NMRRawFIDPreviewResponse and NMRRawFIDProcessResponse carry it
    * as `number | null | undefined` (set by the backend from vendor
@@ -842,6 +1174,9 @@ export function SpectraCheckRawFidSection({
       selectedFileName: null,
     })
     if (fileRef.current) fileRef.current.value = ""
+    clearBatch()
+    setFolderDetection(null)
+    setFolderError(null)
     setGsdResult(null)
     setGsdError("")
     setGsdSolvent(solvent)
@@ -1004,7 +1339,7 @@ export function SpectraCheckRawFidSection({
         eyebrow="Step 1 · Setup"
         title="Configure & upload raw FID archive"
         icon={Upload}
-        description="Set sample metadata, choose nucleus and vendor, then drop the archive (.zip / .tar.gz / .tgz). The original archive is preserved unchanged."
+        description="Set sample metadata, choose nucleus and vendor, then drop an instrument folder or archives (.zip / .tar.gz / .tgz). Drop as many as you like — each experiment becomes its own dataset. Every original archive is preserved unchanged."
         className="min-w-0"
       >
         <div className="space-y-5">
@@ -1130,11 +1465,11 @@ export function SpectraCheckRawFidSection({
                   })()
                   return
                 }
-                const file = dt.files?.[0]
-                if (file) {
+                const dropped = Array.from(dt.files ?? [])
+                if (dropped.length > 0) {
                   setFolderDetection(null)
                   setFolderError(null)
-                  attachFile(file)
+                  enqueueArchives(dropped)
                 }
               }}
               className={cn(
@@ -1155,14 +1490,16 @@ export function SpectraCheckRawFidSection({
               <p className="font-mono text-sm font-bold tracking-tight">
                 {folderBusy
                   ? folderBusy
-                  : selectedFileName
-                    ? "Archive ready"
-                    : dragOver
-                      ? "Drop to attach"
-                      : "Drop the instrument folder or an archive"}
+                  : batchItems.length > 0
+                    ? `${batchItems.length} dataset${batchItems.length === 1 ? "" : "s"} ready`
+                    : selectedFileName
+                      ? "Archive ready"
+                      : dragOver
+                        ? "Drop to attach"
+                        : "Drop instrument folders or archives"}
               </p>
               <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-                Bruker / Varian folder · ZIP · TAR.GZ · TGZ
+                Bruker / Varian folders · ZIP · TAR.GZ · TGZ · several at once
               </p>
               <p className="mt-1 text-[10px] text-muted-foreground">
                 Packaged in your browser — nothing leaves this machine until you start the analysis.
@@ -1223,8 +1560,10 @@ export function SpectraCheckRawFidSection({
                   {folderDetection.experiments.length === 1 ? "" : "s"}
                 </p>
                 <p className="text-muted-foreground">
-                  {folderDetection.fileCount} files · {formatBytes(folderDetection.totalBytes)} packaged
-                  into one archive.
+                  {folderDetection.fileCount} files · {formatBytes(folderDetection.totalBytes)} ·{" "}
+                  {folderDetection.experiments.length === 1
+                    ? "packaged as one dataset."
+                    : `packaged as ${folderDetection.experiments.length} separate datasets, one per experiment.`}
                 </p>
                 {folderDetection.experiments.length > 1 ? (
                   <p className="mt-0.5 text-muted-foreground">
@@ -1236,7 +1575,7 @@ export function SpectraCheckRawFidSection({
                         .join(", ")}
                       {folderDetection.experiments.length > 6 ? " …" : ""}
                     </span>
-                    . The analyzer selects the dataset matching the nucleus you choose below.
+                    . Each is queued and analyzed on its own, so none of them is skipped.
                   </p>
                 ) : null}
               </div>
@@ -1246,20 +1585,26 @@ export function SpectraCheckRawFidSection({
               id="raw-file"
               ref={fileRef}
               type="file"
+              multiple
               accept={SPECTRACHECK_RAW_FID_ACCEPT}
               className="sr-only"
               onChange={(e) => {
-                const file = e.target.files?.[0]
-                if (file) {
-                  setSelectedFile(file)
-                  setSelectedFileName(file.name)
-                } else {
+                const picked = Array.from(e.target.files ?? [])
+                if (picked.length === 0) {
                   setSelectedFile(null)
                   setSelectedFileName(null)
+                  return
                 }
+                setFolderDetection(null)
+                setFolderError(null)
+                // enqueueArchives points the single-dataset controls at the first admitted
+                // archive, so picking exactly one behaves as it always has.
+                enqueueArchives(picked)
               }}
             />
-            {selectedFileName ? (
+            {/* The queue row carries the same name with more beside it, so this chip would only
+                repeat it. Shown when nothing has been queued — the single-archive path. */}
+            {selectedFileName && batchItems.length === 0 ? (
               <div
                 className="flex items-center justify-between gap-2 rounded-md border px-3 py-2"
                 style={{ borderColor: "var(--mt-teal)", backgroundColor: "var(--mt-teal-soft)" }}
@@ -1366,11 +1711,31 @@ export function SpectraCheckRawFidSection({
         </div>
       </ModuleCard>
 
-      {/* ── Step 2 — Run ───────────────────────────────────────────────── */}
+      {/* ── Step 2 — Dataset queue ─────────────────────────────────────────
+          Only present once something has been queued, so a single-archive
+          upload looks exactly as it always did. */}
+      <SpectraCheckRawFidBatch
+        items={batchItems}
+        mode={batchMode}
+        onModeChange={(next) => update({ batchMode: next })}
+        running={batchRunning}
+        packaging={folderBusy}
+        notice={batchNotice}
+        activeItemId={batchActiveId}
+        nucleus={nucleus}
+        onSelectItem={selectBatchItem}
+        onRunAll={runBatchAll}
+        onStop={stopBatch}
+        onRunItem={runBatchOne}
+        onRemoveItem={removeBatchItem}
+        onClearAll={clearBatch}
+      />
+
+      {/* ── Step 3 — Run ───────────────────────────────────────────────── */}
       <ModuleCard
         accent="teal"
-        eyebrow="Step 2 · Run"
-        title="Inspect or process"
+        eyebrow="Step 3 · Run"
+        title={batchItems.length > 0 ? "Inspect or process the selected dataset" : "Inspect or process"}
         icon={Zap}
         description="Preview archive metadata with an automatic quick spectrum, or process the FID through the full selected recipe."
         className="min-w-0"
@@ -1595,7 +1960,7 @@ export function SpectraCheckRawFidSection({
         tag={sampleId.trim() || undefined}
         testId="raw-fid-fullscreen-view"
       >
-      {/* ── Step 3 — Results ──────────────────────────────────────────── */}
+      {/* ── Step 4 — Results ──────────────────────────────────────────── */}
       {/*
         Show this surface as soon as Preview or Process starts. The result
         card is the loading surface and the final surface, so it does not
@@ -1605,7 +1970,7 @@ export function SpectraCheckRawFidSection({
         <div className="min-w-0" data-stable-results-surface="">
           <ModuleCard
             accent="teal"
-            eyebrow="Step 3 · Results"
+            eyebrow="Step 4 · Results"
             title={resultTitle}
             icon={BarChart3}
             description={resultDescription}
@@ -2253,18 +2618,18 @@ export function SpectraCheckRawFidSection({
         </div>
       )}
 
-      {/* ── Step 3b — GSD-Prompt-3 output (experimental) ──────────────────
+      {/* ── Step 4b — GSD-Prompt-3 output (experimental) ──────────────────
           Only renders when the user has run the experimental backend.
-          Lives alongside the legacy Step 3 results without replacing them. */}
+          Lives alongside the legacy Step 4 results without replacing them. */}
       <GsdResultsPanel result={gsdResult} testId="raw-fid-gsd-results-surface" />
 
-      {/* ── Step 3c — Multiplet analysis (Phase 26) ───────────────────────
+      {/* ── Step 4c — Multiplet analysis (Phase 26) ───────────────────────
           Chained automatically off the GSD result — peaks above S/N>3
           forwarded to /spectrum/analyze/multiplets for first-order +
           complex multiplet detection. */}
       <GsdMultipletPanel gsdResult={gsdResult} testId="raw-fid-multiplet-results-surface" />
 
-      {/* ── Step 3d — Candidate J-agreement (Phase 26b / v0.7.1) ──────────
+      {/* ── Step 4d — Candidate J-agreement (Phase 26b / v0.7.1) ──────────
           Same panel as the processed section; shares the multiplet
           WeakMap cache so the multiplet POST fires once per gsdResult. */}
       <GsdJCouplingPanel
@@ -2275,7 +2640,7 @@ export function SpectraCheckRawFidSection({
         testId="raw-fid-jcoupling-results-surface"
       />
 
-      {/* ── Step 3e — Region integration (Prompt 5) ───────────────────────
+      {/* ── Step 4e — Region integration (Prompt 5) ───────────────────────
           Integrate each detected multiplet range on the FT-processed
           trace. field_mhz pulled from the vendor metadata (same cascade
           as the GSD call); shares the multiplet WeakMap cache. */}
@@ -2305,12 +2670,12 @@ export function SpectraCheckRawFidSection({
         testId="raw-fid-spectrum-retrieve-surface"
       />
 
-      {/* ── Step 3c — Legacy detection summary (unified panel) ──────────
+      {/* ── Step 4f — Legacy detection summary (unified panel) ──────────
           Post-Phase-11 the raw-FID responses expose the same envelope
           (`peaks` + `environments` + `category_counts`) as GSD. Render
           them through the same component so users get a consistent
           summary view regardless of which backend they chose. The
-          existing Step 3 evidence-detail rendering above is untouched. */}
+          existing Step 4 evidence-detail rendering above is untouched. */}
       {legacyDetectionResult ? (
         <DetectionResultsPanel
           result={legacyDetectionResult}
