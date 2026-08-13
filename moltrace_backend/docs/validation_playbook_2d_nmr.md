@@ -712,3 +712,50 @@ Failing that, a targeted MetaboLights scan filtering assay files for HSQC/HMBC
 experiment types (rather than scanning by recency) is the next cheapest search —
 the metabolomics 2D literature exists, so the deposits likely do too, just not in
 the most recent 60.
+
+### C0 UNBLOCKED — real 2D exists in the maintainer's own Drive (2026-08-09)
+
+The earlier negative result was scoped to the local `NMR Test Samples` folder and
+to MetaboLights. A Drive archive supplied afterwards contains the missing data.
+
+**Structure:** `A400`, `A600`, `B500` (spectrometers) → dated sessions → sample
+names → Bruker experiment numbers. `B500` alone holds **14 sessions** from
+2026-06-05 to 2026-08-06, on the `Apr.N3` / `Apr.NAc` series — the same
+pyrrolidine/sulfamate chemistry as the existing 1D fixtures.
+
+**Confirmed 2D**, at `B500 / 06-05-2026 / Apr.N3.2 / 12`:
+
+```
+##$PULPROG= <cosydfphpp>      double-quantum-filtered phase-sensitive COSY
+##$NUC1= <1H>
+##$SFO1= 500.16300096
+files: ser, acqu2, acqu2s, pdata, ...   (no fid — genuinely 2D)
+```
+
+That single dataset unblocks **C2** (parser fidelity needs real `ser` +
+`acqu2s` + per-axis referencing), **C3** (artifact rejection on real t1 noise)
+and **C6** (the COSY diagonal and symmetry).
+
+**Two caveats, both material:**
+
+* **Experiment numbers do not indicate dimensionality.** `Apr.N3.2/12` is a
+  COSY, but `Apr.N3.1-TBDPS/20` — a higher number in a later session — is
+  `zg30`, a 1D proton. Any inventory must read `PULPROG` from `acqus`, or check
+  for `ser` versus `fid`. Guessing from the folder number will mis-sort the
+  corpus.
+* **HSQC/HMBC not yet located.** COSY is homonuclear, so it serves C6 but **not
+  C4**, whose structural denominator is one-bond H–C. Sweeping the remaining
+  sessions for `hsqc*` / `hmbc*` pulse programs is the next step, and it is far
+  cheaper done on a local copy than through Drive's embedded folder view, which
+  costs a network round trip per directory.
+
+**Recommended:** sync the Drive folder locally (Drive desktop client or `rclone`),
+then inventory by reading `PULPROG` from every `acqus`. That turns a multi-minute
+remote walk into a seconds-long local one and produces the C0 inventory directly.
+
+**This also reduces what 2DNMRGym is needed for.** With in-house 2D available,
+the NC-licensed corpus is no longer required for C2/C3/C6 — it would only add
+scale (22k spectra) and the 479 expert-annotated gold set, which matter for
+training and for C8-style statistics rather than for the correctness work
+immediately ahead. In-house data is also stronger ground truth: the structures
+are known rather than inferred.
