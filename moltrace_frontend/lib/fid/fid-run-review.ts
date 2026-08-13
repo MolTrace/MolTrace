@@ -20,6 +20,8 @@
  *    empty queue for a user on no team is correct, not a fault — there are no
  *    colleagues to review for, and the panel should say so rather than look broken.
  *    The write routes enforce the same rule: a run you cannot open 404s on POST too.
+ *    `scope` slices that visible set into all / mine / the review queue; it never
+ *    widens it, so the three views are filters over one already-scoped population.
  * 2. **The process response now names its run.** `NMRRawFIDProcessResponse` carries
  *    `fid_run_id`, so the Raw FID tab can anchor review to the run the user just
  *    created instead of finding it again in the list. The list remains the entry
@@ -71,10 +73,31 @@ export function fidReviewStatusLabel(status: string): string {
   return FID_REVIEW_STATUS_LABELS[status] ?? status.replace(/_/g, " ")
 }
 
-export async function fetchFidRuns(limit = 20): Promise<FIDRunRecord[]> {
-  return apiFetch<FIDRunRecord[]>(`/fid/runs?limit=${encodeURIComponent(String(limit))}`, {
-    method: "GET",
-  })
+/**
+ * Which slice of the runs you can already see to list, in the order offered.
+ *
+ * These narrow — none of them grants sight of anything the visibility rule above
+ * withholds. `review_queue` is the population this surface exists for: open runs
+ * awaiting a verdict from somebody other than their author, so it excludes your own.
+ * It is applied server-side because one limit-bounded page ordered newest-first
+ * would otherwise let a prolific author's own runs push the queue out of view.
+ */
+export const FID_RUN_SCOPES = ["all", "mine", "review_queue"] as const
+export type FIDRunScope = (typeof FID_RUN_SCOPES)[number]
+
+/** Reader-facing labels. "To review" avoids colliding with the *status* "Awaiting review". */
+export const FID_RUN_SCOPE_LABELS: Record<FIDRunScope, string> = {
+  all: "All runs",
+  mine: "Mine",
+  review_queue: "To review",
+}
+
+export async function fetchFidRuns(
+  limit = 20,
+  scope: FIDRunScope = "all",
+): Promise<FIDRunRecord[]> {
+  const query = new URLSearchParams({ limit: String(limit), scope })
+  return apiFetch<FIDRunRecord[]>(`/fid/runs?${query.toString()}`, { method: "GET" })
 }
 
 export async function fetchFidRunReviewDecisions(runId: number): Promise<FIDRunReviewDecision[]> {
