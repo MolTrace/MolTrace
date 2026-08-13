@@ -317,43 +317,6 @@
   --mt-slate-ink: #94A3B8;
 }
 
-/* Constellation backdrop (components/marketing/constellation-backdrop.tsx).
-   Both animations are opacity/stroke-only, so they run on the compositor and
-   never trigger layout. Every star shares one keyframe set and is separated by
-   per-element delay and duration, rather than each getting its own rule. */
-@keyframes mt-star-twinkle {
-  0%, 100% { opacity: var(--mt-star-o, 0.5); }
-  50%      { opacity: calc(var(--mt-star-o, 0.5) * 0.35); }
-}
-
-@keyframes mt-trail-walk {
-  from { stroke-dashoffset: 1000; }
-  to   { stroke-dashoffset: 0; }
-}
-
-.mt-star {
-  animation-name: mt-star-twinkle;
-  animation-iteration-count: infinite;
-  animation-timing-function: ease-in-out;
-}
-
-.mt-trail-pulse {
-  animation: mt-trail-walk 11s linear infinite;
-}
-
-/* A backdrop is exactly the kind of ambient motion this setting exists to stop:
-   it is decorative, it never ends, and nobody is looking at it on purpose. */
-@media (prefers-reduced-motion: reduce) {
-  .mt-star,
-  .mt-trail-pulse {
-    animation: none;
-  }
-  /* Without the walk the dash would freeze mid-path as a stray line segment. */
-  .mt-trail-pulse {
-    stroke: transparent;
-  }
-}
-
 /* Module panel entrance (components/marketing/module-cards.tsx).
 
    The tab indicator slid, so the tabs LOOKED animated while the panel they

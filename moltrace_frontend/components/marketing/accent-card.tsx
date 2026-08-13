@@ -10,7 +10,7 @@ import type { LucideIcon } from "lucide-react"
  * glyph and has always been separate on purpose.)
  *
  * TWO SURFACES. `surface` is the ordinary card on a page background. `glass` is
- * for the constellation band, where an opaque card would punch a hole in the sky
+ * for the orbital-field band, where an opaque card would punch a hole in the sky
  * — it is translucent and blurred so the stars carry through, with a light
  * border instead of the theme's. Everything else about the card is identical, so
  * the two cannot drift apart.

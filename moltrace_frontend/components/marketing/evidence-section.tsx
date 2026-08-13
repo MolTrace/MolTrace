@@ -1,6 +1,6 @@
 import { BookMarked, FileSignature, Link2 } from "lucide-react"
 import { AccentCard } from "./accent-card"
-import { ConstellationBackdrop } from "./constellation-backdrop"
+import { OrbitalFieldBackdrop } from "./orbital-field-backdrop"
 
 /**
  * The section a reader lands on after clicking "See how the evidence trail
@@ -101,7 +101,7 @@ const mechanics = [
 export function EvidenceSection() {
   return (
     <section className="dark relative isolate overflow-hidden py-28 text-foreground" id="solutions">
-      <ConstellationBackdrop />
+      <OrbitalFieldBackdrop />
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="max-w-3xl">
           {/* Eyebrow deliberately not "Evidence-First AI" — that was a
