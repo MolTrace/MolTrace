@@ -936,6 +936,22 @@ export function SpectraCheckRawFidSection({
     () => (processResult ? extractPeaksFromPayload(processResult) : []),
     [processResult],
   )
+  /**
+   * The run `/nmr/raw-fid/process` persisted for this response, or null.
+   *
+   * The route always created a run; it just never said which, so the review panel
+   * below had to start from the run list even for the run the user had this second
+   * produced. `fid_run_id` closes that, and the panel opens straight onto it.
+   *
+   * Read defensively rather than through the response type: a deployment whose
+   * backend predates the field returns nothing here, and the correct behaviour then
+   * is the old one — no anchor, find it in the list.
+   */
+  const processedRunId = useMemo(() => {
+    if (!isRecord(processResult)) return null
+    const value = processResult.fid_run_id
+    return typeof value === "number" && Number.isFinite(value) ? value : null
+  }, [processResult])
   // Stabilise the resolved spectrum xy reference across upstream transitions.
   // The preview / process pipelines may hand us the same numeric x / y in
   // back-to-back responses (e.g. re-running ``process`` with the same
@@ -2198,12 +2214,12 @@ export function SpectraCheckRawFidSection({
                 <SpectraCheckEvidencePanels payload={displayPayload} />
                 {/* Review sits after the evidence, on the Raw FID tab because this
                     is where processing runs are produced — no new navigation for a
-                    step that belongs to the run you just made. It lists runs rather
-                    than binding to this one: the response from processing here
-                    carries no run id (NMRRawFIDProcessResponse has no such field
-                    and forbids extras), so the run list is the only place the ids
-                    exist. See lib/fid/fid-run-review.ts. */}
-                <SpectraCheckFidRunReview />
+                    step that belongs to the run you just made. It now opens straight
+                    onto that run: NMRRawFIDProcessResponse carries `fid_run_id`. The
+                    list is still the entry point for the queue, since reviewing a
+                    colleague's work starts there by definition — you did not process
+                    it. See lib/fid/fid-run-review.ts. */}
+                <SpectraCheckFidRunReview focusRunId={processedRunId} />
               </>
             ) : null}
 

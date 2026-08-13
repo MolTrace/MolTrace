@@ -11,6 +11,7 @@ vi.mock("@/lib/api/client", async () => {
 
 const apiFetchMock = vi.mocked(apiFetch)
 
+/** A colleague's run, open for a verdict — the population the queue exists for. */
 const RUN = {
   id: 7,
   user_id: 3,
@@ -22,6 +23,18 @@ const RUN = {
   quality_score: 0.62,
   review_status: "pending_review",
   preview: {},
+  viewer_is_author: false,
+  viewer_can_review: true,
+}
+
+/** The caller's own run. `viewer_can_review` is false: they may not sign their own work. */
+const OWN_RUN = {
+  ...RUN,
+  id: 8,
+  user_id: 42,
+  filename: "kanamycin.zip",
+  viewer_is_author: true,
+  viewer_can_review: false,
 }
 
 const DECISION = {
@@ -144,5 +157,92 @@ describe("FID run review", () => {
     routeBy({ "/fid/runs": [] })
     render(<SpectraCheckFidRunReview />)
     expect(await screen.findByTestId("fid-run-review-empty")).toBeInTheDocument()
+  })
+
+  it("asks the server for the chosen slice instead of filtering in the browser", async () => {
+    // The queue is server-side on purpose: one limit-bounded page ordered
+    // newest-first would let a prolific author's own runs push it out of view.
+    routeBy({ "review-decisions": [], "/fid/runs": [RUN] })
+    render(<SpectraCheckFidRunReview />)
+    await screen.findByTestId("fid-run-row-7")
+    expect(apiFetchMock.mock.calls[0]?.[0]).toContain("scope=all")
+
+    fireEvent.click(screen.getByTestId("fid-run-scope-review_queue"))
+    await waitFor(() =>
+      expect(
+        apiFetchMock.mock.calls.some(([path]) => String(path).includes("scope=review_queue")),
+      ).toBe(true),
+    )
+  })
+
+  it("says whose run each row is, now that the list is mixed", async () => {
+    routeBy({ "review-decisions": [], "/fid/runs": [RUN, OWN_RUN] })
+    render(<SpectraCheckFidRunReview />)
+    // Read off viewer_is_author, never by comparing user_id to the signed-in user —
+    // the client is not told who it is.
+    expect((await screen.findByTestId("fid-run-author-7")).textContent).toBe("Someone else")
+    expect(screen.getByTestId("fid-run-author-8").textContent).toBe("You")
+  })
+
+  it("refuses self-review before the post rather than after a failed one", async () => {
+    routeBy({ "review-decisions": [], "/fid/runs": [OWN_RUN] })
+    render(<SpectraCheckFidRunReview />)
+    fireEvent.click(await screen.findByTestId("fid-run-row-8"))
+    await screen.findByTestId("fid-run-review-detail")
+
+    expect(screen.getByTestId("fid-review-cannot-review")).toBeInTheDocument()
+    // All four, not only the verdicts: the backend applies the separation rule
+    // before it reads the action, so an author cannot add a comment either.
+    for (const action of ["approve", "request_changes", "reject", "review"]) {
+      expect(screen.getByTestId(`fid-review-action-${action}`)).toBeDisabled()
+    }
+    expect(screen.getByTestId("fid-review-comment")).toBeDisabled()
+
+    fireEvent.click(screen.getByTestId("fid-review-action-approve"))
+    expect(apiFetchMock.mock.calls.some(([path]) => String(path).includes("/approve"))).toBe(false)
+  })
+
+  it("explains an empty queue instead of reading as a fault", async () => {
+    // Colleagues resolve through shared organization membership, and an org is
+    // created deliberately — signing up does not create one. A permanently empty
+    // queue is the accurate answer for somebody on no team, so it has to say why.
+    routeBy({ "/fid/runs": [] })
+    render(<SpectraCheckFidRunReview />)
+    await screen.findByTestId("fid-run-review-empty")
+
+    fireEvent.click(screen.getByTestId("fid-run-scope-review_queue"))
+    await waitFor(() =>
+      expect(screen.getByTestId("fid-run-review-empty").textContent).toContain("organization"),
+    )
+  })
+
+  it("keeps the run you just signed open after it leaves the queue", async () => {
+    routeBy({ "review-decisions": [], "/fid/runs": [RUN] })
+    render(<SpectraCheckFidRunReview />)
+    fireEvent.click(screen.getByTestId("fid-run-scope-review_queue"))
+    fireEvent.click(await screen.findByTestId("fid-run-row-7"))
+    await screen.findByTestId("fid-run-no-decisions")
+
+    // Clause 2 lapses on completion, so the approved run drops out of the queue.
+    // Losing the evidence at the instant of signing is backwards for a Part 11
+    // signature — the panel holds the run open rather than deriving it from the list.
+    routeBy({ "/approve": DECISION, "review-decisions": [DECISION], "/fid/runs": [] })
+    fireEvent.click(screen.getByTestId("fid-review-action-approve"))
+
+    expect(await screen.findByTestId("fid-run-out-of-view")).toBeInTheDocument()
+    expect(screen.getByTestId("fid-run-review-detail")).toBeInTheDocument()
+    expect(screen.getByText("Baseline and phasing check out.")).toBeInTheDocument()
+  })
+
+  it("opens the run just processed instead of making you find it again", async () => {
+    routeBy({ "review-decisions": [], "/fid/runs": [RUN] })
+    render(<SpectraCheckFidRunReview focusRunId={7} />)
+    // No click: the process response named the run, so review starts on it.
+    expect(await screen.findByTestId("fid-run-review-detail")).toBeInTheDocument()
+    await waitFor(() =>
+      expect(
+        apiFetchMock.mock.calls.some(([path]) => String(path).includes("/7/review-decisions")),
+      ).toBe(true),
+    )
   })
 })
