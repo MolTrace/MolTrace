@@ -163,6 +163,21 @@ export function SpectraCheckRawFidBatch({
     return out
   }, [items])
 
+  /**
+   * Colour by position in the DRAWN stack, not by row number.
+   *
+   * The plot colours its traces by their index among the traces it actually draws, so colouring
+   * the table by row index diverged the moment any row was not drawn — a still-queued dataset, a
+   * failure, or a finished one whose response carried no usable trace. Colour is the only thing
+   * linking a row to a line, so a divergence here does not look like a bug: it silently points
+   * the reviewer at the wrong spectrum. One map, derived from the same array the plot receives.
+   */
+  const traceColorById = useMemo(() => {
+    const map = new Map<string, string>()
+    traces.forEach((trace, position) => map.set(trace.id, stackTraceColor(position)))
+    return map
+  }, [traces])
+
   if (items.length === 0) return null
 
   const runnableLabel = mode === "process" ? "Process" : "Quick scan"
@@ -170,7 +185,7 @@ export function SpectraCheckRawFidBatch({
   return (
     <ModuleCard
       accent="teal"
-      eyebrow="Step 2 · Datasets"
+      eyebrow="Datasets"
       title={`Dataset queue · ${items.length}`}
       icon={ListChecks}
       description="Every experiment you dropped, run as its own dataset. Pick a row to bring it into the analysis below."
@@ -270,9 +285,14 @@ export function SpectraCheckRawFidBatch({
           </Button>
         </div>
 
+        {/* Mode-dependent on purpose: the "full recipe" half of this sentence is only true of
+            Process. Saying it while Quick scan is selected would promise phasing and baseline
+            correction the run is not doing. */}
         <p className="text-[11px] text-muted-foreground">
-          Datasets run one at a time. Running several at once would not make them finish sooner, and each
-          one keeps the full instrument-grade recipe.
+          Datasets run one at a time. Running several at once would not make them finish sooner.{" "}
+          {mode === "process"
+            ? "Each one gets the full processing recipe."
+            : "Quick scan reads each archive and produces a fast spectrum — run Process for the full recipe."}
         </p>
 
         {/* Queue table */}
@@ -292,7 +312,7 @@ export function SpectraCheckRawFidBatch({
               </tr>
             </thead>
             <tbody>
-              {items.map((item, index) => {
+              {items.map((item) => {
                 const facts = readRawFidBatchItemFacts(item.result)
                 const isActive = activeItemId === item.id
                 return (
@@ -320,7 +340,10 @@ export function SpectraCheckRawFidBatch({
                         <span
                           className="h-2 w-2 shrink-0 rounded-full"
                           style={{
-                            backgroundColor: item.status === "done" ? stackTraceColor(index) : "var(--mt-slate)",
+                            // Slate whenever this dataset has no line in the plot — including a
+                            // finished one that returned no usable trace. Showing a stack colour
+                            // for a dataset that is not in the stack is the mismatch itself.
+                            backgroundColor: traceColorById.get(item.id) ?? "var(--mt-slate)",
                           }}
                           aria-hidden
                         />

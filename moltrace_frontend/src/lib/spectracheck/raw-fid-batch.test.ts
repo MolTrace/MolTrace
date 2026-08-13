@@ -211,8 +211,8 @@ describe("reading one analysis into a queue row", () => {
   })
 
   it("finds which experiment folder was analyzed wherever the response reports it", () => {
-    expect(readRawFidBatchItemFacts({ file_inventory: { dataset_root: "sample-c/34" } }).datasetRoot).toBe("sample-c/34")
-    expect(readRawFidBatchItemFacts({ metadata: { file_inventory: { dataset_root: "sample-c/35" } } }).datasetRoot).toBe("sample-c/35")
+    expect(readRawFidBatchItemFacts({ file_inventory: { dataset_root: "Sample/34" } }).datasetRoot).toBe("Sample/34")
+    expect(readRawFidBatchItemFacts({ metadata: { file_inventory: { dataset_root: "Sample/35" } } }).datasetRoot).toBe("Sample/35")
   })
 
   it("returns nulls rather than invented defaults for a response that omits everything", () => {

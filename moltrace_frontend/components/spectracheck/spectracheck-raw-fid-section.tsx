@@ -407,6 +407,15 @@ export function SpectraCheckRawFidSection({
 }: Props) {
   const fileRef = useRef<HTMLInputElement>(null)
   const { state, update, updateWith } = useRawFidTabState()
+  /**
+   * Latest tab state, readable from inside the long-running queue loop.
+   *
+   * The loop closes over the render that started it, so `state` there is a snapshot that ages as
+   * the user keeps working. It only ever READS through this — every write still goes through
+   * `updateWith` so it is derived from the live state rather than from this ref.
+   */
+  const stateRef = useRef(state)
+  stateRef.current = state
   const {
     nucleus,
     vendor,
@@ -500,7 +509,31 @@ export function SpectraCheckRawFidSection({
    * dataset's analysis to another is the worst thing this surface could do, so the GSD output is
    * cleared with the selection and the reviewer re-runs it deliberately.
    */
+  /**
+   * The payload the current GSD output was actually computed from.
+   *
+   * Keying the reset on the queue SELECTION was not enough: the results surface also changes when
+   * the user attaches another archive and presses Process, which leaves `batchActiveId` untouched.
+   * That let dataset A's peak table, multiplets and J-couplings sit under dataset B's spectrum —
+   * and the integration panel, which re-fires on a trace change, would post A's peaks against B's
+   * trace and print the region integrals beneath B. Identity of the analyzed payload is the thing
+   * that actually has to match, so that is what is tracked.
+   */
+  const gsdSourceRef = useRef<unknown>(null)
+  const gsdSourcePayload = processResult ?? previewResult
+
   useEffect(() => {
+    if (gsdSourceRef.current === null) return
+    if (gsdSourceRef.current === gsdSourcePayload) return
+    gsdSourceRef.current = null
+    setGsdResult(null)
+    setGsdError("")
+  }, [gsdSourcePayload])
+
+  // A selection change swaps the surface even when the payload happens to be identical (both
+  // null, say), so the selection remains a reset trigger in its own right.
+  useEffect(() => {
+    gsdSourceRef.current = null
     setGsdResult(null)
     setGsdError("")
   }, [batchActiveId])
@@ -985,6 +1018,11 @@ export function SpectraCheckRawFidSection({
         // remaining uploads on it.
         if (!isRawFidBatchRunCurrent(generation)) break
 
+        // The plan was fixed when the run started; the queue was not. A dataset removed since
+        // then must not be uploaded, because uploading it also vaults it — "removed" has to mean
+        // removed, not merely hidden.
+        if (!stateRef.current.batchItems.some((item) => item.id === step.id)) continue
+
         const controller = new AbortController()
         rawFidBatchRun.controller = controller
         const startedAt = Date.now()
@@ -1041,10 +1079,11 @@ export function SpectraCheckRawFidSection({
         }
       }
     } finally {
-      // Only if this run still holds the claim. An abandoned loop finishing late must not clear
-      // the flags of a run the user started after coming back to the workspace.
-      endRawFidBatchRun(generation)
-      update({ batchRunning: false })
+      // BOTH halves are gated on still holding the claim. Releasing the claim without also
+      // gating the flag was a half-fix: an abandoned loop finishing late would clear
+      // `batchRunning` for the run the user had since started, so the queue would read as idle
+      // while it was still working — and the Run button it offered would be declined silently.
+      if (endRawFidBatchRun(generation)) update({ batchRunning: false })
     }
   }
 
@@ -1065,7 +1104,18 @@ export function SpectraCheckRawFidSection({
     stopRawFidBatchRun()
   }
 
+  /**
+   * Remove a dataset from the queue — and actually stop it.
+   *
+   * Dropping the row alone was not enough. The run works from a plan captured when it started, so
+   * a removed dataset was still uploaded and analyzed, and both analysis routes vault the archive.
+   * The reviewer's "remove" would have silently stored the very data they were withdrawing. The
+   * in-flight one is aborted; the rest are skipped by the membership check in the runner.
+   */
   function removeBatchItem(id: string) {
+    if (batchRunning && batchItems.some((item) => item.id === id && item.status === "running")) {
+      rawFidBatchRun.controller?.abort()
+    }
     updateWith((prev) => ({
       batchItems: prev.batchItems.filter((item) => item.id !== id),
       ...(prev.batchActiveId === id ? { batchActiveId: null } : {}),
@@ -1109,6 +1159,9 @@ export function SpectraCheckRawFidSection({
     }
     setGsdLoading(true)
     setGsdError("")
+    // Which payload this analysis will belong to, worked out the same way the reset effect above
+    // derives it. Recorded only on success, so a failed run cannot claim a dataset.
+    let analyzedPayload: unknown = processResult ?? previewResult
     try {
       let trace: { x: number[]; y: number[] } | null = null
       if (processResult) trace = extractSpectrumXY(processResult)
@@ -1123,6 +1176,8 @@ export function SpectraCheckRawFidSection({
         })
         pushDev("raw_fid_gsd_autopreview", previewData)
         update({ previewResult: previewData, previewError: "" })
+        // The auto-fetch becomes the displayed payload, so it is what this analysis belongs to.
+        if (!processResult) analyzedPayload = previewData
         trace = extractSpectrumXY(previewData)
       }
       if (!trace || trace.x.length < 16) {
@@ -1151,6 +1206,9 @@ export function SpectraCheckRawFidSection({
         "/spectrum/analyze/gsd",
         { method: "POST", body },
       )
+      // Bind the analysis to the payload it was computed from BEFORE storing it, so the reset
+      // effect can tell "still the same dataset" from "the surface moved on".
+      gsdSourceRef.current = analyzedPayload
       setGsdResult(data)
       pushDev("raw_fid_gsd_analyze", data)
     } catch (err) {
@@ -1517,7 +1575,7 @@ export function SpectraCheckRawFidSection({
                 Choose folder…
               </Button>
               <span className="text-[10px] text-muted-foreground">
-                or click the box above to pick a single archive file
+                or click the box above to pick one or more archive files
               </span>
             </div>
             {/* Folder picker — webkitdirectory is the click-to-browse twin of a directory drop. */}
@@ -1575,7 +1633,10 @@ export function SpectraCheckRawFidSection({
                         .join(", ")}
                       {folderDetection.experiments.length > 6 ? " …" : ""}
                     </span>
-                    . Each is queued and analyzed on its own, so none of them is skipped.
+                    . Each is queued and analyzed on its own.
+                    {folderDetection.experiments.length > RAW_FID_BATCH_MAX_ITEMS
+                      ? ` The queue holds ${RAW_FID_BATCH_MAX_ITEMS} at a time, so the rest are left for a second pass.`
+                      : ""}
                   </p>
                 ) : null}
               </div>
@@ -1734,7 +1795,7 @@ export function SpectraCheckRawFidSection({
       {/* ── Step 3 — Run ───────────────────────────────────────────────── */}
       <ModuleCard
         accent="teal"
-        eyebrow="Step 3 · Run"
+        eyebrow="Step 2 · Run"
         title={batchItems.length > 0 ? "Inspect or process the selected dataset" : "Inspect or process"}
         icon={Zap}
         description="Preview archive metadata with an automatic quick spectrum, or process the FID through the full selected recipe."
@@ -1970,7 +2031,7 @@ export function SpectraCheckRawFidSection({
         <div className="min-w-0" data-stable-results-surface="">
           <ModuleCard
             accent="teal"
-            eyebrow="Step 4 · Results"
+            eyebrow="Step 3 · Results"
             title={resultTitle}
             icon={BarChart3}
             description={resultDescription}

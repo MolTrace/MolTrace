@@ -131,12 +131,20 @@ export function beginRawFidBatchRun(): number | null {
   return rawFidBatchRun.generation
 }
 
-/** Release the run, but only if this generation still holds it. */
-export function endRawFidBatchRun(generation: number): void {
-  if (generation !== rawFidBatchRun.generation) return
+/**
+ * Release the run, but only if this generation still holds it.
+ *
+ * Returns whether it did. Callers have their OWN cleanup to do — clearing the "a run is going"
+ * flag in React state, most of all — and that cleanup has to be gated on the same answer. Gating
+ * only the release would let an abandoned loop finishing late paint "idle" over a run that is
+ * still working, which is worse than not cleaning up at all.
+ */
+export function endRawFidBatchRun(generation: number): boolean {
+  if (generation !== rawFidBatchRun.generation) return false
   rawFidBatchRun.active = false
   rawFidBatchRun.stop = false
   rawFidBatchRun.controller = null
+  return true
 }
 
 /** True while this generation is still the run everyone means. */
