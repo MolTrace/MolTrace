@@ -2,7 +2,7 @@
 
 Prompt 6 covers the NMR shift predictor. This module completes the Phase-1
 pretrained-foundation layer with the MS/MS and candidate-ranking models a
-combined NMR/MS product needs, fusing orthogonal evidence into one calibrated
+combined NMR/MS product needs, fusing orthogonal evidence into one combined
 candidate ranking — which the **independent** Prompt 7 verifier
 (:func:`moltrace.spectroscopy.verification.verify_structure`) then arbitrates.
 
@@ -21,15 +21,28 @@ candidate ranking — which the **independent** Prompt 7 verifier
 
 3. **DP4-AI candidate ranking.** :func:`dp4_candidate_posterior` **reuses** the
    existing, validated DP4 implementation (``nmrcheck.dp4_scoring`` — Smith &
-   Goodman 2010 σ/ν) to return a calibrated posterior over NMR candidates. We
+   Goodman 2010 σ/ν) to return a DP4 posterior over NMR candidates. We
    integrate the in-house DP4 rather than reimplementing it.
 
 :func:`fuse_candidates` combines NMR (DP4) + MS/MS (CSI:FingerID) + RT into one
-calibrated ranking (RT as a multiplicative down-weight); the output is candidates
+combined ranking (RT as a multiplicative down-weight); the output is candidates
 + scores **only** — decision-support. Each model is registered in the Prompt 13
 registry (:func:`register_ms_models`) with version + SHA-256. Device strategy
 mirrors Prompt 6 (``PYTORCH_ENABLE_MPS_FALLBACK=1``; MPS -> CPU) for any local
 PyTorch model.
+
+**Normalised is not calibrated.** Every score here sums to 1.0 across the
+candidates supplied, which is a fact about arithmetic, not about correctness. A
+*calibrated* score would mean that of all candidates scored 0.7, about 70% really
+are the right structure. Nothing in this module measures or enforces that, and
+three steps preclude it outright: the DP4 σ/ν are the published values fitted to
+DFT/GIAO-computed shifts while MolTrace predicts shifts empirically; CSI scores
+are min-max normalised, so the best candidate is 1.0 however weak it is; and the
+RT weight multiplies the result before renormalisation. What comes out is a
+*relative ordering of the candidates supplied* — the wording the white papers and
+the DP4 panel already use — and the Prompt 7 verifier remains the arbiter of
+pass/fail. Say "combined" or "relative" here, never "calibrated": this file is
+upstream of the papers, and the claim has propagated from these docstrings before.
 """
 
 from __future__ import annotations
@@ -142,11 +155,13 @@ class CandidatePosterior:
 
 @dataclass(frozen=True)
 class RankedCandidate:
-    """A fused, calibrated candidate ranking (decision-support only)."""
+    """A fused candidate ranking (relative ordering, decision-support only)."""
 
     candidate_id: str
     smiles: str | None
-    combined_score: float  # calibrated: sums to 1.0 across the returned candidates
+    # Normalised, NOT calibrated: it sums to 1.0 across the returned candidates because it
+    # is divided by their total, which says nothing about how often the top pick is right.
+    combined_score: float
     signals: Mapping[str, float]  # per-signal contributions (nmr_dp4, msms, rt_corroboration)
     rank: int
     notes: tuple[str, ...] = ()
@@ -319,10 +334,14 @@ def dp4_candidate_posterior(
     nucleus: str,
     pairing_tolerance_ppm: float | None = None,
 ) -> list[CandidatePosterior]:
-    """Calibrated DP4 posterior over NMR candidates (reuses ``nmrcheck.dp4_scoring``).
+    """DP4 posterior over NMR candidates (reuses ``nmrcheck.dp4_scoring``).
 
     Delegates to the validated, in-house ``dp4_probabilities`` (Smith & Goodman
-    2010 σ/ν); the returned probabilities sum to 1.0 across candidates.
+    2010 σ/ν). The returned values sum to 1.0 across the candidates supplied —
+    normalised, not calibrated. The published σ/ν describe the error of
+    DFT/GIAO-computed shifts, while MolTrace predicts shifts empirically, so the
+    result is a defensible *relative* ordering of those candidates rather than a
+    probability that the leading one is correct.
     """
 
     from nmrcheck.dp4_scoring import dp4_probabilities  # local import: avoids cycle
@@ -353,7 +372,7 @@ def dp4_candidate_posterior(
 
 
 # --------------------------------------------------------------------------- #
-# Fusion: NMR (DP4) + MS/MS (CSI) + RT -> one calibrated ranking
+# Fusion: NMR (DP4) + MS/MS (CSI) + RT -> one combined ranking
 # --------------------------------------------------------------------------- #
 _DEFAULT_SIGNAL_WEIGHTS = {"nmr_dp4": 0.5, "msms": 0.5}
 
@@ -378,13 +397,15 @@ def fuse_candidates(
     smiles: Mapping[str, str] | None = None,
     weights: Mapping[str, float] | None = None,
 ) -> list[RankedCandidate]:
-    """Fuse orthogonal signals into one calibrated candidate ranking.
+    """Fuse orthogonal signals into one combined candidate ranking.
 
-    ``dp4`` (a calibrated posterior) and ``msms`` (CSI scores, min-max normalised
-    to a relative [0,1]) are combined by a weighted mean over the signals present
-    for each candidate (weights renormalised when a signal is missing). ``rt_weights``
-    multiply the result (RT corroboration is a down-weight, never a hard filter).
-    The combined scores are normalised to sum to 1.0 across candidates.
+    ``dp4`` (a DP4 posterior — relative, not calibrated) and ``msms`` (CSI scores,
+    min-max normalised to a relative [0,1]) are combined by a weighted mean over the
+    signals present for each candidate (weights renormalised when a signal is missing).
+    ``rt_weights`` multiply the result (RT corroboration is a down-weight, never a hard
+    filter). The combined scores are normalised to sum to 1.0 across candidates, which
+    makes them shares of the supplied set — a relative ordering, not a probability that
+    the leading candidate is correct.
 
     Output is candidates + scores only — decision-support. The Prompt 7 verifier
     remains the arbiter of pass/fail (:func:`arbitrate`).
