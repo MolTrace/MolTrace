@@ -221,3 +221,94 @@ describe("WorkspaceStageNav route mode", () => {
     expect(screen.queryByTestId("stage-section-/regulatory")).not.toBeInTheDocument()
   })
 })
+
+/**
+ * LAYOUT STABILITY.
+ *
+ * The second tier only has pills when the active stage holds more than one
+ * section, so on a nav whose stages hold different numbers — Regentry is 1, 1, 2
+ * and 3 — the nav changed height as you moved between them. It sits above the
+ * whole workspace, so everything below jumped. Measured on Regentry at
+ * 1440x900: 80px against 136px, a 56px shift on every stage change. That is
+ * what "the UI is shaky" was.
+ *
+ * Four of the five navs in the app had mixed stage sizes and all four were
+ * doing it: Regentry, SpectraCheck, the dossier workspace and Reaction Studio.
+ *
+ * jsdom has no layout, so these assert the RESERVATIONS rather than pixel
+ * heights — the classes are the mechanism, and the pixels were verified in a
+ * real browser. A test that measured heights here would read 0 for everything
+ * and pass no matter what.
+ */
+describe("WorkspaceStageNav — layout stability", () => {
+  const MIXED: WorkspaceStageGroup[] = [
+    { id: "one", label: "One", sections: [{ value: "a", label: "A", desc: "Short." }] },
+    {
+      id: "many",
+      label: "Many",
+      sections: [
+        { value: "b", label: "B", desc: "Another." },
+        { value: "c", label: "C", desc: "And another." },
+      ],
+    },
+  ]
+
+  // An explicit hook, not `.min-h-11`: the primary tabs carry that same utility
+  // class, so selecting on it matched a tab button and the "reserves nothing"
+  // case passed for the wrong reason.
+  const reservedBand = (c: HTMLElement) => c.querySelector("[data-stage-sections-band]")
+
+  it("reserves the second-tier band on a stage that has no pills", () => {
+    // The single-section stage. Without the reservation this row is absent and
+    // the nav is shorter here than on every other stage.
+    const { container } = render(
+      <WorkspaceStageNav groups={MIXED} activeValue="a" label="Test" onSelect={() => {}} />,
+    )
+    const band = reservedBand(container)
+    expect(band).not.toBeNull()
+    // Existing is not enough: an empty band with no min-height is 0px tall and
+    // the jump is back. Mutation-checked — dropping the class alone used to
+    // leave this test green.
+    expect(band!.className).toContain("min-h-11")
+    // ...and it is still EMPTY — the fix reserves space, it does not invent a
+    // pill duplicating the tab you are already on.
+    expect(container.querySelector('[aria-label$="sections"]')).toBeNull()
+  })
+
+  it("uses the same band on a stage that does have pills", () => {
+    const { container } = render(
+      <WorkspaceStageNav groups={MIXED} activeValue="b" label="Test" onSelect={() => {}} />,
+    )
+    const band = reservedBand(container)
+    expect(band).not.toBeNull()
+    // Same reserved height as the empty case, or the two states differ by the
+    // 4px of `pb-1` that box-sizing folds inside an empty reservation.
+    expect(band!.className).toContain("min-h-11")
+    expect(container.querySelector('[aria-label$="sections"]')).not.toBeNull()
+  })
+
+  it("reserves nothing when no stage could ever show a second tier", () => {
+    // Every stage single-section: the row can never appear, so reserving room
+    // for it would be dead space that nothing ever fills.
+    const uniform: WorkspaceStageGroup[] = [
+      { id: "x", label: "X", sections: [{ value: "x1", label: "X1", desc: "One." }] },
+      { id: "y", label: "Y", sections: [{ value: "y1", label: "Y1", desc: "Two." }] },
+    ]
+    const { container } = render(
+      <WorkspaceStageNav groups={uniform} activeValue="x1" label="Test" onSelect={() => {}} />,
+    )
+    expect(reservedBand(container)).toBeNull()
+  })
+
+  it("reserves two lines for the description, which is 1 or 2 lines by section", () => {
+    // Regentry's descriptions measured 20px and 40px depending on the section,
+    // so the block below them moved 20px on every switch even when the pill row
+    // did not change.
+    const { container } = render(
+      <WorkspaceStageNav groups={MIXED} activeValue="a" label="Test" onSelect={() => {}} />,
+    )
+    const desc = container.querySelector("p.max-w-3xl")
+    expect(desc).not.toBeNull()
+    expect(desc!.className).toContain("min-h-[2lh]")
+  })
+})

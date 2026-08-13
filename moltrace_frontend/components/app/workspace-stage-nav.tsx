@@ -136,6 +136,23 @@ export function WorkspaceStageNav({
   // would be a row containing the tab you are already on.
   const showSecondTier = activeGroup.sections.length > 1
 
+  /**
+   * ...but the SPACE is reserved whenever any stage in this nav could show that
+   * row, even on the stages that do not.
+   *
+   * Without this the nav changes height as you move between stages, and since it
+   * sits above the whole workspace, everything below it jumps. Measured on
+   * Regentry, whose stages hold 1, 1, 2 and 3 sections: the nav block went 80px
+   * to 136px and the content beneath it moved 56px — every time you changed
+   * stage. That is the "shaky" feeling; it is not a transition problem, it is
+   * the chrome resizing under the content.
+   *
+   * Reserving costs an empty 40px band on single-section stages. That is the
+   * right trade for a workspace nav: it is furniture, and furniture that moves
+   * when you look at it is worse than furniture that takes up room.
+   */
+  const reserveSecondTier = groups.some((g) => g.sections.length > 1)
+
   return (
     <div className="space-y-3">
       <div className="min-w-0 overflow-x-auto [-webkit-overflow-scrolling:touch]">
@@ -208,8 +225,17 @@ export function WorkspaceStageNav({
         </div>
       </div>
 
-      {showSecondTier ? (
-        <div className="min-w-0 overflow-x-auto pb-1 [-webkit-overflow-scrolling:touch]">
+      {reserveSecondTier ? (
+        // min-h-11 (44px), not min-h-10. The pills are 40px and `pb-1` adds 4
+        // BELOW them, so a populated band measures 44 — while an empty band with
+        // min-height 40 measures 40, because box-sizing folds that same padding
+        // inside the reservation. Reserving 40 therefore leaves a 4px twitch,
+        // which is exactly the kind of almost-fixed that reads as still broken.
+        <div
+          data-stage-sections-band=""
+          className="min-h-11 min-w-0 overflow-x-auto pb-1 [-webkit-overflow-scrolling:touch]"
+        >
+          {showSecondTier ? (
           <div
             {...(routeMode ? {} : ({ role: "tablist" } as const))}
             ref={secondaryNav.containerRef}
@@ -281,11 +307,19 @@ export function WorkspaceStageNav({
               )
             })}
           </div>
+          ) : null}
         </div>
       ) : null}
 
+      {/* min-h-[2lh] reserves TWO LINES, because these descriptions are one line
+          on some sections and two on others — measured at 20px and 40px on
+          Regentry — and that difference moved the whole workspace by 20px on
+          every switch. Expressed in `lh` rather than a pixel value so it stays
+          exactly two lines if the type scale ever changes. */}
       {activeSection ? (
-        <p className="max-w-3xl text-sm leading-relaxed text-muted-foreground">{activeSection.desc}</p>
+        <p className="min-h-[2lh] max-w-3xl text-sm leading-relaxed text-muted-foreground">
+          {activeSection.desc}
+        </p>
       ) : null}
     </div>
   )
