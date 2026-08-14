@@ -76,3 +76,24 @@ def test_security_headers_on_authed_and_error_responses(tmp_path):
         r = client.get("/auth/me")
         assert r.status_code == 401
         assert r.headers["X-Content-Type-Options"] == "nosniff"
+
+
+def test_request_timing_emitted(tmp_path, caplog):
+    """The middleware times every request: Server-Timing header + one log line.
+
+    This is the platform's only whole-surface latency series (P1 §2) — the log
+    line carries the route template so id-bearing paths stay aggregable.
+    """
+    import logging
+
+    with TestClient(_app(tmp_path)) as client:
+        with caplog.at_level(logging.INFO, logger="nmrcheck.api"):
+            r = client.get("/health")
+    assert r.headers["Server-Timing"].startswith("app;dur=")
+    float(r.headers["Server-Timing"].removeprefix("app;dur="))  # parses as a number
+    timing_lines = [
+        rec for rec in caplog.records if rec.getMessage().startswith("request GET /health -> 200 in ")
+    ]
+    assert timing_lines, "expected one timing log line for the request"
+    assert "correlation_id=" in timing_lines[0].getMessage()
+    assert timing_lines[0].duration_ms >= 0
