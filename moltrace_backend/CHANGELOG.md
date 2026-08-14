@@ -14,6 +14,26 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.69.5 — A deploy cannot silently ship the seed predictor (2026-08-13)
+
+The HOSE knowledge base is gitignored (NMRShiftDB2 CC BY-SA derivative), so the
+CI deploy job's clean checkout built images whose shift predictor fell back to
+the bundled 16-molecule seed table — ~35 ppm median ¹³C uncertainty against
+~1.88 ppm with the full 495,215-atom index — with no signal anywhere. Manual
+deploys from a checkout that happened to hold the file baked it in, so **which
+deploy ran last decided production accuracy**. Four guards, each independently
+sufficient to make the failure loud: the deploy workflow stages the table from
+`gs://moltrace-model-weights/hose/` and verifies it against a tracked sha256
+(`data/hose/hose_index.json.gz.sha256` — updating the table is now a reviewable
+diff); the Dockerfile refuses to build without the table (`REQUIRE_HOSE_KB=0`
+is the deliberate dev opt-out); `/health` and `/admin/deployment` report a
+`hose_kb` block (configured / path_present / loaded / source / reference_count),
+with set-and-missing or unset-in-production marked `error` and degrading health;
+and `validate_startup_settings` records the seed fallback as a startup issue —
+all startup issues are now also logged at ERROR at app construction, so a log
+alert can watch for them instead of an admin having to open `/admin/deployment`.
+Unset in development remains a legitimate, quiet configuration.
+
 ## v0.69.4 — A safety metric with no denominator is not a perfect score (2026-08-09)
 
 `false_confirmation_rate` is `SAFETY_CRITICAL` with a zero tolerance — it may never

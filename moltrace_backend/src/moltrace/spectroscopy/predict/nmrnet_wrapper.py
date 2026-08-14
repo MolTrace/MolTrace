@@ -730,6 +730,25 @@ def _fallback_kb() -> KnowledgeBase:
     return _FALLBACK_KB
 
 
+def knowledge_base_status() -> dict[str, object]:
+    """Which knowledge base this process is (or would be) answering from.
+
+    Cheap by design — reports configuration and file presence without loading
+    anything, so health probes can call it on every hit. ``source`` /
+    ``reference_count`` are populated only once :func:`_fallback_kb` has actually
+    loaded a table (``loaded`` says which case you are looking at).
+    """
+
+    kb_path = os.environ.get("MOLTRACE_HOSE_KB")
+    return {
+        "configured": bool(kb_path),
+        "path_present": bool(kb_path) and Path(kb_path).exists(),
+        "loaded": _FALLBACK_KB is not None,
+        "source": None if _FALLBACK_KB is None else _FALLBACK_KB.source,
+        "reference_count": None if _FALLBACK_KB is None else _FALLBACK_KB.reference_count,
+    }
+
+
 # --------------------------------------------------------------------------- #
 # Conformer generation
 # --------------------------------------------------------------------------- #

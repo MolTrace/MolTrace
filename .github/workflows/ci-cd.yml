@@ -430,6 +430,20 @@ jobs:
           workload_identity_provider: projects/304031104668/locations/global/workloadIdentityPools/github/providers/github-oidc
           service_account: moltrace-deployer@moltrace-prod.iam.gserviceaccount.com
       - uses: google-github-actions/setup-gcloud@v2
+      - name: Stage HOSE knowledge base (gitignored; fetched from GCS)
+        working-directory: moltrace_backend
+        # The NMRShiftDB2-derived table is gitignored (CC BY-SA derivative), so a
+        # clean checkout builds an image whose predictor falls back to the
+        # 16-molecule seed (~35 ppm median 13C uncertainty vs ~1.88 ppm with the
+        # full index). Fetch the artifact and verify it against the tracked
+        # checksum so the deploy fails closed instead of shipping the degraded
+        # predictor — the Dockerfile's REQUIRE_HOSE_KB guard is the backstop.
+        # Publishing a new table = upload to GCS + update the tracked .sha256.
+        run: |
+          gcloud storage cp \
+            gs://moltrace-model-weights/hose/hose_index.json.gz \
+            data/hose/hose_index.json.gz
+          (cd data/hose && sha256sum -c hose_index.json.gz.sha256)
       - name: Build + push image (Cloud Build)
         working-directory: moltrace_backend
         run: |

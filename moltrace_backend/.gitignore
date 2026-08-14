@@ -139,3 +139,6 @@ hose_index*.json
 hose_index*.json.gz
 data/hose/*
 !data/hose/README.md
+# The checksum that pins WHICH table CI deploys (fetched from GCS) is tracked —
+# updating the table is a deliberate, reviewable change to this file.
+!data/hose/hose_index.json.gz.sha256
