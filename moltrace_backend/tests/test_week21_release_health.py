@@ -115,8 +115,12 @@ def test_release_health_requires_admin_and_returns_release_data(tmp_path) -> Non
 
 
 def test_ci_runs_raw_fid_prompt_promotion_gate_as_non_blocking_artifact() -> None:
+    # The monorepo root's ci-cd.yml is the only workflow location GitHub
+    # executes. This test previously pinned moltrace_backend/.github/workflows/
+    # tests.yml — a pre-monorepo relic GitHub never ran, so every assertion
+    # passed while no run ever produced the artifacts. Pin the live file.
     workflow_path = (
-        Path(__file__).resolve().parents[1] / ".github" / "workflows" / "tests.yml"
+        Path(__file__).resolve().parents[2] / ".github" / "workflows" / "ci-cd.yml"
     )
     workflow = workflow_path.read_text(encoding="utf-8")
 
