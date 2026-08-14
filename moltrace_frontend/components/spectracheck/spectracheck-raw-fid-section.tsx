@@ -515,6 +515,21 @@ export function SpectraCheckRawFidSection({
   const gsdSourceRef = useRef<unknown>(null)
   const gsdSourcePayload = processResult ?? previewResult
 
+  /**
+   * What the surface is showing RIGHT NOW, tracked during render.
+   *
+   * The reset effects above only run when something changes; they cannot police a request that is
+   * still in the air. An experimental analysis takes seconds, and the reviewer can pick another
+   * queue row while it runs — at which point the effects correctly clear, and then the late
+   * response arrives and re-binds itself to the dataset that has already left the screen. Nothing
+   * fires again after that, because from the effects' point of view nothing has changed since.
+   *
+   * Assigned in render rather than in an effect so a result can be checked against it the moment
+   * it resolves, with no dependency on effect ordering.
+   */
+  const displayedPayloadRef = useRef<unknown>(gsdSourcePayload)
+  displayedPayloadRef.current = gsdSourcePayload
+
   useEffect(() => {
     if (gsdSourceRef.current === null) return
     if (gsdSourceRef.current === gsdSourcePayload) return
@@ -1173,7 +1188,12 @@ export function SpectraCheckRawFidSection({
         pushDev("raw_fid_gsd_autopreview", previewData)
         update({ previewResult: previewData, previewError: "" })
         // The auto-fetch becomes the displayed payload, so it is what this analysis belongs to.
-        if (!processResult) analyzedPayload = previewData
+        // The ref is moved here too rather than waiting for the re-render, so the commit check
+        // below cannot mistake this run's own write for the surface moving under it.
+        if (!processResult) {
+          analyzedPayload = previewData
+          displayedPayloadRef.current = previewData
+        }
         trace = extractSpectrumXY(previewData)
       }
       if (!trace || trace.x.length < 16) {
@@ -1202,6 +1222,14 @@ export function SpectraCheckRawFidSection({
         "/spectrum/analyze/gsd",
         { method: "POST", body },
       )
+      // The surface may have moved while this was in the air — the reviewer picked another queue
+      // row, or processed a different archive. Storing the result anyway would re-bind it to a
+      // dataset that is no longer shown, and the reset effects would never fire again because
+      // from their point of view nothing changed. Drop it instead; it belongs to nothing on screen.
+      if (displayedPayloadRef.current !== analyzedPayload) {
+        pushDev("raw_fid_gsd_analyze_discarded", data)
+        return
+      }
       // Bind the analysis to the payload it was computed from BEFORE storing it, so the reset
       // effect can tell "still the same dataset" from "the surface moved on".
       gsdSourceRef.current = analyzedPayload
@@ -1510,7 +1538,14 @@ export function SpectraCheckRawFidSection({
                   // A drop can carry folders AND loose archives together. Reading only the
                   // folders silently discarded the archives, under copy that invites dropping
                   // both — so the plain files are captured here before the async folder walk.
-                  const alongside = Array.from(dt.files ?? [])
+                  //
+                  // Filtered to things that are actually archives, because `dataTransfer.files`
+                  // ALSO lists the dropped directory itself. Taking it verbatim added a bogus
+                  // "Not accepted" row for the folder and then cleared the archive the folder
+                  // walk had just attached.
+                  const alongside = Array.from(dt.files ?? []).filter((file) =>
+                    isRawFidArchiveFilename(file.name),
+                  )
                   void (async () => {
                     try {
                       const entries = await vendorFolderEntriesFromDataTransfer(dt)

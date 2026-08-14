@@ -29,7 +29,12 @@ import {
 import { ModuleCard } from "@/components/dashboard/module-card"
 import { AlertCard } from "@/components/dashboard/alert-card"
 import { Button } from "@/components/ui/button"
-import { SpectrumStackViewer, stackTraceColor, type SpectrumStackTrace } from "@/components/science/SpectrumStackViewer"
+import {
+  SpectrumStackViewer,
+  stackTraceColor,
+  stackTraceDash,
+  type SpectrumStackTrace,
+} from "@/components/science/SpectrumStackViewer"
 import { extractSpectrumXY } from "@/components/spectracheck/spectracheck-nmr-result-parse"
 import {
   estimateRemainingMs,
@@ -170,9 +175,11 @@ export function SpectraCheckRawFidBatch({
    * linking a row to a line, so a divergence here does not look like a bug: it silently points
    * the reviewer at the wrong spectrum. One map, derived from the same array the plot receives.
    */
-  const traceColorById = useMemo(() => {
-    const map = new Map<string, string>()
-    traces.forEach((trace, position) => map.set(trace.id, stackTraceColor(position)))
+  const tracePenById = useMemo(() => {
+    const map = new Map<string, { color: string; dash: string }>()
+    traces.forEach((trace, position) =>
+      map.set(trace.id, { color: stackTraceColor(position), dash: stackTraceDash(position) }),
+    )
     return map
   }, [traces])
 
@@ -200,6 +207,26 @@ export function SpectraCheckRawFidBatch({
 
   const runnableLabel = mode === "process" ? "Process" : "Quick scan"
 
+  /**
+   * One sentence describing where the run is, for assistive tech.
+   *
+   * A batch is minutes of work whose entire progress lived in pill colours and a counter, none of
+   * it in a live region — so a screen-reader user had to keep re-reading the table to learn
+   * whether anything was still happening. WCAG 2.2 SC 4.1.3 covers exactly this. Deliberately
+   * coarse: announcing every row transition on a 64-dataset run would be unusable, so it reports
+   * the phase and the tallies that change slowly.
+   */
+  const runningItem = items.find((item) => item.status === "running")
+  const runAnnouncement = running
+    ? `Analyzing ${runningItem ? runningItem.label : "datasets"} — ${counts.done} of ${items.length} finished${
+        counts.failed > 0 ? `, ${counts.failed} failed` : ""
+      }.`
+    : counts.done + counts.failed + counts.cancelled + counts.unconfirmed > 0
+      ? `Run finished. ${counts.done} done${counts.failed > 0 ? `, ${counts.failed} failed` : ""}${
+          counts.unconfirmed > 0 ? `, ${counts.unconfirmed} unconfirmed` : ""
+        }${counts.cancelled > 0 ? `, ${counts.cancelled} stopped` : ""}.`
+      : ""
+
   return (
     <ModuleCard
       accent="teal"
@@ -210,6 +237,11 @@ export function SpectraCheckRawFidBatch({
       className="min-w-0"
     >
       <div className="space-y-4" data-testid="raw-fid-queue">
+        {/* Always mounted, so the region exists before it has anything to say — a live region
+            inserted together with its text is unreliably announced. */}
+        <p className="sr-only" role="status" aria-live="polite" data-testid="raw-fid-queue-announcer">
+          {runAnnouncement}
+        </p>
         {packaging ? (
           <div
             className="flex items-center gap-2 rounded-md border px-3 py-1.5 font-mono text-[11px]"
@@ -365,16 +397,21 @@ export function SpectraCheckRawFidBatch({
                         )}
                         data-testid={`raw-fid-queue-select-${item.id}`}
                       >
-                        <span
-                          className="h-2 w-2 shrink-0 rounded-full"
-                          style={{
-                            // Slate whenever this dataset has no line in the plot — including a
-                            // finished one that returned no usable trace. Showing a stack colour
-                            // for a dataset that is not in the stack is the mismatch itself.
-                            backgroundColor: traceColorById.get(item.id) ?? "var(--mt-slate)",
-                          }}
-                          aria-hidden
-                        />
+                        {/* Draws the LINE, dash and all — not a dot. Colour alone repeats every
+                            8 traces, so a dot made rows 1 and 9 identical here even after the plot
+                            and legend learned to tell them apart. Slate bar whenever this dataset
+                            has no line at all, including a finished one that returned no trace. */}
+                        <svg className="h-2 w-4 shrink-0 overflow-visible" viewBox="0 0 16 2" aria-hidden>
+                          <line
+                            x1="0"
+                            y1="1"
+                            x2="16"
+                            y2="1"
+                            stroke={tracePenById.get(item.id)?.color ?? "var(--mt-slate)"}
+                            strokeWidth="2"
+                            strokeDasharray={tracePenById.get(item.id)?.dash || undefined}
+                          />
+                        </svg>
                         <span className="min-w-0">
                           <span className="block truncate font-mono text-xs font-medium">{item.label}</span>
                           <span className="block truncate font-mono text-[10px] text-muted-foreground">

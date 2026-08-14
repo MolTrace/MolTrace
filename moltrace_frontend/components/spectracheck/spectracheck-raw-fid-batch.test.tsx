@@ -93,13 +93,6 @@ function routeAnalysisSequence(steps: Array<() => unknown>) {
   })
 }
 
-/** jsdom reports style colours as rgb(); the palette is authored as hex. */
-function asRgb(hex: string): string {
-  const value = hex.replace("#", "")
-  const n = parseInt(value, 16)
-  return `rgb(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255})`
-}
-
 /** Never resolves until the test says so — lets a run be inspected mid-flight. */
 function deferred<T>() {
   let resolve!: (value: T) => void
@@ -602,15 +595,90 @@ describe("analysis stays bound to the dataset it was run on", () => {
     await waitFor(() => expect(screen.getAllByText("Done")).toHaveLength(2))
 
     const rows = within(screen.getByTestId("raw-fid-queue-table"))
-    const dotOf = (label: string) => {
+    const penOf = (label: string) => {
       const row = rows.getByText(label).closest("tr") as HTMLElement
-      return (row.querySelector("span[aria-hidden]") as HTMLElement).style.backgroundColor
+      const line = row.querySelector("svg line") as SVGLineElement
+      return {
+        stroke: line.getAttribute("stroke"),
+        dash: line.getAttribute("stroke-dasharray"),
+      }
     }
 
-    // The first row produced no spectrum, so it owns no colour in the stack...
-    expect(dotOf("no-trace.zip")).toBe("var(--mt-slate)")
-    // ...and the one that DID draw wears the first stack colour, not the second. Keyed off the
+    // The dataset that produced no spectrum owns no colour in the stack...
+    expect(penOf("no-trace.zip").stroke).toBe("var(--mt-slate)")
+    // ...and the one that DID draw wears the first stack pen, not the second. Keyed off the
     // exported palette so the test tracks the plot rather than restating a hex value.
-    expect(dotOf("has-trace.zip")).toBe(asRgb(stackTraceColor(0)))
+    expect(penOf("has-trace.zip").stroke).toBe(stackTraceColor(0))
+  })
+})
+
+describe("findings from the adversarial review of the fixes", () => {
+  it("does not add a row for the folder itself when a folder is dropped", async () => {
+    // `dataTransfer.files` lists the dropped DIRECTORY as well. Enqueuing it verbatim added a
+    // bogus "Not accepted" row and then cleared the archive the folder walk had just attached.
+    renderSection()
+    const folder = new File([], "Sample", { type: "" })
+    fireEvent.drop(screen.getByRole("button", { name: /Drop raw FID archive/i }), {
+      dataTransfer: {
+        files: [folder],
+        types: ["Files"],
+        items: [{ kind: "file", webkitGetAsEntry: () => ({ isDirectory: true, isFile: false, name: "Sample" }) }],
+      },
+    })
+
+    await waitFor(() => expect(screen.queryByText("Sample")).not.toBeInTheDocument())
+    expect(screen.queryByTestId("raw-fid-queue")).not.toBeInTheDocument()
+  })
+
+  it("discards an experimental analysis whose dataset left the screen while it ran", async () => {
+    // The reset effects cannot police a request already in the air: the reviewer picks another
+    // row mid-flight, the effects clear, and then the late result re-binds to the dataset that
+    // has gone — after which nothing changes again, so nothing ever clears it.
+    routeAnalysisSequence([() => processResponse(), () => processResponse({ point_count: 128 })])
+    renderSection()
+    dropArchives([archive("a.zip"), archive("b.zip")])
+    fireEvent.click(screen.getByTestId("raw-fid-queue-run-all"))
+    await waitFor(() => expect(screen.getAllByText("Done")).toHaveLength(2))
+
+    const gsd = deferred<unknown>()
+    apiFetchMock.mockImplementation(async (path: string) => {
+      if (String(path) === "/spectrum/analyze/gsd") return gsd.promise as never
+      return [] as never
+    })
+    fireEvent.click(screen.getByRole("radio", { name: "GSD" }))
+    fireEvent.click(screen.getByRole("button", { name: /Run GSD analysis/i }))
+
+    // Move to the other dataset while the analysis is still in flight.
+    const secondRow = within(screen.getByTestId("raw-fid-queue-table"))
+      .getByText("b.zip")
+      .closest("tr") as HTMLElement
+    fireEvent.click(within(secondRow).getByRole("button", { pressed: false }))
+
+    await act(async () => {
+      gsd.resolve({ peaks: [{ position_ppm: 7.26, intensity: 10 }], backend: "gsd_prompt3" })
+    })
+
+    // It belonged to a.zip, so it must not appear under b.zip.
+    expect(screen.queryByTestId("raw-fid-gsd-results-surface")).not.toBeInTheDocument()
+  })
+
+  it("announces the run in a live region rather than only in pill colours", async () => {
+    const first = deferred<unknown>()
+    routeAnalysisSequence([() => first.promise, () => processResponse()])
+    renderSection()
+    dropArchives([archive("a.zip"), archive("b.zip")])
+
+    // Present before it has anything to say — a region inserted with its text is unreliable.
+    const announcer = screen.getByTestId("raw-fid-queue-announcer")
+    expect(announcer).toHaveAttribute("aria-live", "polite")
+
+    fireEvent.click(screen.getByTestId("raw-fid-queue-run-all"))
+    await waitFor(() => expect(announcer).toHaveTextContent(/Analyzing a\.zip/i))
+
+    await act(async () => {
+      first.resolve(processResponse())
+    })
+    await waitFor(() => expect(screen.getAllByText("Done")).toHaveLength(2))
+    expect(announcer).toHaveTextContent(/Run finished\. 2 done/i)
   })
 })
