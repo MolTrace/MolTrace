@@ -455,6 +455,37 @@ describe("a run outliving the tab it was started from", () => {
     expect(analysisCalls()).toHaveLength(2)
   })
 
+  it("honours a removal made after a tab round-trip, so a withdrawn dataset is never uploaded", async () => {
+    // The runner used to read the queue through a ref owned by the section. The section unmounts on
+    // every tab switch, so after a round-trip the loop was reading a snapshot frozen before it —
+    // and a dataset removed afterwards was still uploaded, and both routes vault the archive.
+    const first = deferred<unknown>()
+    routeAnalysisSequence([() => first.promise, () => processResponse(), () => processResponse()])
+
+    const { rerender } = render(<Frame showRaw />)
+    dropArchives([archive("a.zip"), archive("b.zip"), archive("c.zip")])
+    fireEvent.click(screen.getByTestId("raw-fid-queue-run-all"))
+    await waitFor(() => expect(analysisCalls()).toHaveLength(1))
+
+    // Leave the tab and come back: the section remounts with a fresh ref, the run does not.
+    rerender(<Frame showRaw={false} />)
+    rerender(<Frame showRaw />)
+
+    // Withdraw a dataset that has not run yet.
+    const row = screen.getByText("c.zip").closest("tr") as HTMLElement
+    fireEvent.click(within(row).getByRole("button", { name: /Remove c\.zip/i }))
+    expect(screen.queryByText("c.zip")).not.toBeInTheDocument()
+
+    await act(async () => {
+      first.resolve(processResponse())
+    })
+
+    // a.zip and b.zip run; c.zip must never be sent.
+    await waitFor(() => expect(analysisCalls()).toHaveLength(2))
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(analysisCalls()).toHaveLength(2)
+  })
+
   it("does not strand the queue when the user leaves the workspace mid-run", async () => {
     // This request never settles, so the run is still holding its claim at the moment the
     // workspace goes away — the exact state that used to leak.
