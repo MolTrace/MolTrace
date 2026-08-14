@@ -32,6 +32,12 @@ export type VendorFolderDetection = {
   experiments: VendorExperiment[]
   fileCount: number
   totalBytes: number
+  /**
+   * Directories that hold data but are NOT processable 1D datasets — a 2D experiment (`ser`
+   * instead of `fid`), or a folder missing its parameter file. Reported so the UI can say they
+   * were left out: dropping them and saying nothing reads as "all your experiments are here".
+   */
+  skippedDirs: string[]
   /** True when at least one directory looks like a processable dataset. */
   usable: boolean
   /** Plain-language reason when not usable, else null. */
@@ -115,10 +121,19 @@ export function detectVendorDataset(entries: VendorFolderEntry[]): VendorFolderD
   }
 
   const experiments: VendorExperiment[] = []
+  const skippedDirs: string[] = []
   for (const [dir, names] of byDir) {
     const hasBruker = REQUIRED_BRUKER.every((n) => names.has(n))
     const hasVarian = REQUIRED_VARIAN.every((n) => names.has(n))
-    if (!hasBruker && !hasVarian) continue
+    if (!hasBruker && !hasVarian) {
+      // Only count a directory that plausibly meant to be an experiment. Every ordinary
+      // subfolder (pdata/1, and so on) fails the test too, and listing those as "skipped"
+      // would bury the one that matters.
+      if (names.has("ser") || names.has("acqus") || names.has("procpar") || names.has("fid")) {
+        skippedDirs.push(dir)
+      }
+      continue
+    }
     experiments.push({
       dir,
       // A directory with fid+acqus is Bruker; fid+procpar is Varian/Agilent.
@@ -135,12 +150,13 @@ export function detectVendorDataset(entries: VendorFolderEntry[]): VendorFolderD
   const kind: VendorKind = kinds.size === 1 ? [...kinds][0]! : experiments.length > 0 ? "unknown" : "unknown"
 
   if (kept.length === 0) {
-    return { kind: "unknown", experiments: [], fileCount: 0, totalBytes: 0, usable: false, reason: "The folder is empty." }
+    return { kind: "unknown", experiments: [], skippedDirs: [], fileCount: 0, totalBytes: 0, usable: false, reason: "The folder is empty." }
   }
   if (experiments.length === 0) {
     return {
       kind: "unknown",
       experiments: [],
+      skippedDirs,
       fileCount: kept.length,
       totalBytes,
       usable: false,
@@ -148,7 +164,8 @@ export function detectVendorDataset(entries: VendorFolderEntry[]): VendorFolderD
         "No Bruker or Varian/Agilent dataset found — a processable folder contains a raw 'fid' file next to 'acqus' (Bruker) or 'procpar' (Varian/Agilent).",
     }
   }
-  return { kind, experiments, fileCount: kept.length, totalBytes, usable: true, reason: null }
+  skippedDirs.sort(compareNaturalPath)
+  return { kind, experiments, skippedDirs, fileCount: kept.length, totalBytes, usable: true, reason: null }
 }
 
 /** One experiment from a dropped folder, packaged as its own upload. */

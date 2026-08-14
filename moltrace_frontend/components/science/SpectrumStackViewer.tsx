@@ -29,7 +29,14 @@ export type SpectrumStackTrace = {
 
 export type SpectrumStackViewerProps = {
   traces: SpectrumStackTrace[]
-  nucleus?: "1H" | "13C"
+  /**
+   * Nucleus the AXIS describes. Null when the stack holds more than one, or when nothing reported
+   * it — the axis then says "chemical shift" without naming a nucleus it cannot vouch for. Must
+   * come from what each trace was actually run with, never from a live acquisition control: that
+   * control keeps changing to set up the next batch, and a ¹³C label over ¹H traces is a lie the
+   * reviewer has no way to catch.
+   */
+  nucleus?: "1H" | "13C" | null
   /** Highlighted trace. Everything else dims, so the reviewer can find it in a crowded stack. */
   activeTraceId?: string | null
   onSelectTrace?: (id: string) => void
@@ -55,6 +62,22 @@ const STACK_TRACE_COLORS = [
 
 export function stackTraceColor(index: number): string {
   return STACK_TRACE_COLORS[index % STACK_TRACE_COLORS.length]
+}
+
+/**
+ * A SECOND channel that is not colour, so the palette wrapping does not make two datasets
+ * indistinguishable.
+ *
+ * The queue holds up to 64 datasets and there are 8 colours, so trace 9 gets trace 1's blue. When
+ * colour is the only link between a legend entry and a line, two identical blue lines are two
+ * datasets the reviewer cannot tell apart. Cycling a dash pattern every time the colour wraps
+ * gives 8 x 4 distinct pens, and it is also the channel a colour-blind reviewer can actually use.
+ */
+const STACK_TRACE_DASHES = ["", "7 3", "2 3", "10 3 2 3"] as const
+
+export function stackTraceDash(index: number): string {
+  const cycle = Math.floor(index / STACK_TRACE_COLORS.length)
+  return STACK_TRACE_DASHES[cycle % STACK_TRACE_DASHES.length]
 }
 
 const VIEW_WIDTH = 1000
@@ -125,6 +148,8 @@ export function envelopeSampleSpectrum(
 type PreparedTrace = {
   trace: SpectrumStackTrace
   color: string
+  /** Second, non-colour channel — see `stackTraceDash`. Empty string means a solid line. */
+  dash: string
   points: EnvelopePoint[]
   /** Largest value inside the visible window — the trace's own normalisation reference. */
   peak: number
@@ -163,7 +188,7 @@ function formatPpm(value: number): string {
 
 export function SpectrumStackViewer({
   traces,
-  nucleus = "1H",
+  nucleus = null,
   activeTraceId = null,
   onSelectTrace,
   className,
@@ -225,6 +250,7 @@ export function SpectrumStackViewer({
       return {
         trace,
         color: stackTraceColor(colorIndexById.get(trace.id) ?? 0),
+        dash: stackTraceDash(colorIndexById.get(trace.id) ?? 0),
         points,
         peak: peak > 0 ? peak : 1,
         fullRange: finiteRange(trace.x),
@@ -392,28 +418,54 @@ export function SpectrumStackViewer({
         </span>
 
         <span className="font-mono text-[10px] tabular-nums text-muted-foreground">
-          {zoomed ? `${formatPpm(range.max)} – ${formatPpm(range.min)} ppm` : "Drag across the plot to zoom"}
+          {zoomed
+            ? `${formatPpm(range.max)} – ${formatPpm(range.min)} ppm`
+            : "Drag across the plot to zoom, or focus it and use the arrow keys"}
         </span>
 
-        {zoomed ? (
-          <button
-            type="button"
-            onClick={resetView}
-            className="inline-flex items-center gap-1 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground transition-colors hover:text-foreground motion-reduce:transition-none"
-            data-testid={`${testId}-reset-zoom`}
-          >
-            <RotateCcw className="h-3 w-3" aria-hidden />
-            Full range
-          </button>
-        ) : null}
+        {/* Rendered unconditionally: hiding it until zoomed meant a keyboard user who zoomed via
+            the keyboard had no visible way back, and never saw that a reset existed at all. */}
+        <button
+          type="button"
+          onClick={resetView}
+          disabled={!zoomed}
+          className="inline-flex items-center gap-1 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground transition-colors hover:text-foreground disabled:opacity-40 motion-reduce:transition-none"
+          data-testid={`${testId}-reset-zoom`}
+        >
+          <RotateCcw className="h-3 w-3" aria-hidden />
+          Full range
+        </button>
       </div>
 
       <svg
         ref={svgRef}
         viewBox={`0 0 ${VIEW_WIDTH} ${VIEW_HEIGHT}`}
-        className="w-full touch-none select-none rounded-lg border bg-background"
+        className="w-full touch-none select-none rounded-lg border bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--mt-teal)]"
         role="img"
-        aria-label={`${count} spectra stacked on a shared ${nucleus} chemical-shift axis from ${formatPpm(range.max)} to ${formatPpm(range.min)} ppm`}
+        tabIndex={0}
+        data-testid={`${testId}-plot`}
+        onKeyDown={(event) => {
+          // Drag-to-zoom was mouse-only, and the reset control only appeared once zoomed — so a
+          // keyboard reviewer could neither enter nor leave the zoomed state. Inspecting one
+          // region across a stack is the whole point of this view, so it needs a way in that
+          // does not require a pointer.
+          const span = range.max - range.min
+          const stepBy = (fraction: number) => {
+            const delta = span * fraction
+            setZoom({ min: range.min + delta, max: range.max + delta })
+          }
+          const zoomBy = (factor: number) => {
+            const centre = (range.min + range.max) / 2
+            const half = Math.max((span * factor) / 2, MIN_PPM_SPAN / 2)
+            setZoom({ min: centre - half, max: centre + half })
+          }
+          if (event.key === "ArrowLeft") { event.preventDefault(); stepBy(-0.1) }
+          else if (event.key === "ArrowRight") { event.preventDefault(); stepBy(0.1) }
+          else if (event.key === "+" || event.key === "=") { event.preventDefault(); zoomBy(0.5) }
+          else if (event.key === "-" || event.key === "_") { event.preventDefault(); zoomBy(2) }
+          else if (event.key === "0" || event.key === "Escape") { event.preventDefault(); resetView() }
+        }}
+        aria-label={`${count} spectra stacked on a shared ${nucleus ? `${nucleus} ` : ""}chemical-shift axis from ${formatPpm(range.max)} to ${formatPpm(range.min)} ppm. Use arrow keys to pan, plus and minus to zoom, 0 for the full range.`}
         onPointerDown={(event) => {
           const viewX = pointerViewX(event.clientX)
           if (viewX == null) return
@@ -492,7 +544,11 @@ export function SpectrumStackViewer({
           className="fill-muted-foreground font-mono"
           style={{ fontSize: 11 }}
         >
-          {nucleus === "13C" ? "¹³C chemical shift (ppm)" : "¹H chemical shift (ppm)"}
+          {nucleus === "13C"
+            ? "¹³C chemical shift (ppm)"
+            : nucleus === "1H"
+              ? "¹H chemical shift (ppm)"
+              : "Chemical shift (ppm)"}
         </text>
 
         <g clipPath={`url(#stack-clip-${clipId})`}>
@@ -507,6 +563,7 @@ export function SpectrumStackViewer({
                 stroke={item.color}
                 strokeWidth={isActive ? 1.9 : 1.1}
                 strokeLinejoin="round"
+                strokeDasharray={item.dash || undefined}
                 opacity={dimmed ? 0.32 : 1}
                 data-testid={`${testId}-trace-${item.trace.id}`}
                 data-active={isActive ? "true" : "false"}
@@ -570,11 +627,19 @@ export function SpectrumStackViewer({
                 style={isActive ? { borderColor: "var(--mt-teal)" } : undefined}
                 data-testid={`${testId}-legend-${trace.id}`}
               >
-                <span
-                  className="h-2 w-2 shrink-0 rounded-full"
-                  style={{ backgroundColor: stackTraceColor(index) }}
-                  aria-hidden
-                />
+                {/* The key has to carry BOTH channels: past 8 traces the colour repeats, and a
+                    round dot would show two datasets as the same blue. */}
+                <svg className="h-2 w-4 shrink-0 overflow-visible" viewBox="0 0 16 2" aria-hidden>
+                  <line
+                    x1="0"
+                    y1="1"
+                    x2="16"
+                    y2="1"
+                    stroke={stackTraceColor(index)}
+                    strokeWidth="2"
+                    strokeDasharray={stackTraceDash(index) || undefined}
+                  />
+                </svg>
                 <span className="max-w-[13rem] truncate font-mono text-[11px]">{trace.label}</span>
                 {trace.sublabel ? (
                   <span className="hidden font-mono text-[10px] text-muted-foreground sm:inline">
@@ -585,8 +650,8 @@ export function SpectrumStackViewer({
               <button
                 type="button"
                 onClick={() => toggleHidden(trace.id)}
-                aria-pressed={isHidden}
-                aria-label={`${isHidden ? "Show" : "Hide"} ${trace.label} in the stack`}
+                aria-pressed={!isHidden}
+                aria-label={`${trace.label} shown in the stack`}
                 className="flex min-h-0 items-center rounded-r-md border border-l-0 px-1.5 py-1 font-mono text-[10px] text-muted-foreground transition-colors hover:text-foreground motion-reduce:transition-none"
                 data-testid={`${testId}-toggle-${trace.id}`}
               >

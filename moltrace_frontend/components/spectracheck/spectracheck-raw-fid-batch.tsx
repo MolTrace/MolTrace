@@ -54,7 +54,6 @@ type Props = {
   /** A refusal that ended the whole run rather than one dataset. */
   notice?: string | null
   activeItemId: string | null
-  nucleus: "1H" | "13C"
   onSelectItem: (id: string) => void
   onRunAll: () => void
   onStop: () => void
@@ -134,7 +133,6 @@ export function SpectraCheckRawFidBatch({
   packaging = null,
   notice = null,
   activeItemId,
-  nucleus,
   onSelectItem,
   onRunAll,
   onStop,
@@ -178,6 +176,26 @@ export function SpectraCheckRawFidBatch({
     return map
   }, [traces])
 
+  /**
+   * The nucleus the stacked AXIS can honestly claim — read back from what each dataset was
+   * actually run with, not from the acquisition toggle.
+   *
+   * That toggle is freely changed to set up the next batch, so passing it through labelled a
+   * stack of ¹H traces "¹³C" the moment the reviewer flipped it. And one folder can legitimately
+   * hold both nuclei, in which case no single label is true; null makes the axis say "chemical
+   * shift" rather than name a nucleus it cannot vouch for.
+   */
+  const stackNucleus = useMemo<"1H" | "13C" | null>(() => {
+    const seen = new Set<string>()
+    for (const item of items) {
+      if (item.status !== "done") continue
+      const reported = readRawFidBatchItemFacts(item.result).nucleus
+      if (reported === "1H" || reported === "13C") seen.add(reported)
+    }
+    if (seen.size !== 1) return null
+    return seen.has("13C") ? "13C" : "1H"
+  }, [items])
+
   if (items.length === 0) return null
 
   const runnableLabel = mode === "process" ? "Process" : "Quick scan"
@@ -215,7 +233,15 @@ export function SpectraCheckRawFidBatch({
 
         {/* Run controls */}
         <div className="flex flex-wrap items-center gap-3 rounded-xl border p-3" style={{ borderTop: "3px solid var(--mt-teal)" }}>
-          <div className="inline-flex rounded-lg border border-input bg-background p-0.5">
+          {/* A radiogroup, not two plain buttons. This control decides whether twenty datasets
+              get the full recipe or a quick scan, and the selection used to be carried by
+              background colour alone — invisible to a screen reader and to anyone who cannot
+              separate the two shades. Mirrors the Detection engine toggle in gsd-analysis-ui. */}
+          <div
+            role="radiogroup"
+            aria-label="Processing mode"
+            className="inline-flex rounded-lg border border-input bg-background p-0.5"
+          >
             {(
               [
                 { value: "process", label: "Full processing" },
@@ -225,6 +251,8 @@ export function SpectraCheckRawFidBatch({
               <button
                 key={option.value}
                 type="button"
+                role="radio"
+                aria-checked={mode === option.value}
                 disabled={running}
                 onClick={() => onModeChange(option.value)}
                 className={cn(
@@ -300,7 +328,7 @@ export function SpectraCheckRawFidBatch({
           <table className="w-full min-w-[46rem] border-collapse text-left" data-testid="raw-fid-queue-table">
             <thead>
               <tr className="border-b">
-                {["Dataset", "Status", "Vendor", "Points", "Peaks", "Time", ""].map((heading, index) => (
+                {["Dataset", "Status", "Analysis", "Vendor", "Points", "Peaks", "Time", ""].map((heading, index) => (
                   <th
                     key={heading || `actions-${index}`}
                     scope="col"
@@ -361,6 +389,13 @@ export function SpectraCheckRawFidBatch({
                     <td className="py-1.5 pr-3">
                       <QueueStatusPill status={item.status} />
                     </td>
+                    {/* Which analysis actually produced this row. The mode toggle applies to the
+                        NEXT run, so a queue can legitimately hold quick-scan and fully processed
+                        rows side by side — and the Peaks column invites comparing them directly.
+                        Naming each row's analysis is what makes that comparison honest. */}
+                    <td className="py-1.5 pr-3 font-mono text-[11px] text-muted-foreground">
+                      {item.mode === "process" ? "Full" : item.mode === "scan" ? "Quick scan" : "—"}
+                    </td>
                     <td className="py-1.5 pr-3 font-mono text-[11px] uppercase text-muted-foreground">
                       {facts.vendorDetected ?? "—"}
                     </td>
@@ -379,7 +414,10 @@ export function SpectraCheckRawFidBatch({
                           <button
                             type="button"
                             onClick={() => onRunItem(item.id)}
-                            aria-label={`${runnableLabel} ${item.label}`}
+                            // The visible word has to appear IN the accessible name (WCAG 2.5.3):
+                            // naming this "Process a.zip" while it reads "Retry" left speech-input
+                            // users with no control on the page matching what they can see.
+                            aria-label={`${item.status === "queued" ? "Run" : "Retry"} ${item.label} — ${runnableLabel}`}
                             className="flex min-h-0 items-center gap-1 rounded border px-1.5 py-1 font-mono text-[10px] text-muted-foreground transition-colors hover:text-foreground motion-reduce:transition-none"
                             data-testid={`raw-fid-queue-run-${item.id}`}
                           >
@@ -441,7 +479,7 @@ export function SpectraCheckRawFidBatch({
             </div>
             <SpectrumStackViewer
               traces={traces}
-              nucleus={nucleus}
+              nucleus={stackNucleus}
               activeTraceId={activeItemId}
               onSelectTrace={onSelectItem}
               testId="raw-fid-queue-stack-viewer"
