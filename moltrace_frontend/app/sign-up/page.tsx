@@ -5,6 +5,10 @@ import { SignUpForm } from "@/components/marketing/sign-up-form"
 export const metadata: Metadata = {
   title: "Sign up | MolTrace",
   description: "Create a MolTrace account.",
+  // Explicit noindex, belt to robots.txt's braces. A disallow only stops
+  // crawling — a page can still be indexed URL-only from external links, and
+  // an auth form has no business in a results page either way.
+  robots: { index: false, follow: false },
 }
 
 export default function SignUpPage() {

@@ -5,6 +5,10 @@ import { SignInForm } from "@/components/marketing/sign-in-form"
 export const metadata: Metadata = {
   title: "Sign in | MolTrace",
   description: "Sign in to your MolTrace workspace.",
+  // Explicit noindex, belt to robots.txt's braces. A disallow only stops
+  // crawling — a page can still be indexed URL-only from external links, and
+  // an auth form has no business in a results page either way.
+  robots: { index: false, follow: false },
 }
 
 function firstParam(value: string | string[] | undefined): string | undefined {

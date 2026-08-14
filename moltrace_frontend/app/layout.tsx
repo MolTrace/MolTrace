@@ -101,6 +101,14 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
+  // Matches the browser chrome to the page instead of leaving it default-grey.
+  // The dark value is the same #070b12 the PWA manifest declares, so the
+  // installed app and the browsed site tint identically; light gets the page
+  // background rather than white so the address bar does not glow against it.
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#fafbfc' },
+    { media: '(prefers-color-scheme: dark)', color: '#070b12' },
+  ],
 }
 
 export default function RootLayout({
