@@ -16985,6 +16985,30 @@ class FlipReadinessPolicy(BaseModel):
     min_solvent_detect_rate: float = Field(ge=0.0, le=1.0)
 
 
+class RouteTelemetrySummary(BaseModel):
+    """Generic wall-clock rollup over one timed route's audit events.
+
+    Returned by ``GET /admin/ops/route-telemetry-summary?event_type=…`` for any
+    event type that records ``wall_ms`` in its audit metadata — the generic form
+    of the bespoke GSD soak summary below, so the raw-FID and processed-analyze
+    paths (the product's slowest) finally have an automated latency readout.
+    Latency fields are ``None`` rather than ``0.0`` when no samples exist, so an
+    empty window reads as "no data", never as "instant".
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    event_type: str
+    window_days: int = Field(ge=1, le=365)
+    scope_actor_user_id: int | None = None
+    invocations: int = Field(ge=0)
+    error_count: int = Field(ge=0)
+    error_kind_counts: dict[str, int]
+    wall_ms_sample_count: int = Field(ge=0)
+    median_wall_ms: float | None = None
+    p95_wall_ms: float | None = None
+
+
 class SpectrumGSDTelemetrySummary(BaseModel):
     """Aggregated soak telemetry for the opt-in GSD analysis endpoint.
 
