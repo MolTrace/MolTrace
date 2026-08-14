@@ -789,6 +789,7 @@ from .models import (
     ReviewTaskRecord,
     ReviewTaskUpdate,
     RoiSnapshot,
+    RouteTelemetrySummary,
     SampleAliquot,
     SampleAliquotCreate,
     SampleAnalysisComparison,
@@ -9842,6 +9843,102 @@ def _compute_flip_readiness_verdict(
     return "clear", []
 
 
+# The registry of event types that record ``wall_ms`` in their audit metadata.
+# Extending a route with timing means adding its event type here — the summary
+# endpoint validates against this list so a typo'd query fails loudly instead of
+# aggregating an empty stream into "no latency".
+_TIMED_ROUTE_EVENT_TYPES = (
+    "spectrum.analyze_gsd",
+    "spectrum.analyze_integration",
+    "spectrum.predict_shifts",
+    "spectrum.retrieve",
+    "spectrum.reason",
+    "nmr.processed.analyze",
+    "nmr.raw_fid.preview",
+    "nmr.raw_fid.process",
+    "fid.preview.legacy",
+    "fid.process",
+)
+
+
+@router.get(
+    "/admin/ops/route-telemetry-summary",
+    response_model=RouteTelemetrySummary,
+    dependencies=[Depends(require_admin)],
+)
+def admin_route_telemetry_summary(
+    request: Request,
+    context: AccessContext = Depends(require_admin),
+    event_type: str = Query(...),
+    window_days: int = Query(default=90, ge=1, le=365),
+    actor_user_id: int | None = Query(default=None, ge=1),
+) -> RouteTelemetrySummary:
+    """Wall-clock rollup for any timed analysis route.
+
+    The GSD soak endpoint below pre-dates this and stays bespoke (its shape backs
+    the FE readiness panel); this is the generic form for every other event type
+    carrying ``wall_ms`` — including the raw-FID and processed-analyze paths whose
+    only prior latency evidence was a hand-run localhost measurement in
+    ``docs/raw_fid_latency_be_handoff.md``. Same aggregation strategy and admin
+    audience as the GSD rollup.
+    """
+
+    if event_type not in _TIMED_ROUTE_EVENT_TYPES:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"'{event_type}' is not a timed event type; expected one of: "
+                + ", ".join(_TIMED_ROUTE_EVENT_TYPES)
+            ),
+        )
+
+    from datetime import UTC, datetime, timedelta
+
+    since = datetime.now(UTC) - timedelta(days=window_days)
+    events = list_audit_events(
+        _state(request).session_factory,
+        limit=50_000,
+        event_type=event_type,
+        since=since,
+        actor_user_id=actor_user_id,
+    )
+
+    error_kind_counts: dict[str, int] = {}
+    wall_ms_samples: list[float] = []
+    for event in events:
+        meta = event.metadata if isinstance(event.metadata, dict) else {}
+        error_kind = meta.get("error_kind")
+        if isinstance(error_kind, str) and error_kind:
+            error_kind_counts[error_kind] = error_kind_counts.get(error_kind, 0) + 1
+        wall_ms = meta.get("wall_ms")
+        if isinstance(wall_ms, (int, float)) and wall_ms >= 0:
+            wall_ms_samples.append(float(wall_ms))
+
+    median_wall_ms: float | None = None
+    p95_wall_ms: float | None = None
+    if wall_ms_samples:
+        ordered = sorted(wall_ms_samples)
+        n = len(ordered)
+        if n % 2 == 1:
+            median_wall_ms = ordered[n // 2]
+        else:
+            median_wall_ms = 0.5 * (ordered[n // 2 - 1] + ordered[n // 2])
+        p95_index = max(0, min(n - 1, int(round(0.95 * n)) - 1))
+        p95_wall_ms = ordered[p95_index]
+
+    return RouteTelemetrySummary(
+        event_type=event_type,
+        window_days=window_days,
+        scope_actor_user_id=actor_user_id,
+        invocations=len(events),
+        error_count=sum(error_kind_counts.values()),
+        error_kind_counts=error_kind_counts,
+        wall_ms_sample_count=len(wall_ms_samples),
+        median_wall_ms=median_wall_ms,
+        p95_wall_ms=p95_wall_ms,
+    )
+
+
 @router.get(
     "/spectrum/analyze/gsd/telemetry-summary",
     response_model=SpectrumGSDTelemetrySummary,
@@ -10931,6 +11028,7 @@ async def nmr_processed_analyze_route(
     preview_points_json: str | None = Form(default=None),
     context: AccessContext = Depends(require_access_context),
 ) -> NMRProcessedAnalyzeResponse:
+    _route_t0 = time.perf_counter()
     filename = file.filename or "processed_spectrum.dat"
     content = await file.read()
     normalized_compound_class = normalize_compound_class(compound_class)
@@ -11341,6 +11439,7 @@ async def nmr_processed_analyze_route(
             "point_count": point_count,
             "peak_count": len(peaks),
             "candidate_text_supplied": bool(candidates_text and candidates_text.strip()),
+            "wall_ms": int((time.perf_counter() - _route_t0) * 1000),
         },
     )
     return NMRProcessedAnalyzeResponse(
@@ -11393,6 +11492,7 @@ async def nmr_raw_fid_preview_route(
     carbon13_text: str | None = Form(default=None),
     context: AccessContext = Depends(require_access_context),
 ) -> NMRRawFIDPreviewResponse:
+    _route_t0 = time.perf_counter()
     filename = file.filename or "raw_fid_archive.zip"
     content = await file.read()
     normalized_compound_class = normalize_compound_class(compound_class)
@@ -11599,6 +11699,8 @@ async def nmr_raw_fid_preview_route(
             "nucleus": nucleus,
             "inline_spectrum_generated": spectrum_generated,
             "point_count": point_count,
+            "candidate_text_supplied": bool((candidates_text or "").strip()),
+            "wall_ms": int((time.perf_counter() - _route_t0) * 1000),
         },
     )
     _record_automation_event(
@@ -11700,6 +11802,7 @@ async def nmr_raw_fid_process_route(
     carbon13_text: str | None = Form(default=None),
     context: AccessContext = Depends(require_access_context),
 ) -> NMRRawFIDProcessResponse:
+    _route_t0 = time.perf_counter()
     filename = file.filename or "raw_fid_archive.zip"
     content = await file.read()
     normalized_compound_class = normalize_compound_class(compound_class)
@@ -11993,6 +12096,8 @@ async def nmr_raw_fid_process_route(
             "vendor_detected": preview.processing_metadata.vendor_format_detected,
             "nucleus": nucleus,
             "processing_preset": settings.selected_preset,
+            "candidate_text_supplied": bool((candidates_text or "").strip()),
+            "wall_ms": int((time.perf_counter() - _route_t0) * 1000),
         },
     )
     # Normalize vendor-specific spectrometer-frequency keys (Bruker SFO1/BF1,
@@ -12633,6 +12738,7 @@ async def fid_preview(
     debug_preview: bool = Form(default=False),
     context: AccessContext = Depends(require_access_context),
 ) -> FIDPreviewReport:
+    _route_t0 = time.perf_counter()
     filename = file.filename or "bruker_dataset.zip"
     content = await file.read()
     raw_upload_provenance = _metadata_only_raw_fid_provenance(
@@ -12697,6 +12803,7 @@ async def fid_preview(
             "fid_processing": preview.processing_metadata.model_dump(mode="json"),
             "legacy_endpoint": "/fid/preview",
             "recommended_workflow": "POST /raw-fid/upload then POST /raw-fid/{archive_id}/process",
+            "wall_ms": int((time.perf_counter() - _route_t0) * 1000),
         },
     )
     _record_automation_event(
@@ -12744,6 +12851,7 @@ async def fid_process(
     debug_preview: bool = Form(default=False),
     context: AccessContext = Depends(require_access_context),
 ) -> FIDProcessResult:
+    _route_t0 = time.perf_counter()
     filename = file.filename or "bruker_dataset.zip"
     content = await file.read()
     raw_upload_provenance = _raw_fid_upload_provenance(
@@ -12895,6 +13003,7 @@ async def fid_process(
             "reference_text_supplied": bool(reference_nmr_text and reference_nmr_text.strip()),
             "fid_processing": preview.processing_metadata.model_dump(mode="json"),
             "fid_run_id": fid_run.id,
+            "wall_ms": int((time.perf_counter() - _route_t0) * 1000),
         },
     )
     return FIDProcessResult(preview=preview, generated_inputs=generated_inputs, analysis=report)
