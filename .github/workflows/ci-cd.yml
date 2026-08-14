@@ -674,6 +674,35 @@ jobs:
             gs://moltrace-model-weights/hose/hose_index.json.gz \
             data/hose/hose_index.json.gz
           (cd data/hose && sha256sum -c hose_index.json.gz.sha256)
+      - name: Setup uv (accuracy gate)
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+        with:
+          python-version: "3.13.5"
+          enable-cache: true
+          cache-dependency-glob: moltrace_backend/uv.lock
+      # Accuracy regression sentinel (informational first, per the
+      # security_sdlc_gates policy): score the production verify/predict path on
+      # the frozen fixture gold set against the committed incumbent vector.
+      # Runs AFTER the KB staging step above so candidate and incumbent share
+      # knowledge-base provenance — the gate refuses cross-KB comparisons.
+      # Before flipping to blocking (drop --informational): re-mint the
+      # incumbent from a CI run of this step's artifact so latency percentiles
+      # reflect CI hardware, and review it.
+      - name: Accuracy regression sentinel (informational)
+        working-directory: moltrace_backend
+        env:
+          MOLTRACE_HOSE_KB: ${{ github.workspace }}/moltrace_backend/data/hose/hose_index.json.gz
+        run: |
+          uv sync --frozen --extra fid --extra dev
+          uv run moltrace-eval-gate --informational \
+            --persist-out "$RUNNER_TEMP/nmr_eval_gate/candidate_metric_vector.json"
+      - name: Upload accuracy sentinel vector
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nmr-eval-gate-candidate-vector
+          path: ${{ runner.temp }}/nmr_eval_gate/candidate_metric_vector.json
+          if-no-files-found: ignore
       - name: Build + push image (Cloud Build)
         working-directory: moltrace_backend
         run: |
