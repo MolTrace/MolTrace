@@ -329,11 +329,18 @@ export function OpsDashboardWorkspace() {
               </ul>
             </div>
 
-            {/* monitoring_thresholds — the drift-config sub-panel */}
+            {/* monitoring_thresholds — the drift-config sub-panel. These are configured
+                targets only: no live drift/latency series is evaluated against them yet
+                (the drift endpoint is a documented deferral), and presenting them as
+                monitored state would overclaim to exactly the audience reading this panel
+                as evidence. */}
             <div className="space-y-2">
               <p className="inline-flex items-center gap-1.5 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
                 <SlidersHorizontal className="h-3 w-3" aria-hidden />
                 Monitoring thresholds
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Targets only — not yet evaluated against live measurements.
               </p>
               {thresholdEntries.length === 0 ? (
                 <p className="text-xs text-muted-foreground">No thresholds reported.</p>
