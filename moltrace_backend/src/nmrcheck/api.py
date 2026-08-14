@@ -9,6 +9,7 @@ import json
 import logging
 import math
 import re
+import time
 import uuid
 import zipfile
 from collections.abc import AsyncIterator, Awaitable, Callable, Iterator, Mapping
@@ -31464,6 +31465,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         correlation_id = _correlation_id_from_request(request)
         request.state.correlation_id = correlation_id
         generated_at = _generated_at_iso()
+        started = time.perf_counter()
         try:
             response = await call_next(request)
         except Exception:
@@ -31476,6 +31478,27 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 content=_stable_unavailable_payload(request),
             )
         data_mode = "unavailable" if response.status_code >= 500 else "live"
+        duration_ms = (time.perf_counter() - started) * 1000.0
+        # The only server-side latency series the platform emits (5 of ~910 routes
+        # hand-roll their own). Fields ride in the message because the default
+        # logging formatter drops `extra`; the route template (not the raw path)
+        # keeps id-bearing URLs aggregable in a log-based metric.
+        route_template = getattr(request.scope.get("route"), "path", request.url.path)
+        logger.info(
+            "request %s %s -> %d in %.1f ms [correlation_id=%s]",
+            request.method,
+            route_template,
+            response.status_code,
+            duration_ms,
+            correlation_id,
+            extra={
+                "correlation_id": correlation_id,
+                "route_template": route_template,
+                "status_code": response.status_code,
+                "duration_ms": round(duration_ms, 1),
+            },
+        )
+        response.headers["Server-Timing"] = f"app;dur={duration_ms:.1f}"
         response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
         response.headers["Pragma"] = "no-cache"
         response.headers["Expires"] = "0"
