@@ -33,10 +33,13 @@ const ROUTES: Entry[] = [
 ]
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const lastModified = new Date()
+  // Static routes carry NO lastmod. It used to be new Date() at request time,
+  // which stamps every fetch as "modified right now" — a signal that is always
+  // wrong, and search engines are documented to stop trusting lastmod entirely
+  // for a site that inflates it. No date is honest; the blog entries below keep
+  // real publication dates, which is the signal worth sending.
   const staticEntries = ROUTES.map(({ path, priority, changeFrequency }) => ({
     url: `${SITE_URL}${path === "/" ? "" : path}`,
-    lastModified,
     changeFrequency,
     priority,
   }))

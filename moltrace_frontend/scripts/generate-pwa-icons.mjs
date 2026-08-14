@@ -194,6 +194,37 @@ function buildWordmarkSvg() {
 </svg>`
 }
 
+/**
+ * A PNG-in-ICO container. Every browser that still requests /favicon.ico
+ * understands it (Vista onward), and it avoids a dependency whose only job
+ * would be writing a 22-byte header per image. /favicon.ico had simply never
+ * existed here — modern browsers used the <link rel=icon> SVG, while bookmark
+ * systems, legacy agents and a long tail of tooling that request the bare path
+ * unconditionally all got a 404.
+ */
+function buildIco(images) {
+  const head = Buffer.alloc(6)
+  head.writeUInt16LE(0, 0) // reserved
+  head.writeUInt16LE(1, 2) // type: icon
+  head.writeUInt16LE(images.length, 4)
+  let offset = 6 + images.length * 16
+  const entries = []
+  for (const { size, data } of images) {
+    const e = Buffer.alloc(16)
+    e.writeUInt8(size >= 256 ? 0 : size, 0)
+    e.writeUInt8(size >= 256 ? 0 : size, 1)
+    e.writeUInt8(0, 2)
+    e.writeUInt8(0, 3)
+    e.writeUInt16LE(1, 4) // colour planes
+    e.writeUInt16LE(32, 6) // bits per pixel
+    e.writeUInt32LE(data.length, 8)
+    e.writeUInt32LE(offset, 12)
+    offset += data.length
+    entries.push(e)
+  }
+  return Buffer.concat([head, ...entries, ...images.map((i) => i.data)])
+}
+
 async function main() {
   const logoSvg = buildLogoMarkSvg()
   const wordmarkSvg = buildWordmarkSvg()
@@ -219,7 +250,28 @@ async function main() {
   writeFileSync(join(ICONS_DIR, "icon-512.png"), logo512)
   writeFileSync(join(ICONS_DIR, "icon-192.png"), logo192)
   writeFileSync(join(ICONS_DIR, "maskable-icon-512.png"), maskable512)
-  writeFileSync(join(PUBLIC_DIR, "apple-icon.png"), logo192)
+  // Apple touch icons get an OPAQUE tile. iOS composites a transparent
+  // apple-touch-icon onto solid black on the home screen, which swallowed the
+  // mark's dark facets; the same navy tile the maskable icon uses keeps the
+  // rendering ours instead of Apple's default.
+  const appleInner = await sharp(logoRgb).resize(150, 150, { kernel: sharp.kernel.lanczos3 }).png().toBuffer()
+  const apple180 = await sharp({
+    create: { width: 180, height: 180, channels: 4, background: LOGO_BACKGROUND_DARK_BLUE },
+  })
+    .composite([{ input: appleInner, gravity: "center" }])
+    .png()
+    .toBuffer()
+  writeFileSync(join(PUBLIC_DIR, "apple-icon.png"), apple180)
+
+  // The bare /favicon.ico path: Next serves app/favicon.ico there verbatim.
+  const [ico16, ico32, ico48] = await Promise.all(
+    [16, 32, 48].map((px) => sharp(logoRgb).resize(px, px, { kernel: sharp.kernel.lanczos3 }).png().toBuffer()),
+  )
+  writeFileSync(join(__dirname, "..", "app", "favicon.ico"), buildIco([
+    { size: 16, data: ico16 },
+    { size: 32, data: ico32 },
+    { size: 48, data: ico48 },
+  ]))
 
   writeFileSync(join(PUBLIC_DIR, "icon.svg"), logoSvg, "utf8")
   writeFileSync(join(ICONS_DIR, "moltrace-mark.svg"), logoSvg, "utf8")
