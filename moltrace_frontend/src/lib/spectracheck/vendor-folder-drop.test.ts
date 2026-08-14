@@ -296,3 +296,34 @@ describe("experiment ordering", () => {
     ])
   })
 })
+
+describe("experiments the 1D reader cannot use", () => {
+  it("reports a 2D experiment as skipped instead of dropping it in silence", () => {
+    // A Bruker 2D holds `ser`, not `fid`, so it can never be a 1D dataset. Saying nothing left
+    // the panel claiming every experiment in the folder had been queued.
+    const entries = [
+      entry("Sample/1/fid"),
+      entry("Sample/1/acqus"),
+      entry("Sample/2/fid"),
+      entry("Sample/2/acqus"),
+      entry("Sample/4/ser"),
+      entry("Sample/4/acqus"),
+    ]
+
+    const detection = detectVendorDataset(entries)
+
+    expect(detection.experiments.map((e) => e.dir)).toEqual(["Sample/1", "Sample/2"])
+    expect(detection.skippedDirs).toEqual(["Sample/4"])
+  })
+
+  it("does not list ordinary sub-folders as skipped experiments", () => {
+    // pdata/1 fails the same test but was never an experiment; listing it would bury a real one.
+    const detection = detectVendorDataset([
+      entry("Sample/1/fid"),
+      entry("Sample/1/acqus"),
+      entry("Sample/1/pdata/1/procs"),
+    ])
+
+    expect(detection.skippedDirs).toEqual([])
+  })
+})

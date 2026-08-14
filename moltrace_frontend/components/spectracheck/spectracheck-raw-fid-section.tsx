@@ -1511,6 +1511,10 @@ export function SpectraCheckRawFidSection({
                 // synchronous (no behaviour change); only a real folder takes the async path.
                 const dt = e.dataTransfer
                 if (dataTransferHasDirectory(dt)) {
+                  // A drop can carry folders AND loose archives together. Reading only the
+                  // folders silently discarded the archives, under copy that invites dropping
+                  // both — so the plain files are captured here before the async folder walk.
+                  const alongside = Array.from(dt.files ?? [])
                   void (async () => {
                     try {
                       const entries = await vendorFolderEntriesFromDataTransfer(dt)
@@ -1520,6 +1524,7 @@ export function SpectraCheckRawFidSection({
                         err instanceof Error ? err.message : "Could not read that folder.",
                       )
                     }
+                    if (alongside.length > 0) enqueueArchives(alongside)
                   })()
                   return
                 }
@@ -1637,6 +1642,21 @@ export function SpectraCheckRawFidSection({
                     {folderDetection.experiments.length > RAW_FID_BATCH_MAX_ITEMS
                       ? ` The queue holds ${RAW_FID_BATCH_MAX_ITEMS} at a time, so the rest are left for a second pass.`
                       : ""}
+                  </p>
+                ) : null}
+                {folderDetection.skippedDirs.length > 0 ? (
+                  // Named, not merely counted: "2 skipped" leaves the chemist wondering which two.
+                  // These are usually 2D experiments (ser, no fid), which this 1D path cannot read.
+                  <p className="mt-0.5 text-muted-foreground" data-testid="raw-fid-folder-skipped">
+                    Left out —{" "}
+                    <span className="font-mono text-foreground">
+                      {folderDetection.skippedDirs
+                        .slice(0, 6)
+                        .map((dir) => dir.split("/").pop() || dir)
+                        .join(", ")}
+                      {folderDetection.skippedDirs.length > 6 ? " …" : ""}
+                    </span>
+                    . No readable 1D dataset there; a 2D experiment is the usual reason.
                   </p>
                 ) : null}
               </div>
@@ -1783,7 +1803,6 @@ export function SpectraCheckRawFidSection({
         packaging={folderBusy}
         notice={batchNotice}
         activeItemId={batchActiveId}
-        nucleus={nucleus}
         onSelectItem={selectBatchItem}
         onRunAll={runBatchAll}
         onStop={stopBatch}

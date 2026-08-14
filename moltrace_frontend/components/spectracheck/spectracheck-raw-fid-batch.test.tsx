@@ -319,8 +319,20 @@ describe("running the queue", () => {
     await waitFor(() => expect(screen.getByText("Failed")).toBeInTheDocument())
 
     routeAnalysisSequence([() => processResponse()])
-    fireEvent.click(screen.getByRole("button", { name: /^Process a\.zip$/i }))
+    // Re-baselined: this used to query /^Process a\.zip$/, the accessible name that OVERRODE the
+    // button's visible "Retry". That mismatch is a WCAG 2.5.3 failure — speech input matching the
+    // visible word found nothing — so the name now leads with the word on screen.
+    fireEvent.click(screen.getByRole("button", { name: /^Retry a\.zip/i }))
     await waitFor(() => expect(screen.getByText("Done")).toBeInTheDocument())
+  })
+
+  it("keeps the visible word inside each row button's accessible name", () => {
+    renderSection()
+    dropArchives([archive("a.zip")])
+    // A queued row reads "Run"; the name must contain it, and still say which analysis will run.
+    const run = screen.getByRole("button", { name: /^Run a\.zip/i })
+    expect(run).toHaveTextContent("Run")
+    expect(run).toHaveAccessibleName(/Process/)
   })
 })
 

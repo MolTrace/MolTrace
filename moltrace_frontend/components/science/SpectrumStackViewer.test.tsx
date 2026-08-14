@@ -4,6 +4,7 @@ import {
   SpectrumStackViewer,
   envelopeSampleSpectrum,
   stackTraceColor,
+  stackTraceDash,
   type SpectrumStackTrace,
 } from "@/components/science/SpectrumStackViewer"
 
@@ -140,5 +141,63 @@ describe("SpectrumStackViewer", () => {
   it("rotates colours so two spectra never share one", () => {
     expect(stackTraceColor(0)).not.toBe(stackTraceColor(1))
     expect(stackTraceColor(0)).toBe(stackTraceColor(8))
+  })
+})
+
+describe("telling many traces apart", () => {
+  it("gives trace 9 a different pen from trace 1, not just the same colour again", () => {
+    // 8 colours, 64 datasets allowed. Colour alone repeats, and two identical blue lines are two
+    // datasets the reviewer cannot separate — so the dash pattern carries the difference.
+    expect(stackTraceColor(8)).toBe(stackTraceColor(0))
+    expect(stackTraceDash(8)).not.toBe(stackTraceDash(0))
+    expect(stackTraceDash(0)).toBe("")
+  })
+
+  it("names no nucleus on the axis when the datasets do not agree on one", () => {
+    render(
+      <SpectrumStackViewer
+        traces={[
+          { id: "a", label: "a", x: [1, 2, 3], y: [1, 5, 1] },
+          { id: "b", label: "b", x: [1, 2, 3], y: [1, 4, 1] },
+        ]}
+        nucleus={null}
+      />,
+    )
+    expect(screen.getByText("Chemical shift (ppm)")).toBeInTheDocument()
+    expect(screen.queryByText(/¹H chemical shift/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/¹³C chemical shift/)).not.toBeInTheDocument()
+  })
+
+  it("can be zoomed and reset from the keyboard alone", () => {
+    render(
+      <SpectrumStackViewer
+        traces={[{ id: "a", label: "a", x: [0, 1, 2, 3, 4], y: [1, 2, 9, 2, 1] }]}
+        nucleus="1H"
+      />,
+    )
+    const plot = screen.getByTestId("spectrum-stack-viewer-plot")
+    // Reset is present but inert before zooming, so a keyboard user can see the way back exists.
+    expect(screen.getByTestId("spectrum-stack-viewer-reset-zoom")).toBeDisabled()
+
+    fireEvent.keyDown(plot, { key: "+" })
+    expect(screen.getByTestId("spectrum-stack-viewer-reset-zoom")).toBeEnabled()
+
+    fireEvent.keyDown(plot, { key: "0" })
+    expect(screen.getByTestId("spectrum-stack-viewer-reset-zoom")).toBeDisabled()
+  })
+
+  it("reports a shown trace as pressed, so the state and the name agree", () => {
+    render(
+      <SpectrumStackViewer
+        traces={[{ id: "a", label: "expt-33", x: [1, 2, 3], y: [1, 5, 1] }]}
+        nucleus="1H"
+      />,
+    )
+    const toggle = screen.getByTestId("spectrum-stack-viewer-toggle-a")
+    expect(toggle).toHaveAttribute("aria-pressed", "true")
+    fireEvent.click(toggle)
+    expect(toggle).toHaveAttribute("aria-pressed", "false")
+    // The name does not flip with the state — "Show X … pressed" announced the opposite.
+    expect(toggle).toHaveAccessibleName("expt-33 shown in the stack")
   })
 })
