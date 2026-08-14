@@ -38,9 +38,11 @@ import {
   endRawFidBatchRun,
   isRawFidBatchItemRunnable,
   isRawFidBatchRunCurrent,
+  isWithdrawnFromRawFidBatchRun,
   preflightRawFidArchive,
   rawFidBatchRun,
   stopRawFidBatchRun,
+  withdrawFromRawFidBatchRun,
   type RawFidBatchItem,
   type RawFidBatchMode,
 } from "@/src/lib/spectracheck/raw-fid-batch"
@@ -407,15 +409,6 @@ export function SpectraCheckRawFidSection({
 }: Props) {
   const fileRef = useRef<HTMLInputElement>(null)
   const { state, update, updateWith } = useRawFidTabState()
-  /**
-   * Latest tab state, readable from inside the long-running queue loop.
-   *
-   * The loop closes over the render that started it, so `state` there is a snapshot that ages as
-   * the user keeps working. It only ever READS through this — every write still goes through
-   * `updateWith` so it is derived from the live state rather than from this ref.
-   */
-  const stateRef = useRef(state)
-  stateRef.current = state
   const {
     nucleus,
     vendor,
@@ -1021,7 +1014,7 @@ export function SpectraCheckRawFidSection({
         // The plan was fixed when the run started; the queue was not. A dataset removed since
         // then must not be uploaded, because uploading it also vaults it — "removed" has to mean
         // removed, not merely hidden.
-        if (!stateRef.current.batchItems.some((item) => item.id === step.id)) continue
+        if (isWithdrawnFromRawFidBatchRun(step.id)) continue
 
         const controller = new AbortController()
         rawFidBatchRun.controller = controller
@@ -1113,6 +1106,8 @@ export function SpectraCheckRawFidSection({
    * in-flight one is aborted; the rest are skipped by the membership check in the runner.
    */
   function removeBatchItem(id: string) {
+    // Tell the RUN, not just the list: the run holds its own plan and outlives this component.
+    withdrawFromRawFidBatchRun(id)
     if (batchRunning && batchItems.some((item) => item.id === id && item.status === "running")) {
       rawFidBatchRun.controller?.abort()
     }
@@ -1123,6 +1118,7 @@ export function SpectraCheckRawFidSection({
   }
 
   function clearBatch() {
+    for (const item of batchItems) withdrawFromRawFidBatchRun(item.id)
     stopBatch()
     update({ batchItems: [], batchActiveId: null })
     setBatchNotice(null)

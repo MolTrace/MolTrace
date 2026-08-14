@@ -121,6 +121,26 @@ export const rawFidBatchRun: RawFidBatchRunHandle = {
   generation: 0,
 }
 
+/**
+ * Datasets withdrawn from the queue since this run started.
+ *
+ * A run works from a plan fixed at the start, so it needs to be told what has since been removed —
+ * and both analysis routes vault the archive, so an upload the reviewer withdrew is data they did
+ * not consent to store. This lives beside the run rather than in component state because the
+ * section unmounts on every tab switch: a ref captured by the loop freezes at the last render
+ * before that, so after a tab round-trip the loop would be consulting a minutes-old snapshot.
+ */
+const rawFidBatchWithdrawn = new Set<string>()
+
+/** Mark a dataset as withdrawn, so the runner skips it even if its plan still names it. */
+export function withdrawFromRawFidBatchRun(id: string): void {
+  rawFidBatchWithdrawn.add(id)
+}
+
+export function isWithdrawnFromRawFidBatchRun(id: string): boolean {
+  return rawFidBatchWithdrawn.has(id)
+}
+
 /** Claim the run. Returns the generation to pass back to `endRawFidBatchRun`, or null if busy. */
 export function beginRawFidBatchRun(): number | null {
   if (rawFidBatchRun.active) return null
@@ -128,6 +148,9 @@ export function beginRawFidBatchRun(): number | null {
   rawFidBatchRun.active = true
   rawFidBatchRun.stop = false
   rawFidBatchRun.controller = null
+  // A new run re-admits anything the reviewer put back; a withdrawal binds only the run it was
+  // made during.
+  rawFidBatchWithdrawn.clear()
   return rawFidBatchRun.generation
 }
 
@@ -170,6 +193,7 @@ export function abortRawFidBatchRun(): void {
   rawFidBatchRun.generation += 1
   rawFidBatchRun.active = false
   rawFidBatchRun.controller = null
+  rawFidBatchWithdrawn.clear()
 }
 
 let batchItemSequence = 0
