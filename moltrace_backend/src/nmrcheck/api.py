@@ -2456,6 +2456,7 @@ def _record_automation_event(
     sample_id: str | None = None,
     session_id: int | None = None,
     metadata: dict[str, Any] | None = None,
+    duration_seconds: float | None = None,
 ) -> None:
     """Record that a stateless computation route completed a unit of automated work.
 
@@ -2463,6 +2464,11 @@ def _record_automation_event(
     and the usage event is the only record that the work happened. Routes that *do* write
     their result emit from inside their own store function instead, so the event cannot
     outlive a rolled-back write.
+
+    ``duration_seconds`` is how long the unit of work actually took — the column has
+    existed on usage events all along with no producer able to write it, leaving the ROI
+    telemetry latency-blind (minutes-saved constants with no measured wall clock beside
+    them).
     """
     analytics_store.record_automation_event(
         _state(request).session_factory,
@@ -2473,6 +2479,7 @@ def _record_automation_event(
         sample_id=sample_id,
         session_id=session_id,
         metadata=metadata,
+        duration_seconds=duration_seconds,
     )
 
 
