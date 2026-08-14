@@ -14,6 +14,32 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.69.6 — The accuracy gate finally has something to gate (2026-08-14)
+
+`gate_for_ci` — the Prompt 17 dominance machinery — had never been called
+outside its own tests because no gold set existed. Now: `scripts/
+build_nmr_gold_set.py` joins the repo's own real NMRShiftDB2 Bruker fixtures
+(expected peak lists ↔ molblocks from the bundled NMReDATA source) into a
+frozen, checksummed 21-record set (`tests/fixtures/nmr_gold_set/
+gold_set_v1.json`, both nuclei), and `moltrace-eval-gate` scores the
+**production path** on it — each record's real FID through `read_fid` →
+`verify_structure` → `predict_shifts`, never a reimplementation, honouring the
+measured rule that synthesised spectra do not transfer. The first minted vector
+is committed as `benchmarks/nmr/incumbent_metric_vector.json` and pins, among
+others, `reviewer_agreement_rate = 0.571` — the verifier confirms 12/21 correct
+structures on real spectra. That number is now a floor a commit cannot silently
+lower. Named a **regression sentinel, not an accuracy claim**: several gold
+molecules sit in the shipped KB's training data, so absolute MAE here partially
+measures memorisation (held-out numbers remain `eval/shift_accuracy.py`'s job),
+and with no decoy records yet `false_confirmation_rate` is unmeasured — the CLI
+warns on that gap every run rather than letting it read as perfect. The CLI's
+default `--mode regression` passes an unchanged model (dominance's
+strict-improvement requirement stays for `--mode promotion`); a candidate that
+drops a measured safety metric still hard-fails; cross-KB comparisons are
+refused rather than reported as regressions. Wired into the deploy workflow
+after the KB staging step, informational until the incumbent is re-minted on CI
+hardware and reviewed.
+
 ## v0.69.5 — A deploy cannot silently ship the seed predictor (2026-08-13)
 
 The HOSE knowledge base is gitignored (NMRShiftDB2 CC BY-SA derivative), so the
