@@ -455,6 +455,11 @@ export function readRawFidBatchItemFacts(payload: unknown): RawFidBatchItemFacts
   if (!isRecord(payload)) return empty
 
   const metadata = isRecord(payload.metadata) ? payload.metadata : {}
+  // Verified against a live /nmr/raw-fid/process response for a real Bruker archive: the analyzed
+  // experiment directory is reported at metadata.raw_upload_provenance.dataset_root. The two
+  // file_inventory shapes below were a guess that no real payload ever satisfies — this row was
+  // silently blank for every upload until a real response was actually read.
+  const provenance = isRecord(metadata.raw_upload_provenance) ? metadata.raw_upload_provenance : {}
   const inventory = isRecord(payload.file_inventory)
     ? payload.file_inventory
     : isRecord(metadata.file_inventory)
@@ -471,7 +476,11 @@ export function readRawFidBatchItemFacts(payload: unknown): RawFidBatchItemFacts
   return {
     vendorDetected: readString(payload.vendor_detected, metadata.vendor_detected),
     nucleus: readString(payload.nucleus, metadata.nucleus),
-    datasetRoot: readString(inventory.dataset_root, metadata.dataset_root),
+    datasetRoot: readString(
+      provenance.dataset_root,
+      inventory.dataset_root,
+      metadata.dataset_root,
+    ),
     pointCount: readPositiveNumber(payload.point_count, metadata.point_count),
     peakCount: peaks ? peaks.length : null,
     fieldMhz: readPositiveNumber(payload.field_mhz, metadata.field_mhz),

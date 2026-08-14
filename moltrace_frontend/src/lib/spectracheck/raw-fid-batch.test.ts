@@ -211,6 +211,15 @@ describe("reading one analysis into a queue row", () => {
   })
 
   it("finds which experiment folder was analyzed wherever the response reports it", () => {
+    // The shape a REAL /nmr/raw-fid/process response uses — confirmed by posting a genuine
+    // Bruker archive to a running server. The two file_inventory shapes this test used to assert
+    // were invented, so it passed while the queue row stayed blank on every real upload.
+    expect(
+      readRawFidBatchItemFacts({
+        metadata: { raw_upload_provenance: { dataset_root: "Study/2" } },
+      }).datasetRoot,
+    ).toBe("Study/2")
+    // Older/alternative shapes still read, so nothing that used to work stops working.
     expect(readRawFidBatchItemFacts({ file_inventory: { dataset_root: "Sample/34" } }).datasetRoot).toBe("Sample/34")
     expect(readRawFidBatchItemFacts({ metadata: { file_inventory: { dataset_root: "Sample/35" } } }).datasetRoot).toBe("Sample/35")
   })
