@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next'
 import { Analytics } from '@vercel/analytics/next'
+import { SpeedInsights } from '@vercel/speed-insights/next'
 import { SITE_URL, SITE_NAME, SITE_TAGLINE, SITE_DESCRIPTION } from '@/lib/seo/site'
 import { SHELL_MODE_INLINE_SCRIPT } from '@/src/lib/shell/shell-mode'
 import { OrganizationJsonLd } from '@/components/seo/json-ld'
@@ -142,6 +143,11 @@ export default function RootLayout({
             On other platforms (e.g. Render) the script 404s and logs a noisy error.
             Gate on the platform-supplied VERCEL env var so non-Vercel deploys stay clean. */}
         {process.env.NODE_ENV === 'production' && process.env.VERCEL && <Analytics />}
+        {/* Field Core Web Vitals (LCP/INP/CLS per route, real users) — the render-heavy
+            surfaces ship with no field signal otherwise. Same platform gate as <Analytics/>;
+            chosen over a hand-rolled useReportWebVitals -> /analytics/events reporter so
+            anonymous marketing pageviews never cost a backend hop. */}
+        {process.env.NODE_ENV === 'production' && process.env.VERCEL && <SpeedInsights />}
       </body>
     </html>
   )
