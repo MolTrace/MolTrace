@@ -73,17 +73,66 @@ export function useSlidingIndicator<T extends HTMLElement = HTMLDivElement>(
     measure()
   }, [measure, activeKey])
 
+  /**
+   * Observer-driven re-measures are COALESCED to one animation frame, and this
+   * is what stops the indicator flicking to the wrong tab.
+   *
+   * Both observers below fire while the DOM is mid-update — a ResizeObserver
+   * reports each item as it reflows, a MutationObserver fires per attribute
+   * mutation — so measuring on every callback samples the strip in states that
+   * never actually paint. Every sample is published, and the indicator animates
+   * to it over 300ms, so ONE bad intermediate reading turns into a visible
+   * swing. Measured while changing stage on Regentry: the bar went from x=80 to
+   * x=465 and then back to x=297, i.e. it travelled past the tab it was heading
+   * for and came back. That is the shake, and it is worst when the surrounding
+   * layout is also moving, which is why collapsing the sidebar made it obvious.
+   *
+   * Deferring to the next frame collapses a burst of callbacks into a single
+   * measurement of the settled layout. The layout effect above is deliberately
+   * left synchronous: on an actual selection change the indicator must be
+   * placed in the same frame, or the first frame paints it under the old tab.
+   */
+  const frame = useRef<number | null>(null)
+  const scheduleMeasure = useCallback(() => {
+    if (typeof requestAnimationFrame === "undefined") {
+      measure()
+      return
+    }
+    if (frame.current !== null) cancelAnimationFrame(frame.current)
+    frame.current = requestAnimationFrame(() => {
+      frame.current = null
+      measure()
+    })
+  }, [measure])
+
+  useEffect(() => {
+    return () => {
+      if (frame.current !== null && typeof cancelAnimationFrame !== "undefined") {
+        cancelAnimationFrame(frame.current)
+      }
+    }
+  }, [])
+
   // Re-measure when the strip or its items resize: a font swap, a badge
   // appearing, or the container being scrolled into a narrower column all move
   // the target out from under the indicator.
   useEffect(() => {
     const container = containerRef.current
     if (!container || typeof ResizeObserver === "undefined") return
-    const observer = new ResizeObserver(() => measure())
+    const observer = new ResizeObserver(() => scheduleMeasure())
     observer.observe(container)
-    for (const child of Array.from(container.children)) observer.observe(child)
+    for (const child of Array.from(container.children)) {
+      // NOT the indicator itself. It is a child of the strip, and the hook sets
+      // its width — so observing it means every measurement resizes the thing
+      // being observed, which schedules another measurement. The equality check
+      // in `measure` stops that becoming an infinite loop, but it still doubles
+      // the callback traffic during exactly the reflow where the readings are
+      // least trustworthy.
+      if (child.getAttribute("aria-hidden") === "true") continue
+      observer.observe(child)
+    }
     return () => observer.disconnect()
-  }, [measure])
+  }, [scheduleMeasure])
 
   // Watch the marker attribute itself. Callers that own the selected value pass
   // it as `activeKey` and are already covered by the layout effect above, but a
@@ -92,14 +141,14 @@ export function useSlidingIndicator<T extends HTMLElement = HTMLDivElement>(
   useEffect(() => {
     const container = containerRef.current
     if (!container || typeof MutationObserver === "undefined") return
-    const observer = new MutationObserver(() => measure())
+    const observer = new MutationObserver(() => scheduleMeasure())
     observer.observe(container, {
       attributes: true,
       attributeFilter: ["data-state", "data-active"],
       subtree: true,
     })
     return () => observer.disconnect()
-  }, [measure])
+  }, [scheduleMeasure])
 
   return { containerRef, rect }
 }
