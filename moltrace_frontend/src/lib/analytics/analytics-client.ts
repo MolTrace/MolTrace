@@ -518,6 +518,22 @@ function reactionAnalyticsMetadata(meta: ReactionAnalyticsMetadata): Record<stri
   return Object.keys(out).length > 0 ? out : undefined
 }
 
+/**
+ * Hoist a measured duration into the typed ``duration_seconds`` column. The value
+ * has always also ridden inside ``metadata_json`` — but a JSON blob is unqueryable
+ * by percentile SQL, so the column stayed NULL even for events that measured one.
+ * The metadata copy stays for context.
+ */
+function withMeasuredDuration(
+  event: UsageAnalyticsEventInput,
+  duration: number | null | undefined,
+): UsageAnalyticsEventInput {
+  if (duration != null && Number.isFinite(duration) && duration >= 0) {
+    return { ...event, duration_seconds: Math.round(duration * 1000) / 1000 }
+  }
+  return event
+}
+
 export function trackReactionProjectCreated(meta: ReactionAnalyticsMetadata): void {
   trackUsageEvent({ event_type: "reaction_project_created", metadata: reactionAnalyticsMetadata(meta) })
 }
@@ -535,7 +551,12 @@ export function trackReactionOptimizationRunStarted(meta: ReactionAnalyticsMetad
 }
 
 export function trackReactionOptimizationRunCompleted(meta: ReactionAnalyticsMetadata): void {
-  trackUsageEvent({ event_type: "reaction_optimization_run_completed", metadata: reactionAnalyticsMetadata(meta) })
+  trackUsageEvent(
+    withMeasuredDuration(
+      { event_type: "reaction_optimization_run_completed", metadata: reactionAnalyticsMetadata(meta) },
+      meta.duration_seconds,
+    ),
+  )
 }
 
 export function trackReactionRecommendationApproved(meta: ReactionAnalyticsMetadata): void {
@@ -567,11 +588,21 @@ export function trackReactionBoRunStarted(meta: ReactionAnalyticsMetadata): void
 }
 
 export function trackReactionBoRunCompleted(meta: ReactionAnalyticsMetadata): void {
-  trackUsageEvent({ event_type: "reaction_bo_run_completed", metadata: reactionAnalyticsMetadata(meta) })
+  trackUsageEvent(
+    withMeasuredDuration(
+      { event_type: "reaction_bo_run_completed", metadata: reactionAnalyticsMetadata(meta) },
+      meta.duration_seconds,
+    ),
+  )
 }
 
 export function trackReactionRecommendationBatchCreated(meta: ReactionAnalyticsMetadata): void {
-  trackUsageEvent({ event_type: "reaction_recommendation_batch_created", metadata: reactionAnalyticsMetadata(meta) })
+  trackUsageEvent(
+    withMeasuredDuration(
+      { event_type: "reaction_recommendation_batch_created", metadata: reactionAnalyticsMetadata(meta) },
+      meta.duration_seconds,
+    ),
+  )
 }
 
 export function trackReactionBenchmarkRunStarted(meta: ReactionAnalyticsMetadata): void {
@@ -579,7 +610,12 @@ export function trackReactionBenchmarkRunStarted(meta: ReactionAnalyticsMetadata
 }
 
 export function trackReactionBenchmarkRunCompleted(meta: ReactionAnalyticsMetadata): void {
-  trackUsageEvent({ event_type: "reaction_benchmark_run_completed", metadata: reactionAnalyticsMetadata(meta) })
+  trackUsageEvent(
+    withMeasuredDuration(
+      { event_type: "reaction_benchmark_run_completed", metadata: reactionAnalyticsMetadata(meta) },
+      meta.duration_seconds,
+    ),
+  )
 }
 
 export function trackReactionAdvisorRunStarted(meta: ReactionAnalyticsMetadata): void {
@@ -587,7 +623,12 @@ export function trackReactionAdvisorRunStarted(meta: ReactionAnalyticsMetadata):
 }
 
 export function trackReactionAdvisorRunCompleted(meta: ReactionAnalyticsMetadata): void {
-  trackUsageEvent({ event_type: "reaction_advisor_run_completed", metadata: reactionAnalyticsMetadata(meta) })
+  trackUsageEvent(
+    withMeasuredDuration(
+      { event_type: "reaction_advisor_run_completed", metadata: reactionAnalyticsMetadata(meta) },
+      meta.duration_seconds,
+    ),
+  )
 }
 
 export function trackReactionRecommendationCritiqued(meta: ReactionAnalyticsMetadata): void {

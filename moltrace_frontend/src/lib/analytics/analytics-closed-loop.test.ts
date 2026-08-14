@@ -19,6 +19,7 @@ import {
   trackCompoundLinkedToReaction,
   trackCoreModuleOpened,
   trackReactionAnalyticalResultLinked,
+  trackReactionBoRunCompleted,
   trackReactionCycleDecisionSaved,
   trackReactionExecutionBatchCreated,
   trackReactionExecutionItemCompleted,
@@ -580,5 +581,24 @@ describe("tenant SaaS analytics metadata", () => {
     expect(metadata?.ip_allowlist_json).toBeUndefined()
     expect(metadata?.allowed_domains_json).toBeUndefined()
     expect(metadata?.notes_json).toBeUndefined()
+  })
+})
+
+describe("measured-duration hoist (P1 §4)", () => {
+  it("a tracker given a measured duration writes the typed column, not only metadata", () => {
+    apiFetchMock.mockResolvedValue(undefined)
+    trackReactionBoRunCompleted({ reaction_project_id: 1, bo_run_id: 7, duration_seconds: 1.23456 })
+    const raw = lastAnalyticsRequestBody()
+    // Typed column populated (rounded to ms precision) — this is what makes
+    // `percentile_cont(0.95) WITHIN GROUP (ORDER BY duration_seconds)` answerable.
+    expect(raw.duration_seconds).toBe(1.235)
+    // The metadata copy stays for context.
+    expect((raw.metadata ?? raw.metadata_json)?.duration_seconds).toBe(1.235)
+  })
+
+  it("a tracker with no duration leaves the column absent rather than zero", () => {
+    apiFetchMock.mockResolvedValue(undefined)
+    trackReactionBoRunCompleted({ reaction_project_id: 1, bo_run_id: 8 })
+    expect(lastAnalyticsRequestBody().duration_seconds).toBeUndefined()
   })
 })
