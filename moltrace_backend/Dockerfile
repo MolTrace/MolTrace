@@ -67,6 +67,19 @@ ENV PATH="/app/.venv/bin:$PATH" \
     MOLTRACE_HOSE_KB=/app/data/hose/hose_index.json.gz \
     PORT=8080
 
+# Fail the build when the knowledge base is absent: a clean CI checkout lacks the
+# gitignored table, and the resulting image would silently serve the seed
+# predictor in production (the exact failure the block above describes). CI
+# stages the file from gs://moltrace-model-weights/hose/ before building; a
+# deliberately degraded local image needs --build-arg REQUIRE_HOSE_KB=0.
+ARG REQUIRE_HOSE_KB=1
+RUN if [ "$REQUIRE_HOSE_KB" = "1" ] && [ ! -s "$MOLTRACE_HOSE_KB" ]; then \
+      echo "ERROR: $MOLTRACE_HOSE_KB is missing or empty in the build context." \
+           "Stage data/hose/hose_index.json.gz before building, or pass" \
+           "--build-arg REQUIRE_HOSE_KB=0 for a seed-table dev image." >&2; \
+      exit 1; \
+    fi
+
 USER app
 EXPOSE 8080
 

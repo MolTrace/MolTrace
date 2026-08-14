@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 from functools import lru_cache
+from pathlib import Path
 
 from .secrets_provider import resolve_secret, resolve_secret_strict
 
@@ -59,6 +60,9 @@ class Settings:
     database_url: str = "sqlite:///./nmrcheck.sqlite3"
     redis_url: str | None = None
     queue_name: str = "nmrcheck"
+    # Mirrors MOLTRACE_HOSE_KB (read directly by moltrace.spectroscopy.predict);
+    # carried here so validate_startup_settings can judge it against app_env.
+    hose_kb_path: str = ""
 
     max_batch_size: int = 100
     allowed_upload_types: tuple[str, ...] = ("csv", "json")
@@ -250,6 +254,7 @@ def get_settings() -> Settings:
         ),
         redis_url=resolve_secret("REDIS_URL"),
         queue_name=os.getenv("QUEUE_NAME", "nmrcheck"),
+        hose_kb_path=os.getenv("MOLTRACE_HOSE_KB", ""),
         max_batch_size=_parse_int(os.getenv("MAX_BATCH_SIZE"), 100),
         allowed_upload_types=tuple(
             ext.lower().lstrip(".")
@@ -437,6 +442,20 @@ def validate_startup_settings(settings: Settings) -> list[str]:
         issues.append("SSO_ENCRYPTION_KEY must be set in production.")
     if settings.app_env == "production" and not settings.mfa_encryption_key:
         issues.append("MFA_ENCRYPTION_KEY must be set in production.")
+    # A missing knowledge base does not stop the service — it silently answers from a
+    # 16-molecule seed table (~35 ppm median 13C uncertainty vs ~1.88 ppm with the full
+    # NMRShiftDB2 index), which is why it must be a startup issue rather than something
+    # to discover from degraded verification verdicts later.
+    if settings.hose_kb_path and not Path(settings.hose_kb_path).exists():
+        issues.append(
+            f"MOLTRACE_HOSE_KB is set to {settings.hose_kb_path!r} but no such file exists; "
+            "shift prediction would silently fall back to the 16-molecule seed table."
+        )
+    elif settings.app_env == "production" and not settings.hose_kb_path:
+        issues.append(
+            "MOLTRACE_HOSE_KB is not set in production; shift prediction would run on the "
+            "16-molecule seed table instead of the full NMRShiftDB2 index."
+        )
     if settings.app_env == "production" and settings.disable_auth:
         issues.append("DISABLE_BACKEND_AUTH must not be enabled in production.")
     if settings.app_env == "production" and settings.debug:

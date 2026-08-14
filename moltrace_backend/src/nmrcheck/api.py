@@ -3158,8 +3158,20 @@ def _health_response(request: Request | None = None) -> dict[str, object]:
                 extra={"correlation_id": _request_correlation_id(request)},
             )
             checks["database"] = "error"
+    from moltrace.spectroscopy.predict.nmrnet_wrapper import knowledge_base_status
+
+    hose_kb = knowledge_base_status()
+    app_env = (_state(request).settings if request is not None else get_settings()).app_env
+    if hose_kb["configured"] and not hose_kb["path_present"]:
+        # Set-and-missing is what a deploy that forgot to stage the table looks like.
+        checks["hose_kb"] = "error"
+    elif not hose_kb["configured"] and app_env == "production":
+        # The bundled 16-molecule seed table is not a production state (see Dockerfile).
+        checks["hose_kb"] = "error"
+    else:
+        checks["hose_kb"] = "ok"
     status_value = "ok" if all(value == "ok" for value in checks.values()) else "degraded"
-    return {"status": status_value, "checks": checks}
+    return {"status": status_value, "checks": checks, "hose_kb": hose_kb}
 
 
 def health() -> dict[str, object]:
@@ -27953,12 +27965,15 @@ def admin_system(
 
 @router.get("/admin/deployment", dependencies=[Depends(require_admin)])
 def admin_deployment_diagnostics(request: Request) -> dict[str, object]:
+    from moltrace.spectroscopy.predict.nmrnet_wrapper import knowledge_base_status
+
     settings = _state(request).settings
     optional_fid_ready = (
         importlib.util.find_spec("nmrglue") is not None
         and importlib.util.find_spec("numpy") is not None
     )
     return {
+        "hose_kb": knowledge_base_status(),
         "app_env": settings.app_env,
         "database_url_configured": bool(settings.database_url),
         "redis_configured": bool(settings.redis_url),
@@ -31409,6 +31424,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or get_settings()
     session_factory = create_session_factory(settings.database_url)
     startup_issues = validate_startup_settings(settings)
+    for issue in startup_issues:
+        # Alertable signal — these otherwise surface only on /admin/deployment.
+        logger.error("Startup configuration issue: %s", issue)
 
     @asynccontextmanager
     async def app_lifespan(_: FastAPI) -> AsyncIterator[None]:
