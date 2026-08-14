@@ -13,8 +13,18 @@ vi.mock("next/navigation", () => ({
   usePathname: () => "/dashboard",
 }))
 
+/** Records the `collapsed` value on EVERY render, so a test can assert what the
+ *  FIRST render after a remount looked like. Asserting the settled DOM cannot:
+ *  RTL flushes effects inside `render`, so the corrected value is already in
+ *  place by the time it returns — which is exactly the frame the reader sees
+ *  and the test would not. */
+const sidebarRenders = vi.hoisted(() => [] as boolean[])
+
 vi.mock("@/components/app/app-sidebar", () => ({
-  AppSidebar: () => <aside data-testid="desktop-sidebar" />,
+  AppSidebar: ({ collapsed }: { collapsed: boolean }) => {
+    sidebarRenders.push(collapsed)
+    return <aside data-testid="desktop-sidebar" data-collapsed={String(collapsed)} />
+  },
 }))
 
 vi.mock("@/components/app/app-topbar", () => ({
@@ -195,5 +205,53 @@ describe("ResponsiveAppShell shell mode", () => {
     await waitFor(() => {
       expect(screen.queryByTestId("evidence-queue")).not.toBeInTheDocument()
     })
+  })
+})
+
+/**
+ * THE SHELL REMOUNTS ON EVERY NAVIGATION — it is rendered by each page rather
+ * than by a layout. Its panel states default to "expanded"/"open" and were
+ * corrected in an effect after mount, so that correction replayed on every
+ * route change: with the sidebar collapsed, each navigation rendered it at its
+ * full 224px and animated back to 56px, jerking the page 168px sideways and
+ * back. Measured in a browser across one navigation: 56 -> 224 -> 56.
+ *
+ * The defaults are still right for the FIRST render of a document, because they
+ * are what the server sent and reading storage during render would hydrate into
+ * a mismatch. A module-level cache separates the two cases.
+ */
+describe("ResponsiveAppShell — remount does not replay the layout", () => {
+  it("first render of a document matches the server, then corrects", async () => {
+    window.localStorage.setItem("moltrace:shell:sidebar-collapsed", "1")
+    sidebarRenders.length = 0
+
+    render(<ResponsiveAppShell>content</ResponsiveAppShell>)
+
+    // The very first render must be the SERVER's value, or hydration mismatches.
+    expect(sidebarRenders[0]).toBe(false)
+    // ...and the stored preference is applied straight after.
+    await waitFor(() =>
+      expect(screen.getByTestId("desktop-sidebar")).toHaveAttribute("data-collapsed", "true"),
+    )
+  })
+
+  it("a remount starts collapsed, with no expanded frame at all", async () => {
+    window.localStorage.setItem("moltrace:shell:sidebar-collapsed", "1")
+
+    // Prime the cache the way the first page load does.
+    const first = render(<ResponsiveAppShell>content</ResponsiveAppShell>)
+    await waitFor(() =>
+      expect(screen.getByTestId("desktop-sidebar")).toHaveAttribute("data-collapsed", "true"),
+    )
+    first.unmount()
+
+    // The remount every navigation causes.
+    sidebarRenders.length = 0
+    render(<ResponsiveAppShell>content</ResponsiveAppShell>)
+
+    // The point of the fix: not "ends up collapsed" but "was never anything
+    // else". A single `false` here is one painted frame of a 224px sidebar.
+    expect(sidebarRenders).not.toContain(false)
+    expect(sidebarRenders[0]).toBe(true)
   })
 })

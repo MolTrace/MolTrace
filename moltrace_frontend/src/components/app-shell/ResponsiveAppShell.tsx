@@ -41,14 +41,54 @@ function writeShellPref(key: string, value: boolean): void {
   }
 }
 
+/**
+ * The preferences, cached OUTSIDE React so they survive the shell's remount.
+ *
+ * This is the fix for the shell visibly rebuilding itself on every navigation.
+ * The states below default to "expanded" and "open" and are corrected in an
+ * effect after mount — which is right for the first paint, because those
+ * defaults are what the server rendered and reading storage during render would
+ * hydrate into a mismatch. But this shell remounts on EVERY navigation, so that
+ * correction replayed every time: with the sidebar collapsed, each route change
+ * rendered it at its full 224px and then animated it back down to 56px, jerking
+ * the entire page 168px sideways and back. Measured across one navigation:
+ * 56 -> 224 -> 56.
+ *
+ * A module variable is the only thing in this file that outlives a remount
+ * while staying inside the same document. On the first render of a fresh
+ * document it is null, so the initialisers return exactly the values the server
+ * sent and hydration still matches. On every remount after that it is populated,
+ * so the shell rebuilds itself already in the shape the reader left it and there
+ * is nothing to correct and nothing to animate.
+ */
+type ShellPrefs = { sidebarCollapsed: boolean; evidenceQueueOpen: boolean }
+let cachedShellPrefs: ShellPrefs | null = null
+
+/** Keeps the cache level with storage, so the next remount restores what the
+ *  reader actually chose rather than what they chose before that. */
+function rememberShellPref(patch: Partial<ShellPrefs>): void {
+  cachedShellPrefs = {
+    sidebarCollapsed: false,
+    evidenceQueueOpen: true,
+    ...(cachedShellPrefs ?? {}),
+    ...patch,
+  }
+}
+
 export function ResponsiveAppShell({ children }: { children: React.ReactNode }) {
   const isMobile = useIsMobile()
   const router = useRouter()
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  // Null cache => first render of this document => the server's value, so
+  // hydration matches. Populated => a remount, so start where the reader left it.
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(
+    () => cachedShellPrefs?.sidebarCollapsed ?? false,
+  )
   // Docked panel: open by default on desktop, and the reader's choice is
   // restored after mount (see below) rather than read during render, which
   // would not match what the server rendered.
-  const [evidenceQueueOpen, setEvidenceQueueOpen] = useState(true)
+  const [evidenceQueueOpen, setEvidenceQueueOpen] = useState(
+    () => cachedShellPrefs?.evidenceQueueOpen ?? true,
+  )
   // The mobile sheet is a separate, deliberately-closed-by-default state. It must
   // NOT ride on `evidenceQueueOpen`: that defaults to true and this shell remounts
   // on every navigation, so sharing it would slam a full-screen sheet over the
@@ -56,14 +96,22 @@ export function ResponsiveAppShell({ children }: { children: React.ReactNode }) 
   const [evidenceSheetOpen, setEvidenceSheetOpen] = useState(false)
 
   useEffect(() => {
-    setSidebarCollapsed(readShellPref("sidebar-collapsed", false))
-    setEvidenceQueueOpen(readShellPref("evidence-queue-open", true))
+    const prefs = {
+      sidebarCollapsed: readShellPref("sidebar-collapsed", false),
+      evidenceQueueOpen: readShellPref("evidence-queue-open", true),
+    }
+    // Cache first, so the NEXT remount starts in the right shape rather than
+    // repeating this correction.
+    cachedShellPrefs = prefs
+    setSidebarCollapsed(prefs.sidebarCollapsed)
+    setEvidenceQueueOpen(prefs.evidenceQueueOpen)
   }, [])
 
   function toggleSidebar() {
     setSidebarCollapsed((prev) => {
       const next = !prev
       writeShellPref("sidebar-collapsed", next)
+      rememberShellPref({ sidebarCollapsed: next })
       return next
     })
   }
@@ -71,6 +119,9 @@ export function ResponsiveAppShell({ children }: { children: React.ReactNode }) 
   function setDockedQueueOpen(next: boolean) {
     setEvidenceQueueOpen(next)
     writeShellPref("evidence-queue-open", next)
+    // Without this the cache keeps the pre-toggle value, and the next
+    // navigation reopens (or recloses) the panel the reader just changed.
+    rememberShellPref({ evidenceQueueOpen: next })
   }
 
   // One button in the topbar drives two surfaces: the docked column when there is
