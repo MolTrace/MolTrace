@@ -418,6 +418,31 @@ def analyze_nmr2d_preview(
         dept_adjustment = 0.06 * (dept_apt_carbon_type_score - 0.5)
     matched_correlation_count = sum(1 for item in correlations if item.matched_1h_peak is not None or item.matched_13c_peak is not None)
 
+    # The coverage NUMERATOR: distinct one-bond environments, not raw correlations.
+    #
+    # Counting correlations that found *a* reference on *either* axis let noise
+    # manufacture coverage. A cross peak anchored on one axis only is not an
+    # observed environment — an artifact sitting on a 13C column matches the
+    # carbon and nothing else — and several peaks landing on the SAME (1H, 13C)
+    # pair (a ridge, t1 noise, symmetric duplicates) are one environment seen
+    # repeatedly. With the old count, seven such peaks reached
+    # structural_coverage = 1.0 for a molecule whose real correlations were
+    # never observed.
+    #
+    # Restricted to HSQC/HMQC because that is what the denominator expects: an
+    # HMBC peak is a 2-3 bond correlation and must not satisfy a one-bond
+    # expectation. Matching still runs against the OBSERVED 1D shifts, never the
+    # predicted ones — see the note below on the predictor's heavy-tailed error.
+    matched_environment_count = len(
+        {
+            (item.matched_1h_peak, item.matched_13c_peak)
+            for item in correlations
+            if str(item.correlation_type) in {"HSQC", "HMQC"}
+            and item.matched_1h_peak is not None
+            and item.matched_13c_peak is not None
+        }
+    )
+
     # Structural coverage: how much of what the STRUCTURE predicts was seen.
     #
     # The count comes from graph symmetry (exact chemistry), never from the shift
@@ -438,7 +463,7 @@ def analyze_nmr2d_preview(
 
     if expected_environment_count:
         # A distinct observed environment can satisfy at most one expectation.
-        observed_environments = min(matched_correlation_count, expected_environment_count)
+        observed_environments = min(matched_environment_count, expected_environment_count)
         structural_coverage = observed_environments / expected_environment_count
         missing_reference_count = expected_environment_count - observed_environments
     else:
@@ -521,6 +546,10 @@ def analyze_nmr2d_preview(
         "proton_reference_count": len(proton_refs),
         "carbon13_reference_count": len(carbon_refs),
         "matched_correlation_count": matched_correlation_count,
+        # The coverage numerator, reported alongside its denominator so a reader
+        # can see WHY coverage is what it is — a large matched_correlation_count
+        # beside a small matched_environment_count is the artifact signature.
+        "matched_environment_count": matched_environment_count,
         "missing_reference_count": missing_reference_count,
         "expected_environment_count": expected_environment_count,
         "structural_coverage": (
