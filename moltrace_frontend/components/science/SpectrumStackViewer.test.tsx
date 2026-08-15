@@ -201,3 +201,123 @@ describe("telling many traces apart", () => {
     expect(toggle).toHaveAccessibleName("expt-33 shown in the stack")
   })
 })
+
+describe("canvas gesture contract — stacked viewer", () => {
+  function tracePair() {
+    const x: number[] = []
+    const y: number[] = []
+    for (let i = 0; i < 512; i++) {
+      x.push(10 - (i / 511) * 10)
+      y.push(i === 200 ? 90 : 1)
+    }
+    return [
+      { id: "a", label: "a", x, y },
+      { id: "b", label: "b", x: [...x], y: [...y] },
+    ]
+  }
+
+  function mockPlotRect() {
+    const plot = screen.getByTestId("spectrum-stack-viewer-plot")
+    vi.spyOn(plot, "getBoundingClientRect").mockReturnValue({
+      bottom: 460,
+      height: 460,
+      left: 0,
+      right: 1000,
+      top: 0,
+      width: 1000,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    } as DOMRect)
+    Object.assign(plot, { setPointerCapture: vi.fn(), releasePointerCapture: vi.fn() })
+    return plot
+  }
+
+  /** The aria-label carries the visible range, so it is the observable view state. */
+  function labelledSpan(plot: HTMLElement): number {
+    const match = (plot.getAttribute("aria-label") ?? "").match(/from ([\d.]+) to ([\d.]+) ppm/)
+    expect(match).not.toBeNull()
+    return Number(match![1]) - Number(match![2])
+  }
+
+  it("zooms only on the shift-drag chord — a plain drag at full range changes nothing", () => {
+    render(<SpectrumStackViewer traces={tracePair()} nucleus="1H" />)
+    const plot = mockPlotRect()
+
+    fireEvent.pointerDown(plot, { button: 0, clientX: 200, pointerId: 1 })
+    fireEvent.pointerMove(plot, { clientX: 600, pointerId: 1 })
+    fireEvent.pointerUp(plot, { pointerId: 1 })
+    expect(screen.getByTestId("spectrum-stack-viewer-reset-zoom")).toBeDisabled()
+
+    fireEvent.pointerDown(plot, { button: 0, shiftKey: true, clientX: 200, pointerId: 2 })
+    fireEvent.pointerMove(plot, { clientX: 600, pointerId: 2 })
+    fireEvent.pointerUp(plot, { pointerId: 2 })
+    expect(screen.getByTestId("spectrum-stack-viewer-reset-zoom")).toBeEnabled()
+  })
+
+  it("pans with a plain drag once zoomed, keeping the window width", () => {
+    render(<SpectrumStackViewer traces={tracePair()} nucleus="1H" />)
+    const plot = mockPlotRect()
+
+    fireEvent.keyDown(plot, { key: "+" })
+    const spanBefore = labelledSpan(plot)
+
+    fireEvent.pointerDown(plot, { button: 0, clientX: 500, pointerId: 3 })
+    fireEvent.pointerMove(plot, { clientX: 400, pointerId: 3 })
+    fireEvent.pointerUp(plot, { pointerId: 3 })
+
+    // Still zoomed, same width — a pan slides the window, it must never resize it.
+    expect(screen.getByTestId("spectrum-stack-viewer-reset-zoom")).toBeEnabled()
+    expect(labelledSpan(plot)).toBeCloseTo(spanBefore, 6)
+  })
+
+  it("pans ArrowLeft toward higher shifts, the way the reversed axis reads", () => {
+    render(<SpectrumStackViewer traces={tracePair()} nucleus="1H" />)
+    const plot = mockPlotRect()
+
+    fireEvent.keyDown(plot, { key: "+" })
+    const upperBefore = Number(
+      (plot.getAttribute("aria-label") ?? "").match(/from ([\d.]+)/)?.[1],
+    )
+    fireEvent.keyDown(plot, { key: "ArrowLeft" })
+    const upperAfter = Number(
+      (plot.getAttribute("aria-label") ?? "").match(/from ([\d.]+)/)?.[1],
+    )
+    // View-left on an NMR axis means higher ppm. The original handler had this inverted.
+    expect(upperAfter).toBeGreaterThan(upperBefore)
+  })
+
+  it("does not reset the zoom on Escape — Esc only abandons an in-progress drag", () => {
+    // Re-baselined from the first keyboard pass, where Escape aliased "0". Same key, opposite
+    // outcomes across the two canvases was the exact inconsistency the shared contract removes:
+    // a reviewer's reflexive Esc must not throw away the window they were reading.
+    render(<SpectrumStackViewer traces={tracePair()} nucleus="1H" />)
+    const plot = mockPlotRect()
+
+    fireEvent.keyDown(plot, { key: "+" })
+    expect(screen.getByTestId("spectrum-stack-viewer-reset-zoom")).toBeEnabled()
+
+    fireEvent.keyDown(plot, { key: "Escape" })
+    expect(screen.getByTestId("spectrum-stack-viewer-reset-zoom")).toBeEnabled()
+
+    fireEvent.keyDown(plot, { key: "0" })
+    expect(screen.getByTestId("spectrum-stack-viewer-reset-zoom")).toBeDisabled()
+  })
+
+  it("drives intensity from the wheel only while the plot is focused, and 0 restores it", () => {
+    render(<SpectrumStackViewer traces={tracePair()} nucleus="1H" />)
+    const plot = mockPlotRect()
+
+    expect(plot.getAttribute("data-vertical-gain")).toBe("1.000")
+    fireEvent.wheel(plot, { deltaY: -400 })
+    expect(plot.getAttribute("data-vertical-gain")).toBe("1.000")
+
+    plot.focus()
+    fireEvent.wheel(plot, { deltaY: -400 })
+    const raised = Number(plot.getAttribute("data-vertical-gain"))
+    expect(raised).toBeGreaterThan(1)
+
+    fireEvent.keyDown(plot, { key: "0" })
+    expect(plot.getAttribute("data-vertical-gain")).toBe("1.000")
+  })
+})
