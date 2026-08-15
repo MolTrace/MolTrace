@@ -35,10 +35,34 @@ from nmrcheck.settings import Settings
 # Big enough that the pipeline takes >1 s (32k complex points zero-fill to a
 # >=196k FFT, the size of a real 2.5 MB archive), small enough to build fast.
 _POINTS = 32768
-# The loop must never be starved for longer than this while the route runs.
-# Generous against CI scheduler noise, and an order of magnitude below the
-# >1 s compute time an inline pipeline would block for.
-_MAX_HEARTBEAT_GAP_S = 0.5
+# Inline-vs-threadpool is a RATIO question, not an absolute one, and pinning it
+# to seconds made this gate fail on the hardware it is supposed to run on: an
+# absolute 0.5 s (picked as "generous against CI scheduler noise") measured
+# 0.529 s on a CI runner and turned a green pipeline red.
+#
+# Measured, cold cache, eight runs on a dev M-series Mac: wall 2.0-2.6 s, largest
+# gap 0.074-0.243 s -- a ratio of 0.036-0.106. The CI run that failed: wall
+# 5.78 s, gap 0.529 s -- a ratio of 0.092, squarely inside the same band. The
+# absolute number moved with the hardware; the ratio did not. A bound in seconds
+# sitting at roughly twice the fast-machine maximum is a coin flip on a runner
+# 2-3x slower, which is a flaky gate on the deploy path, not a science gate.
+#
+# The property this test actually asserts survives the change intact, because it
+# was always a ratio: an INLINE pipeline starves the loop for essentially the
+# whole request (ratio -> 1.0), a threadpooled one only for scheduler slices.
+# 0.35 leaves >3x headroom over the worst gap ever observed and still trips at a
+# third of the inline signature.
+_MAX_GAP_FRACTION_OF_WALL = 0.35
+
+# A floor that proves the pipeline actually ran, which the ratio alone does not.
+# The report cache landed with this same work and returns a completed report for
+# an archive it has already seen without touching the pipeline: measured, a
+# repeat of this exact request in-process drops the wall from 2.3 s to 0.08 s.
+# The heartbeat across a cache hit is beautifully flat and means nothing, so the
+# test has to refuse to draw a conclusion from one. Cold wall is >=2 s on the
+# fastest machine here and was 5.78 s on CI, so this floor only ever catches the
+# cache.
+_MIN_MEANINGFUL_WALL_S = 0.75
 
 
 def _bruker_zip(points: int = _POINTS) -> bytes:
@@ -140,10 +164,15 @@ def test_preview_route_keeps_event_loop_responsive() -> None:
 
         assert gaps, "heartbeat never ticked"
         max_gap = max(gaps)
-        assert max_gap < _MAX_HEARTBEAT_GAP_S, (
-            f"event loop starved for {max_gap:.3f}s during a {wall:.2f}s preview "
-            "request — the FID pipeline is running inline on the loop instead of "
-            "in the threadpool"
+        assert wall > _MIN_MEANINGFUL_WALL_S, (
+            f"the preview returned in {wall:.2f}s, too fast to have run the "
+            "pipeline — this is a report-cache hit, and a heartbeat measured "
+            "across one says nothing about where the compute ran"
+        )
+        assert max_gap < wall * _MAX_GAP_FRACTION_OF_WALL, (
+            f"event loop starved for {max_gap:.3f}s of a {wall:.2f}s preview "
+            f"request ({max_gap / wall:.0%} of it) — the FID pipeline is running "
+            "inline on the loop instead of in the threadpool"
         )
 
     asyncio.run(run())
