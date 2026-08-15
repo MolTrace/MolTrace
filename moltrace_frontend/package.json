@@ -8,6 +8,13 @@
     "node": "22.14.0",
     "pnpm": "11.0.3"
   },
+  "browserslist": [
+    "chrome >= 111",
+    "edge >= 111",
+    "firefox >= 128",
+    "safari >= 16.4",
+    "ios_saf >= 16.4"
+  ],
   "scripts": {
     "dev": "next dev",
     "build": "next build",
