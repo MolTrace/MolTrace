@@ -98,6 +98,32 @@ describe("ProcessingParametersCard", () => {
 })
 
 describe("MetadataKeyValueCard", () => {
+  it("finds acquisition metadata where the raw-FID response actually nests it", () => {
+    // Shape confirmed by posting a real Bruker archive to a running server: /nmr/raw-fid/process
+    // reports the instrument parameters under metadata.raw_upload_provenance, NOT at the top
+    // level. Reading only the top level made this card vanish on every real raw-FID upload — and
+    // a card that renders nothing is indistinguishable from one whose data was never reported,
+    // so nothing on screen suggested anything was missing.
+    render(
+      <MetadataKeyValueCard
+        payload={{
+          metadata: {
+            raw_upload_provenance: {
+              acquisition_metadata: { PULPROG: "zg30", TD: 65536, SFO1: 400.13 },
+            },
+          },
+        }}
+        title="Acquisition metadata"
+        field="acquisition_metadata"
+        testId="acq-card"
+      />,
+    )
+    const card = screen.getByTestId("acq-card")
+    expect(card).toHaveTextContent("zg30")
+    expect(card).toHaveTextContent("65536")
+  })
+
+
   it("renders flat key/value rows for the acquisition_metadata dict", () => {
     const payload = {
       acquisition_metadata: {
