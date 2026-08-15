@@ -54,6 +54,17 @@ export const SPECTRACHECK_NAV: WorkspaceStageGroup[] = [
     ],
   },
   {
+    id: "bench",
+    label: "Bench",
+    sections: [
+      {
+        value: "tab-bench",
+        label: "Evidence Bench",
+        desc: "Spectrum, picked peaks, and evidence side by side for every finished dataset, with the processing recipe underneath.",
+      },
+    ],
+  },
+  {
     id: "output",
     label: "Outputs",
     sections: [

@@ -96,6 +96,7 @@ import {
   SPECTRACHECK_NAV,
   isSpectraCheckSection,
 } from "@/components/spectracheck/spectracheck-section-directory"
+import { SpectraCheckBench } from "@/components/spectracheck/spectracheck-bench"
 import { SpectraCheckSessionControls } from "@/components/spectracheck/spectracheck-session-controls"
 import { SpectraCheckSystemStatusBadges } from "@/components/spectracheck/spectracheck-system-status-badges"
 import type { SessionSaveFeedback } from "@/components/spectracheck/spectracheck-session-controls"
@@ -1935,6 +1936,10 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
             compoundClass={compoundClass}
             registerDev={registerDev}
           />
+        </TabsContent>
+
+        <TabsContent value="tab-bench" className="mt-4">
+          <SpectraCheckBench />
         </TabsContent>
 
         <TabsContent value="tab-raw-fid" className="mt-4">
