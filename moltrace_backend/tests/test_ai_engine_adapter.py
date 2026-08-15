@@ -311,3 +311,66 @@ def test_no_atoms_yields_no_confidence_rather_than_a_default() -> None:
     assert summary.score == 0.0
     assert summary.ood_status == "not_assessed"
     assert any("no atoms" in w for w in summary.warnings)
+
+
+# --------------------------------------------------------------------------- #
+# Candidate ranking — coverage disclosure (P5 §6)
+# --------------------------------------------------------------------------- #
+def test_candidate_ranking_reports_its_denominator_and_basis() -> None:
+    """`matched_peaks` alone is unreadable: 2 looks the same as 2 of 2 or 2 of 8.
+
+    The SpectraCheck panel path has carried this disclosure since the coverage
+    work (docs/fe_handoff_dp4_ranking_coverage.md); this surface emitted the same
+    numbers bare while feeding an automated review threshold.
+    """
+    result = adapter.run_prediction(
+        "nmr_candidate_ranking",
+        {
+            "nucleus": "13C",
+            "observed_shifts_ppm": [18.0, 58.0, 128.0, 140.0],
+            "candidates": [
+                {"candidate_id": "close", "predicted_shifts_ppm": [18.2, 58.3, 127.6, 140.4]},
+                {"candidate_id": "far", "predicted_shifts_ppm": [40.0, 90.0, 100.0, 175.0]},
+            ],
+        },
+    )
+    row = result.output["candidates"][0]
+    assert row["observed_peak_count"] == 4
+    assert 0.0 <= row["matched_fraction"] <= 1.0
+    assert row["error_basis"] == "matched_peaks_only"
+    # A ranking share is not a calibrated probability of correctness, and the
+    # record must say so rather than let a consumer assume it.
+    assert row["probability_is_calibrated"] is False
+    assert row["probability_basis"]
+    assert any("not calibrated" in w or "not\ncalibrated" in w or "calibrated" in w
+               for w in result.warnings)
+
+
+def test_a_leading_candidate_that_explains_little_records_no_confidence() -> None:
+    """A DP4 share is computed over MATCHED peaks only.
+
+    So a candidate matching a minority of the spectrum can still take most of the
+    probability mass. Reporting that as confidence would clear a review threshold
+    on the strength of a fit to a fraction of the evidence — the same defect the
+    single-candidate case already guards against.
+    """
+    result = adapter.run_prediction(
+        "nmr_candidate_ranking",
+        {
+            "nucleus": "13C",
+            # Eight observed signals; each candidate predicts only two, so the
+            # leader can explain at most a quarter of what was measured.
+            "observed_shifts_ppm": [18.0, 58.0, 128.0, 140.0, 22.0, 71.0, 133.0, 155.0],
+            "candidates": [
+                {"candidate_id": "partial", "predicted_shifts_ppm": [18.1, 58.2]},
+                {"candidate_id": "worse", "predicted_shifts_ppm": [95.0, 99.0]},
+            ],
+        },
+    )
+    top = result.output["candidates"][0]
+    assert top["low_coverage"] is True
+    assert top["matched_fraction"] < 0.75
+    assert result.confidence is None, (
+        "a share carried by a minority of the spectrum must not be recorded as confidence"
+    )
+    assert any("observed signals" in w for w in result.warnings)
