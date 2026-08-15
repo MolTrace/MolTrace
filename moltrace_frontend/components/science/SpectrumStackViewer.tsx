@@ -4,6 +4,11 @@
  * Cascade / overlay view of several 1D spectra on one shared ppm axis — the stacked plot a
  * chemist reaches for the moment there is more than one dataset to look at.
  *
+ * Interaction follows the MolTrace canvas gesture contract (lib/science/canvas-interaction.ts):
+ * hover = crosshair readout | drag = pan when zoomed | shift+drag = zoom to window | wheel while
+ * focused = vertical intensity | arrows pan | +/- zoom | 0 and double-click = full range and
+ * intensity x1 | Esc cancels the in-progress drag and never resets the view.
+ *
  * Deliberately NOT built on `SpectrumViewer`. That component is one trace with its own private
  * zoom state, a fixed 360px height, and a per-instance resize + hover loop, so N of them can
  * neither share an axis nor stay cheap. It is also not built on Plotly: a stack is polylines on a
@@ -14,9 +19,21 @@
  * the comparison surface that sits above it.
  */
 
-import { useCallback, useId, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react"
 import { Layers, RotateCcw } from "lucide-react"
 import { cn } from "@/lib/utils"
+import {
+  CANVAS_INTENSITY_MAX,
+  CANVAS_INTENSITY_MIN,
+  canvasKeyAction,
+  clampSpanToDomain,
+  formatHoverPpm,
+  isZoomWindowChord,
+  panSpan,
+  spanFromDrag,
+  wheelIntensityFactor,
+  zoomSpanAboutCentre,
+} from "@/lib/science/canvas-interaction"
 
 export type SpectrumStackTrace = {
   id: string
@@ -201,8 +218,20 @@ export function SpectrumStackViewer({
   const [sharedScale, setSharedScale] = useState(false)
   const [hidden, setHidden] = useState<Set<string>>(() => new Set())
   const [zoom, setZoom] = useState<{ min: number; max: number } | null>(null)
-  const [drag, setDrag] = useState<{ from: number; to: number } | null>(null)
+  /**
+   * The in-progress pointer gesture. `window` is the shift+drag zoom selection; `pan` grabs the
+   * content so the ppm under the pointer stays under it. Plain drag at full range is neither —
+   * there is nothing to pan and zooming is the explicit chord, so it does nothing.
+   */
+  const [drag, setDrag] = useState<
+    | { kind: "window"; from: number; to: number }
+    | { kind: "pan"; startViewX: number; startZoom: { min: number; max: number } }
+    | null
+  >(null)
   const [hoverPpm, setHoverPpm] = useState<number | null>(null)
+  /** Wheel-driven display multiplier on trace amplitude. Display-only; the clamp in `pathFor`
+   *  still bounds the drawn excursion, so a large gain clips rather than invading neighbours. */
+  const [verticalGain, setVerticalGain] = useState(1)
 
   const visibleTraces = useMemo(
     () => traces.filter((trace) => !hidden.has(trace.id)),
@@ -315,8 +344,8 @@ export function SpectrumStackViewer({
         // Clamp the drawn excursion. A saturated solvent peak's negative dispersion lobe can dip
         // many times the analyte height; unclamped it would punch through the trace stacked
         // below it and read as that trace's own signal. Standard NMR display convention.
-        const high = Math.min(point.high / reference, 1.04)
-        const low = Math.max(point.low / reference, -0.16)
+        const high = Math.min((point.high / reference) * verticalGain, 1.04)
+        const low = Math.max((point.low / reference) * verticalGain, -0.16)
         segments.push(
           `${i === 0 ? "M" : "L"}${px.toFixed(2)} ${(baseline - high * amplitude).toFixed(2)}`,
         )
@@ -324,7 +353,7 @@ export function SpectrumStackViewer({
       }
       return segments.join(" ")
     },
-    [amplitude, baselineFor, ppmToX, sharedPeak, sharedScale],
+    [amplitude, baselineFor, ppmToX, sharedPeak, sharedScale, verticalGain],
   )
 
   const ticks = useMemo(() => (range ? niceTicks(range.min, range.max) : []), [range])
@@ -341,6 +370,28 @@ export function SpectrumStackViewer({
   const resetView = useCallback(() => {
     setZoom(null)
     setDrag(null)
+    setVerticalGain(1)
+  }, [])
+
+  // Wheel = vertical intensity, gated on keyboard focus. Ungated, a full-width chart is a scroll
+  // trap in the middle of a long page; focus is the explicit opt-in, and it is the same opt-in
+  // the keyboard already requires. Native + non-passive because React's onWheel is passive and
+  // preventDefault would be silently ignored.
+  useEffect(() => {
+    const el = svgRef.current
+    if (!el) return
+    const onWheel = (event: WheelEvent) => {
+      if (document.activeElement !== el) return
+      event.preventDefault()
+      setVerticalGain((gain) =>
+        Math.min(
+          CANVAS_INTENSITY_MAX,
+          Math.max(CANVAS_INTENSITY_MIN, gain * wheelIntensityFactor(event.deltaY)),
+        ),
+      )
+    }
+    el.addEventListener("wheel", onWheel, { passive: false })
+    return () => el.removeEventListener("wheel", onWheel)
   }, [])
 
   if (!range || traces.length === 0) {
@@ -362,8 +413,9 @@ export function SpectrumStackViewer({
     )
   }
 
-  const dragFromX = drag ? ppmToX(drag.from) : 0
-  const dragToX = drag ? ppmToX(drag.to) : 0
+  const windowDrag = drag?.kind === "window" ? drag : null
+  const dragFromX = windowDrag ? ppmToX(windowDrag.from) : 0
+  const dragToX = windowDrag ? ppmToX(windowDrag.to) : 0
   const zoomed = zoom != null
 
   return (
@@ -419,8 +471,8 @@ export function SpectrumStackViewer({
 
         <span className="font-mono text-[10px] tabular-nums text-muted-foreground">
           {zoomed
-            ? `${formatPpm(range.max)} – ${formatPpm(range.min)} ppm`
-            : "Drag across the plot to zoom, or focus it and use the arrow keys"}
+            ? `${formatPpm(range.max)} – ${formatPpm(range.min)} ppm · drag to pan`
+            : "Shift-drag a region to zoom, or focus the plot and use + and the arrows"}
         </span>
 
         {/* Rendered unconditionally: hiding it until zoomed meant a keyboard user who zoomed via
@@ -444,50 +496,75 @@ export function SpectrumStackViewer({
         role="img"
         tabIndex={0}
         data-testid={`${testId}-plot`}
+        data-vertical-gain={verticalGain.toFixed(3)}
         onKeyDown={(event) => {
-          // Drag-to-zoom was mouse-only, and the reset control only appeared once zoomed — so a
-          // keyboard reviewer could neither enter nor leave the zoomed state. Inspecting one
-          // region across a stack is the whole point of this view, so it needs a way in that
-          // does not require a pointer.
-          const span = range.max - range.min
-          const stepBy = (fraction: number) => {
-            const delta = span * fraction
-            setZoom({ min: range.min + delta, max: range.max + delta })
+          // Shared keymap so this canvas and the single-spectrum canvas answer every key the
+          // same way. Esc cancels an in-progress drag and NOTHING ELSE — a reflexive Esc must
+          // not throw away the zoom a reviewer was working inside (0 resets, deliberately).
+          if (event.key === "Escape") {
+            if (drag) {
+              event.preventDefault()
+              setDrag(null)
+            }
+            return
           }
-          const zoomBy = (factor: number) => {
-            const centre = (range.min + range.max) / 2
-            const half = Math.max((span * factor) / 2, MIN_PPM_SPAN / 2)
-            setZoom({ min: centre - half, max: centre + half })
+          const action = canvasKeyAction(event.key)
+          if (!action || !fullRange) return
+          event.preventDefault()
+          if (action.kind === "reset") {
+            resetView()
+          } else if (action.kind === "pan") {
+            const next = panSpan(range, fullRange, action.screenDirection, { reversedX: true })
+            if (next) setZoom(next)
+          } else {
+            setZoom(zoomSpanAboutCentre(range, fullRange, action.factor, MIN_PPM_SPAN))
           }
-          if (event.key === "ArrowLeft") { event.preventDefault(); stepBy(-0.1) }
-          else if (event.key === "ArrowRight") { event.preventDefault(); stepBy(0.1) }
-          else if (event.key === "+" || event.key === "=") { event.preventDefault(); zoomBy(0.5) }
-          else if (event.key === "-" || event.key === "_") { event.preventDefault(); zoomBy(2) }
-          else if (event.key === "0" || event.key === "Escape") { event.preventDefault(); resetView() }
         }}
-        aria-label={`${count} spectra stacked on a shared ${nucleus ? `${nucleus} ` : ""}chemical-shift axis from ${formatPpm(range.max)} to ${formatPpm(range.min)} ppm. Use arrow keys to pan, plus and minus to zoom, 0 for the full range.`}
+        aria-label={`${count} spectra stacked on a shared ${nucleus ? `${nucleus} ` : ""}chemical-shift axis from ${formatPpm(range.max)} to ${formatPpm(range.min)} ppm. Shift-drag to zoom to a region. Arrow keys pan, plus and minus zoom, 0 restores the full range, and the mouse wheel adjusts intensity while the plot is focused.`}
         onPointerDown={(event) => {
           const viewX = pointerViewX(event.clientX)
           if (viewX == null) return
           event.currentTarget.setPointerCapture?.(event.pointerId)
-          const ppm = xToPpm(viewX)
-          setDrag({ from: ppm, to: ppm })
+          if (isZoomWindowChord(event)) {
+            const ppm = xToPpm(viewX)
+            setDrag({ kind: "window", from: ppm, to: ppm })
+            return
+          }
+          // Plain drag pans the zoomed window. At full range there is nothing to pan and zoom is
+          // the explicit chord, so a plain drag deliberately does nothing but focus the canvas.
+          if (zoom) setDrag({ kind: "pan", startViewX: viewX, startZoom: zoom })
         }}
         onPointerMove={(event) => {
           const viewX = pointerViewX(event.clientX)
           if (viewX == null) return
-          const ppm = xToPpm(viewX)
-          setHoverPpm(ppm)
-          setDrag((prev) => (prev ? { ...prev, to: ppm } : prev))
+          setHoverPpm(xToPpm(viewX))
+          // Read the gesture from the render closure, not a state updater: a pan writes ZOOM
+          // (a different piece of state), and a setState-inside-updater side effect is exactly
+          // what StrictMode double-invocation punishes. The closure is fresh enough — every move
+          // re-renders through setHoverPpm above.
+          if (!drag) return
+          if (drag.kind === "window") {
+            setDrag({ ...drag, to: xToPpm(viewX) })
+            return
+          }
+          // Content follows the pointer: the shift that keeps the grabbed ppm under the cursor
+          // is the pointer's view-space travel expressed in ppm of the WINDOW AT GRAB TIME.
+          const span = drag.startZoom.max - drag.startZoom.min
+          const deltaPpm = ((viewX - drag.startViewX) / PLOT_WIDTH) * span
+          setZoom(
+            clampSpanToDomain(
+              { min: drag.startZoom.min + deltaPpm, max: drag.startZoom.max + deltaPpm },
+              fullRange ?? drag.startZoom,
+            ),
+          )
         }}
         onPointerUp={() => {
           if (!drag) return
-          const min = Math.min(drag.from, drag.to)
-          const max = Math.max(drag.from, drag.to)
           setDrag(null)
+          if (drag.kind !== "window") return
           // A click, not a drag — leave the view alone rather than zooming to a sliver.
-          if (max - min < MIN_PPM_SPAN) return
-          setZoom({ min, max })
+          const selected = spanFromDrag(drag.from, drag.to, MIN_PPM_SPAN)
+          if (selected) setZoom(selected)
         }}
         onPointerLeave={() => {
           setHoverPpm(null)
@@ -572,7 +649,7 @@ export function SpectrumStackViewer({
           })}
 
           {/* Drag-to-zoom band */}
-          {drag && Math.abs(dragToX - dragFromX) > 1 ? (
+          {windowDrag && Math.abs(dragToX - dragFromX) > 1 ? (
             <rect
               x={Math.min(dragFromX, dragToX)}
               y={PLOT_TOP}
@@ -601,7 +678,7 @@ export function SpectrumStackViewer({
                 className="fill-foreground font-mono"
                 style={{ fontSize: 11 }}
               >
-                {formatPpm(hoverPpm)} ppm
+                {formatHoverPpm(hoverPpm)}
               </text>
             </g>
           ) : null}

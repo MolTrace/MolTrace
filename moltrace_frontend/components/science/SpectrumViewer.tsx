@@ -17,6 +17,18 @@ import { Button } from "@/components/ui/button"
 import { Slider } from "@/components/ui/slider"
 import { cn } from "@/lib/utils"
 import {
+  CANVAS_INTENSITY_MAX,
+  CANVAS_INTENSITY_MIN,
+  canvasKeyAction,
+  formatHoverIntensity,
+  formatHoverPpm,
+  isZoomWindowChord,
+  panSpan,
+  spanFromDrag,
+  wheelIntensityFactor,
+  zoomSpanAboutCentre,
+} from "@/lib/science/canvas-interaction"
+import {
   PEAK_CATEGORY_DEFAULT_COLOR,
   humanizePeakCategory,
   plotColorForCategory,
@@ -43,6 +55,14 @@ import {
   ZoomIn,
   ZoomOut,
 } from "lucide-react"
+
+/*
+ * Interaction follows the MolTrace canvas gesture contract (lib/science/canvas-interaction.ts):
+ * hover = crosshair readout | drag = pan (mouse/pen; touch pans in Move mode only, so pages keep
+ * scrolling) | shift+drag = zoom to window | wheel while focused = vertical intensity | arrows
+ * pan | +/- zoom | 0 and double-click = full range and intensity x1 | Esc cancels the
+ * in-progress gesture or closes the canvas menu and never resets the view | right-click = menu.
+ */
 
 /** Peak annotations from backend (no frontend picking).
  *
@@ -1046,6 +1066,17 @@ function SpectrumViewerImpl({
   // trace for the duration of the drag (see ``sampleXRange`` below).
   const [isPanning, setIsPanning] = useState(false)
   const panRafRef = useRef(0)
+  /**
+   * Shift+drag zoom-window selection, in pane pixels. State (not a ref) because the selection
+   * band renders from it; the band is an absolutely-positioned overlay like the hover crosshair,
+   * so drawing it never touches Plotly's props and the static-plot architecture holds.
+   */
+  const [dragZoom, setDragZoom] = useState<{
+    pointerId: number
+    startPx: number
+    currentPx: number
+    paneWidth: number
+  } | null>(null)
   const panTargetRef = useRef<[number, number] | null>(null)
 
   const effectiveXMin = xRange ? xRange[0] : xMin
@@ -1463,9 +1494,31 @@ function SpectrumViewerImpl({
 
   const startMoveDrag = useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {
-      if (!moveMode || e.button !== 0) return
+      if (e.button !== 0) return
+      // Touch drags stay page scrolls unless the user explicitly turned Move mode on — a chart
+      // that swallows every touch is unscrollable-past on a phone. Mouse and pen get the
+      // contract's neutral-drag pan with no mode required.
+      if (!moveMode && e.pointerType === "touch") return
       e.preventDefault()
       const pane = e.currentTarget
+      // Focus makes the keyboard and wheel halves of the contract live from the first click.
+      pane.focus({ preventScroll: true })
+      if (isZoomWindowChord(e)) {
+        const rect = pane.getBoundingClientRect()
+        const px = e.clientX - rect.left
+        setDragZoom({
+          pointerId: e.pointerId,
+          startPx: px,
+          currentPx: px,
+          paneWidth: Math.max(rect.width, 1),
+        })
+        try {
+          pane.setPointerCapture(e.pointerId)
+        } catch {
+          // Synthetic PointerEvents in tests/devtools may not register as active pointers.
+        }
+        return
+      }
       dragPanRef.current = {
         pointerId: e.pointerId,
         startClientX: e.clientX,
@@ -1487,6 +1540,13 @@ function SpectrumViewerImpl({
 
   const moveDrag = useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {
+      if (dragZoom && dragZoom.pointerId === e.pointerId) {
+        e.preventDefault()
+        const rect = e.currentTarget.getBoundingClientRect()
+        const px = e.clientX - rect.left
+        setDragZoom((prev) => (prev && prev.pointerId === e.pointerId ? { ...prev, currentPx: px } : prev))
+        return
+      }
       const drag = dragPanRef.current
       if (!drag || drag.pointerId !== e.pointerId) return
       e.preventDefault()
@@ -1508,10 +1568,36 @@ function SpectrumViewerImpl({
         })
       }
     },
-    [clampRangeToDomain, reversedXAxis],
+    [clampRangeToDomain, reversedXAxis, dragZoom],
   )
 
   const endMoveDrag = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    if (dragZoom && dragZoom.pointerId === e.pointerId) {
+      setDragZoom(null)
+      const fullLayout = plotDivRef.current?._fullLayout
+      const toPpm = (pointerX: number) =>
+        chemicalShiftFromPlotPointer({
+          pointerX,
+          paneWidth: dragZoom.paneWidth,
+          effectiveXMin,
+          effectiveXMax,
+          reversedXAxis,
+          plotlyXAxis: fullLayout?.xaxis,
+        })?.ppm
+      const a = toPpm(dragZoom.startPx)
+      const b = toPpm(dragZoom.currentPx)
+      if (a != null && b != null) {
+        // Minimum span mirrors the stack viewer: a shift+click must not zoom to a sliver.
+        const selected = spanFromDrag(a, b, 0.02)
+        if (selected) setXRange([selected.min, selected.max])
+      }
+      try {
+        e.currentTarget.releasePointerCapture(e.pointerId)
+      } catch {
+        // See setPointerCapture guard in startMoveDrag.
+      }
+      return
+    }
     const drag = dragPanRef.current
     if (!drag || drag.pointerId !== e.pointerId) return
     dragPanRef.current = null
@@ -1531,7 +1617,7 @@ function SpectrumViewerImpl({
     } catch {
       // See setPointerCapture guard in startMoveDrag.
     }
-  }, [])
+  }, [dragZoom, effectiveXMin, effectiveXMax, reversedXAxis])
 
   // ── Custom hover readout ────────────────────────────────────────────────
   // Plotly is left fully static (``hovermode:false``, ``staticPlot:true``):
@@ -1729,6 +1815,25 @@ function SpectrumViewerImpl({
     [effectiveXMin, effectiveXMax],
   )
 
+  // ── Focus-gated wheel on the chart pane: vertical intensity ─────────────
+  // The contract's wheel half. Gated on keyboard focus so plain scrolling over
+  // the chart still scrolls the page; the first click on the pane focuses it
+  // (see startMoveDrag), after which the wheel drives peak height.
+  useEffect(() => {
+    const el = chartPaneRef.current
+    if (!el) return
+    const onWheel = (e: WheelEvent) => {
+      if (document.activeElement !== el) return
+      e.preventDefault()
+      e.stopPropagation()
+      setYZoom((z) =>
+        Math.min(CANVAS_INTENSITY_MAX, Math.max(CANVAS_INTENSITY_MIN, z * wheelIntensityFactor(e.deltaY))),
+      )
+    }
+    el.addEventListener("wheel", onWheel, { passive: false })
+    return () => el.removeEventListener("wheel", onWheel)
+  }, [])
+
   // ── Non-passive wheel handler for the gain rail ─────────────────────────
   // React's onWheel is passive by default in modern browsers, so calling
   // preventDefault inside it is silently ignored and the page scrolls anyway.
@@ -1797,10 +1902,52 @@ function SpectrumViewerImpl({
         <div
           ref={chartPaneRef}
           className={cn(
-            "relative min-h-0 flex-1",
+            "relative min-h-0 flex-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[color:var(--mt-teal)]",
             moveMode ? "cursor-grab active:cursor-grabbing" : "cursor-crosshair",
           )}
           data-testid="spectrum-move-pane"
+          tabIndex={0}
+          role="application"
+          aria-label="Spectrum canvas. Drag pans. Shift-drag zooms to a region. Arrow keys pan, plus and minus zoom, 0 restores the full range, and the mouse wheel adjusts intensity while the canvas is focused."
+          onKeyDown={(event) => {
+            // The shared keymap — identical dispatch in SpectrumStackViewer. Esc cancels the
+            // in-progress gesture only; it must never reset a zoom the reviewer is inside.
+            if (event.key === "Escape") {
+              if (dragZoom) {
+                event.preventDefault()
+                setDragZoom(null)
+              } else if (dragPanRef.current) {
+                event.preventDefault()
+                dragPanRef.current = null
+                if (panRafRef.current) {
+                  window.cancelAnimationFrame(panRafRef.current)
+                  panRafRef.current = 0
+                }
+                panTargetRef.current = null
+                setIsPanning(false)
+              }
+              return
+            }
+            const action = canvasKeyAction(event.key)
+            if (!action) return
+            event.preventDefault()
+            const domain = { min: Math.min(xMin, xMax), max: Math.max(xMin, xMax) }
+            const visible = { min: effectiveXMin, max: effectiveXMax }
+            if (action.kind === "reset") {
+              setXRange(null)
+              setYZoom(1)
+            } else if (action.kind === "pan") {
+              const next = panSpan(visible, domain, action.screenDirection, { reversedX: reversedXAxis })
+              if (next) setXRange([next.min, next.max])
+            } else {
+              const next = zoomSpanAboutCentre(visible, domain, action.factor, 0.02)
+              setXRange([next.min, next.max])
+            }
+          }}
+          onDoubleClick={() => {
+            setXRange(null)
+            setYZoom(1)
+          }}
           onContextMenuCapture={openSpectrumContextMenu}
           onPointerDown={startMoveDrag}
           onPointerMove={handleChartPointerMove}
@@ -1847,6 +1994,17 @@ function SpectrumViewerImpl({
             triggers a Plotly redraw (the chart stays stable). ``pointer-events
             -none`` keeps the pane's own pan/hover pointer handlers working.
           */}
+          {dragZoom && Math.abs(dragZoom.currentPx - dragZoom.startPx) > 1 ? (
+            <div
+              aria-hidden
+              data-testid="spectrum-zoom-band"
+              className="pointer-events-none absolute inset-y-0 border-x border-[color:var(--mt-teal)] bg-[color:var(--mt-teal-soft)]"
+              style={{
+                left: Math.min(dragZoom.startPx, dragZoom.currentPx),
+                width: Math.abs(dragZoom.currentPx - dragZoom.startPx),
+              }}
+            />
+          ) : null}
           {hoverReadout ? (
             <div className="pointer-events-none absolute inset-0 z-10">
               <div
@@ -1869,11 +2027,11 @@ function SpectrumViewerImpl({
                 }}
               >
                 <div className="font-semibold tabular-nums text-foreground">
-                  δ {hoverReadout.ppm.toFixed(3)} ppm
+                  {formatHoverPpm(hoverReadout.ppm)}
                 </div>
                 <div className="tabular-nums text-muted-foreground">
                   {Number.isFinite(hoverReadout.intensity)
-                    ? `I ${hoverReadout.intensity.toExponential(2)}`
+                    ? formatHoverIntensity(hoverReadout.intensity)
                     : "I —"}
                 </div>
               </div>
