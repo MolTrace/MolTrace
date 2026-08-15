@@ -34,6 +34,8 @@ function doneItem(id: string, label: string, pointCount: number): RawFidBatchIte
     sourceDir: null,
     fileCount: null,
     uncompressedBytes: null,
+    // This bench builds already-completed rows, so there is no drop-time readout to carry.
+    detected: null,
     status: "done",
     mode: "process",
     error: null,
