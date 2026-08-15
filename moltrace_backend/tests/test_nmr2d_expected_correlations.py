@@ -332,3 +332,62 @@ class TestHMBCGetsNoStructuralDenominator:
         blob = " ".join(result.notes).lower()
         assert "long-range" in blob or "long range" in blob
         assert "review" in blob
+
+
+class TestArtifactsCannotManufactureCoverage:
+    """The C4 numerator, tightened.
+
+    C4 gave HSQC a structural denominator and fixed the case it measured:
+    withholding correlations now lowers the score. But the NUMERATOR counted
+    observed correlations that found *a* 1D reference on *either* axis, and was
+    then merely capped at the expected count. So N artifacts — t1 noise, a
+    ridge, or several cross peaks all sitting on one environment — each counted
+    once and could carry structural_coverage to 1.0 for a molecule whose real
+    correlations were never observed.
+
+    The fix stays inside C4's documented design: matching remains against the
+    OBSERVED 1D shifts (measured, tight), never against predicted shifts, whose
+    heavy-tailed error would need windows wide enough to match almost anything.
+    What changed is that a correlation must anchor on BOTH axes, and only
+    DISTINCT (proton, carbon) environment pairs count — one environment cannot
+    be satisfied twice.
+    """
+
+    IBU = TestTheAnalyzerReportsStructuralCoverage.IBU
+    PROTON = TestTheAnalyzerReportsStructuralCoverage.PROTON
+    CARBON = TestTheAnalyzerReportsStructuralCoverage.CARBON
+    PAIRS = TestTheAnalyzerReportsStructuralCoverage.PAIRS
+
+    def _coverage(self, pairs):
+        result = TestTheAnalyzerReportsStructuralCoverage._run(self, pairs)
+        return result.correlation_summary.get("structural_coverage"), result
+
+    def test_repeats_of_one_environment_do_not_fill_the_denominator(self) -> None:
+        # Seven cross peaks, but every one of them lands on the SAME 1H/13C
+        # environment — a ridge through one resonance, not seven environments.
+        ridge = [self.PAIRS[0]] * 7
+        coverage, result = self._coverage(ridge)
+        assert coverage is not None
+        assert coverage < 1.0, (
+            f"seven copies of one environment reported structural_coverage {coverage}"
+        )
+        assert result.missing_reference_count >= 5, (
+            "a ridge on one environment reported almost nothing missing: "
+            f"{result.missing_reference_count}"
+        )
+
+    def test_half_matched_peaks_do_not_count_as_environments(self) -> None:
+        # Cross peaks whose carbon axis matches a real reference but whose proton
+        # axis is nowhere near one: an artifact aligned to a 13C column.
+        half = [(15.0 + 0.11 * i, c) for i, (_h, c) in enumerate(self.PAIRS)]
+        coverage, _result = self._coverage(half)
+        assert coverage is not None
+        assert coverage == 0.0, (
+            f"peaks anchored on only one axis produced structural_coverage {coverage}"
+        )
+
+    def test_a_real_complete_spectrum_still_reports_full_coverage(self) -> None:
+        # The tightening must not punish the correct case it was built around.
+        coverage, result = self._coverage(self.PAIRS)
+        assert coverage == 1.0, f"a complete HSQC reported coverage {coverage}"
+        assert result.missing_reference_count == 0
