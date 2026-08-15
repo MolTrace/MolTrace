@@ -47,21 +47,17 @@ export function useIsMobile() {
       applyShellMode(mobile ? 'mobile' : 'desktop')
     }
 
-    // Older Safari (≤13) ships MediaQueryList without add/removeEventListener —
-    // only the deprecated addListener pair. Guard so the hook degrades to the
-    // resize listener instead of throwing and unmounting the page.
-    queries.forEach((mql) => {
-      if (typeof mql.addEventListener === 'function') mql.addEventListener('change', onChange)
-      else if (typeof mql.addListener === 'function') mql.addListener(onChange)
-    })
+    // No addListener fallback: the declared browser floor (package.json
+    // browserslist — Tailwind v4's floor, Safari ≥ 16.4) is far past the
+    // Safari ≤ 13 the old guard defended. On those browsers the oklch()/
+    // @custom-variant stylesheet does not even parse, so the guard was
+    // unreachable support theater.
+    queries.forEach((mql) => mql.addEventListener('change', onChange))
     window.addEventListener('resize', onChange)
     onChange()
 
     return () => {
-      queries.forEach((mql) => {
-        if (typeof mql.removeEventListener === 'function') mql.removeEventListener('change', onChange)
-        else if (typeof mql.removeListener === 'function') mql.removeListener(onChange)
-      })
+      queries.forEach((mql) => mql.removeEventListener('change', onChange))
       window.removeEventListener('resize', onChange)
     }
   }, [])
