@@ -14,6 +14,16 @@
 import type { WorkspaceStageGroup } from "@/components/app/workspace-stage-nav"
 
 export const SPECTRACHECK_NAV: WorkspaceStageGroup[] = [
+  // Overview leads because it is where the workspace actually opens (`defaultTab`), and a nav
+  // whose first item is not the one highlighted on arrival reads as though something was skipped.
+  {
+    id: "start",
+    label: "Overview",
+    sections: [
+      { value: "tab-overview", label: "Overview", desc: "Summary of available evidence, connection status, and next recommended actions." },
+      { value: "tab-workflow", label: "Workflow", desc: "A predefined sequence of analysis, QC, evidence, unified confidence, and report steps. Reproduces the session." },
+    ],
+  },
   {
     id: "session",
     label: "Session",
@@ -23,14 +33,6 @@ export const SPECTRACHECK_NAV: WorkspaceStageGroup[] = [
         label: "Session",
         desc: "Choose the project and sample this work belongs to, load or save a session, and link supporting knowledge records.",
       },
-    ],
-  },
-  {
-    id: "start",
-    label: "Overview",
-    sections: [
-      { value: "tab-overview", label: "Overview", desc: "Summary of available evidence, connection status, and next recommended actions." },
-      { value: "tab-workflow", label: "Workflow", desc: "A predefined sequence of analysis, QC, evidence, unified confidence, and report steps. Reproduces the session." },
     ],
   },
   {
