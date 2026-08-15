@@ -12158,6 +12158,7 @@ async def nmr_raw_fid_process_route(
         environments=_process_envs,  # type: ignore[arg-type]
         environment_count=_process_env_count,
         environment_counts=_process_env_counts,
+        inferred_nmr_text=preview.inferred_nmr_text or "",
         peak_category_summary=peak_category_summary,
         labile_hydrogen_summary=labile_hydrogen_summary,
         proton_inventory=proton_inventory,
