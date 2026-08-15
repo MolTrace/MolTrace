@@ -1,9 +1,8 @@
 "use client"
 
 import { Canvas, useFrame } from "@react-three/fiber"
-import { Environment } from "@react-three/drei"
 import * as THREE from "three"
-import { Suspense, useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 
 /** Stylistic palette — cyan / emerald / violet (reference artwork) */
 const PALETTE = ["#22d3ee", "#34d399", "#a78bfa"] as const
@@ -262,9 +261,11 @@ export function HeroMoleculeBackground() {
         <directionalLight position={[-12, -6, -8]} intensity={0.42} color="#93c5fd" />
         <pointLight position={[14, 4, 10]} intensity={0.55} color="#a5b4fc" />
         <pointLight position={[-8, 10, -6]} intensity={0.35} color="#6ee7b7" />
-        <Suspense fallback={null}>
-          <Environment preset="studio" environmentIntensity={0.5} />
-        </Suspense>
+        {/* No <Environment>: the drei preset fetched a ~1-2 MB HDR from
+            raw.githack.com — an uncached third-party request racing LCP, whose
+            failure left the hero dark (Suspense fallback null), and which the
+            Report-Only CSP's connect-src will hard-block the day it is
+            enforced. The five explicit lights above are the lighting rig. */}
         <HypotheticalMoleculeScene />
       </Canvas>
     </div>

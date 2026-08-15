@@ -1,3 +1,7 @@
+"use client"
+
+import { useEffect, useRef } from "react"
+
 import "./orbital-field.css"
 
 /**
@@ -44,8 +48,34 @@ import "./orbital-field.css"
 const LAYERS = 6
 
 export function OrbitalFieldBackdrop() {
+  const rootRef = useRef<HTMLDivElement | null>(null)
+
+  // Third cost, learned after the two documented above: layer RETENTION. Six
+  // section-sized composited layers with will-change stay resident on the GPU
+  // and keep ticking for the tab's lifetime, long after the section scrolls
+  // away. Same IntersectionObserver pattern the hero (frameloop) and the
+  // stacked deck (interval) already use: off-screen, animations pause and
+  // will-change releases the textures. rootMargin resumes them just before
+  // re-entry so the drift is never seen starting.
+  useEffect(() => {
+    const root = rootRef.current
+    if (!root || typeof IntersectionObserver !== "function") return
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        root.classList.toggle("mt-orbit-paused", !entry.isIntersecting)
+      },
+      { rootMargin: "20% 0px" },
+    )
+    observer.observe(root)
+    return () => observer.disconnect()
+  }, [])
+
   return (
-    <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
+    <div
+      ref={rootRef}
+      aria-hidden
+      className="pointer-events-none absolute inset-0 -z-10 overflow-hidden"
+    >
       <div className="absolute inset-0 bg-[#05070c]" />
       <div className="mt-orbit-sky absolute inset-0" />
 
