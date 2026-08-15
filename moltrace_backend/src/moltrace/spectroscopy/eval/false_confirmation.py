@@ -68,6 +68,7 @@ class FalseConfirmationReport:
     pairs_scored: int
     truth_wins: int
     decoy_wins: int
+    ties: int
     indistinguishable: int
     rejected_on_formula: int
     unscorable: int
@@ -78,7 +79,29 @@ class FalseConfirmationReport:
 
     @property
     def false_confirmation_rate(self) -> float | None:
-        """Share of scored pairs where a wrong structure won. ``None`` if none scored."""
+        """Share of scored pairs where the wrong structure was NOT rejected.
+
+        Ties count against us. A ``>`` comparison credited an exact
+        probability tie to the truth, which made the published figure a lower
+        bound rather than the rate — and, worse, gave a zero-regression safety
+        metric a way to be improved by producing more ties. This module's
+        sibling (``verifier_margin``) already refuses to fold ties into either
+        side; this is the same rule applied to the rate.
+
+        ``None`` if nothing was scored — zero evidence is not a perfect score.
+        """
+
+        if not self.pairs_scored:
+            return None
+        return (self.decoy_wins + self.ties) / self.pairs_scored
+
+    @property
+    def decoy_strict_win_rate(self) -> float | None:
+        """The strictly-worse-than-truth share, i.e. the historical figure.
+
+        Kept so the change in the published number is legible as a definition
+        change rather than a measurement change.
+        """
 
         if not self.pairs_scored:
             return None
@@ -92,10 +115,12 @@ class FalseConfirmationReport:
             "pairs_scored": self.pairs_scored,
             "truth_wins": self.truth_wins,
             "decoy_wins": self.decoy_wins,
+            "ties": self.ties,
             "indistinguishable": self.indistinguishable,
             "rejected_on_formula": self.rejected_on_formula,
             "unscorable": self.unscorable,
             "false_confirmation_rate": self.false_confirmation_rate,
+            "decoy_strict_win_rate": self.decoy_strict_win_rate,
             "by_kind": {k: dict(v) for k, v in sorted(self.by_kind.items())},
             "notes": list(self.notes),
         }
@@ -147,7 +172,7 @@ def measure_false_confirmation(
     kb = knowledge_base if knowledge_base is not None else build_knowledge_base(train)
     element = "H" if nucleus == "1H" else "C"
 
-    generated = scored = truth_wins = decoy_wins = 0
+    generated = scored = truth_wins = decoy_wins = ties = 0
     indistinguishable = rejected_on_formula = unscorable = 0
     examined = 0
     by_kind: dict[str, dict[str, int]] = {}
@@ -188,6 +213,7 @@ def measure_false_confirmation(
                 {
                     "truth_wins": 0,
                     "decoy_wins": 0,
+                    "ties": 0,
                     "indistinguishable": 0,
                     "rejected_on_formula": 0,
                     "unscorable": 0,
@@ -214,9 +240,17 @@ def measure_false_confirmation(
                 nucleus=nucleus,  # type: ignore[arg-type]
             )
             scored += 1
+            # Three outcomes, not two. An exact tie is not a win for the truth:
+            # DP4 failed to separate a wrong structure from the right one, and
+            # crediting that to the truth both flattered the published figure
+            # and left a zero-regression safety metric improvable by producing
+            # more ties.
             if probabilities[1].probability > probabilities[0].probability:
                 decoy_wins += 1
                 bucket["decoy_wins"] += 1
+            elif probabilities[1].probability == probabilities[0].probability:
+                ties += 1
+                bucket["ties"] += 1
             else:
                 truth_wins += 1
                 bucket["truth_wins"] += 1
@@ -235,6 +269,7 @@ def measure_false_confirmation(
         pairs_scored=scored,
         truth_wins=truth_wins,
         decoy_wins=decoy_wins,
+        ties=ties,
         indistinguishable=indistinguishable,
         rejected_on_formula=rejected_on_formula,
         unscorable=unscorable,
