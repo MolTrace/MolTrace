@@ -1,10 +1,6 @@
 import type { MetadataRoute } from "next"
 
-const PWA_ASSET_VERSION = "2026-08-09-neon-prism-raised-m-v1"
-
-function versionedIcon(src: string) {
-  return `${src}?v=${PWA_ASSET_VERSION}`
-}
+import { versionedIcon } from "@/lib/pwa/asset-version"
 
 export default function manifest(): MetadataRoute.Manifest {
   return {

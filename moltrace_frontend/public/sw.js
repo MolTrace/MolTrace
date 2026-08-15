@@ -2,7 +2,14 @@ var SW_VERSION = "2026-08-14-http-cache-respected-v3"
 var STATIC_CACHE = "moltrace-static-" + SW_VERSION
 var RUNTIME_CACHE = "moltrace-runtime-" + SW_VERSION
 var OFFLINE_URL = "/offline"
-var ICON_VERSION = "v=" + SW_VERSION
+// Icon URLs are versioned by ARTWORK version, never by SW_VERSION. Keying them
+// to SW_VERSION put the precache in a different URL space from the page (page
+// requests could never be served from it, and both copies were pinned for a
+// year by the immutable header), and made every unrelated SW bump re-download
+// the whole shell. This literal mirrors PWA_ASSET_VERSION in
+// lib/pwa/asset-version.ts — sw-asset-version.test.ts fails if they drift.
+var PWA_ASSET_VERSION = "2026-08-09-neon-prism-raised-m-v1"
+var ICON_VERSION = "v=" + PWA_ASSET_VERSION
 var SHELL_ASSETS = [
   OFFLINE_URL,
   "/icons/moltrace-mark.svg?" + ICON_VERSION,
@@ -69,8 +76,18 @@ function precacheShell() {
   })
 }
 
+// Documents revalidate, never go stale. The marketing paths carry
+// `stale-while-revalidate=86400`, which Chrome and Firefox honour in the BROWSER
+// cache too — with a plain fetch a returning visitor could be served yesterday's
+// HTML (and yesterday's build id, which the update manager then cannot reload
+// while the tab is visible). `no-cache` still permits a conditional request, so
+// the 304 saving this SW change is about is preserved; only staleness is not.
+function revalidatingFetch(request) {
+  return fetch(request, { cache: "no-cache" })
+}
+
 function networkFirst(request, fallbackUrl) {
-  return networkOnly(request).catch(function () {
+  return revalidatingFetch(request).catch(function () {
     if (!fallbackUrl) return Response.error()
     return caches.match(fallbackUrl).then(function (fallback) {
       return fallback || Response.error()

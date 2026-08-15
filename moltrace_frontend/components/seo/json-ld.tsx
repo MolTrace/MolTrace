@@ -1,4 +1,5 @@
 import { SITE_URL, SITE_NAME, SITE_DESCRIPTION } from "@/lib/seo/site"
+import { versionedIcon } from "@/lib/pwa/asset-version"
 
 /**
  * Structured data (schema.org / JSON-LD) for the site root. Rendered once in the
@@ -45,7 +46,7 @@ export function OrganizationJsonLd() {
         url: SITE_URL,
         logo: {
           "@type": "ImageObject",
-          url: `${SITE_URL}/icons/icon-512.png`,
+          url: `${SITE_URL}${versionedIcon("/icons/icon-512.png")}`,
           width: 512,
           height: 512,
         },

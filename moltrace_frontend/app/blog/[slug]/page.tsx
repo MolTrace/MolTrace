@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Footer } from "@/components/marketing/footer"
 import { Header } from "@/components/marketing/header"
 import { SITE_URL, SITE_NAME } from "@/lib/seo/site"
+import { versionedIcon } from "@/lib/pwa/asset-version"
 import { getLivePosts, getPostBySlug, socialImageFor, type PostBlock } from "@/lib/blog/posts"
 
 // Only live posts (status: "live" + a body) are emitted as routes; any other
@@ -194,7 +195,7 @@ export default async function BlogPostPage({ params }: Params) {
       name: SITE_NAME,
       logo: {
         "@type": "ImageObject",
-        url: `${SITE_URL}/icons/icon-512.png`,
+        url: `${SITE_URL}${versionedIcon("/icons/icon-512.png")}`,
         width: 512,
         height: 512,
       },
