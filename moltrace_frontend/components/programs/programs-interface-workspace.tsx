@@ -1,26 +1,36 @@
 "use client"
 
 import dynamic from "next/dynamic"
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 import { AiModulePredictionAugmentation } from "@/components/ai/ai-module-prediction-augmentation"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { MobileSpectraCheckReview } from "@/src/components/mobile/MobileSpectraCheckReview"
 import { trackCoreModuleOpened } from "@/src/lib/analytics/analytics-client"
 
-// The desktop workspace is the app's heaviest client graph. Loaded on demand so
-// the mobile branch never fetches its chunk; ssr:false keeps the two branches
-// out of the prerendered HTML, so the branch swap cannot hydrate-mismatch.
+/** Reserves roughly the workspace's above-the-fold height so the swap-in is not
+ *  a full-page layout jump, and announces itself instead of being invisible to
+ *  assistive tech (the previous aria-hidden box did neither). */
+function WorkspacePlaceholder() {
+  return (
+    <div
+      role="status"
+      aria-label="Loading SpectraCheck workspace"
+      className="min-h-[70vh] animate-pulse rounded-lg border bg-muted/20"
+    />
+  )
+}
+
+// The desktop workspace is the app's heaviest client graph, so it loads on
+// demand. ssr:false because the route is authed and every panel fetches its own
+// data — there is no meaningful server-rendered content to lose, and it keeps
+// both branches out of the prerendered HTML so the branch swap cannot
+// hydrate-mismatch.
 const SpectraCheckWorkspace = dynamic(
   () =>
     import("@/components/spectracheck/spectracheck-workspace").then(
       (m) => m.SpectraCheckWorkspace,
     ),
-  {
-    ssr: false,
-    loading: () => (
-      <div className="h-64 animate-pulse rounded-lg border bg-muted/20" aria-hidden />
-    ),
-  },
+  { ssr: false, loading: WorkspacePlaceholder },
 )
 
 /**
@@ -37,6 +47,18 @@ export function ProgramsInterfaceWorkspace({
   sessionId?: string | null
 }) {
   const isMobile = useIsMobile()
+  // On a HARD load (shared link, refresh, PWA cold start) useIsMobile must
+  // report false during hydration to match the server HTML — so rendering the
+  // branch immediately would instantiate the lazy workspace on a phone and
+  // fetch + evaluate the heaviest chunk in the app before the viewport is even
+  // known. Rendering the placeholder for that one commit defers the branch
+  // decision until the answer is real; the mobile path then never requests the
+  // chunk at all, which is the whole point. Desktop loses nothing: ssr:false
+  // emits no preload, so its fetch begins after hydration either way.
+  const [viewportKnown, setViewportKnown] = useState(false)
+  useEffect(() => {
+    setViewportKnown(true)
+  }, [])
 
   useEffect(() => {
     trackCoreModuleOpened("spectracheck", { surface: "programs_workspace" })
@@ -47,7 +69,9 @@ export function ProgramsInterfaceWorkspace({
       {/* One tree, never both: the old CSS-`hidden` desktop copy stayed fully
           mounted on phones — effects, workspace fetches, DOM — behind
           display:none, on exactly the devices least able to absorb it. */}
-      {!desktopMode && isMobile ? (
+      {!viewportKnown ? (
+        <WorkspacePlaceholder />
+      ) : !desktopMode && isMobile ? (
         <MobileSpectraCheckReview sessionId={sessionId} />
       ) : (
         <SpectraCheckWorkspace />

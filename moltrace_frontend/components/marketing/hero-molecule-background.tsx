@@ -141,13 +141,19 @@ function BondCylinder({
   return (
     <mesh position={position} quaternion={quaternion} renderOrder={0}>
       <cylinderGeometry args={[STICK_R, STICK_R, height, 8]} />
+      {/* Re-tuned for a lights-only rig. PBR scales diffuse by (1 - metalness),
+          so metalness 0.72 took nearly all of its appearance from specular
+          reflections of scene.environment — which the <Environment> HDR used to
+          supply. With that removed, high metalness reads as unlit metal, and
+          envMapIntensity is a no-op with no env map to scale. Low metalness +
+          slightly softer roughness keeps the sticks legible under the four
+          explicit lights. */}
       <meshPhysicalMaterial
         color="#c8cdd8"
-        metalness={0.72}
-        roughness={0.22}
+        metalness={0.12}
+        roughness={0.32}
         transparent
         opacity={0.72}
-        envMapIntensity={1.1}
       />
     </mesh>
   )
@@ -171,7 +177,6 @@ function GlassAtom({ color, radius }: { color: string; radius: number }) {
         opacity={0.78}
         clearcoat={0.9}
         clearcoatRoughness={0.12}
-        envMapIntensity={1.15}
         attenuationColor={color}
         attenuationDistance={0.65}
       />

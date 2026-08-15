@@ -10,9 +10,10 @@ vi.mock("@react-three/fiber", () => ({
   useFrame: vi.fn(),
 }))
 
-vi.mock("@react-three/drei", () => ({
-  Environment: () => null,
-}))
+// No @react-three/drei mock: the hero dropped <Environment> (its HDR was a
+// third-party fetch racing LCP that the CSP will block). Mocking a module the
+// component no longer imports is inert today but becomes a tripwire the moment
+// the now-unused dependency is removed from package.json.
 
 import { HeroMoleculeBackground } from "@/components/marketing/hero-molecule-background"
 
