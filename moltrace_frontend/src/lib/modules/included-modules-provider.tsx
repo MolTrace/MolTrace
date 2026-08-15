@@ -14,7 +14,7 @@
  *
  * Mirrors the developer-mode-provider pattern.
  */
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react"
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import { apiFetch } from "@/lib/api/client"
 import { isModuleKey, MODULE_DISPLAY_NAMES, routeIsOffered, type ModuleKey } from "@/src/lib/modules/module-routes"
 
@@ -42,6 +42,9 @@ const FALLBACK: IncludedModulesState = {
 }
 
 const IncludedModulesContext = createContext<IncludedModulesState>(FALLBACK)
+
+/** Internal: lets the hook start the fetch without widening the public state. */
+const EnsureLoadedContext = createContext<() => void>(() => {})
 
 export function parseSystemCapabilities(resp: unknown): {
   included: Set<ModuleKey>
@@ -72,13 +75,40 @@ export function IncludedModulesProvider({ children }: { children: ReactNode }) {
     unavailable: boolean
   }>({ included: new Set(), displayNames: MODULE_DISPLAY_NAMES, loading: true, unavailable: false })
 
+  /**
+   * The fetch fires on the FIRST SUBSCRIBER, not on mount.
+   *
+   * This provider sits in the root layout — the only ancestor the per-page app
+   * shell shares — so mounting-time fetching meant every page ran it, including
+   * the public marketing site, whose components never read this context at all.
+   * Every anonymous homepage visit fired a backend /system/capabilities call:
+   * a wasted Cloud Run request per marketing pageview in production, and a 503
+   * console error on every page whenever the backend is unreachable.
+   *
+   * Every real consumer (topbar, sidebar, route guard, dashboards) lives inside
+   * the app shell, so deferring to the first useIncludedModules() call keeps the
+   * app's behaviour byte-identical — the shell subscribes in its first render —
+   * while a marketing page, with zero subscribers, makes zero requests. The
+   * tri-state loading/unavailable semantics below are untouched: with no
+   * subscriber the state simply stays `loading`, which nobody is looking at.
+   */
+  const startedRef = useRef(false)
+  const aliveRef = useRef(true)
   useEffect(() => {
-    let cancelled = false
+    aliveRef.current = true
+    return () => {
+      aliveRef.current = false
+    }
+  }, [])
+
+  const ensureLoaded = useCallback(() => {
+    if (startedRef.current) return
+    startedRef.current = true
     void (async () => {
       try {
         const data = await apiFetch<unknown>("/system/capabilities", { method: "GET" })
         const parsed = parseSystemCapabilities(data)
-        if (cancelled) return
+        if (!aliveRef.current) return
         if (parsed == null) {
           setState((s) => ({ ...s, loading: false, unavailable: true }))
           return
@@ -86,12 +116,9 @@ export function IncludedModulesProvider({ children }: { children: ReactNode }) {
         setState({ ...parsed, loading: false, unavailable: false })
       } catch {
         // Older deployment, or an unauthenticated shell — fail OPEN rather than hiding the app.
-        if (!cancelled) setState((s) => ({ ...s, loading: false, unavailable: true }))
+        if (aliveRef.current) setState((s) => ({ ...s, loading: false, unavailable: true }))
       }
     })()
-    return () => {
-      cancelled = true
-    }
   }, [])
 
   const value = useMemo<IncludedModulesState>(() => {
@@ -116,9 +143,18 @@ export function IncludedModulesProvider({ children }: { children: ReactNode }) {
     }
   }, [state])
 
-  return <IncludedModulesContext.Provider value={value}>{children}</IncludedModulesContext.Provider>
+  return (
+    <EnsureLoadedContext.Provider value={ensureLoaded}>
+      <IncludedModulesContext.Provider value={value}>{children}</IncludedModulesContext.Provider>
+    </EnsureLoadedContext.Provider>
+  )
 }
 
 export function useIncludedModules(): IncludedModulesState {
+  const ensureLoaded = useContext(EnsureLoadedContext)
+  // Subscribing IS the signal the readout is needed — see the provider comment.
+  useEffect(() => {
+    ensureLoaded()
+  }, [ensureLoaded])
   return useContext(IncludedModulesContext)
 }
