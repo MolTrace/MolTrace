@@ -221,7 +221,14 @@ export function StackedDeck({ items, label }: StackedDeckProps) {
   )
 
   return (
-    <div>
+    <div
+      onFocus={() => setSuspended(true)}
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+          setSuspended(false)
+        }
+      }}
+    >
       {/* The stage. `overflow-hidden` is what lets the receding cards run past
           the content width and get clipped, which is the effect — without it
           they would widen the page instead. */}
@@ -234,8 +241,10 @@ export function StackedDeck({ items, label }: StackedDeckProps) {
         // choice is permanent.
         onMouseEnter={() => setSuspended(true)}
         onMouseLeave={() => setSuspended(false)}
-        onFocus={() => setSuspended(true)}
-        onBlur={() => setSuspended(false)}
+        // Focus handlers live on the OUTER wrapper below, not here: the dot
+        // row is outside this stage, and rule 3 says focus ANYWHERE inside
+        // suspends. Handlers here left the dots running autoplay under a
+        // focused control.
         // Touching the deck ANYWHERE stops it for good — this is the 2.2.2
         // mechanism, so it deliberately covers the gaps between cards and the
         // card already in front, not only the cards you might be choosing

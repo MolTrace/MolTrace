@@ -819,7 +819,8 @@ export function ReactionOptimizationPage() {
                   bayesian_optimization_run · run_4f7a · 5 rounds · convergence reached
                 </p>
               </div>
-              <table className="w-full text-left text-sm">
+              <div className="table-scroll">
+              <table className="w-full min-w-[560px] text-left text-sm">
                 <thead className="border-b bg-muted/20 font-mono uppercase tracking-[0.12em] text-[10px] text-muted-foreground">
                   <tr>
                     <th className="px-5 py-2.5">Round</th>
@@ -867,6 +868,7 @@ export function ReactionOptimizationPage() {
                   })}
                 </tbody>
               </table>
+              </div>
             </div>
 
             {/* Yield trajectory — text-mode bar visualization */}
@@ -910,7 +912,8 @@ export function ReactionOptimizationPage() {
               </p>
             </div>
             <div className="mt-12 overflow-hidden rounded-2xl border bg-card shadow-sm">
-              <table className="w-full text-left text-sm">
+              <div className="table-scroll">
+              <table className="w-full min-w-[560px] text-left text-sm">
                 <thead className="bg-muted/40 font-mono uppercase tracking-[0.12em] text-[10px] text-muted-foreground">
                   <tr>
                     <th className="px-5 py-3">Dimension</th>
@@ -945,6 +948,7 @@ export function ReactionOptimizationPage() {
                   ))}
                 </tbody>
               </table>
+              </div>
             </div>
           </div>
         </section>

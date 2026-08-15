@@ -309,6 +309,6 @@ describe("WorkspaceStageNav — layout stability", () => {
     )
     const desc = container.querySelector("p.max-w-3xl")
     expect(desc).not.toBeNull()
-    expect(desc!.className).toContain("min-h-[2lh]")
+    expect(desc!.className).toContain("mt-two-line-slot")
   })
 })
