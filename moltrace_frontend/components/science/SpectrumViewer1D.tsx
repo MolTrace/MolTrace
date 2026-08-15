@@ -26,6 +26,7 @@ import {
   RotateCcw,
 } from "lucide-react"
 import { PLOT_DOWNLOAD_PNG_HINT, PLOT_DOWNSAMPLED_NOTE } from "@/lib/ui/copy"
+import { sampleSpectrumTraceForPlot } from "@/components/science/SpectrumViewer"
 
 const Plot = dynamic(() => import("react-plotly.js"), { ssr: false }) as React.ComponentType<
   Record<string, unknown>
@@ -116,17 +117,19 @@ function nearestDisplayYAtX(xArr: number[], yDisp: number[], xTarget: number): n
   return best
 }
 
+/**
+ * Display decimation via the shared min/max+LTTB sampler — never by striding.
+ *
+ * The previous body strode the arrays (`i += step`), which silently deletes any feature narrower
+ * than the stride: a 3-point singlet in a 64k-point spectrum vanished entirely at the default
+ * budgets, leaving the trace flat where the chemistry was. A min/max bucket keeps both extremes of
+ * every bucket, so no peak can be thinner than the sampler's notice. One sampler for both viewers
+ * also means one place where honesty is tested (see SpectrumViewer1D.test.tsx and the fixtures in
+ * spectracheck-sections.test.tsx).
+ */
 function downsampleXYDisplay(x: number[], y: number[], maxPoints: number): { x: number[]; y: number[]; reduced: boolean } {
-  const len = Math.min(x.length, y.length)
-  if (len <= maxPoints) return { x: x.slice(0, len), y: y.slice(0, len), reduced: false }
-  const step = Math.ceil(len / maxPoints)
-  const dx: number[] = []
-  const dy: number[] = []
-  for (let i = 0; i < len; i += step) {
-    dx.push(x[i]!)
-    dy.push(y[i]!)
-  }
-  return { x: dx, y: dy, reduced: true }
+  const sample = sampleSpectrumTraceForPlot(x, y, { maxPoints })
+  return { x: sample.x, y: sample.y, reduced: sample.sampled }
 }
 
 export function SpectrumViewer1D({
