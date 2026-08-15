@@ -1,11 +1,27 @@
 "use client"
 
+import dynamic from "next/dynamic"
 import { useEffect } from "react"
 import { AiModulePredictionAugmentation } from "@/components/ai/ai-module-prediction-augmentation"
-import { SpectraCheckWorkspace } from "@/components/spectracheck/spectracheck-workspace"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { MobileSpectraCheckReview } from "@/src/components/mobile/MobileSpectraCheckReview"
 import { trackCoreModuleOpened } from "@/src/lib/analytics/analytics-client"
+
+// The desktop workspace is the app's heaviest client graph. Loaded on demand so
+// the mobile branch never fetches its chunk; ssr:false keeps the two branches
+// out of the prerendered HTML, so the branch swap cannot hydrate-mismatch.
+const SpectraCheckWorkspace = dynamic(
+  () =>
+    import("@/components/spectracheck/spectracheck-workspace").then(
+      (m) => m.SpectraCheckWorkspace,
+    ),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="h-64 animate-pulse rounded-lg border bg-muted/20" aria-hidden />
+    ),
+  },
+)
 
 /**
  * SpectraCheck route content. After the nav reorg, the three modules (SpectraCheck,
@@ -28,12 +44,14 @@ export function ProgramsInterfaceWorkspace({
 
   return (
     <div className="space-y-6">
+      {/* One tree, never both: the old CSS-`hidden` desktop copy stayed fully
+          mounted on phones — effects, workspace fetches, DOM — behind
+          display:none, on exactly the devices least able to absorb it. */}
       {!desktopMode && isMobile ? (
         <MobileSpectraCheckReview sessionId={sessionId} />
-      ) : null}
-      <div className={desktopMode || !isMobile ? "" : "hidden"}>
+      ) : (
         <SpectraCheckWorkspace />
-      </div>
+      )}
       <AiModulePredictionAugmentation
         moduleKey="spectracheck"
         moduleTitle="SpectraCheck"

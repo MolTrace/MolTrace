@@ -13,8 +13,22 @@ function isMobileViewport() {
   return computeShellMode(window) === 'mobile'
 }
 
+// False only until the first mount anywhere has completed. On the true first
+// page load the initial render must match the server-rendered HTML (which was
+// built with `false`) or React hydrates into a mismatch — but every LATER mount
+// is a client-side navigation with no hydration constraint, and starting those
+// at `false` made phones mount desktop trees for a tick (effects included).
+// Same contract ResponsiveAppShell documents for its preference cache.
+let hydrationComplete = false
+
 export function useIsMobile() {
-  const [isMobile, setIsMobile] = React.useState(false)
+  const [isMobile, setIsMobile] = React.useState(
+    () => hydrationComplete && isMobileViewport(),
+  )
+
+  React.useEffect(() => {
+    hydrationComplete = true
+  }, [])
 
   React.useEffect(() => {
     const queries =
