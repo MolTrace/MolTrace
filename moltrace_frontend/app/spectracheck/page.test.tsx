@@ -81,11 +81,15 @@ describe("spectracheck page", () => {
     expect(textarea.value).not.toContain("WrongMolecule")
   })
 
-  it("keeps raw FID uploads across page navigation until the user explicitly clears them", () => {
+  // The raw-FID and processed-spectrum sections are code-split (they load when
+  // their tab is first activated), so every mount must be awaited before its
+  // dropzone exists. Awaiting also makes the closing "not in document" checks
+  // meaningful — against an unmounted section they would pass vacuously.
+  it("keeps raw FID uploads across page navigation until the user explicitly clears them", async () => {
     const rawFile = new File(["pretend-fid"], "route-raw.zip", { type: "application/zip" })
     let view = render(<SpectraCheckWorkspace defaultTab="tab-raw-fid" />)
 
-    fireEvent.drop(screen.getByRole("button", { name: /Drop raw FID archive/i }), {
+    fireEvent.drop(await screen.findByRole("button", { name: /Drop raw FID archive/i }), {
       dataTransfer: { files: [rawFile], types: ["Files"] },
     })
     expect(screen.getAllByText("route-raw.zip").length).toBeGreaterThan(0)
@@ -96,21 +100,22 @@ describe("spectracheck page", () => {
     away.unmount()
 
     view = render(<SpectraCheckWorkspace defaultTab="tab-raw-fid" />)
-    expect(screen.getAllByText("route-raw.zip").length).toBeGreaterThan(0)
+    expect((await screen.findAllByText("route-raw.zip")).length).toBeGreaterThan(0)
 
     fireEvent.click(screen.getByRole("button", { name: /^Clear$/i }))
     expect(screen.queryByText("route-raw.zip")).not.toBeInTheDocument()
 
     view.unmount()
     render(<SpectraCheckWorkspace defaultTab="tab-raw-fid" />)
+    await screen.findByRole("button", { name: /Drop raw FID archive/i })
     expect(screen.queryByText("route-raw.zip")).not.toBeInTheDocument()
   })
 
-  it("keeps processed spectrum uploads across page navigation until the user explicitly clears them", () => {
+  it("keeps processed spectrum uploads across page navigation until the user explicitly clears them", async () => {
     const processedFile = new File(["##TITLE=processed"], "route-processed.jdx", { type: "text/plain" })
     let view = render(<SpectraCheckWorkspace defaultTab="tab-processed" />)
 
-    fireEvent.drop(screen.getByRole("button", { name: /Drop processed spectrum file/i }), {
+    fireEvent.drop(await screen.findByRole("button", { name: /Drop processed spectrum file/i }), {
       dataTransfer: { files: [processedFile], types: ["Files"] },
     })
     expect(screen.getAllByText("route-processed.jdx").length).toBeGreaterThan(0)
@@ -121,13 +126,14 @@ describe("spectracheck page", () => {
     away.unmount()
 
     view = render(<SpectraCheckWorkspace defaultTab="tab-processed" />)
-    expect(screen.getAllByText("route-processed.jdx").length).toBeGreaterThan(0)
+    expect((await screen.findAllByText("route-processed.jdx")).length).toBeGreaterThan(0)
 
     fireEvent.click(screen.getByRole("button", { name: /^Clear$/i }))
     expect(screen.queryByText("route-processed.jdx")).not.toBeInTheDocument()
 
     view.unmount()
     render(<SpectraCheckWorkspace defaultTab="tab-processed" />)
+    await screen.findByRole("button", { name: /Drop processed spectrum file/i })
     expect(screen.queryByText("route-processed.jdx")).not.toBeInTheDocument()
   })
 })

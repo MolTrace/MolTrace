@@ -39,18 +39,52 @@ import {
   SpectraCheckConfidenceAdvProvider,
   SpectraCheckConfidenceSuite,
 } from "@/components/spectracheck/spectracheck-confidence-suite"
-import { SpectraCheckMsEvidenceStudio } from "@/components/spectracheck/spectracheck-ms-evidence-studio"
+import dynamic from "next/dynamic"
 import {
   DeveloperJsonPanel,
   SummarizedEvidenceView,
   TabResultSection,
 } from "@/components/spectracheck/spectracheck-result-panels"
-import { SpectraCheckProcessedSpectrumSection } from "@/components/spectracheck/spectracheck-processed-spectrum-section"
-import { SpectraCheckRawFidSection } from "@/components/spectracheck/spectracheck-raw-fid-section"
 import { SpectrumResultsFullscreen } from "@/components/spectracheck/spectracheck-fullscreen-results"
 import { SessionValidateCard } from "@/components/spectracheck/spectracheck-session-validate-card"
 import { ResetToExampleButton } from "@/components/spectracheck/spectracheck-reset-to-example-button"
-import { SpectraCheckBenchmarkSection } from "@/components/spectracheck/spectracheck-benchmark-section"
+// The four heaviest tab bodies load on first tab activation instead of riding
+// the initial bundle — together they were most of this route's 152-module
+// static client graph, hydrated before the user had uploaded anything. Radix
+// already unmounts inactive tab content; this moves the DOWNLOAD/parse cost
+// behind the same boundary. ssr:false — these are upload/analysis surfaces
+// with nothing meaningful to prerender.
+const sectionSkeleton = () => (
+  <div className="h-64 animate-pulse rounded-lg border bg-muted/20" aria-hidden />
+)
+const SpectraCheckMsEvidenceStudio = dynamic(
+  () =>
+    import("@/components/spectracheck/spectracheck-ms-evidence-studio").then(
+      (m) => m.SpectraCheckMsEvidenceStudio,
+    ),
+  { ssr: false, loading: sectionSkeleton },
+)
+const SpectraCheckProcessedSpectrumSection = dynamic(
+  () =>
+    import("@/components/spectracheck/spectracheck-processed-spectrum-section").then(
+      (m) => m.SpectraCheckProcessedSpectrumSection,
+    ),
+  { ssr: false, loading: sectionSkeleton },
+)
+const SpectraCheckRawFidSection = dynamic(
+  () =>
+    import("@/components/spectracheck/spectracheck-raw-fid-section").then(
+      (m) => m.SpectraCheckRawFidSection,
+    ),
+  { ssr: false, loading: sectionSkeleton },
+)
+const SpectraCheckBenchmarkSection = dynamic(
+  () =>
+    import("@/components/spectracheck/spectracheck-benchmark-section").then(
+      (m) => m.SpectraCheckBenchmarkSection,
+    ),
+  { ssr: false, loading: sectionSkeleton },
+)
 import {
   getNmrSolventForApi,
   NMR_SOLVENT_OPTIONS,
