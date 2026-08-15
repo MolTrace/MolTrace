@@ -317,6 +317,17 @@
   --mt-slate-ink: #94A3B8;
 }
 
+/* Two-line reservation with a fallback (components/app/workspace-stage-nav.tsx).
+   The lh unit only reaches Safari 16.4 / Firefox 120; on anything older an
+   arbitrary min-h-[2lh] utility is dropped whole and the workspace nav goes
+   back to changing height between sections. The rem floor is 2 x the measured
+   20px line at the default scale; the lh declaration then refines it wherever
+   the unit exists. Order is the mechanism — do not alphabetise. */
+.mt-two-line-slot {
+  min-height: 2.5rem;
+  min-height: 2lh;
+}
+
 /* Module panel entrance (components/marketing/module-cards.tsx).
 
    The tab indicator slid, so the tabs LOOKED animated while the panel they

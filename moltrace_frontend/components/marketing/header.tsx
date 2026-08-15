@@ -121,13 +121,39 @@ export function Header() {
                   className="relative"
                   onMouseEnter={() => setActiveDropdown(item.label)}
                   onMouseLeave={() => setActiveDropdown(null)}
+                  // KEYBOARD PARITY WITH HOVER. These panels were mouse-only: a
+                  // keyboard user tabbing the desktop nav got the trigger link
+                  // and never its eight child destinations, and a screen reader
+                  // heard a plain link with no hint a panel existed — at
+                  // exactly the widths where the accessible mobile sheet is
+                  // display:none. Focus opens (the keyboard's hover), focus
+                  // leaving the whole subtree closes, Escape closes and is
+                  // swallowed so it cannot also dismiss an ancestor.
+                  onFocus={() => setActiveDropdown(item.label)}
+                  onBlur={(event) => {
+                    if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+                      setActiveDropdown(null)
+                    }
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === "Escape" && activeDropdown === item.label) {
+                      event.stopPropagation()
+                      setActiveDropdown(null)
+                    }
+                  }}
                 >
                   <Link
                     href={item.href}
-                    className="flex items-center gap-1 rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
+                    // The trigger both navigates (to the section page) and
+                    // discloses; aria-expanded is what tells a screen reader
+                    // the second half exists.
+                    aria-haspopup="menu"
+                    aria-expanded={activeDropdown === item.label}
+                    className="flex items-center gap-1 rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:text-foreground"
                   >
                     {item.label}
                     <ChevronDown
+                      aria-hidden
                       className={`h-3 w-3 transition-transform duration-150 ${activeDropdown === item.label ? "rotate-180" : ""}`}
                     />
                   </Link>
@@ -163,13 +189,16 @@ export function Header() {
         <div className="flex items-center gap-3">
           <ThemeToggle />
           <div className="hidden items-center gap-2 md:flex">
-            <Button variant="ghost" size="sm" asChild>
+            {/* min-h-10 on all three: size="sm" is 36px, and asChild renders
+                an <a>, which the global `button, [role=button]` 2.5rem
+                tap-target rule does not reach. */}
+            <Button variant="ghost" size="sm" className="min-h-10" asChild>
               <Link href="/sign-in">Sign In</Link>
             </Button>
-            <Button variant="outline" size="sm" asChild>
+            <Button variant="outline" size="sm" className="min-h-10" asChild>
               <Link href="/sign-up">Sign Up</Link>
             </Button>
-            <Button size="sm" asChild>
+            <Button size="sm" className="min-h-10" asChild>
               <Link href="/contact?reason=Request%20a%20demo">Request Demo</Link>
             </Button>
           </div>
@@ -203,7 +232,7 @@ export function Header() {
                     about what the panel contains. sr-only because sighted users
                     already see the sections. Surfaced by the console gate. */}
                 <SheetDescription className="sr-only">
-                  Platform, solutions, company and resources links, and sign-in options.
+                  Platform, solutions, enterprise and documentation links, and sign-in options.
                 </SheetDescription>
 
                 {/* Brand block */}

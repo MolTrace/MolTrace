@@ -13,6 +13,12 @@ function Progress({
   return (
     <ProgressPrimitive.Root
       data-slot="progress"
+      // `value` is forwarded, not only painted. Destructuring it for the
+      // Indicator's transform used to swallow it before it reached Radix, so
+      // every Progress in the app was announced as an INDETERMINATE progressbar
+      // — no aria-valuenow — while visually showing an exact figure. The hero's
+      // "87.3%" card was the audit finding, but the fix is for every consumer.
+      value={value}
       className={cn(
         'bg-primary/20 relative h-2 w-full overflow-hidden rounded-full',
         className,

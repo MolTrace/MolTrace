@@ -317,7 +317,7 @@ export function WorkspaceStageNav({
           every switch. Expressed in `lh` rather than a pixel value so it stays
           exactly two lines if the type scale ever changes. */}
       {activeSection ? (
-        <p className="min-h-[2lh] max-w-3xl text-sm leading-relaxed text-muted-foreground">
+        <p className="mt-two-line-slot max-w-3xl text-sm leading-relaxed text-muted-foreground">
           {activeSection.desc}
         </p>
       ) : null}

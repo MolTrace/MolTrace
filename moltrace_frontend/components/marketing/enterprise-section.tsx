@@ -118,7 +118,10 @@ export function EnterpriseSection() {
 
         {/* Section header */}
         <div className="mb-16 text-center">
-          <p className="mb-4 text-xs font-bold uppercase tracking-[0.2em] text-cyan-500 dark:text-cyan-400">
+          {/* cyan-INK, not the vivid token: raw text-cyan-500 measures ~2.4:1
+              on the light page — the exact failure the -ink variants exist for,
+              and the same pattern the evidence section's eyebrow already uses. */}
+          <p className="mb-4 text-xs font-bold uppercase tracking-[0.2em]" style={{ color: "var(--mt-cyan-ink)" }}>
             Enterprise
           </p>
           <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">

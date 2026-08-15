@@ -629,22 +629,34 @@ function SpectrumCarousel({ slides }: { slides: SlideDef[] }) {
         >
           <ChevronLeft className="h-4 w-4" aria-hidden />
         </button>
-        <div className="flex items-center gap-2" role="tablist" aria-label="Spectrum indicators">
+        {/* Plain buttons with aria-pressed, not role="tab": there is no
+            corresponding role="tabpanel", and a tablist that promises panels it
+            does not mark up is worse for a screen reader than an honest toggle
+            — the same call module-cards.tsx documents for its own tabs. And the
+            BUTTON is the hit area with a SPAN as the visual dot: styling the
+            button itself h-2 collided with the global 2.5rem button min-height,
+            which stretched every "dot" into a 40px-tall bar. Same split the
+            enterprise deck's dots use. */}
+        <div className="flex items-center gap-1" aria-label="Spectrum indicators">
           {slides.map((s, i) => (
             <button
               key={i}
               type="button"
-              role="tab"
               onClick={() => gotoSlide(i)}
               aria-label={`Show ${s.figureLabel}`}
-              aria-selected={activeIdx === i}
-              className={[
-                "h-2 rounded-full transition-all duration-200",
-                activeIdx === i
-                  ? "w-10 bg-teal-500 dark:bg-teal-400"
-                  : "w-4 bg-border hover:bg-muted-foreground/40",
-              ].join(" ")}
-            />
+              aria-pressed={activeIdx === i}
+              className="group flex min-w-6 items-center justify-center rounded-md px-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500/40"
+            >
+              <span
+                aria-hidden
+                className={[
+                  "h-2 rounded-full transition-all duration-200",
+                  activeIdx === i
+                    ? "w-10 bg-teal-500 dark:bg-teal-400"
+                    : "w-4 bg-border group-hover:bg-muted-foreground/40",
+                ].join(" ")}
+              />
+            </button>
           ))}
         </div>
         <button
