@@ -697,7 +697,7 @@ export function SpectroscopyExploreInterface({ onClose }: { onClose: () => void 
         "Automated deconvolution is designed to separate overlapping multiplets, including peaks near a residual solvent signal that would otherwise complicate quantification.",
         "FID processed in one pass: apodization, zero-filling, phase correction, and baseline drift handled before integration.",
         "Auto-referenced against a known standard so every chemical shift you publish is grounded in raw signal you can re-derive.",
-        "Five multiplets resolved with integrations designed to support USP <761> workflows, and a confidence level per peak.",
+        "Five multiplets resolved, each integral carrying a combined standard uncertainty, and a confidence level per peak.",
       ],
       footer: (
         <>
@@ -801,7 +801,7 @@ export function SpectroscopyExploreInterface({ onClose }: { onClose: () => void 
 // ─────────────────────────────────────────────────────────────────────────────
 // REGULATORY INTELLIGENCE HUB — explore overlay
 //
-// Headline: "Built-in Compliance and Safety."
+// Headline: "Designed to Support Compliance and Safety."
 // Body (bulleted): How the QA-RAG system grounds every answer in
 //   EPA / FDA / ICH / EMA / REACH guidance, jurisdiction-aware risk
 //   thresholds, and the mandatory human reviewer gate before findings can
@@ -822,7 +822,7 @@ function RegulatoryQaRagSnippet() {
       <div className="mb-4 flex items-center justify-between gap-2">
         <span className="inline-flex items-center gap-1.5 rounded-md border border-cyan-500/30 bg-cyan-500/10 px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-cyan-600 dark:text-cyan-400">
           <Sparkles className="h-3 w-3" aria-hidden />
-          QA-RAG · Live answer
+          QA-RAG · Example answer
         </span>
         <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
           v2.4 · 4 sources
@@ -955,7 +955,7 @@ export function RegulatoryExploreInterface({ onClose }: { onClose: () => void })
             <li className="flex items-start gap-2.5 text-sm leading-snug text-foreground/90">
               <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-cyan-500 dark:text-cyan-400" strokeWidth={2.5} />
               <span>
-                Every regulatory question is answered against a curated corpus — ICH (Q3A/B/C/D, M7,
+                Designed to answer every regulatory question against a curated corpus — ICH (Q3A/B/C/D, M7,
                 Q14), EPA TRI, FDA Q3C residual solvents, EU REACH SVHC, and your tenant's standard
                 operating procedures.
               </span>
@@ -970,8 +970,8 @@ export function RegulatoryExploreInterface({ onClose }: { onClose: () => void })
             <li className="flex items-start gap-2.5 text-sm leading-snug text-foreground/90">
               <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-cyan-500 dark:text-cyan-400" strokeWidth={2.5} />
               <span>
-                Risk thresholds are jurisdiction-aware: an impurity that's safe at FDA limits may
-                flag at PMDA. The system tells you which jurisdiction triggered the warning.
+                Risk thresholds are jurisdiction-aware by design: an impurity that's safe at FDA
+                limits may flag at PMDA, with the triggering jurisdiction named on the warning.
               </span>
             </li>
             <li className="flex items-start gap-2.5 text-sm leading-snug text-foreground/90">

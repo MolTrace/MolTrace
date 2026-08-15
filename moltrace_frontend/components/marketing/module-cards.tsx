@@ -43,10 +43,13 @@ const ReactionExploreInterface = dynamic(
  *   path at all.
  *
  *   "designed to support USP <761>": qNMR purity is real and computes a genuine
- *   combined standard uncertainty, but the only "USP" strings in the whole
- *   backend are "USPTO" — the patent office, from reaction extraction. Nothing
- *   references the pharmacopoeial chapter. The bullet now states the uncertainty
- *   the module actually computes, which is the stronger claim anyway.
+ *   combined standard uncertainty, but nothing in the backend references
+ *   chapter <761>. (The regulatory module does now cite USP <467>, <711>,
+ *   <701> and <921> — an earlier version of this note claimed the only "USP"
+ *   strings were "USPTO", which has since become stale — but none of those
+ *   sit on the spectroscopy/qNMR path, so the conclusion stands.) The bullet
+ *   now states the uncertainty the module actually computes, which is the
+ *   stronger claim anyway.
  *
  * The other fourteen hold. Notably "Gaussian process surrogate modelling" is
  * genuine — sklearn is a CORE dependency, made so deliberately, with a comment in
