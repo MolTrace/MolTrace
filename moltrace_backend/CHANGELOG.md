@@ -14,6 +14,30 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.69.7 — The installer that builds the image is no longer a moving target (2026-08-15)
+
+Cloud Build `392b29a0` failed on step 2 of 19 with `dial tcp 140.82.112.33:443:
+i/o timeout` reaching ghcr.io for uv — on a frontend-only commit that touched no
+backend file, with the identical build passing 28 minutes later. A deploy lost to
+weather. Two things came out of it.
+
+`COPY --from=ghcr.io/astral-sh/uv:latest` was the **one mutable third-party input
+to the production image**, in a pipeline that pins its GitHub Actions by SHA,
+verifies SLSA provenance as a release gate, and publishes a CycloneDX SBOM. Not a
+theoretical gap: the tag was republished as 0.12.5 on 2026-08-14 19:24 UTC, so the
+image built that morning and the one serving production were installed by
+different uv binaries — and nothing downstream would have shown it, because an
+SBOM records the packages that came out, never the resolver that chose them. Now
+pinned by digest, with the version tag kept alongside for readability; bumping uv
+is a visible commit.
+
+`cloudbuild.yaml` retries the build up to three times with a widening pause. Every
+layer this Dockerfile builds reaches a network it does not control — ghcr.io,
+Docker Hub, PyPI, Debian — and neither Cloud Build nor `gcloud builds submit`
+retries any of it. A genuine failure still fails the step after the third attempt;
+retries only run when an attempt has already failed, against 120 free
+build-minutes a day.
+
 ## v0.69.6 — The accuracy gate finally has something to gate (2026-08-14)
 
 `gate_for_ci` — the Prompt 17 dominance machinery — had never been called

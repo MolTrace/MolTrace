@@ -11,8 +11,21 @@
 # ---------- build stage ----------
 FROM python:3.13-slim AS build
 
-# uv provides fast, lockfile-frozen installs (matches CI + Render).
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+# uv provides fast, lockfile-frozen installs (the same resolver CI runs).
+#
+# PINNED BY DIGEST, and the tag is only there to be readable — Docker resolves the
+# digest and ignores it. This was `:latest`, which made the installer the one
+# mutable third-party input to a production image in a pipeline that otherwise
+# pins its GitHub Actions by SHA, verifies SLSA provenance as a release gate and
+# publishes a CycloneDX SBOM. Not hypothetical: the tag was republished as 0.12.5
+# on 2026-08-14 19:24 UTC, so images built either side of that afternoon were
+# resolved by different uv binaries. The SBOM records the packages that came out,
+# never the resolver that chose them, so nothing downstream would have shown it.
+#
+# Bumping uv is now a visible commit: pick the version, read its digest with
+#   docker buildx imagetools inspect ghcr.io/astral-sh/uv:<version>
+# and edit both halves of this reference together.
+COPY --from=ghcr.io/astral-sh/uv:0.12.5@sha256:e85be844203885286c60ffad8a858d48afb6c5a5c237ca0e67f12e74b8f174b1 /uv /usr/local/bin/uv
 ENV UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy \
     UV_PYTHON_DOWNLOADS=never

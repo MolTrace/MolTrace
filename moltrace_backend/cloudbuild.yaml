@@ -22,10 +22,36 @@ images:
   - "${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/${_IMAGE}:latest"
 
 steps:
+  # Retried, because a single registry blip costs a whole deploy. Every layer
+  # this Dockerfile builds reaches out to a network it does not control — ghcr.io
+  # for uv, Docker Hub for the python base, PyPI for the locked wheels, Debian
+  # for the runtime shared libraries — and none of that is retried by Cloud Build
+  # or by `gcloud builds submit`. Build 392b29a0 (2026-08-15) died on step 2 of 19
+  # with `dial tcp 140.82.112.33:443: i/o timeout` reaching ghcr.io, on a
+  # frontend-only commit that touched no backend file at all; the identical build
+  # 28 minutes later passed. That is a deploy lost to weather.
+  #
+  # Three attempts with a widening pause, and no bare `sleep`-then-retry loop
+  # variable: Cloud Build substitutes `$NAME` before bash ever sees the script and
+  # fails closed on a key it does not recognise, so a shell variable here would
+  # have to be written `$$NAME`. A function called twice keeps the script free of
+  # `$` entirely, apart from the substitutions that are genuinely meant for
+  # Cloud Build. The last call decides the step's exit status.
+  #
+  # Cost: a retry only runs when the first attempt already failed, and the build
+  # is ~1m45s against 120 free build-minutes a day.
   - id: build
     name: gcr.io/cloud-builders/docker
+    entrypoint: bash
     args:
-      - build
-      - "--tag=${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/${_IMAGE}:${_TAG}"
-      - "--tag=${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/${_IMAGE}:latest"
-      - "."
+      - -c
+      - |
+        build() {
+          docker build \
+            --tag "${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/${_IMAGE}:${_TAG}" \
+            --tag "${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/${_IMAGE}:latest" \
+            .
+        }
+        build \
+          || { echo "docker build failed; retrying in 15s" >&2; sleep 15; build; } \
+          || { echo "docker build failed again; retrying in 45s" >&2; sleep 45; build; }
