@@ -682,3 +682,38 @@ describe("findings from the adversarial review of the fixes", () => {
     expect(announcer).toHaveTextContent(/Run finished\. 2 done/i)
   })
 })
+
+describe("the single-dataset tiles feed the queue", () => {
+  it("marks the dropped dataset Done when processed through the Process FID tile", async () => {
+    // The primary CTA. Dropping an archive enqueues it; processing it through the tile used to
+    // write only the section's own result state, so the queue row sat at "Queued" forever and
+    // the Evidence Bench — which shows DONE queue items — stayed empty after a successful run.
+    // Processing a spectrum has to mean the same thing whichever button ran it.
+    routeAnalysis(() => processResponse())
+    renderSection()
+    dropArchives([archive("solo.zip")])
+
+    expect(within(screen.getByTestId("raw-fid-queue-table")).getByText("Queued")).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole("button", { name: /Process FID/i }))
+
+    await waitFor(() =>
+      expect(within(screen.getByTestId("raw-fid-queue-table")).getByText("Done")).toBeInTheDocument(),
+    )
+    // The row records WHICH analysis produced it, same as a queue-run row.
+    expect(within(screen.getByTestId("raw-fid-queue-table")).getByText("Full")).toBeInTheDocument()
+  })
+
+  it("marks the dropped dataset Done as a quick scan when previewed through the tile", async () => {
+    routeAnalysis(() => processResponse())
+    renderSection()
+    dropArchives([archive("solo.zip")])
+
+    fireEvent.click(screen.getByRole("button", { name: /Preview spectrum/i }))
+
+    await waitFor(() =>
+      expect(within(screen.getByTestId("raw-fid-queue-table")).getByText("Done")).toBeInTheDocument(),
+    )
+    expect(within(screen.getByTestId("raw-fid-queue-table")).getByText("Quick scan")).toBeInTheDocument()
+  })
+})
