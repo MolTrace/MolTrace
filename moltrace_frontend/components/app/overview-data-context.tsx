@@ -133,13 +133,6 @@ export function OverviewDataProvider({ children }: { children: ReactNode }) {
   )
 
   useEffect(() => {
-    // While the capabilities readout is unresolved, isIncluded() answers false
-    // for everything. Building the snapshot now would bake sessions out of it
-    // AND stamp it fresh — so the corrected refetch after capabilities resolve
-    // hit the freshness gate below and the dashboard stayed empty for the
-    // 30-second window on every cold load. Wait for the real answer; the
-    // effect re-runs when `loading` flips.
-    if (modulesLoading) return
     // A fresh snapshot is already on screen — nothing to do until it ages out.
     if (isShellSnapshotFresh(SHELL_SNAPSHOT_KEYS.overviewData, SHELL_SNAPSHOT_MAX_AGE_MS)) return
 
@@ -147,9 +140,21 @@ export function OverviewDataProvider({ children }: { children: ReactNode }) {
     if (readShellSnapshot<OverviewSnapshot>(SHELL_SNAPSHOT_KEYS.overviewData) == null) {
       setLoading(true)
     }
-    void loadShellSnapshot(SHELL_SNAPSHOT_KEYS.overviewData, () =>
-      fetchOverviewSnapshot(isIncluded("spectracheck")),
-    ).then((next) => {
+    // While the capabilities readout is unresolved, isIncluded() answers false
+    // for everything, so a snapshot built now would omit sessions. Fetch anyway:
+    // three of the four requests do not depend on that answer, and apiFetch
+    // carries no timeout — so *waiting* on a stalled /system/capabilities would
+    // leave the dashboard permanently empty, which is worse than the bug being
+    // fixed. The provisional result is simply never written into the snapshot
+    // cache, so when `loading` flips this effect re-runs and refetches with the
+    // real answer instead of being short-circuited by the freshness gate above.
+    // (Baking "no sessions" into a *fresh* snapshot was the original defect.)
+    const pending = modulesLoading
+      ? fetchOverviewSnapshot(false)
+      : loadShellSnapshot(SHELL_SNAPSHOT_KEYS.overviewData, () =>
+          fetchOverviewSnapshot(isIncluded("spectracheck")),
+        )
+    void pending.then((next) => {
       if (!active) return
       setProjects(next.projects)
       setProjectsDataAvailable(next.projectsDataAvailable)
