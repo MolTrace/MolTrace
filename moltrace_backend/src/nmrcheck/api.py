@@ -3184,7 +3184,12 @@ def _health_response(request: Request | None = None) -> dict[str, object]:
     else:
         checks["hose_kb"] = "ok"
     status_value = "ok" if all(value == "ok" for value in checks.values()) else "degraded"
-    return {"status": status_value, "checks": checks, "hose_kb": hose_kb}
+    # Only the coarse verdict is public. /health is deliberately unauthenticated,
+    # and the detailed block (source, reference_count, path) is deployment
+    # internals — it also tells an anonymous caller exactly when predictions are
+    # degraded to the seed table. The full dict stays on admin-gated
+    # /admin/deployment, which is where an operator looks anyway.
+    return {"status": status_value, "checks": checks}
 
 
 def health() -> dict[str, object]:
@@ -31689,7 +31694,20 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         # hand-roll their own). Fields ride in the message because the default
         # logging formatter drops `extra`; the route template (not the raw path)
         # keeps id-bearing URLs aggregable in a log-based metric.
-        route_template = getattr(request.scope.get("route"), "path", request.url.path)
+        #
+        # NEVER fall back to request.url.path: scope["route"] is unset for 404s
+        # and for Starlette's redirect_slashes 307 (which matches against a COPY
+        # of the scope), so a fallback would durably log raw paths — including
+        # secrets that live in the path itself, e.g. a trailing-slash hit on
+        # /share-links/<token>. A sentinel keeps those requests countable
+        # without persisting the URL.
+        matched_route = request.scope.get("route")
+        if matched_route is not None:
+            route_template = getattr(matched_route, "path", "<unmatched>")
+        elif response.status_code in (301, 302, 307, 308):
+            route_template = "<redirect>"
+        else:
+            route_template = "<unmatched>"
         logger.info(
             "request %s %s -> %d in %.1f ms [correlation_id=%s]",
             request.method,
