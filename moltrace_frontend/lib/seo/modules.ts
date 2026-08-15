@@ -51,11 +51,11 @@ export const HOME_FAQS: FaqItem[] = [
   },
   {
     q: "Does MolTrace's AI make the analytical or regulatory decisions?",
-    a: "No. MolTrace is architected deterministic-first: regulated math and classifications come from a version-pinned rule engine, an auditable verifier is the sole arbiter of correctness, and AI is strictly advisory — it proposes and drafts, then a qualified human signs off. No regulatory document is released without explicit human review.",
+    a: "No. MolTrace is architected deterministic-first: regulated math and classifications come from a version-pinned rule engine, every result carries a tamper-evident audit trail, and AI is strictly advisory — it proposes and drafts, then a qualified human signs off. No regulatory document is released without explicit human review.",
   },
   {
     q: "Is MolTrace 21 CFR Part 11 compliant?",
-    a: "MolTrace's controls — a tamper-evident HMAC-chained audit ledger, electronic signatures, and an immutable SHA-256-hashed raw-data vault — are designed to support 21 CFR Part 11 and GAMP 5. MolTrace does not claim the product is itself compliant or validated; full computerized-system validation, SOPs, and identity management remain the customer's responsibility.",
+    a: "MolTrace's controls — a tamper-evident SHA-256 hash-chained audit ledger that re-verifies without any secret, electronic signatures, and an immutable SHA-256-hashed raw-data vault — are designed to support 21 CFR Part 11 and GAMP 5. MolTrace does not claim the product is itself compliant or validated; full computerized-system validation, SOPs, and identity management remain the customer's responsibility.",
   },
   {
     q: "Can I trace a MolTrace result back to the raw data?",
@@ -112,7 +112,7 @@ export const REGULATORY_SEO: ModuleSeo = {
     },
     {
       q: "What is an ALCOA+ audit trail and how does Regentry provide one?",
-      a: "ALCOA+ is the data-integrity set — Attributable, Legible, Contemporaneous, Original, Accurate, plus Complete, Consistent, Enduring, Available. Regentry writes each signed decision to an HMAC-SHA256 hash-chained audit ledger with a configurable retention floor (default seven years), so any edit or reordering breaks recomputation.",
+      a: "ALCOA+ is the data-integrity set — Attributable, Legible, Contemporaneous, Original, Accurate, plus Complete, Consistent, Enduring, Available. Regentry writes each signed decision to a SHA-256 hash-chained audit ledger with a configurable retention floor (default seven years), so any edit or reordering breaks recomputation.",
     },
     {
       q: "Can Regentry auto-release a dossier without human sign-off?",

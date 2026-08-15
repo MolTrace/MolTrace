@@ -92,7 +92,7 @@ describe("Marketing Header — mobile sidebar refresh", () => {
       "Drug discovery & development", // Solutions · Pharmaceutical R&D
       "University & institute labs", //  Solutions · Academic Research
       "Dossier & submission teams", //   Solutions · Regulatory Affairs
-      "ICH · FDA · EMA compliance", //   Platform · Regentry
+      "ICH · FDA · EMA readiness", //   Platform · Regentry
     ]
     for (const text of longDescriptions) {
       const node = within(sidebar).getByText(text)

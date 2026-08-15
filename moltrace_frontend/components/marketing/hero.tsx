@@ -54,7 +54,7 @@ const HERO_MODULES = [
     name: "Report",
     tag: "Dossier",
     desc: "Audit-ready dossier & sign-off",
-    href: "/reports",
+    href: "/platform#solutions",
     icon: FileSignature,
     accent: "var(--mt-amber)",
     ink: "var(--mt-amber-ink)",

@@ -15,9 +15,11 @@ import { StackedDeck } from "./stacked-deck"
  *
  * The colours are not decoration — moving through the deck re-tints the stage
  * behind it, so the hue is how you tell at a glance that the card changed. They
- * are assigned by subject, not cycled: identity and access are the violet/cyan
- * pair, the two infrastructure controls take teal and amber, and the two
- * attestation controls take green and slate.
+ * are assigned by subject, not cycled: access takes violet and the audit trail
+ * cyan, the database boundary teal, identity amber, and the two attestation
+ * controls green and slate. (An earlier version of this comment described a
+ * different pairing than the code below actually ships — caught in review;
+ * the list here is the mapping, read it against `features`.)
  *
  * Every family resolves through its `-ink` token for type. The vivid tokens sit
  * at 2-3:1 on the light card and fail AA as text; green-ink and slate-ink were
@@ -95,7 +97,7 @@ const features = [
   },
   {
     icon: ShieldCheck,
-    title: "Designed for SOC 2 Type II",
+    title: "Designed to support SOC 2 Type II",
     pill: "Compliance",
     desc: "Access control, audit trail, secret scanning and dependency scanning run as controls in the pipeline — the evidence a Type II audit samples.",
     ...family("green"),
