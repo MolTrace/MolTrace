@@ -748,6 +748,15 @@ class NMRRawFIDProcessResponse(BaseModel):
     environments: list[GSDPromptEnvironment] = Field(default_factory=list)
     environment_count: int = Field(default=0, ge=0)
     environment_counts: dict[str, int] = Field(default_factory=dict)
+    # Multiplet summary string inferred from the processed FID, e.g.
+    # ``"5.23 (d, J = 3.6 Hz, 12.5H), 3.95 (ddd, J = 10.3 Hz, 9.5H)"``.
+    # Same field name and type as SpectrumPreviewReport.inferred_nmr_text so
+    # the Raw FID tab can mount the same InferredNmrTextPanel as the
+    # Processed tab.  The ``H`` suffix is the machine format the parser
+    # round-trips (see _peaks_to_nmr_text); when the integrals are ungrounded
+    # the relative-integral disclosure rides in ``warnings`` and relabelling
+    # for display is the frontend's job.
+    inferred_nmr_text: str = ""
     labile_hydrogen_summary: dict[str, Any] = Field(default_factory=dict)
     proton_inventory: dict[str, Any] = Field(default_factory=dict)
     impurity_candidates: list[dict[str, Any]] = Field(default_factory=list)

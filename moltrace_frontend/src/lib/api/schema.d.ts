@@ -3180,6 +3180,33 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/admin/ops/route-telemetry-summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Admin Route Telemetry Summary
+         * @description Wall-clock rollup for any timed analysis route.
+         *
+         *     The GSD soak endpoint below pre-dates this and stays bespoke (its shape backs
+         *     the FE readiness panel); this is the generic form for every other event type
+         *     carrying ``wall_ms`` — including the raw-FID and processed-analyze paths whose
+         *     only prior latency evidence was a hand-run localhost measurement in
+         *     ``docs/raw_fid_latency_be_handoff.md``. Same aggregation strategy and admin
+         *     audience as the GSD rollup.
+         */
+        get: operations["admin_route_telemetry_summary_admin_ops_route_telemetry_summary_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/spectrum/analyze/gsd/telemetry-summary": {
         parameters: {
             query?: never;
@@ -28873,6 +28900,11 @@ export interface components {
             environment_counts?: {
                 [key: string]: number;
             };
+            /**
+             * Inferred Nmr Text
+             * @default
+             */
+            inferred_nmr_text: string;
             /** Labile Hydrogen Summary */
             labile_hydrogen_summary?: {
                 [key: string]: unknown;
@@ -36994,6 +37026,39 @@ export interface components {
              * Format: date-time
              */
             generated_at?: string;
+        };
+        /**
+         * RouteTelemetrySummary
+         * @description Generic wall-clock rollup over one timed route's audit events.
+         *
+         *     Returned by ``GET /admin/ops/route-telemetry-summary?event_type=…`` for any
+         *     event type that records ``wall_ms`` in its audit metadata — the generic form
+         *     of the bespoke GSD soak summary below, so the raw-FID and processed-analyze
+         *     paths (the product's slowest) finally have an automated latency readout.
+         *     Latency fields are ``None`` rather than ``0.0`` when no samples exist, so an
+         *     empty window reads as "no data", never as "instant".
+         */
+        RouteTelemetrySummary: {
+            /** Event Type */
+            event_type: string;
+            /** Window Days */
+            window_days: number;
+            /** Scope Actor User Id */
+            scope_actor_user_id?: number | null;
+            /** Invocations */
+            invocations: number;
+            /** Error Count */
+            error_count: number;
+            /** Error Kind Counts */
+            error_kind_counts: {
+                [key: string]: number;
+            };
+            /** Wall Ms Sample Count */
+            wall_ms_sample_count: number;
+            /** Median Wall Ms */
+            median_wall_ms?: number | null;
+            /** P95 Wall Ms */
+            p95_wall_ms?: number | null;
         };
         /**
          * SPCAlertOut
@@ -51433,6 +51498,42 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SpectrumSolventCatalog"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    admin_route_telemetry_summary_admin_ops_route_telemetry_summary_get: {
+        parameters: {
+            query: {
+                event_type: string;
+                window_days?: number;
+                actor_user_id?: number | null;
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RouteTelemetrySummary"];
                 };
             };
             /** @description Validation Error */
