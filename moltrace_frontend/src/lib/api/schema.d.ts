@@ -16262,60 +16262,30 @@ export interface components {
             zero_fill_factor?: number | null;
             /** Line Broadening Hz */
             line_broadening_hz?: number | null;
-            /**
-             * Apodization Mode
-             * @default exponential
-             */
-            apodization_mode: string;
-            /**
-             * Apply Group Delay
-             * @default true
-             */
-            apply_group_delay: boolean;
-            /**
-             * Auto Phase
-             * @default true
-             */
-            auto_phase: boolean;
-            /**
-             * Auto Baseline
-             * @default true
-             */
-            auto_baseline: boolean;
-            /**
-             * Phase Mode
-             * @default auto
-             */
-            phase_mode: string;
-            /**
-             * Phase P0
-             * @default 0
-             */
-            phase_p0: number;
-            /**
-             * Phase P1
-             * @default 0
-             */
-            phase_p1: number;
-            /**
-             * Baseline Correction
-             * @default bernstein
-             */
-            baseline_correction: string;
-            /**
-             * Baseline Order
-             * @default 3
-             */
-            baseline_order: number;
+            /** Apodization Mode */
+            apodization_mode?: string | null;
+            /** Apply Group Delay */
+            apply_group_delay?: boolean | null;
+            /** Auto Phase */
+            auto_phase?: boolean | null;
+            /** Auto Baseline */
+            auto_baseline?: boolean | null;
+            /** Phase Mode */
+            phase_mode?: string | null;
+            /** Phase P0 */
+            phase_p0?: number | null;
+            /** Phase P1 */
+            phase_p1?: number | null;
+            /** Baseline Correction */
+            baseline_correction?: string | null;
+            /** Baseline Order */
+            baseline_order?: number | null;
             /** Baseline Lock */
             baseline_lock?: boolean | null;
             /** Peak Sensitivity */
             peak_sensitivity?: number | null;
-            /**
-             * Mask Solvent Regions
-             * @default true
-             */
-            mask_solvent_regions: boolean;
+            /** Mask Solvent Regions */
+            mask_solvent_regions?: boolean | null;
             /**
              * Display Mode
              * @default real
@@ -16367,60 +16337,30 @@ export interface components {
             zero_fill_factor?: number | null;
             /** Line Broadening Hz */
             line_broadening_hz?: number | null;
-            /**
-             * Apodization Mode
-             * @default exponential
-             */
-            apodization_mode: string;
-            /**
-             * Apply Group Delay
-             * @default true
-             */
-            apply_group_delay: boolean;
-            /**
-             * Auto Phase
-             * @default true
-             */
-            auto_phase: boolean;
-            /**
-             * Auto Baseline
-             * @default true
-             */
-            auto_baseline: boolean;
-            /**
-             * Phase Mode
-             * @default auto
-             */
-            phase_mode: string;
-            /**
-             * Phase P0
-             * @default 0
-             */
-            phase_p0: number;
-            /**
-             * Phase P1
-             * @default 0
-             */
-            phase_p1: number;
-            /**
-             * Baseline Correction
-             * @default bernstein
-             */
-            baseline_correction: string;
-            /**
-             * Baseline Order
-             * @default 3
-             */
-            baseline_order: number;
+            /** Apodization Mode */
+            apodization_mode?: string | null;
+            /** Apply Group Delay */
+            apply_group_delay?: boolean | null;
+            /** Auto Phase */
+            auto_phase?: boolean | null;
+            /** Auto Baseline */
+            auto_baseline?: boolean | null;
+            /** Phase Mode */
+            phase_mode?: string | null;
+            /** Phase P0 */
+            phase_p0?: number | null;
+            /** Phase P1 */
+            phase_p1?: number | null;
+            /** Baseline Correction */
+            baseline_correction?: string | null;
+            /** Baseline Order */
+            baseline_order?: number | null;
             /** Baseline Lock */
             baseline_lock?: boolean | null;
             /** Peak Sensitivity */
             peak_sensitivity?: number | null;
-            /**
-             * Mask Solvent Regions
-             * @default true
-             */
-            mask_solvent_regions: boolean;
+            /** Mask Solvent Regions */
+            mask_solvent_regions?: boolean | null;
             /**
              * Display Mode
              * @default real
@@ -20919,7 +20859,7 @@ export interface components {
              * Id
              * @enum {string}
              */
-            id: "baseline_preserve" | "balanced" | "sensitive_weak_peaks" | "higher_resolution" | "custom";
+            id: "baseline_preserve" | "phase_preserve" | "balanced" | "sensitive_weak_peaks" | "higher_resolution" | "custom";
             /** Label */
             label: string;
             /** Description */

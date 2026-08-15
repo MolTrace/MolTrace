@@ -1263,6 +1263,10 @@ def test_fid_presets_endpoint_lists_expected_presets() -> None:
     labels = [preset.label for preset in presets]
     assert labels == [
         "Baseline preserve",
+        # Added by the honest-presets fix (Prompt 2 A5): the product's
+        # "No phase correction" choice needs a preset whose settings
+        # actually skip phasing rather than falling back to Balanced.
+        "No phase correction",
         "Balanced",
         "Sensitive weak peaks",
         "Higher resolution",

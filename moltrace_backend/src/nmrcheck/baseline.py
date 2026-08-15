@@ -240,6 +240,7 @@ def apply_bernstein_baseline_correction(
     order: int = 3,
     quantile: float = 0.25,
     max_iter: int = 3,
+    shared_qa_state: dict[str, Any] | None = None,
 ) -> tuple[list[tuple[float, float]], dict[str, Any], list[str]]:
     """Subtract a conservative Bernstein-polynomial baseline from NMR points.
 
@@ -340,7 +341,18 @@ def apply_bernstein_baseline_correction(
             residual_offset = float(median(baseline_residuals))
             corrected = [(x, y - residual_offset) for x, y in corrected]
 
-    qa = evaluate_baseline_flatness(corrected, mode="bernstein").as_dict()
+    corrected_baseline_estimate = estimate_baseline_points(corrected)
+    if shared_qa_state is not None:
+        # Hand the estimate to the next stage (the signal-free polish and the
+        # final flatness QA run on this same trace) so one request estimates
+        # each trace's baseline points once instead of once per QA call.
+        shared_qa_state["baseline_points_estimate"] = corrected_baseline_estimate
+        shared_qa_state["estimated_for_point_count"] = len(corrected)
+    qa = evaluate_baseline_flatness(
+        corrected,
+        mode="bernstein",
+        baseline_points_estimate=corrected_baseline_estimate,
+    ).as_dict()
     metadata.update(
         {
             "correction_applied": True,
@@ -397,8 +409,16 @@ def apply_bernstein_baseline(
     return apply_bernstein_baseline_correction(points, order=order)
 
 
-def _baseline_fit_span(points: list[tuple[float, float]]) -> dict[str, float | int]:
-    baseline = estimate_baseline_points(points)
+def _baseline_fit_span(
+    points: list[tuple[float, float]],
+    *,
+    baseline_points_estimate: list[tuple[float, float]] | None = None,
+) -> dict[str, float | int]:
+    baseline = (
+        baseline_points_estimate
+        if baseline_points_estimate is not None
+        else estimate_baseline_points(points)
+    )
     if len(baseline) < 3:
         return {"span": 0.0, "slope": 0.0, "intercept": 0.0, "baseline_points": len(baseline)}
     try:
@@ -538,6 +558,7 @@ def apply_signal_free_smooth_baseline_polish(
     smoothness: float | None = None,
     asymmetry: float = 0.01,
     max_iter: int = 10,
+    shared_qa_state: dict[str, Any] | None = None,
 ) -> tuple[list[tuple[float, float]], dict[str, Any], list[str]]:
     """Remove residual rolling baseline using signal-free regions and smoothing.
 
@@ -553,8 +574,21 @@ def apply_signal_free_smooth_baseline_polish(
         for x, y in points
         if math.isfinite(float(x)) and math.isfinite(float(y))
     ]
-    before_qa = evaluate_baseline_flatness(clean, mode="signal_free_smoother").as_dict()
-    before_span = _baseline_fit_span(clean)
+    # Reuse the Bernstein stage's baseline-point estimate when the caller ran
+    # both stages on the same trace — valid only if no non-finite points were
+    # dropped between the stages, which the length check verifies.
+    incoming_estimate: list[tuple[float, float]] | None = None
+    if (
+        shared_qa_state is not None
+        and shared_qa_state.get("estimated_for_point_count") == len(clean)
+    ):
+        incoming_estimate = shared_qa_state.get("baseline_points_estimate")
+    before_qa = evaluate_baseline_flatness(
+        clean,
+        mode="signal_free_smoother",
+        baseline_points_estimate=incoming_estimate,
+    ).as_dict()
+    before_span = _baseline_fit_span(clean, baseline_points_estimate=incoming_estimate)
     metadata: dict[str, Any] = {
         "method": "signal_free_smooth_baseline_polish",
         "correction_applied": False,
@@ -606,8 +640,15 @@ def apply_signal_free_smooth_baseline_polish(
             offset = 0.0
 
         corrected = [(x, float(value)) for (x, _y), value in zip(clean, corrected_y, strict=False)]
-        after_qa = evaluate_baseline_flatness(corrected, mode="signal_free_smoother").as_dict()
-        after_span = _baseline_fit_span(corrected)
+        after_baseline_estimate = estimate_baseline_points(corrected)
+        after_qa = evaluate_baseline_flatness(
+            corrected,
+            mode="signal_free_smoother",
+            baseline_points_estimate=after_baseline_estimate,
+        ).as_dict()
+        after_span = _baseline_fit_span(
+            corrected, baseline_points_estimate=after_baseline_estimate
+        )
         before_score = float(before_qa.get("score") or 0.0)
         after_score = float(after_qa.get("score") or 0.0)
         before_span_value = float(before_span.get("span") or 0.0)
@@ -638,6 +679,9 @@ def apply_signal_free_smooth_baseline_polish(
                 "baseline_span": round(float(after_span.get("span") or 0.0), 10),
             }
         )
+        if shared_qa_state is not None:
+            shared_qa_state["baseline_points_estimate"] = after_baseline_estimate
+            shared_qa_state["estimated_for_point_count"] = len(corrected)
         return (corrected, metadata, warnings)
     except Exception as exc:
         warnings.append(
@@ -745,8 +789,18 @@ def evaluate_baseline_flatness(
     points: list[tuple[float, float]],
     *,
     mode: str = "flat",
+    baseline_points_estimate: list[tuple[float, float]] | None = None,
 ) -> BaselineQA:
-    baseline = estimate_baseline_points(points)
+    # ``estimate_baseline_points`` is deterministic in (x, y), and every QA
+    # statistic below is invariant under a constant x translation (slope,
+    # spans and orderings only ever use x differences), so a caller that has
+    # already estimated the baseline for the same y-trace may pass it in —
+    # one request evaluates flatness on the same trace several times.
+    baseline = (
+        baseline_points_estimate
+        if baseline_points_estimate is not None
+        else estimate_baseline_points(points)
+    )
     if len(baseline) < 5:
         return BaselineQA(
             mode=normalize_baseline_mode(mode),

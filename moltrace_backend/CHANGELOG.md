@@ -14,6 +14,42 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.69.8 — Instant FID: the preview/process path stops blocking, forgetting, and lying (2026-08-15)
+
+Measured baseline on a real 2.5 MB Bruker 1H archive: 6.8 s cold, 0.017 s on the
+in-process cache, and 40–78 s under concurrent load — the whole pipeline ran on
+the asyncio event loop, so one upload froze the instance for everyone. Four
+changes, each pinned by tests before it landed:
+
+- **The event loop never blocks.** Every async route wraps
+  `process_bruker_1d_zip` (and the ¹³C variant) in `run_in_threadpool`;
+  `test_raw_fid_event_loop.py` proves `/health` keeps answering mid-process via
+  a heartbeat that would starve 8× over on the old inline path.
+- **The 400× cache is now a property of the system, not a process accident.**
+  Derived `FIDPreviewReport`s persist in the new `raw_fid_report_cache` table
+  (Alembic `0048`, additive), keyed by the same content-addressed processing
+  identity as the in-process L1. A scale-to-zero restart or a different
+  autoscaled instance serves a repeat request in ~0.09 s instead of recomputing.
+  Cache failures degrade to recompute, never to a request failure.
+- **Cold runs shed measured-redundant work — output-identical, proven.**
+  19 golden files (`test_fid_pipeline_invariants.py`, nmrshiftdb2 corpus) pin
+  peaks, integrals, phase, baseline, chosen sensitivity, and preview aggregates;
+  all match bit-identically after: one shared detection preamble across the
+  7-candidate sensitivity sweep, one baseline-point estimate per trace instead
+  of seven, debug-gated preserved-state QA, a vectorized trace build, and a
+  single serialization in `save_fid_run`. Cold guided runs dropped ~2.2×.
+  Two candidate optimizations were measured and **rejected** by the same rule:
+  decimated auto-phase scoring (p0/p1 drift up to 34°/992°) and a decimated
+  sensitivity sweep (chosen sensitivity changes on ≥1/8 of fixtures).
+- **Presets do what they say, and unknown ones are refused.** The product ids
+  `safe_automatic` / `no_baseline_correction` / `no_phase_correction` resolve to
+  real presets (`balanced` / `baseline_preserve` / the new `phase_preserve`);
+  choosing a preset now counts as explicit intent, so the 1H advised recipe no
+  longer stomps it back to Bernstein + auto-phase. Unknown ids (including
+  `imported_parameters`, which has no engine support) fail with a 422 naming
+  the id instead of silently running "balanced". Plus `GZipMiddleware` — the
+  377–650 KB float-JSON previews gzip 5–8×.
+
 ## v0.69.7 — The installer that builds the image is no longer a moving target (2026-08-15)
 
 Cloud Build `392b29a0` failed on step 2 of 19 with `dial tcp 140.82.112.33:443:

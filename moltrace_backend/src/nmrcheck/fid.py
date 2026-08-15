@@ -121,6 +121,7 @@ _REQUIRED_VARIAN_FILES = {"fid", "procpar"}
 _OPTIONAL_VARIAN_FILES = {"log", "text", "phasefile"}
 _FID_PRESET_ORDER: tuple[FIDPresetId, ...] = (
     "baseline_preserve",
+    "phase_preserve",
     "balanced",
     "sensitive_weak_peaks",
     "higher_resolution",
@@ -139,6 +140,20 @@ _FID_PRESET_SETTINGS: dict[FIDPresetId, dict[str, Any]] = {
         "baseline_correction": "preserve",
         "baseline_order": 3,
         "peak_sensitivity": 0.1,
+        "mask_solvent_regions": True,
+    },
+    "phase_preserve": {
+        "zero_fill_factor": 2,
+        "fourier_transform": "fft_1d",
+        "apodization_mode": "exponential",
+        "line_broadening_hz": 0.3,
+        "apply_group_delay": True,
+        "auto_phase": False,
+        "phase_mode": "none",
+        "auto_baseline": True,
+        "baseline_correction": "bernstein",
+        "baseline_order": 3,
+        "peak_sensitivity": 0.12,
         "mask_solvent_regions": True,
     },
     "balanced": {
@@ -187,6 +202,7 @@ _FID_PRESET_SETTINGS: dict[FIDPresetId, dict[str, Any]] = {
 }
 _FID_PRESET_LABELS: dict[FIDPresetId, str] = {
     "baseline_preserve": "Baseline preserve",
+    "phase_preserve": "No phase correction",
     "balanced": "Balanced",
     "sensitive_weak_peaks": "Sensitive weak peaks",
     "higher_resolution": "Higher resolution",
@@ -196,6 +212,10 @@ _FID_PRESET_DESCRIPTIONS: dict[FIDPresetId, str] = {
     "baseline_preserve": (
         "Preserves the transformed FID spectrum state with no line broadening or "
         "baseline subtraction, then reports baseline flatness for review."
+    ),
+    "phase_preserve": (
+        "Skips phase correction entirely (the spectrum keeps its as-transformed "
+        "phase) while still applying automatic Bernstein baseline correction."
     ),
     "balanced": "Conservative default for routine Bruker or Varian/Agilent 1D FID review with auto phase and Bernstein baseline correction.",
     "sensitive_weak_peaks": "Adds mild apodization and lower peak threshold for weak signals with Bernstein baseline correction.",
@@ -276,18 +296,56 @@ def _suppress_known_nmrglue_warnings() -> Any:
         yield
 
 
+# Product-facing preset ids and how they resolve to engine presets. These are
+# the ids the SpectraCheck UI sends; each maps to a preset whose settings
+# actually do what the label says (verified 2026-08: before this table existed,
+# all four UI ids silently fell back to "balanced", so "No baseline correction"
+# still ran Bernstein baseline + auto phase).
+_FID_PRESET_ALIASES: dict[str, FIDPresetId] = {
+    "sensitive": "sensitive_weak_peaks",
+    "weak_peaks": "sensitive_weak_peaks",
+    "higher": "higher_resolution",
+    "resolution": "higher_resolution",
+    "safe_automatic": "balanced",
+    "no_baseline_correction": "baseline_preserve",
+    "no_phase_correction": "phase_preserve",
+}
+
+
+class UnknownFIDPresetError(ValueError):
+    """A processing preset id that maps to no real engine behaviour."""
+
+
+def _normalize_preset_token(value: str | None) -> str:
+    return (value or "balanced").strip().lower().replace("-", "_").replace(" ", "_")
+
+
 def normalize_fid_preset_id(value: str | None) -> FIDPresetId:
-    normalized = (value or "balanced").strip().lower().replace("-", "_").replace(" ", "_")
-    aliases = {
-        "sensitive": "sensitive_weak_peaks",
-        "weak_peaks": "sensitive_weak_peaks",
-        "higher": "higher_resolution",
-        "resolution": "higher_resolution",
-    }
-    normalized = aliases.get(normalized, normalized)
+    normalized = _FID_PRESET_ALIASES.get(
+        _normalize_preset_token(value), _normalize_preset_token(value)
+    )
     if normalized not in _FID_PRESET_SETTINGS:
         return "balanced"
     return normalized  # type: ignore[return-value]
+
+
+def resolve_fid_preset_id_strict(value: str | None) -> FIDPresetId:
+    """Resolve a caller-supplied preset id, refusing to guess.
+
+    The lenient ``normalize_fid_preset_id`` silently substitutes "balanced"
+    for anything it does not recognise — acceptable for internal defaults,
+    but on product-facing routes it meant a preset the user chose could be
+    quietly replaced by different processing. Unknown ids now fail naming
+    the id so the caller can correct it.
+    """
+    token = _normalize_preset_token(value)
+    resolved = _FID_PRESET_ALIASES.get(token, token)
+    if resolved not in _FID_PRESET_SETTINGS:
+        known = sorted({*_FID_PRESET_SETTINGS, *_FID_PRESET_ALIASES})
+        raise UnknownFIDPresetError(
+            f"Unknown processing preset '{value}'. Choose one of: {', '.join(known)}."
+        )
+    return resolved  # type: ignore[return-value]
 
 
 def normalize_phase_mode(value: str | None) -> str:
@@ -414,7 +472,20 @@ def fid_settings_from_preset(
     explicit_overrides = {key for key, value in overrides.items() if value is not None}
     values.update({key: value for key, value in overrides.items() if value is not None})
     settings = FIDProcessingSettings(selected_preset=preset_id, **values)
-    settings._explicit_overrides = explicit_overrides
+    # Choosing a non-default preset is itself an explicit processing decision:
+    # every axis where the preset deviates from "balanced" is marked explicit
+    # so the 1H advised-processing constraints preserve it. Without this, the
+    # advised recipe stomped e.g. baseline_preserve back to Bernstein + auto
+    # phase, making "No baseline correction" a label with no behaviour.
+    preset_intent_overrides: set[str] = set()
+    if preset_id not in {"balanced", "custom"}:
+        balanced_values = _FID_PRESET_SETTINGS["balanced"]
+        preset_intent_overrides = {
+            key
+            for key, preset_value in _FID_PRESET_SETTINGS[preset_id].items()
+            if key in balanced_values and preset_value != balanced_values[key]
+        }
+    settings._explicit_overrides = explicit_overrides | preset_intent_overrides
     return settings
 
 
@@ -1081,14 +1152,38 @@ def _get_raw_fid_process_cache(
     cache_key: str,
     *,
     raw_upload_provenance: dict[str, Any],
+    session_factory: Any | None = None,
 ) -> FIDPreviewReport | None:
     with _RAW_FID_PROCESS_CACHE_LOCK:
         cached = _RAW_FID_PROCESS_CACHE.get(cache_key)
-        if cached is None:
+        if cached is not None:
+            _RAW_FID_PROCESS_CACHE.move_to_end(cache_key)
+    if cached is not None:
+        return _raw_fid_cached_report_copy(
+            cached,
+            hit=True,
+            raw_upload_provenance=raw_upload_provenance,
+        )
+    if session_factory is None:
+        return None
+    # L2: the persisted report survives scale-to-zero restarts and is shared
+    # across instances. Any failure here is a miss, never a request failure.
+    try:
+        from .database import load_cached_fid_report_json
+
+        report_json = load_cached_fid_report_json(session_factory, cache_key)
+        if report_json is None:
             return None
+        restored = FIDPreviewReport.model_validate_json(report_json)
+    except Exception:
+        return None
+    with _RAW_FID_PROCESS_CACHE_LOCK:
+        _RAW_FID_PROCESS_CACHE[cache_key] = restored.model_copy(deep=True)
         _RAW_FID_PROCESS_CACHE.move_to_end(cache_key)
+        while len(_RAW_FID_PROCESS_CACHE) > _RAW_FID_PROCESS_CACHE_MAX_ENTRIES:
+            _RAW_FID_PROCESS_CACHE.popitem(last=False)
     return _raw_fid_cached_report_copy(
-        cached,
+        restored,
         hit=True,
         raw_upload_provenance=raw_upload_provenance,
     )
@@ -1097,6 +1192,8 @@ def _get_raw_fid_process_cache(
 def _store_raw_fid_process_cache(
     cache_key: str,
     report: FIDPreviewReport,
+    *,
+    session_factory: Any | None = None,
 ) -> FIDPreviewReport:
     returned = _raw_fid_cached_report_copy(
         report,
@@ -1108,6 +1205,24 @@ def _store_raw_fid_process_cache(
         _RAW_FID_PROCESS_CACHE.move_to_end(cache_key)
         while len(_RAW_FID_PROCESS_CACHE) > _RAW_FID_PROCESS_CACHE_MAX_ENTRIES:
             _RAW_FID_PROCESS_CACHE.popitem(last=False)
+    if session_factory is not None:
+        try:
+            from .database import store_cached_fid_report_json
+
+            provenance = returned.processing_metadata.raw_upload_provenance or {}
+            store_cached_fid_report_json(
+                session_factory,
+                cache_key=cache_key,
+                cache_version=_RAW_FID_PROCESS_CACHE_VERSION,
+                raw_sha256=(
+                    str(provenance.get("sha256")) if provenance.get("sha256") else None
+                ),
+                report_json=returned.model_dump_json(),
+            )
+        except Exception:
+            # Persisting the derivation is best-effort; the computed report
+            # is already in hand and in the L1 dict.
+            pass
     return returned
 
 
@@ -2116,6 +2231,8 @@ def _fine_tune_solvent_display_regions(
 def _apply_fid_baseline_correction(
     points: list[tuple[float, float]],
     settings: FIDProcessingSettings,
+    *,
+    shared_qa_state: dict[str, Any] | None = None,
 ) -> tuple[list[tuple[float, float]], dict[str, Any], list[str]]:
     mode = normalize_baseline_mode(settings.baseline_correction)
     if not settings.auto_baseline:
@@ -2124,10 +2241,12 @@ def _apply_fid_baseline_correction(
         corrected, metadata, warnings = apply_bernstein_baseline_correction(
             points,
             order=settings.baseline_order,
+            shared_qa_state=shared_qa_state,
         )
         if settings.auto_baseline and len(corrected) >= 32:
             polished, polish_metadata, polish_warnings = apply_signal_free_smooth_baseline_polish(
                 corrected,
+                shared_qa_state=shared_qa_state,
             )
             warnings.extend(note for note in polish_warnings if note not in warnings)
             metadata["post_baseline_polish"] = polish_metadata
@@ -2793,6 +2912,7 @@ def process_bruker_1d_zip(
     expected_non_labile_h: int | None = None,
     compound_class: str | None = None,
     raw_upload_provenance: dict[str, Any] | None = None,
+    session_factory: Any | None = None,
 ) -> FIDPreviewReport:
     if not filename.lower().endswith((".zip", ".tar.gz", ".tgz")):
         raise FIDProcessingError(
@@ -2827,6 +2947,7 @@ def process_bruker_1d_zip(
     cached_report = _get_raw_fid_process_cache(
         cache_key,
         raw_upload_provenance=raw_upload_provenance,
+        session_factory=session_factory,
     )
     if cached_report is not None:
         return disclose_relative_integrals(
@@ -2993,15 +3114,28 @@ def process_bruker_1d_zip(
             }
         )
 
-        original_spectrum_points = [
-            (float(x), float(y))
-            for x, y in zip(axis, real_before_baseline, strict=False)
-            if math.isfinite(float(x)) and math.isfinite(float(y))
-        ]
-        original_spectrum_points.sort(key=lambda item: item[0], reverse=True)
+        # Vectorized build of the (x, y) trace: the per-element comprehension
+        # ran two math.isfinite calls per point (measured 1.8M/request) plus a
+        # Python-level sort of ~196k tuples. Stable descending argsort keeps
+        # tie order identical to list.sort(reverse=True).
+        axis_array = np.asarray(axis, dtype=float)
+        real_array = np.asarray(real_before_baseline, dtype=float)
+        finite_mask = np.isfinite(axis_array) & np.isfinite(real_array)
+        finite_axis = axis_array[finite_mask]
+        finite_real = real_array[finite_mask]
+        descending = np.argsort(-finite_axis, kind="stable")
+        original_spectrum_points = list(
+            zip(
+                finite_axis[descending].tolist(),
+                finite_real[descending].tolist(),
+                strict=False,
+            )
+        )
+        baseline_qa_state: dict[str, Any] = {}
         points, baseline_correction_detail, baseline_warnings = _apply_fid_baseline_correction(
             original_spectrum_points,
             settings,
+            shared_qa_state=baseline_qa_state,
         )
         baseline_correction_detail["warnings"] = baseline_warnings
         warnings.extend(note for note in baseline_warnings if note not in warnings)
@@ -3131,9 +3265,17 @@ def process_bruker_1d_zip(
                 ],
             }
             warnings.extend(note for note in magnifier.warnings if note not in warnings)
+        # Referencing only translates x; every flatness statistic is invariant
+        # under that (slope, spans, and orderings use x differences), so the
+        # estimate computed by the baseline stage is still exact here.
         baseline_flatness_qa = evaluate_baseline_flatness(
             points,
             mode=str(baseline_correction_detail.get("method") or "evidence"),
+            baseline_points_estimate=(
+                baseline_qa_state.get("baseline_points_estimate")
+                if baseline_qa_state.get("estimated_for_point_count") == len(points)
+                else None
+            ),
         ).as_dict()
         baseline_correction_detail["flatness_qa"] = baseline_flatness_qa
         original_spectrum_state = _build_preserved_spectrum_state(
@@ -3143,11 +3285,17 @@ def process_bruker_1d_zip(
             point_limit=settings.max_preview_points,
             normalized_for_preview=False,
         )
-        original_spectrum_state["baseline_flatness_qa"] = evaluate_baseline_flatness(
-            original_spectrum_points,
-            mode="preserve",
-        ).as_dict()
-        if not settings.debug_preview:
+        if settings.debug_preview:
+            # Pre-baseline flatness of the preserved state is a debug-only
+            # readout (measured: one full-trace baseline estimate per request
+            # that nothing on the normal path consumes). Gated exactly like
+            # the preserved preview_points below.
+            original_spectrum_state["baseline_flatness_qa"] = evaluate_baseline_flatness(
+                original_spectrum_points,
+                mode="preserve",
+            ).as_dict()
+        else:
+            original_spectrum_state["baseline_flatness_qa_omitted"] = True
             original_spectrum_state["preview_points"] = []
             original_spectrum_state["preview_points_omitted"] = True
         target_total_h = _select_target_proton_count(
@@ -3184,7 +3332,7 @@ def process_bruker_1d_zip(
             if not reference_assignments and target_total_h is None
             else None
         )
-        estimates, best_comparison, _chosen_sensitivity = _structure_guided_peak_estimates(
+        estimates, best_comparison, chosen_sensitivity = _structure_guided_peak_estimates(
             inference_points,
             reference_assignments=reference_assignments,
             reference_peaks=reference_peaks,
@@ -3482,6 +3630,7 @@ def process_bruker_1d_zip(
                 "target_total_h": expected_total_h,
                 "target_non_labile_h": expected_non_labile_h,
                 "target_visible_h": target_total_h,
+                "peak_detection_sensitivity": chosen_sensitivity,
                 **peak_meta,
             },
             processing_metadata=metadata,
@@ -3496,7 +3645,9 @@ def process_bruker_1d_zip(
             }
         )
         return disclose_relative_integrals(
-            _store_raw_fid_process_cache(cache_key, report),
+            _store_raw_fid_process_cache(
+                cache_key, report, session_factory=session_factory
+            ),
             expected_total_h=expected_total_h,
         )
 
@@ -3513,6 +3664,7 @@ def process_raw_fid_zip_to_spectrum(
     expected_total_h: int | None = None,
     expected_non_labile_h: int | None = None,
     raw_upload_provenance: dict[str, Any] | None = None,
+    session_factory: Any | None = None,
 ) -> FIDPreviewReport:
     """Compatibility wrapper for the Bruker/Varian 1D raw-FID processor."""
 
@@ -3527,4 +3679,5 @@ def process_raw_fid_zip_to_spectrum(
         expected_total_h=expected_total_h,
         expected_non_labile_h=expected_non_labile_h,
         raw_upload_provenance=raw_upload_provenance,
+        session_factory=session_factory,
     )
