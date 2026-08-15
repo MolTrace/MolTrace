@@ -757,3 +757,83 @@ scale (22k spectra) and the 479 expert-annotated gold set, which matter for
 training and for C8-style statistics rather than for the correctness work
 immediately ahead. In-house data is also stronger ground truth: the structures
 are known rather than inferred.
+
+---
+
+## C0 RESULT — fixtures staged, ground truth still missing (2026-08-14)
+
+Eight real 2D datasets staged into `validation_fixtures/nmr2d/` (gitignored) and
+registered as roles in `validation_fixtures/fixture_map.json`, resolvable through
+`tests/fixture_pointer.py`. They are referred to here **only by role**: the source
+directory names are sample codes and this repository is public.
+
+Every parameter below was read from `acqus`/`acqu2s`, not from the folder name —
+C2's own rule, applied to C0.
+
+| role | experiment | pulse program | F1 | SW F1 | increments | phase | 2rr |
+|---|---|---|---|---|---|---|---|
+| `nmr2d_hsqc_1..6` | multiplicity-edited HSQC | `hsqcedetgpsisp.2` | 13C | 170 ppm | 128 | echo-antiecho | yes |
+| `nmr2d_cosy_1` | DQF-COSY | `cosydfphpp` | 1H | 16 ppm | **93** | States-TPPI | **no** |
+| `nmr2d_cosy_2` | DQF-COSY | `cosydfphpp` | 1H | 16 ppm | 128 | States-TPPI | yes |
+
+Solvents span MeOD (4), CDCl₃ (2), CD₂Cl₂ (1) across the HSQC set — useful later,
+because an F1 referencing error is solvent-independent while a shift error is not.
+
+Two datasets are **not** clean and the inventory flags them rather than letting
+them look normal: `nmr2d_cosy_1` stopped at 93 of 128 increments and has no
+processed `2rr` (an aborted acquisition — truncation artifacts in F1 are expected,
+which makes it the natural negative control for C3), and `nmr2d_hsqc_5` has
+`td_f2` 1500 rather than 2048.
+
+**The C0 gate is NOT met.** It requires hand-derived expected correlations from an
+assigned structure, and that cannot be produced here: the `pdata/1/title` files are
+empty, no structure file accompanies any dataset, and the compounds are unpublished
+synthetic intermediates. Deriving correlations from the software under test is the
+exact circularity the A1 retraction came from, so this waits on the maintainer
+supplying one structure. C4/C5 measurement and C8 remain blocked behind it.
+
+---
+
+## C2 + C3 RESULT — there is no path for a 2D acquisition to enter the system (2026-08-14)
+
+C2 asks for axis assignment, per-dimension referencing, magnitude-vs-phase-sensitive
+handling and folding to be checked against the acquisition parameters. **None of
+them can be checked, because no vendor 2D dataset can enter the system at all.**
+
+Measured, not inferred:
+
+* `read_fid` on a staged 2D directory raises `FIDReaderError: No Bruker or
+  Varian/Agilent FID dataset was found.` It looks for `fid`; a 2D acquisition has
+  `ser`.
+* `process_bruker_1d_zip` on the same data zipped as a user would drop it raises
+  `Bruker-style acqus file was found, but the required fid file is missing.` —
+  correct, and it names the missing file rather than failing vaguely.
+* `acqu2s` appears in exactly one place in the backend, a filename allowlist in
+  `fid_reader.py`. Nothing parses it.
+* The matrix path (`parse_2d_matrix_preview`) returns `peak_count=0`, stamps
+  `raw_2d_fid_processing: not_implemented_guarded_release` and
+  `contour_preview_affects_evidence_score: false`, and warns that raw 2D
+  processing is not performed.
+
+So this is a **declared boundary, not a hidden defect** — the code says what it
+does not do. The consequence is the finding: axis assignment, referencing,
+phase-sensitivity and folding are all decided by whatever produced the uploaded
+peak list, upstream and outside the system, and are therefore unverifiable by it.
+Any downstream claim about connectivity inherits that unverified input. This
+belongs in user-facing copy about what 2D evidence means, and it makes the C1
+result sharper: the layer does not merely score its own peak list, it never sees a
+spectrum.
+
+**C3 follows directly.** There is no 2D peak picker to measure. t1 noise, ridges,
+solvent columns and symmetrisation cannot over-pick or manufacture correlations
+here, because peaks arrive as a list rather than being detected. The 3–7× 1D
+over-picking has no 2D counterpart to measure *yet* — and that is a statement about
+scope, not a clean bill of health. When raw 2D processing is implemented, C3 must
+run before it ships, with `nmr2d_cosy_1` as the truncation control.
+
+`tests/test_nmr2d_ingestion_boundary.py` pins all of this. The invariant guarded
+there is the rejection itself: widening the 1D reader to accept `ser` because a
+user complained about the error would read interleaved 2D data as a 1D FID, which
+transforms into something with plausible peaks and a plausible axis and no outward
+sign of being wrong. The rejection must be replaced by real 2D handling, never
+merely relaxed.
