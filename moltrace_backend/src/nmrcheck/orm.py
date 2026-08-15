@@ -3315,6 +3315,28 @@ class RawArchiveORM(Base):
     fid_runs: Mapped[list[FIDRunORM]] = relationship(back_populates="raw_archive")
 
 
+class RawFIDReportCacheORM(Base):
+    """Persisted (archive, settings) -> FIDPreviewReport derivations.
+
+    The in-process report cache dies on every Cloud Run scale-to-zero and
+    misses across instances; this table is its L2. Rows are pure derived
+    data — the immutable archive lives in raw_archives / the vault — so
+    deleting them only costs recompute time, never information.
+    """
+
+    __tablename__ = "raw_fid_report_cache"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    # sha256 hex of the full processing-identity payload (content sha,
+    # settings, nucleus, solvent, reference text, expected H, compound
+    # class, key version) — the same key the in-process cache uses.
+    cache_key: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    cache_version: Mapped[str] = mapped_column(String(64), index=True)
+    raw_sha256: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    report_json: Mapped[str] = mapped_column(Text)
+
+
 class NMR2DRunORM(Base):
     __tablename__ = "nmr2d_runs"
     __table_args__ = (

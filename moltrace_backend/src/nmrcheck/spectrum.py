@@ -6,7 +6,7 @@ import math
 import re
 from dataclasses import dataclass
 from statistics import median
-from typing import Any
+from typing import Any, NamedTuple
 
 from .baseline import (
     apply_bernstein_baseline_correction,
@@ -1238,10 +1238,11 @@ def _cluster_peak_components(
     detection_trace: list[float] | None = None,
     noise_sigma: float = 0.0,
     deconvolve: bool = False,
+    precomputed_ppm_step: float | None = None,
 ) -> list[_PeakEstimate]:
     if not components:
         return []
-    ppm_step = _ppm_step(x_vals)
+    ppm_step = precomputed_ppm_step if precomputed_ppm_step is not None else _ppm_step(x_vals)
     gap_threshold = min(0.09, max(0.028, ppm_step * 18))
     index_gap_threshold = max(3, int(round(12 * ppm_step / max(ppm_step, 1e-6))))
 
@@ -1419,6 +1420,64 @@ def _lorentzian_capture_fraction(
     return min(1.0, max(0.35, fraction))
 
 
+class _DetectionTracePrep(NamedTuple):
+    """The sensitivity-independent front half of peak detection.
+
+    Everything here depends only on the trace itself — never on the caller's
+    sensitivity, priority regions, or deconvolve flag — so the structure-guided
+    sensitivity sweep computes it once and reuses it for every candidate
+    (measured: 8 identical sort/baseline/smooth/σ passes per guided request).
+    All members are treated as read-only by consumers.
+    """
+
+    ordered: list[tuple[float, float]]
+    x_vals: list[float]
+    detection_clipped: list[float]
+    y_smoothed: list[float]
+    lo: float
+    hi: float
+    noise_sigma: float
+    baseline_level: float
+    ppm_step: float
+
+
+def _prepare_detection_trace(
+    points: list[tuple[float, float]],
+) -> _DetectionTracePrep | None:
+    if len(points) < 3:
+        return None
+    ordered = sorted(points, key=lambda item: item[0], reverse=True)
+    x_vals = [x for x, _ in ordered]
+    # Baseline-correct once: the unclipped result feeds an unbiased noise
+    # estimate; the zero-clipped result is the detection / integration trace
+    # (identical to the previous _baseline_correct output).
+    corrected, _baseline_meta = _robust_polynomial_baseline_correct(
+        [float(y) for _, y in ordered], orient_positive=True
+    )
+    if len(corrected) < 3:
+        return None
+    short_trace = len(corrected) < 25
+    smoothing_window = 1 if short_trace else 5 if len(corrected) >= 1200 else 3
+    detection_clipped = [max(0.0, value) for value in corrected]
+    y_smoothed = _smooth(detection_clipped, window=smoothing_window)
+    # SNR noise floor. σ is measured on the *unclipped* trace under the same
+    # smoothing as the detection array so the two share a scale.
+    noise_sigma = (
+        0.0 if short_trace else _estimate_noise_sigma(_smooth(corrected, window=smoothing_window))
+    )
+    return _DetectionTracePrep(
+        ordered=ordered,
+        x_vals=x_vals,
+        detection_clipped=detection_clipped,
+        y_smoothed=y_smoothed,
+        lo=min(y_smoothed),
+        hi=max(y_smoothed),
+        noise_sigma=noise_sigma,
+        baseline_level=median(y_smoothed),
+        ppm_step=_ppm_step(x_vals),
+    )
+
+
 def _infer_peak_estimates(
     points: list[tuple[float, float]],
     *,
@@ -1426,6 +1485,7 @@ def _infer_peak_estimates(
     frequency_mhz: float | None = None,
     priority_regions: tuple[tuple[float, float], ...] = (),
     deconvolve: bool = False,
+    prepared_trace: _DetectionTracePrep | None = None,
 ) -> list[_PeakEstimate]:
     """Detect peaks from a processed / FID-derived intensity trace.
 
@@ -1436,34 +1496,22 @@ def _infer_peak_estimates(
     tallest peak and therefore both missed genuine weak signals and admitted
     noise spikes. ``priority_regions`` are compound-class-diagnostic ppm
     windows that receive a more sensitive (lower) threshold so weak diagnostic
-    peaks there are not missed.
+    peaks there are not missed. ``prepared_trace`` must have been built from
+    the same ``points`` by ``_prepare_detection_trace``.
     """
-    if len(points) < 3:
+    prep = prepared_trace if prepared_trace is not None else _prepare_detection_trace(points)
+    if prep is None:
         return []
-    ordered = sorted(points, key=lambda item: item[0], reverse=True)
-    x_vals = [x for x, _ in ordered]
+    x_vals = prep.x_vals
+    detection_clipped = prep.detection_clipped
+    y_smoothed = prep.y_smoothed
+    lo = prep.lo
+    hi = prep.hi
+    noise_sigma = prep.noise_sigma
+    baseline_level = prep.baseline_level
     sensitivity = min(max(sensitivity, 0.02), 0.45)
-    # Baseline-correct once: the unclipped result feeds an unbiased noise
-    # estimate; the zero-clipped result is the detection / integration trace
-    # (identical to the previous _baseline_correct output).
-    corrected, _baseline_meta = _robust_polynomial_baseline_correct(
-        [float(y) for _, y in ordered], orient_positive=True
-    )
-    if len(corrected) < 3:
-        return []
-    short_trace = len(corrected) < 25
-    smoothing_window = 1 if short_trace else 5 if len(corrected) >= 1200 else 3
-    detection_clipped = [max(0.0, value) for value in corrected]
-    y_smoothed = _smooth(detection_clipped, window=smoothing_window)
-    lo = min(y_smoothed)
-    hi = max(y_smoothed)
     if math.isclose(hi, lo):
         return []
-
-    # SNR detection threshold. σ is measured on the *unclipped* trace under
-    # the same smoothing as the detection array so the two share a scale.
-    noise_sigma = 0.0 if short_trace else _estimate_noise_sigma(_smooth(corrected, window=smoothing_window))
-    baseline_level = median(y_smoothed)
     if noise_sigma > 0.0:
         noise_factor = _sensitivity_to_noise_factor(sensitivity)
         threshold = baseline_level + noise_factor * noise_sigma
@@ -1539,7 +1587,7 @@ def _infer_peak_estimates(
 
     components.sort(key=lambda peak: peak.shift_ppm, reverse=True)
     filtered_components: list[_PeakComponent] = []
-    min_component_sep = max(_ppm_step(x_vals) * 4, 0.008)
+    min_component_sep = max(prep.ppm_step * 4, 0.008)
     for component in components:
         if filtered_components and abs(filtered_components[-1].shift_ppm - component.shift_ppm) < min_component_sep:
             if component.intensity > filtered_components[-1].intensity:
@@ -1555,6 +1603,7 @@ def _infer_peak_estimates(
         detection_trace=detection_clipped,
         noise_sigma=noise_sigma,
         deconvolve=deconvolve,
+        precomputed_ppm_step=prep.ppm_step,
     )
 
 
@@ -2561,12 +2610,17 @@ def _structure_guided_peak_estimates(
     best_comparison: SpectrumComparisonReport | None = None
     best_key: tuple[float, ...] | None = None
 
+    # The sort/baseline/smooth/σ front half of detection is identical for
+    # every candidate sensitivity — prepare it once for the whole sweep.
+    prepared_trace = _prepare_detection_trace(points)
+
     for sensitivity_candidate in sensitivity_candidates:
         estimates = _infer_peak_estimates(
             points,
             sensitivity=sensitivity_candidate,
             frequency_mhz=frequency_mhz,
             priority_regions=priority_regions,
+            prepared_trace=prepared_trace,
         )
         candidate_peaks, _ = _estimates_to_peaks(
             estimates, target_total_h=target_total_h, solvent=solvent, nucleus=nucleus
@@ -2629,6 +2683,7 @@ def _structure_guided_peak_estimates(
             frequency_mhz=frequency_mhz,
             priority_regions=priority_regions,
             deconvolve=True,
+            prepared_trace=prepared_trace,
         )
     return best_estimates, best_comparison, best_sensitivity
 

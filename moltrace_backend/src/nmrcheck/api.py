@@ -41,6 +41,7 @@ from fastapi import (
 )
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import (
     HTMLResponse,
     JSONResponse,
@@ -52,6 +53,7 @@ from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from pydantic import ValidationError as PydanticValidationError
 from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
+from starlette.concurrency import run_in_threadpool
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from . import ai_evidence_store as ai_evidence_store
@@ -201,10 +203,12 @@ from .exceptions import StructureParseError
 from .export_raw_package import export_raw_fid_analysis_package
 from .fid import (
     FIDProcessingError,
+    UnknownFIDPresetError,
     available_fid_presets,
     fid_settings_from_preset,
     normalize_phase_mode,
     process_bruker_1d_zip,
+    resolve_fid_preset_id_strict,
 )
 from .fid_pipeline_adapter import (
     attach_prompt_pipeline_sidecar,
@@ -10333,7 +10337,7 @@ def _unwrap_form_default(value: Any) -> Any:
     return getattr(value, "default", value)
 
 
-def _coerce_optional_form_bool(value: Any, *, default: bool) -> bool:
+def _coerce_optional_form_bool(value: Any, *, default: bool | None) -> bool | None:
     value = _unwrap_form_default(value)
     if isinstance(value, bool):
         return value
@@ -10346,7 +10350,7 @@ def _coerce_optional_form_bool(value: Any, *, default: bool) -> bool:
     return default
 
 
-def _coerce_optional_form_float(value: Any, *, default: float) -> float:
+def _coerce_optional_form_float(value: Any, *, default: float | None) -> float | None:
     value = _unwrap_form_default(value)
     try:
         return float(value)
@@ -10781,42 +10785,70 @@ def _prompt_sidecar_guidance(
     return build_prompt_pipeline_analysis_guidance(preview, prompt_pipeline_sidecar)
 
 
+def _resolve_processing_preset_or_422(value: Any) -> str:
+    """Resolve a product-facing preset id, or fail naming the id.
+
+    The lenient normalizer silently substituted "balanced" for unknown ids,
+    so a preset the user chose could be replaced by different processing
+    with no signal. Product routes refuse instead.
+    """
+    try:
+        return resolve_fid_preset_id_strict(_unwrap_form_default(value))
+    except UnknownFIDPresetError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
 def _fid_settings_from_form(
     *,
     selected_preset: str | None,
     processing_preset: str | None,
     zero_fill_factor: int | None,
     line_broadening_hz: float | None,
-    apodization_mode: str = "exponential",
-    apply_group_delay: bool,
-    auto_phase: bool,
-    auto_baseline: bool,
-    phase_mode: str,
-    phase_p0: float,
-    phase_p1: float,
-    baseline_correction: str,
-    baseline_order: int,
+    apodization_mode: str | None = "exponential",
+    apply_group_delay: bool | None,
+    auto_phase: bool | None,
+    auto_baseline: bool | None,
+    phase_mode: str | None,
+    phase_p0: float | None,
+    phase_p1: float | None,
+    baseline_correction: str | None,
+    baseline_order: int | None,
     baseline_lock: bool | None,
     peak_sensitivity: float | None,
-    mask_solvent_regions: bool,
+    mask_solvent_regions: bool | None,
     display_mode: str = "real",
     vertical_gain: float = 1.0,
     debug_preview: bool = False,
 ) -> FIDProcessingSettings:
+    # None means "the caller did not choose" — the preset (and, downstream,
+    # the advised processing constraints) decide. Passing a concrete value
+    # marks that axis as an explicit caller override, which the 1H advised
+    # recipe preserves; routes that hardcoded these to "auto"/"bernstein"
+    # therefore made every preset collapse into the same settings.
     display_mode = _coerce_display_mode(display_mode)
-    apply_group_delay = _coerce_optional_form_bool(apply_group_delay, default=True)
-    auto_phase = _coerce_optional_form_bool(auto_phase, default=True)
-    auto_baseline = _coerce_optional_form_bool(auto_baseline, default=True)
-    mask_solvent_regions = _coerce_optional_form_bool(mask_solvent_regions, default=True)
-    phase_mode = normalize_phase_mode(_unwrap_form_default(phase_mode))
-    apodization_mode = _unwrap_form_default(apodization_mode) or "exponential"
-    phase_p0 = _coerce_optional_form_float(phase_p0, default=0.0)
-    phase_p1 = _coerce_optional_form_float(phase_p1, default=0.0)
-    baseline_correction = normalize_baseline_mode(_unwrap_form_default(baseline_correction))
-    try:
-        baseline_order = max(1, min(8, int(_unwrap_form_default(baseline_order))))
-    except (TypeError, ValueError):
-        baseline_order = 3
+    apply_group_delay = _coerce_optional_form_bool(apply_group_delay, default=None)
+    auto_phase = _coerce_optional_form_bool(auto_phase, default=None)
+    auto_baseline = _coerce_optional_form_bool(auto_baseline, default=None)
+    mask_solvent_regions = _coerce_optional_form_bool(mask_solvent_regions, default=None)
+    phase_mode_value = _unwrap_form_default(phase_mode)
+    phase_mode = normalize_phase_mode(phase_mode_value) if phase_mode_value is not None else None
+    apodization_mode = _unwrap_form_default(apodization_mode)
+    phase_p0 = _coerce_optional_form_float(phase_p0, default=None)
+    phase_p1 = _coerce_optional_form_float(phase_p1, default=None)
+    baseline_correction_value = _unwrap_form_default(baseline_correction)
+    baseline_correction = (
+        normalize_baseline_mode(baseline_correction_value)
+        if baseline_correction_value is not None
+        else None
+    )
+    baseline_order_value = _unwrap_form_default(baseline_order)
+    if baseline_order_value is None:
+        baseline_order = None
+    else:
+        try:
+            baseline_order = max(1, min(8, int(baseline_order_value)))
+        except (TypeError, ValueError):
+            baseline_order = 3
     vertical_gain = _coerce_optional_form_float(vertical_gain, default=1.0)
     debug_preview = _coerce_optional_form_bool(debug_preview, default=False)
     processing_preset = _unwrap_form_default(processing_preset)
@@ -11501,6 +11533,7 @@ async def nmr_raw_fid_preview_route(
 ) -> NMRRawFIDPreviewResponse:
     _route_t0 = time.perf_counter()
     filename = file.filename or "raw_fid_archive.zip"
+    resolved_processing_preset_id = _resolve_processing_preset_or_422(processing_preset)
     content = await file.read()
     normalized_compound_class = normalize_compound_class(compound_class)
     shared_proton_text = (proton_nmr_text or "").strip() or None
@@ -11546,29 +11579,36 @@ async def nmr_raw_fid_preview_route(
     spectrum_preview: FIDPreviewReport | None = None
     include_spectrum = _coerce_optional_form_bool(include_spectrum, default=True)
     if include_spectrum:
+        # Recipe axes are None: the resolved preset decides them. Hardcoding
+        # "auto"/"bernstein" here marked every axis as an explicit caller
+        # override, which collapsed all product presets into identical
+        # settings — "No baseline correction" still ran Bernstein baseline.
         settings = _fid_settings_from_form(
-            selected_preset=processing_preset or "balanced",
-            processing_preset=processing_preset,
+            selected_preset=resolved_processing_preset_id,
+            processing_preset=resolved_processing_preset_id,
             zero_fill_factor=None,
             line_broadening_hz=None,
-            apodization_mode="exponential",
-            apply_group_delay=True,
-            auto_phase=True,
-            auto_baseline=True,
-            phase_mode="auto",
-            phase_p0=0.0,
-            phase_p1=0.0,
-            baseline_correction="bernstein",
-            baseline_order=3,
+            apodization_mode=None,
+            apply_group_delay=None,
+            auto_phase=None,
+            auto_baseline=None,
+            phase_mode=None,
+            phase_p0=None,
+            phase_p1=None,
+            baseline_correction=None,
+            baseline_order=None,
             baseline_lock=None,
             peak_sensitivity=None,
-            mask_solvent_regions=True,
+            mask_solvent_regions=None,
             display_mode="real",
             vertical_gain=1.0,
             debug_preview=False,
         )
         try:
-            spectrum_preview = process_bruker_1d_zip(
+            # FFT + phase + baseline + peak inference takes seconds on a real
+            # archive; off the event loop so other requests keep being served.
+            spectrum_preview = await run_in_threadpool(
+                process_bruker_1d_zip,
                 filename=filename,
                 content=content,
                 solvent=solvent,
@@ -11579,8 +11619,10 @@ async def nmr_raw_fid_preview_route(
                 expected_non_labile_h=raw_expected_non_labile_h,
                 compound_class=normalized_compound_class,
                 raw_upload_provenance=raw_upload_provenance,
+                session_factory=_state(request).session_factory,
             )
-            spectrum_preview = _maybe_attach_prompt_raw_fid_sidecar(
+            spectrum_preview = await run_in_threadpool(
+                _maybe_attach_prompt_raw_fid_sidecar,
                 spectrum_preview,
                 filename=filename,
                 content=content,
@@ -11811,6 +11853,7 @@ async def nmr_raw_fid_process_route(
 ) -> NMRRawFIDProcessResponse:
     _route_t0 = time.perf_counter()
     filename = file.filename or "raw_fid_archive.zip"
+    resolved_processing_preset_id = _resolve_processing_preset_or_422(processing_preset)
     content = await file.read()
     normalized_compound_class = normalize_compound_class(compound_class)
     include_spectrum_value = _coerce_optional_form_bool(include_spectrum, default=True)
@@ -11851,29 +11894,35 @@ async def nmr_raw_fid_process_route(
     raw_upload_provenance["frontend_endpoint"] = "/nmr/raw-fid/process"
     raw_upload_provenance["raw_data_immutable"] = True
 
+    # Recipe axes are None: the resolved preset decides them. Hardcoding
+    # "auto"/"bernstein" here marked every axis as an explicit caller
+    # override, which collapsed all product presets into identical settings.
     settings = _fid_settings_from_form(
-        selected_preset=processing_preset or "balanced",
-        processing_preset=processing_preset,
+        selected_preset=resolved_processing_preset_id,
+        processing_preset=resolved_processing_preset_id,
         zero_fill_factor=None,
         line_broadening_hz=None,
-        apodization_mode="exponential",
-        apply_group_delay=True,
-        auto_phase=True,
-        auto_baseline=True,
-        phase_mode="auto",
-        phase_p0=0.0,
-        phase_p1=0.0,
-        baseline_correction="bernstein",
-        baseline_order=3,
+        apodization_mode=None,
+        apply_group_delay=None,
+        auto_phase=None,
+        auto_baseline=None,
+        phase_mode=None,
+        phase_p0=None,
+        phase_p1=None,
+        baseline_correction=None,
+        baseline_order=None,
         baseline_lock=None,
         peak_sensitivity=None,
-        mask_solvent_regions=True,
+        mask_solvent_regions=None,
         display_mode="real",
         vertical_gain=1.0,
         debug_preview=False,
     )
     try:
-        preview = process_bruker_1d_zip(
+        # FFT + phase + baseline + peak inference takes seconds on a real
+        # archive; off the event loop so other requests keep being served.
+        preview = await run_in_threadpool(
+            process_bruker_1d_zip,
             filename=filename,
             content=content,
             solvent=solvent,
@@ -11884,8 +11933,10 @@ async def nmr_raw_fid_process_route(
             expected_non_labile_h=raw_expected_non_labile_h,
             compound_class=normalized_compound_class,
             raw_upload_provenance=raw_upload_provenance,
+            session_factory=_state(request).session_factory,
         )
-        preview = _maybe_attach_prompt_raw_fid_sidecar(
+        preview = await run_in_threadpool(
+            _maybe_attach_prompt_raw_fid_sidecar,
             preview,
             filename=filename,
             content=content,
@@ -12348,18 +12399,21 @@ def raw_fid_archive_preview(
     processing_preset: str | None = Form(default=None),
     zero_fill_factor: int | None = Form(default=None),
     line_broadening_hz: float | None = Form(default=None),
-    apodization_mode: str = Form(default="exponential"),
-    apply_group_delay: bool = Form(default=True),
-    auto_phase: bool = Form(default=True),
-    auto_baseline: bool = Form(default=True),
-    phase_mode: str = Form(default="auto"),
-    phase_p0: float = Form(default=0.0),
-    phase_p1: float = Form(default=0.0),
-    baseline_correction: str = Form(default="bernstein"),
-    baseline_order: int = Form(default=3),
+    # Recipe axes default to None: "not sent" lets the selected preset (and
+    # the advised 1H constraints) decide, instead of counting a form default
+    # as an explicit caller override that collapses every preset.
+    apodization_mode: str | None = Form(default=None),
+    apply_group_delay: bool | None = Form(default=None),
+    auto_phase: bool | None = Form(default=None),
+    auto_baseline: bool | None = Form(default=None),
+    phase_mode: str | None = Form(default=None),
+    phase_p0: float | None = Form(default=None),
+    phase_p1: float | None = Form(default=None),
+    baseline_correction: str | None = Form(default=None),
+    baseline_order: int | None = Form(default=None),
     baseline_lock: bool | None = Form(default=None),
     peak_sensitivity: float | None = Form(default=None),
-    mask_solvent_regions: bool = Form(default=True),
+    mask_solvent_regions: bool | None = Form(default=None),
     display_mode: str = Form(default="real"),
     vertical_gain: float = Form(default=1.0),
     debug_preview: bool = Form(default=False),
@@ -12385,9 +12439,12 @@ def raw_fid_archive_preview(
     reference_text_for_detection = (reference_nmr_text or "").strip() or (
         shared_proton_text if nucleus == "1H" else None
     )
+    resolved_preset_id = _resolve_processing_preset_or_422(
+        _unwrap_form_default(processing_preset) or _unwrap_form_default(selected_preset)
+    )
     settings = _fid_settings_from_form(
-        selected_preset=selected_preset,
-        processing_preset=processing_preset,
+        selected_preset=resolved_preset_id,
+        processing_preset=resolved_preset_id,
         zero_fill_factor=zero_fill_factor,
         line_broadening_hz=line_broadening_hz,
         apodization_mode=apodization_mode,
@@ -12419,6 +12476,7 @@ def raw_fid_archive_preview(
             expected_non_labile_h=expected_non_labile_h,
             compound_class=normalized_compound_class,
             raw_upload_provenance=_raw_fid_archive_provenance_from_record(archive),
+            session_factory=_state(request).session_factory,
         )
         preview = _maybe_attach_prompt_raw_fid_sidecar(
             preview,
@@ -12497,18 +12555,21 @@ def raw_fid_archive_process(
     processing_preset: str | None = Form(default=None),
     zero_fill_factor: int | None = Form(default=None),
     line_broadening_hz: float | None = Form(default=None),
-    apodization_mode: str = Form(default="exponential"),
-    apply_group_delay: bool = Form(default=True),
-    auto_phase: bool = Form(default=True),
-    auto_baseline: bool = Form(default=True),
-    phase_mode: str = Form(default="auto"),
-    phase_p0: float = Form(default=0.0),
-    phase_p1: float = Form(default=0.0),
-    baseline_correction: str = Form(default="bernstein"),
-    baseline_order: int = Form(default=3),
+    # Recipe axes default to None: "not sent" lets the selected preset (and
+    # the advised 1H constraints) decide, instead of counting a form default
+    # as an explicit caller override that collapses every preset.
+    apodization_mode: str | None = Form(default=None),
+    apply_group_delay: bool | None = Form(default=None),
+    auto_phase: bool | None = Form(default=None),
+    auto_baseline: bool | None = Form(default=None),
+    phase_mode: str | None = Form(default=None),
+    phase_p0: float | None = Form(default=None),
+    phase_p1: float | None = Form(default=None),
+    baseline_correction: str | None = Form(default=None),
+    baseline_order: int | None = Form(default=None),
     baseline_lock: bool | None = Form(default=None),
     peak_sensitivity: float | None = Form(default=None),
-    mask_solvent_regions: bool = Form(default=True),
+    mask_solvent_regions: bool | None = Form(default=None),
     display_mode: str = Form(default="real"),
     vertical_gain: float = Form(default=1.0),
     debug_preview: bool = Form(default=False),
@@ -12522,9 +12583,12 @@ def raw_fid_archive_process(
         action="process",
     )
     expected_total_h, expected_non_labile_h = _spectrum_structure_targets(smiles)
+    resolved_preset_id = _resolve_processing_preset_or_422(
+        _unwrap_form_default(processing_preset) or _unwrap_form_default(selected_preset)
+    )
     settings = _fid_settings_from_form(
-        selected_preset=selected_preset,
-        processing_preset=processing_preset,
+        selected_preset=resolved_preset_id,
+        processing_preset=resolved_preset_id,
         zero_fill_factor=zero_fill_factor,
         line_broadening_hz=line_broadening_hz,
         apodization_mode=apodization_mode,
@@ -12555,6 +12619,7 @@ def raw_fid_archive_process(
             expected_total_h=expected_total_h,
             expected_non_labile_h=expected_non_labile_h,
             raw_upload_provenance=_raw_fid_archive_provenance_from_record(archive),
+            session_factory=_state(request).session_factory,
         )
         preview = _maybe_attach_prompt_raw_fid_sidecar(
             preview,
@@ -12777,7 +12842,10 @@ async def fid_preview(
         debug_preview=debug_preview,
     )
     try:
-        preview = process_bruker_1d_zip(
+        # FFT + phase + baseline + peak inference takes seconds on a real
+        # archive; off the event loop so other requests keep being served.
+        preview = await run_in_threadpool(
+            process_bruker_1d_zip,
             filename=filename,
             content=content,
             solvent=solvent,
@@ -12788,10 +12856,12 @@ async def fid_preview(
             expected_total_h=expected_total_h,
             expected_non_labile_h=expected_non_labile_h,
             raw_upload_provenance=raw_upload_provenance,
+            session_factory=_state(request).session_factory,
         )
     except (FIDProcessingError, PydanticValidationError, ValueError) as exc:
         raise _upload_http_400(exc, operation="Raw FID preview") from exc
-    preview = _maybe_attach_prompt_raw_fid_sidecar(
+    preview = await run_in_threadpool(
+        _maybe_attach_prompt_raw_fid_sidecar,
         preview,
         filename=filename,
         content=content,
@@ -12903,7 +12973,10 @@ async def fid_process(
         debug_preview=debug_preview,
     )
     try:
-        preview = process_bruker_1d_zip(
+        # FFT + phase + baseline + peak inference takes seconds on a real
+        # archive; off the event loop so other requests keep being served.
+        preview = await run_in_threadpool(
+            process_bruker_1d_zip,
             filename=filename,
             content=content,
             solvent=solvent,
@@ -12914,10 +12987,12 @@ async def fid_process(
             expected_total_h=expected_total_h,
             expected_non_labile_h=expected_non_labile_h,
             raw_upload_provenance=raw_upload_provenance,
+            session_factory=_state(request).session_factory,
         )
     except (FIDProcessingError, PydanticValidationError, ValueError) as exc:
         raise _upload_http_400(exc, operation="Raw FID analysis") from exc
-    preview = _maybe_attach_prompt_raw_fid_sidecar(
+    preview = await run_in_threadpool(
+        _maybe_attach_prompt_raw_fid_sidecar,
         preview,
         filename=filename,
         content=content,
@@ -31244,6 +31319,7 @@ def _carbon13_raw_fid_preview_from_upload(
     reference_ppm: float | None,
     settings: FIDProcessingSettings,
     raw_upload_provenance: dict[str, object] | None = None,
+    session_factory: Any | None = None,
 ) -> tuple[Carbon13UploadPreview, FIDPreviewReport]:
     fid_preview = process_bruker_1d_zip(
         filename=filename,
@@ -31256,6 +31332,7 @@ def _carbon13_raw_fid_preview_from_upload(
         expected_total_h=None,
         expected_non_labile_h=None,
         raw_upload_provenance=raw_upload_provenance,
+        session_factory=session_factory,
     )
     fid_preview = _maybe_attach_prompt_raw_fid_sidecar(
         fid_preview,
@@ -31401,7 +31478,10 @@ async def carbon13_fid_preview_route(
         debug_preview=debug_preview,
     )
     try:
-        preview, _fid_preview = _carbon13_raw_fid_preview_from_upload(
+        # Same seconds-long FFT/phase/baseline pipeline as the 1H routes;
+        # off the event loop so other requests keep being served.
+        preview, _fid_preview = await run_in_threadpool(
+            _carbon13_raw_fid_preview_from_upload,
             filename=filename,
             content=content,
             solvent=solvent,
@@ -31411,6 +31491,7 @@ async def carbon13_fid_preview_route(
             reference_ppm=reference_ppm,
             settings=settings,
             raw_upload_provenance=raw_upload_provenance,
+            session_factory=_state(request).session_factory,
         )
     except (FIDProcessingError, PydanticValidationError, ValueError) as exc:
         raise _upload_http_400(exc, operation="¹³C raw FID preview") from exc
@@ -31495,7 +31576,10 @@ async def carbon13_fid_analyze_route(
         debug_preview=debug_preview,
     )
     try:
-        preview, _fid_preview = _carbon13_raw_fid_preview_from_upload(
+        # Same seconds-long FFT/phase/baseline pipeline as the 1H routes;
+        # off the event loop so other requests keep being served.
+        preview, _fid_preview = await run_in_threadpool(
+            _carbon13_raw_fid_preview_from_upload,
             filename=filename,
             content=content,
             solvent=solvent,
@@ -31505,6 +31589,7 @@ async def carbon13_fid_analyze_route(
             reference_ppm=reference_ppm,
             settings=settings,
             raw_upload_provenance=raw_upload_provenance,
+            session_factory=_state(request).session_factory,
         )
         reviewed_peaks = _manual_carbon13_peaks_from_json(manual_peaks_json, solvent=solvent)
         report = analyze_carbon13(
@@ -31564,6 +31649,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         ),
         lifespan=app_lifespan,
     )
+    # Measured raw-FID preview bodies run 377-650 KB of float JSON, which
+    # gzips 5-8x; the FE's same-origin proxy already decodes Content-Encoding
+    # transparently (route.ts fetch). Small bodies are left alone.
+    app.add_middleware(GZipMiddleware, minimum_size=1024)
     if settings.allowed_origins:
         app.add_middleware(
             CORSMiddleware,

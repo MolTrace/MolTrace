@@ -108,6 +108,10 @@ def test_stable_route_snapshots_with_2d_feature_enabled(client) -> None:
     assert presets.status_code == 200
     assert [preset["id"] for preset in presets.json()] == [
         "baseline_preserve",
+        # Deliberate vocabulary change (Prompt 2 A5, 2026-08-15): the product's
+        # "No phase correction" choice needs a preset whose settings actually
+        # skip phasing rather than silently falling back to Balanced.
+        "phase_preserve",
         "balanced",
         "sensitive_weak_peaks",
         "higher_resolution",

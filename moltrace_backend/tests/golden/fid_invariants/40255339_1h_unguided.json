@@ -1,0 +1,53 @@
+{
+  "baseline": {
+    "correction_applied": true,
+    "mode": "bernstein",
+    "order": 3
+  },
+  "peak_detection_sensitivity": 0.06,
+  "peaks": [
+    {
+      "integration_h": 47.0,
+      "multiplicity": "s",
+      "shift_ppm": 8.12
+    },
+    {
+      "integration_h": 77.0,
+      "multiplicity": "dd",
+      "shift_ppm": 7.764
+    },
+    {
+      "integration_h": 1.0,
+      "multiplicity": "m",
+      "shift_ppm": 7.611
+    },
+    {
+      "integration_h": 103.0,
+      "multiplicity": "m",
+      "shift_ppm": 7.465
+    },
+    {
+      "integration_h": 6.5,
+      "multiplicity": "br s",
+      "shift_ppm": 7.321
+    },
+    {
+      "integration_h": 15.5,
+      "multiplicity": "s",
+      "shift_ppm": 6.661
+    }
+  ],
+  "phase": {
+    "correction_applied": true,
+    "mode": "auto_acme",
+    "p0": -397.747,
+    "p1": 393.966
+  },
+  "point_count": 98304,
+  "preview": {
+    "n": 9473,
+    "x_at_y_max": 7.26,
+    "y_max": 168496949.9393788,
+    "y_sum": 9589258196.540342
+  }
+}

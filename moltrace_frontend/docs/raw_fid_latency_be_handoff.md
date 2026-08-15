@@ -85,3 +85,48 @@ the shape, and whether it is per-peak or per-cluster.
 All numbers here are **localhost**. On Cloud Run, transferring the 447 KB payload and cold-start
 latency will add time we cannot see from here. If the complaint persists after the above, the next
 measurement should be taken against the deployed backend, not local.
+
+---
+
+## 6. Backend response — Instant FID landed (2026-08-15)
+
+Everything in §1 was re-measured after the Prompt 2 backend work. Numbers below are the same
+dev-class M-series Mac, measured on a public 94k-point 1H nmrshiftdb2 fixture (real archives are
+never named or committed; the shape matches §1's archive after zero-fill). "Guided" = with
+`candidates_text` SMILES, the expensive path from §1.
+
+| Case | Before (this fixture) | After | What changed |
+|---|---|---|---|
+| Cold, guided (SMILES supplied) | 9.4 s | **4.34 s** | one shared detection preamble for the 7-candidate sensitivity sweep + deconvolve pass; baseline estimated once instead of 7×; debug-only preserved-state QA gated; vectorized trace build |
+| Cold, unguided | ~5–6 s | **3.82 s** | same, minus the sweep |
+| Repeat, same instance (L1) | 0.017 s | **0.022 s** | unchanged in-process dict |
+| Repeat, after restart / other instance (**new**) | full recompute | **0.094 s** | reports now persist in `raw_fid_report_cache` (Alembic 0048); any instance serves any previously computed (archive, settings) pair |
+| Concurrent requests | 40–78 s (event loop frozen) | no interference | `process_bruker_1d_zip` now runs in the threadpool on every async route; `/health` answers mid-process (pinned by `test_raw_fid_event_loop.py`) |
+| Preview body on the wire | 377–650 KB | ~5–8× smaller | `GZipMiddleware(minimum_size=1024)`; your proxy already decodes |
+
+The §1 ask — "profile what the guidance route adds" — resolved: the doubling was the
+structure-guided sensitivity sweep re-running the full detector 7× plus a deconvolution pass.
+The sweep now shares one preprocessed trace; its *decisions* are unchanged (all 19 pinned
+fixture goldens in `test_fid_pipeline_invariants.py` match bit-identically).
+
+Measured and deliberately **not** taken, per the output-invariance rule:
+
+- Scoring auto-phase on a decimated spectrum: chosen (p0, p1) drift up to 34°/992° vs the
+  full-resolution optimum on the 22-fixture corpus — fails display precision, so both
+  optimizers still run at full resolution (~1.2 s of the cold run).
+- Running the sensitivity sweep on a decimated trace: the chosen sensitivity changes on
+  1/8 (stride 2) to 5/8 (stride 5) of guided fixtures — rejected for the same reason.
+
+Also in this change, relevant to Part B (FE) work:
+
+1. **A1 landed** → the one-at-a-time batch fan-out reason in `raw-fid-batch.ts:12-18` is gone;
+   B2's measured-concurrency raise is now unblocked.
+2. **Presets are honest and strict** (contract regenerated): `safe_automatic`,
+   `no_baseline_correction`, `no_phase_correction` map to real behaviours
+   (`balanced` / `baseline_preserve` / the new `phase_preserve`); the recipe form fields on
+   `/raw-fid/{archive_id}/preview|process` are now optional-nullable ("not sent" = preset
+   decides). **`imported_parameters` is rejected with a 422 naming the id** — there is no
+   engine support for reading vendor processing parameters, so the option must come out of
+   the picker (B4) rather than silently running "balanced".
+3. `wall_ms` audit telemetry (Prompt 1) is emitted on all four raw-FID routes, so the
+   before/after above is verifiable from ops metrics, not just this table.

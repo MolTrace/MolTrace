@@ -48,6 +48,7 @@ ReviewStatus = Literal["pending_review", "approved", "rejected", "needs_revision
 ReviewAction = Literal["approve", "reject", "override", "request_changes", "review"]
 FIDPresetId = Literal[
     "baseline_preserve",
+    "phase_preserve",
     "balanced",
     "sensitive_weak_peaks",
     "higher_resolution",

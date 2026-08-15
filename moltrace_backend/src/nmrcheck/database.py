@@ -63,6 +63,7 @@ from .orm import (
     ProjectORM,
     ProjectSampleORM,
     RawArchiveORM,
+    RawFIDReportCacheORM,
     RefreshTokenORM,
     ReportORM,
     ReviewDecisionORM,
@@ -1982,6 +1983,74 @@ def _fid_derived_spectrum_metadata(preview: FIDPreviewReport) -> dict[str, Any]:
     }
 
 
+# Measured serialized FIDPreviewReport: 377-650 KB of float JSON. 128 rows
+# bounds the table at ~83 MB — derived from the measured entry size against a
+# sub-100 MB derived-data budget on the shared Cloud SQL instance, not from a
+# per-user working set (rows are shared across users; the key is content-based).
+_RAW_FID_REPORT_CACHE_MAX_ROWS = 128
+
+
+def load_cached_fid_report_json(
+    session_factory: sessionmaker[Session],
+    cache_key: str,
+) -> str | None:
+    """Fetch the persisted derived report for one processing identity, if any."""
+    with session_scope(session_factory) as session:
+        return session.scalar(
+            select(RawFIDReportCacheORM.report_json).where(
+                RawFIDReportCacheORM.cache_key == cache_key
+            )
+        )
+
+
+def store_cached_fid_report_json(
+    session_factory: sessionmaker[Session],
+    *,
+    cache_key: str,
+    cache_version: str,
+    raw_sha256: str | None,
+    report_json: str,
+) -> None:
+    """Upsert one derived report and prune the oldest rows beyond the cap.
+
+    Rows are pure derived data (the immutable archive lives in the vault), so
+    pruning only costs recompute time. Concurrent inserts of the same key from
+    two instances are resolved by the unique constraint; the caller treats any
+    failure here as a cache miss, never as a request failure.
+    """
+    with session_scope(session_factory) as session:
+        row = session.scalars(
+            select(RawFIDReportCacheORM).where(RawFIDReportCacheORM.cache_key == cache_key)
+        ).first()
+        if row is not None:
+            row.cache_version = cache_version
+            row.raw_sha256 = raw_sha256
+            row.report_json = report_json
+            return
+        session.add(
+            RawFIDReportCacheORM(
+                cache_key=cache_key,
+                cache_version=cache_version,
+                raw_sha256=raw_sha256,
+                report_json=report_json,
+            )
+        )
+        session.flush()
+        total = session.scalar(select(func.count()).select_from(RawFIDReportCacheORM)) or 0
+        if total > _RAW_FID_REPORT_CACHE_MAX_ROWS:
+            stale_ids = list(
+                session.scalars(
+                    select(RawFIDReportCacheORM.id)
+                    .order_by(RawFIDReportCacheORM.id.asc())
+                    .limit(total - _RAW_FID_REPORT_CACHE_MAX_ROWS)
+                )
+            )
+            if stale_ids:
+                session.execute(
+                    delete(RawFIDReportCacheORM).where(RawFIDReportCacheORM.id.in_(stale_ids))
+                )
+
+
 def save_fid_run(
     session_factory: sessionmaker[Session],
     preview: FIDPreviewReport,
@@ -2008,15 +2077,15 @@ def save_fid_run(
             quality_label=qa.quality_label,
             quality_score=qa.quality_score,
             review_status=metadata.human_review_status,
+            # fid_run_id is stamped at read time (_fid_run_to_record and the
+            # review-decision updater both model_copy it in from row.id), so
+            # the ~650 KB report is serialized exactly once here.
             preview_json=preview.model_copy(update={"fid_run_id": None}).model_dump_json(),
             metadata_json=metadata.model_dump_json(),
             processing_recipe_json=json.dumps(processing_recipe, sort_keys=True),
             derived_spectrum_metadata_json=json.dumps(derived_spectrum_metadata, sort_keys=True),
         )
         session.add(row)
-        session.flush()
-        session.refresh(row)
-        row.preview_json = preview.model_copy(update={"fid_run_id": row.id}).model_dump_json()
         session.flush()
         session.refresh(row)
         return _fid_run_to_record(row)
