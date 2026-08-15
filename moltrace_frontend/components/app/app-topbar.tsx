@@ -13,6 +13,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { Kbd } from "@/components/ui/kbd"
+import { SPECTRACHECK_SECTIONS } from "@/components/spectracheck/spectracheck-section-directory"
 import {
   CommandDialog,
   CommandEmpty,
@@ -131,6 +133,20 @@ export function AppTopbar({ onToggleEvidenceQueue, evidenceQueueOpen = false }: 
   // Which products this deployment serves — gates shell-wide fetches below.
   const { isIncluded } = useIncludedModules()
   const [commandOpen, setCommandOpen] = useState(false)
+
+  // The advertised shortcut. The badge on the search button promised ⌘K from the day it shipped,
+  // but nothing listened — clicking was the only way in. Mirrors the sidebar's ⌘B listener; the
+  // modifier chord means WCAG 2.1.4's single-key concerns don't apply.
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key.toLowerCase() === "k" && (event.metaKey || event.ctrlKey)) {
+        event.preventDefault()
+        setCommandOpen((open) => !open)
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown)
+    return () => window.removeEventListener("keydown", handleKeyDown)
+  }, [])
   const router = useRouter()
   const isMobile = useIsMobile()
   const overview = useOptionalOverviewData()
@@ -670,7 +686,50 @@ export function AppTopbar({ onToggleEvidenceQueue, evidenceQueueOpen = false }: 
               <span>Open Action Queue</span>
             </CommandItem>
           </CommandGroup>
+          <CommandSeparator />
+          {/* Deep links into the SpectraCheck stage nav via its ?section= contract. The list
+              comes from the section directory (plain data), never from the workspace module —
+              importing that here would pull the whole dynamically-loaded workspace into the
+              shell bundle. The Developer stage is omitted: its section hides behind the
+              developer-mode toggle, and the palette must not deep-link into a hidden pane. */}
+          <CommandGroup heading="SpectraCheck sections">
+            {SPECTRACHECK_SECTIONS.filter((section) => section.stage !== "Developer").map(
+              (section) => (
+                <CommandItem
+                  key={section.value}
+                  value={`spectracheck ${section.stage} ${section.label}`}
+                  onSelect={() => {
+                    router.push(`/spectracheck?section=${encodeURIComponent(section.value)}`)
+                    setCommandOpen(false)
+                  }}
+                >
+                  <Waves className="mr-2 h-4 w-4" />
+                  <span>{section.label}</span>
+                  <span className="ml-auto text-xs text-muted-foreground">{section.stage}</span>
+                </CommandItem>
+              ),
+            )}
+          </CommandGroup>
         </CommandList>
+        {/* The shortcut legend — plain text with kbd chips, not command items, so a screen
+            reader hears reference copy rather than actions that do nothing. */}
+        <div
+          className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t px-3 py-2 text-[11px] text-muted-foreground"
+          data-testid="command-shortcut-legend"
+        >
+          <span className="flex items-center gap-1">
+            <Kbd>⌘K</Kbd> palette
+          </span>
+          <span className="flex items-center gap-1">
+            <Kbd>⌘B</Kbd> sidebar
+          </span>
+          <span className="flex items-center gap-1">
+            Spectrum canvas (focused): drag pans · <Kbd>⇧</Kbd>drag zooms · wheel intensity ·{" "}
+            <Kbd>←</Kbd>
+            <Kbd>→</Kbd> pan · <Kbd>+</Kbd>
+            <Kbd>−</Kbd> zoom · <Kbd>0</Kbd> full range
+          </span>
+        </div>
       </CommandDialog>
     </>
   )

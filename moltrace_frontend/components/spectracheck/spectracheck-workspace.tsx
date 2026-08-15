@@ -91,10 +91,11 @@ import {
 import { SessionValueSummaryCard } from "@/components/spectracheck/session-value-summary-card"
 import { SpectraCheckLinkedCompoundCard } from "@/components/spectracheck/spectracheck-linked-compound-card"
 import { SpectraCheckKnowledgeLinksCard } from "@/components/knowledge/knowledge-links-integration"
+import { WorkspaceStageNav } from "@/components/app/workspace-stage-nav"
 import {
-  WorkspaceStageNav,
-  type WorkspaceStageGroup,
-} from "@/components/app/workspace-stage-nav"
+  SPECTRACHECK_NAV,
+  isSpectraCheckSection,
+} from "@/components/spectracheck/spectracheck-section-directory"
 import { SpectraCheckSessionControls } from "@/components/spectracheck/spectracheck-session-controls"
 import { SpectraCheckSystemStatusBadges } from "@/components/spectracheck/spectracheck-system-status-badges"
 import type { SessionSaveFeedback } from "@/components/spectracheck/spectracheck-session-controls"
@@ -149,62 +150,6 @@ import { RAW_DATA_DISCLOSURE } from "@/lib/ui/copy"
 // why the two tiers are split rather than shown as one strip. The per-section
 // blurb (formerly a hover Tooltip on every tab — which obstructed moving
 // between tabs) is a single caption line below the nav.
-const SPECTRACHECK_NAV: WorkspaceStageGroup[] = [
-  {
-    id: "session",
-    label: "Session",
-    sections: [
-      {
-        value: "tab-session",
-        label: "Session",
-        desc: "Choose the project and sample this work belongs to, load or save a session, and link supporting knowledge records.",
-      },
-    ],
-  },
-  {
-    id: "start",
-    label: "Overview",
-    sections: [
-      { value: "tab-overview", label: "Overview", desc: "Summary of available evidence, connection status, and next recommended actions." },
-      { value: "tab-workflow", label: "Workflow", desc: "A predefined sequence of analysis, QC, evidence, unified confidence, and report steps. Reproduces the session." },
-    ],
-  },
-  {
-    id: "inputs",
-    label: "Evidence Inputs",
-    sections: [
-      { value: "tab-nmr-text", label: "NMR text + candidates", desc: "Enter candidate structures and literature-style 1H/13C NMR text for quick structure-evidence comparison." },
-      { value: "tab-processed", label: "Processed 1H / 13C upload", desc: "CSV, TSV, TXT, or JCAMP-DX — for preview, peak picking, and evidence matching." },
-      { value: "tab-raw-fid", label: "Raw FID upload", desc: "Upload raw Bruker or Agilent/Varian FID archives for non-destructive processing. Raw data should remain immutable." },
-      { value: "tab-dept-2d", label: "DEPT/APT + 2D NMR", desc: "Use DEPT/APT carbon typing and COSY, HSQC/HMQC, or HMBC correlations as supporting connectivity evidence." },
-      { value: "tab-ms-evidence", label: "MS Evidence", desc: "HRMS, formula search, adduct inference, MS/MS, fragmentation, and optional LC-MS feature workflows using shared session inputs." },
-    ],
-  },
-  {
-    id: "analysis",
-    label: "Analysis",
-    sections: [
-      { value: "tab-predicted", label: "Predicted NMR matching", desc: "Compare observed NMR evidence against candidate-specific predicted 1H, 13C, and HSQC-style signals." },
-      { value: "tab-evidence-queue", label: "Evidence Queue", desc: "Queue session evidence items for triage, review, and unified-evidence preparation." },
-      { value: "tab-unified", label: "Unified evidence", desc: "Combine available NMR/MS evidence layers into a transparent candidate confidence summary." },
-    ],
-  },
-  {
-    id: "output",
-    label: "Outputs",
-    sections: [
-      { value: "tab-report", label: "Report", desc: "Prepare a reviewer-ready structure elucidation report with evidence, warnings, provenance, and human approval state." },
-      { value: "tab-benchmark", label: "Benchmark", desc: "Run the 5-layer SpectraCheck benchmark — peak-level accuracy, structural ranking, explainability, robustness, regulatory evidence." },
-    ],
-  },
-  {
-    id: "developer",
-    label: "Developer",
-    sections: [
-      { value: "tab-dev-json", label: "Developer JSON", desc: "Raw results for troubleshooting, validation, and data-shape inspection." },
-    ],
-  },
-]
 
 
 const defaultCandidates = `Methanol | CO | starting material
@@ -303,7 +248,18 @@ function SpectraCheckWorkspaceInner({ defaultTab = "tab-overview" }: SpectraChec
   const snapshotRef = useRef("")
   const urlSessionHandledRef = useRef<string | null>(null)
 
-  const [activeTab, setActiveTab] = useState(defaultTab)
+  // ?section=<value> is the deep-link contract for the stage nav (see the section directory).
+  // Validated against the directory so a stale or mistyped link falls back to the default rather
+  // than rendering an empty pane.
+  const sectionFromUrl = searchParams.get("section")
+  const [activeTab, setActiveTab] = useState(
+    isSpectraCheckSection(sectionFromUrl) ? sectionFromUrl : defaultTab,
+  )
+  // React to later pushes too: the command palette navigates with ?section= while the reader is
+  // already on /spectracheck, which changes the param without remounting this component.
+  useEffect(() => {
+    if (isSpectraCheckSection(sectionFromUrl)) setActiveTab(sectionFromUrl)
+  }, [sectionFromUrl])
   // Developer-mode gate: hide the raw "Developer JSON" nav group + section when off.
   const developerModeEnabled = useDeveloperMode().enabled
   const visibleSpectraNav = useMemo(

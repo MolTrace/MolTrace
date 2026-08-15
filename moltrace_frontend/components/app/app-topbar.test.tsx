@@ -1,5 +1,5 @@
 import userEvent from "@testing-library/user-event"
-import { act, render, screen } from "@testing-library/react"
+import { act, fireEvent, render, screen } from "@testing-library/react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { AppTopbar } from "@/components/app/app-topbar"
 import {
@@ -186,5 +186,64 @@ describe("AppTopbar AI Queue control", () => {
     const control = screen.getByRole("button", { name: "Toggle AI Evidence Queue" })
     expect(control).toBeInTheDocument()
     expect(control.querySelector("span[aria-hidden]")).toBeNull()
+  })
+})
+
+describe("the command palette shortcut", () => {
+  it("opens on the advertised chord — the badge promised this from day one with nothing behind it", async () => {
+    shell.isMobile = false
+    render(<AppTopbar onToggleEvidenceQueue={() => {}} evidenceQueueOpen={false} />)
+
+    expect(screen.queryByPlaceholderText(/Search projects/i)).not.toBeInTheDocument()
+
+    await act(async () => {
+      fireEvent.keyDown(window, { key: "k", metaKey: true })
+    })
+    expect(screen.getByPlaceholderText(/Search projects/i)).toBeInTheDocument()
+
+    // The same chord toggles it closed again, matching the sidebar's chord behaviour.
+    await act(async () => {
+      fireEvent.keyDown(window, { key: "k", ctrlKey: true })
+    })
+    expect(screen.queryByPlaceholderText(/Search projects/i)).not.toBeInTheDocument()
+  })
+
+  it("offers deep links into SpectraCheck sections through the ?section= contract", async () => {
+    shell.isMobile = false
+    const user = userEvent.setup()
+    render(<AppTopbar onToggleEvidenceQueue={() => {}} evidenceQueueOpen={false} />)
+
+    await act(async () => {
+      fireEvent.keyDown(window, { key: "k", metaKey: true })
+    })
+
+    // Type-ahead narrows to the section, Enter selects it.
+    await user.keyboard("Raw FID")
+    const option = await screen.findByText("Raw FID upload")
+    await user.click(option)
+
+    expect(routerPushMock).toHaveBeenCalledWith(
+      expect.stringMatching(/^\/spectracheck\?section=tab-/),
+    )
+  })
+
+  it("keeps the hidden Developer section out of the palette", async () => {
+    shell.isMobile = false
+    render(<AppTopbar onToggleEvidenceQueue={() => {}} evidenceQueueOpen={false} />)
+    await act(async () => {
+      fireEvent.keyDown(window, { key: "k", metaKey: true })
+    })
+    expect(screen.queryByText("Developer JSON")).not.toBeInTheDocument()
+  })
+
+  it("shows the shortcut legend as reference copy inside the palette", async () => {
+    shell.isMobile = false
+    render(<AppTopbar onToggleEvidenceQueue={() => {}} evidenceQueueOpen={false} />)
+    await act(async () => {
+      fireEvent.keyDown(window, { key: "k", metaKey: true })
+    })
+    const legend = screen.getByTestId("command-shortcut-legend")
+    expect(legend).toHaveTextContent(/palette/i)
+    expect(legend).toHaveTextContent(/full range/i)
   })
 })
