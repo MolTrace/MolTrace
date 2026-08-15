@@ -13,6 +13,30 @@ const nextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
+  // react-plotly.js resolves `plotly.js/dist/plotly` — the UNMINIFIED 11 MB
+  // dist of an undeclared auto-installed peer — while the science viewers'
+  // image-export path imports `plotly.js-dist-min`. Two module ids → the
+  // bundler shipped BOTH (~2.0 MB + ~1.5 MB gzipped) to anyone opening a
+  // spectrum. Collapse every plotly entry point onto the single declared
+  // minified bundle. Next 16 builds with Turbopack by default, so the alias
+  // lives in `turbopack.resolveAlias`; the webpack mirror keeps `--webpack`
+  // builds identical (`$` = webpack exact-match syntax).
+  turbopack: {
+    resolveAlias: {
+      "plotly.js/dist/plotly": "plotly.js-dist-min",
+      "plotly.js/dist/plotly.js": "plotly.js-dist-min",
+      "plotly.js": "plotly.js-dist-min",
+    },
+  },
+  webpack: (config) => {
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      "plotly.js/dist/plotly$": "plotly.js-dist-min",
+      "plotly.js/dist/plotly.js$": "plotly.js-dist-min",
+      "plotly.js$": "plotly.js-dist-min",
+    }
+    return config
+  },
   images: {
     unoptimized: true,
   },
