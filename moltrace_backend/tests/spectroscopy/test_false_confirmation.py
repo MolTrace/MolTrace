@@ -148,3 +148,58 @@ def test_no_scored_pairs_reports_none_not_zero():
     result = measure_false_confirmation(train=tiny * 4, test=tiny)
     if result.pairs_scored == 0:
         assert result.false_confirmation_rate is None
+
+
+class TestTiesAreNotTruthWins:
+    """A tie must not be credited to the truth.
+
+    `false_confirmation_rate` is SAFETY_CRITICAL with a zero-regression
+    tolerance, so how ties resolve is not a rounding detail: a `>` comparison
+    credited an exact 0.5/0.5 DP4 tie to the truth, which made the published
+    figure a lower bound AND gave the metric a way to be improved by producing
+    more ties — the exact metric-gaming the dominance rule exists to prevent.
+    """
+
+    def _report(self, **kwargs):
+        from moltrace.spectroscopy.eval.false_confirmation import FalseConfirmationReport
+
+        base = dict(
+            pairs_generated=10,
+            pairs_scored=10,
+            truth_wins=6,
+            decoy_wins=3,
+            ties=1,
+            indistinguishable=0,
+            rejected_on_formula=0,
+            unscorable=0,
+            molecules_examined=5,
+            nucleus="13C",
+        )
+        base.update(kwargs)
+        return FalseConfirmationReport(**base)
+
+    def test_a_tie_counts_against_us(self) -> None:
+        # 3 decoy wins + 1 tie over 10 scored: the wrong structure went
+        # unrejected 4 times, not 3.
+        assert self._report().false_confirmation_rate == 0.4
+
+    def test_the_historical_strict_figure_stays_readable(self) -> None:
+        # So a change in the published number is legible as a definition
+        # change rather than a measurement change.
+        assert self._report().decoy_strict_win_rate == 0.3
+
+    def test_producing_ties_cannot_improve_the_safety_metric(self) -> None:
+        before = self._report(truth_wins=6, decoy_wins=3, ties=1)
+        # A model change that turns a decoy win into a tie must not look better.
+        after = self._report(truth_wins=6, decoy_wins=2, ties=2)
+        assert after.false_confirmation_rate >= before.false_confirmation_rate
+
+    def test_nothing_scored_is_still_not_a_perfect_score(self) -> None:
+        empty = self._report(pairs_scored=0, truth_wins=0, decoy_wins=0, ties=0)
+        assert empty.false_confirmation_rate is None
+        assert empty.decoy_strict_win_rate is None
+
+    def test_ties_are_reported_in_the_dict(self) -> None:
+        payload = self._report().as_dict()
+        assert payload["ties"] == 1
+        assert payload["decoy_strict_win_rate"] == 0.3
