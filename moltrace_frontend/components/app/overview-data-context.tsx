@@ -114,7 +114,7 @@ async function fetchOverviewSnapshot(includesSpectraCheck = true): Promise<Overv
 }
 
 export function OverviewDataProvider({ children }: { children: ReactNode }) {
-  const { isIncluded } = useIncludedModules()
+  const { isIncluded, loading: modulesLoading } = useIncludedModules()
   // The shell is re-created on every top-level route change (each page renders
   // its own <AppShell>), so seed from the cross-navigation snapshot instead of
   // re-issuing all four requests and flashing a loading state on every tap.
@@ -133,6 +133,13 @@ export function OverviewDataProvider({ children }: { children: ReactNode }) {
   )
 
   useEffect(() => {
+    // While the capabilities readout is unresolved, isIncluded() answers false
+    // for everything. Building the snapshot now would bake sessions out of it
+    // AND stamp it fresh — so the corrected refetch after capabilities resolve
+    // hit the freshness gate below and the dashboard stayed empty for the
+    // 30-second window on every cold load. Wait for the real answer; the
+    // effect re-runs when `loading` flips.
+    if (modulesLoading) return
     // A fresh snapshot is already on screen — nothing to do until it ages out.
     if (isShellSnapshotFresh(SHELL_SNAPSHOT_KEYS.overviewData, SHELL_SNAPSHOT_MAX_AGE_MS)) return
 
@@ -157,7 +164,7 @@ export function OverviewDataProvider({ children }: { children: ReactNode }) {
     return () => {
       active = false
     }
-  }, [isIncluded])
+  }, [isIncluded, modulesLoading])
 
   const value = useMemo((): OverviewDataContextValue => {
     const projectById = buildProjectNameIndex(projects)
