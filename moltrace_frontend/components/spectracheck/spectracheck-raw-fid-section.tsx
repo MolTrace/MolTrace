@@ -60,6 +60,7 @@ import { DeveloperJsonPanel } from "@/components/spectracheck/spectracheck-resul
 import {
   EnrichedPickedPeaksPanel,
   InferredNmrTextPanel,
+  ReferencesPanel,
   SpectraCheckEvidencePanels,
 } from "@/components/spectracheck/spectracheck-evidence-panels"
 import { SpectraCheckFidRunReview } from "@/components/spectracheck/spectracheck-fid-run-review"
@@ -2861,7 +2862,7 @@ export function SpectraCheckRawFidSection({
                     multiplicity output is visible on both upload paths. */}
                 <InferredNmrTextPanel payload={displayPayload} />
                 <EnrichedPickedPeaksPanel payload={displayPayload} />
-                <SpectraCheckEvidencePanels payload={displayPayload} />
+                <SpectraCheckEvidencePanels payload={displayPayload} showReferences={false} />
                 {/* Review sits after the evidence, on the Raw FID tab because this
                     is where processing runs are produced — no new navigation for a
                     step that belongs to the run you just made. It lists runs rather
@@ -2954,23 +2955,6 @@ export function SpectraCheckRawFidSection({
         testId="raw-fid-integration-results-surface"
       />
 
-      {/* ── Candidate tool — per-atom shift prediction (v0.7.8) ──────────
-          Structure-derived; predicts ¹H/¹³C shifts from a candidate
-          SMILES. Self-gates on the candidate list. */}
-      <ShiftPredictionPanel
-        candidatesText={candidatesText}
-        testId="raw-fid-shift-prediction-surface"
-      />
-
-      {/* ── Candidate tool — spectral-similarity retrieval ──────────────
-          Encodes a candidate SMILES and queries the server-configured
-          similarity index for nearest reference spectra. Self-gates on
-          the candidate list. */}
-      <SpectrumRetrievePanel
-        candidatesText={candidatesText}
-        testId="raw-fid-spectrum-retrieve-surface"
-      />
-
       {/* ── Step 4f — Legacy detection summary (unified panel) ──────────
           Post-Phase-11 the raw-FID responses expose the same envelope
           (`peaks` + `environments` + `category_counts`) as GSD. Render
@@ -2983,6 +2967,35 @@ export function SpectraCheckRawFidSection({
           testId="raw-fid-legacy-results-surface"
         />
       ) : null}
+
+      {/* ── Reference material and candidate tools — everything BELOW here is
+          not a result of the run above ────────────────────────────────────
+          These three used to sit inside the results: the citation list closed
+          the evidence composite about a third of the way down, and the two
+          candidate tools sat between the integration panels and the detection
+          summary. Both interrupted a reader working through the numbers their
+          own upload had just produced.
+
+          They are all reference material rather than output. The citations
+          document the analysis, and the two tools are structure-derived — they
+          take a candidate SMILES and answer a question about the CANDIDATE, not
+          about this spectrum, which is why they self-gate on the candidate list
+          and stay empty until one is entered. Everything the run produced now
+          reads top to bottom without them in the way. */}
+      {displayPayload != null ? <ReferencesPanel payload={displayPayload} /> : null}
+
+      {/* Predicts ¹H/¹³C shifts from a candidate SMILES. */}
+      <ShiftPredictionPanel
+        candidatesText={candidatesText}
+        testId="raw-fid-shift-prediction-surface"
+      />
+
+      {/* Encodes a candidate SMILES and queries the server-configured
+          similarity index for nearest reference spectra. */}
+      <SpectrumRetrievePanel
+        candidatesText={candidatesText}
+        testId="raw-fid-spectrum-retrieve-surface"
+      />
       </SpectrumResultsFullscreen>
     </div>
   )

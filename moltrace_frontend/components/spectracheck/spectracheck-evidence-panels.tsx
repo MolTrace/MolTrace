@@ -1451,7 +1451,26 @@ export function ReferencesPanel({ payload }: { payload: unknown }) {
 // Composite — drop in below the spectrum
 // ────────────────────────────────────────────────────────────────────────────
 
-function SpectraCheckEvidencePanelsImpl({ payload }: { payload: unknown }) {
+function SpectraCheckEvidencePanelsImpl({
+  payload,
+  showReferences = true,
+}: {
+  payload: unknown
+  /**
+   * Render the citation list at the end of this composite.
+   *
+   * The upload tabs turn it OFF and mount `ReferencesPanel` themselves at the foot of the page.
+   * This composite sits about a third of the way down those tabs — run review, processing
+   * parameters, the GSD/J-coupling/integration panels and the detection summary all follow it —
+   * so a citation list closing the composite landed in the middle of the results a chemist is
+   * reading, between two sets of numbers. It is reference material for the whole analysis, not a
+   * step in it.
+   *
+   * Defaults to on so the Evidence Bench, where this composite IS the foot of its card, keeps the
+   * references attached to the payload they describe.
+   */
+  showReferences?: boolean
+}) {
   return (
     <div className="space-y-4">
       <PeakCategorySummaryPanel payload={payload} />
@@ -1465,7 +1484,7 @@ function SpectraCheckEvidencePanelsImpl({ payload }: { payload: unknown }) {
       </div>
       <DP4RankingPanel payload={payload} />
       <PredictedVsObservedPanel payload={payload} />
-      <ReferencesPanel payload={payload} />
+      {showReferences ? <ReferencesPanel payload={payload} /> : null}
     </div>
   )
 }

@@ -23,6 +23,7 @@ import { DeveloperJsonPanel } from "@/components/spectracheck/spectracheck-resul
 import {
   EnrichedPickedPeaksPanel,
   InferredNmrTextPanel,
+  ReferencesPanel,
   SpectraCheckEvidencePanels,
 } from "@/components/spectracheck/spectracheck-evidence-panels"
 import { findRelativeIntegralDisclosure } from "@/components/spectracheck/spectracheck-relative-integrals"
@@ -1611,7 +1612,9 @@ export function SpectraCheckProcessedSpectrumSection({
             {/* Evidence panels — category mix, impurity candidates, labile-H reasoning, predicted vs observed.
                 Render from the same payload as the spectrum to avoid staged
                 analysis-output flicker. */}
-            {displayPayload != null ? <SpectraCheckEvidencePanels payload={displayPayload} /> : null}
+            {displayPayload != null ? (
+              <SpectraCheckEvidencePanels payload={displayPayload} showReferences={false} />
+            ) : null}
 
             {/* Developer JSON — full width at the bottom. */}
             {displayPayload != null ? <DeveloperJsonPanel data={displayPayload} /> : null}
@@ -1696,6 +1699,14 @@ export function SpectraCheckProcessedSpectrumSection({
           hand, so it stays usable with integrals from any source and never
           gates on the GSD chain — stateless compute, nothing persisted. */}
       <QnmrPurityPanel testId="processed-qnmr-purity-surface" />
+
+      {/* Reference material, below the results rather than inside them — the citation
+          list used to close the evidence composite a third of the way down the page,
+          landing between two sets of numbers a reader was working through. It
+          documents the analysis; it is not a step in it. The candidate tools below
+          were already at the foot here, which is where the Raw FID tab now puts them
+          too. */}
+      {displayPayload != null ? <ReferencesPanel payload={displayPayload} /> : null}
 
       {/* ── Candidate tool — per-atom shift prediction (v0.7.8) ──────────
           Structure-derived (not part of the observed-spectrum chain):
