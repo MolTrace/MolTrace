@@ -215,11 +215,23 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"gold set unreadable: {exc}", file=sys.stderr)
         return 2
 
-    if args.limit is not None:
+    subset_run = args.limit is not None
+    if subset_run:
         subset = gold.records[: max(0, args.limit)]
         gold = GoldSet(name=f"{gold.name}[:{len(subset)}]", records=subset)
+        # A subset carries no expected_checksum, so assert_integrity is a no-op on
+        # it — it can never be the frozen verdict. Refuse to persist one (it would
+        # become an incumbent that silently under-measures) and refuse to compare
+        # one against the full-set incumbent.
+        if args.persist_out is not None:
+            print(
+                "--limit is a smoke/testing mode and its vector must not become an "
+                "incumbent; rerun without --limit to persist.",
+                file=sys.stderr,
+            )
+            return 2
 
-    incumbent = load_incumbent_vector(args.incumbent)
+    incumbent = None if subset_run else load_incumbent_vector(args.incumbent)
     bundle = production_bundle()
 
     if incumbent is not None:
@@ -250,6 +262,22 @@ def main(argv: Sequence[str] | None = None) -> int:
             f"(no incumbent, kb={bundle.model_versions.get('kb_source')})"
         )
         return 0
+
+    # Two vectors are only comparable if they scored the SAME evidence. The
+    # harness ships a checksum for exactly this; without the guard a gold-set
+    # edit (or a subset) would read as a model regression, or worse, hide one.
+    if (
+        candidate.gold_checksum != incumbent.gold_checksum
+        or candidate.n_records != incumbent.n_records
+    ):
+        print(
+            "gold set differs between candidate and incumbent "
+            f"(candidate={candidate.gold_checksum} n={candidate.n_records}, "
+            f"incumbent={incumbent.gold_checksum} n={incumbent.n_records}); "
+            "re-mint the incumbent against the current gold set before comparing.",
+            file=sys.stderr,
+        )
+        return 0 if args.informational else 2
 
     passed_promotion, deltas = dominates(candidate, incumbent)
     # dominates() refuses a safety-critical metric missing from either side by

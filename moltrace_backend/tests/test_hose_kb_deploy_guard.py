@@ -68,8 +68,6 @@ def test_health_flags_set_and_missing(monkeypatch, tmp_path) -> None:
     report = _health_response()
     assert report["checks"]["hose_kb"] == "error"
     assert report["status"] == "degraded"
-    assert report["hose_kb"]["configured"] is True
-    assert report["hose_kb"]["path_present"] is False
 
 
 def test_health_ok_on_dev_seed(monkeypatch) -> None:
@@ -78,4 +76,17 @@ def test_health_ok_on_dev_seed(monkeypatch) -> None:
     report = _health_response()
     assert report["checks"]["hose_kb"] == "ok"
     assert report["status"] == "ok"
-    assert report["hose_kb"]["configured"] is False
+
+
+def test_public_health_does_not_leak_kb_internals(monkeypatch) -> None:
+    """/health is unauthenticated: the coarse verdict is public, the detail is not.
+
+    source / reference_count / path_present are deployment internals, and they
+    also tell an anonymous caller exactly when predictions are degraded to the
+    seed table. They live on admin-gated /admin/deployment instead.
+    """
+    monkeypatch.delenv("MOLTRACE_HOSE_KB", raising=False)
+    monkeypatch.setattr(nmrnet_wrapper, "_FALLBACK_KB", None)
+    report = _health_response()
+    assert "hose_kb" not in report
+    assert set(report) == {"status", "checks"}
