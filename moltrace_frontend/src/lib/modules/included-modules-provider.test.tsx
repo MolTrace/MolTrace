@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from "vitest"
-import { render, screen, waitFor } from "@testing-library/react"
+import { act, render, screen, waitFor } from "@testing-library/react"
 
 const apiFetch = vi.fn()
 vi.mock("@/lib/api/client", () => ({ apiFetch: (...a: unknown[]) => apiFetch(...a) }))
@@ -120,5 +120,34 @@ describe("IncludedModulesProvider", () => {
     await waitFor(() => expect(read("loading")).toBe("false"))
     expect(apiFetch).toHaveBeenCalledTimes(1)
     expect(apiFetch.mock.calls[0]?.[0]).toBe("/system/capabilities")
+  })
+})
+
+describe("IncludedModulesProvider — lazy on first subscriber", () => {
+  beforeEach(() => {
+    apiFetch.mockReset()
+  })
+
+  it("makes NO capabilities request when nothing subscribes (a marketing page)", async () => {
+    apiFetch.mockResolvedValue(SINGLE_MODULE)
+    render(
+      <IncludedModulesProvider>
+        {/* Marketing content: children that never call useIncludedModules. */}
+        <p>public homepage</p>
+      </IncludedModulesProvider>,
+    )
+    // Flush effects; the provider is mounted in the ROOT layout, so before this
+    // change every public marketing pageview fired a backend request here.
+    await act(async () => {})
+    expect(apiFetch).not.toHaveBeenCalled()
+  })
+
+  it("fetches exactly once when the first consumer mounts", async () => {
+    apiFetch.mockResolvedValue(SINGLE_MODULE)
+    renderProbe()
+    await waitFor(() => expect(read("loading")).toBe("false"))
+    expect(apiFetch).toHaveBeenCalledTimes(1)
+    expect(read("spec")).toBe("true")
+    expect(read("reg")).toBe("false")
   })
 })
