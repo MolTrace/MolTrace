@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils"
+import { versionedIcon } from "@/lib/pwa/asset-version"
 
 type MoleculeLogoMarkProps = {
   className?: string
@@ -48,7 +49,7 @@ export function MoleculeLogoMark({ className }: MoleculeLogoMarkProps) {
           Decorative — every call site sets "MolTrace" beside it, so an alt would
           make a screen reader say the name twice. */}
       <img
-        src="/icons/moltrace-mark-3d-hex-128.png"
+        src={versionedIcon("/icons/moltrace-mark-3d-hex-128.png")}
         alt=""
         width={128}
         height={128}

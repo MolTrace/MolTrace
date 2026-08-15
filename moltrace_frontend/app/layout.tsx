@@ -14,8 +14,7 @@ import { PWAUpdateManager } from '@/src/components/pwa/PWAUpdateManager'
 import { DevToolsBridge } from '@/components/dev/devtools-bridge'
 import './globals.css'
 
-const PWA_ASSET_VERSION = '2026-08-09-neon-prism-raised-m-v1'
-const versionedIcon = (src: string) => `${src}?v=${PWA_ASSET_VERSION}`
+import { versionedIcon } from '@/lib/pwa/asset-version'
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
