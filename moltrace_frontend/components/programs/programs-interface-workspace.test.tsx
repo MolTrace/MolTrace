@@ -69,8 +69,18 @@ describe("ProgramsInterfaceWorkspace (post-reorg: SpectraCheck only)", () => {
     invalidateSpectraCheckSessionReadCache()
   })
 
-  it("renders the SpectraCheck workspace without the cross-module tab switcher", () => {
+  it("renders the SpectraCheck workspace without the cross-module tab switcher", async () => {
     render(<ProgramsInterfaceWorkspace />)
+    // The workspace is behind next/dynamic + a viewport gate, so it mounts a
+    // tick or two after render(). Wait for one of ITS OWN tabs before making
+    // negative assertions — otherwise this guard passes against an empty
+    // placeholder and would not notice Regentry/Repho tabs coming back.
+    const spectraCheckTab = await screen.findByRole(
+      "tab",
+      { name: /^Session$/i },
+      { timeout: 5000 },
+    )
+    expect(spectraCheckTab).toBeInTheDocument()
     // The cross-module switcher (SpectraCheck / Regentry / Repho) lives on the sidebar
     // now, not in-page. So /spectracheck must NOT render any of those as page tabs.
     expect(screen.queryByRole("tab", { name: /^Regentry$/i })).not.toBeInTheDocument()
