@@ -210,7 +210,23 @@ export function MetadataKeyValueCard({
   testId?: string
 }) {
   if (!isRecord(payload)) return null
-  const meta = isRecord(payload[field]) ? (payload[field] as Record<string, unknown>) : null
+  /**
+   * Two shapes, because the raw-FID response does not carry this at the top level.
+   *
+   * Verified against a live /nmr/raw-fid/process response for a real Bruker archive: the
+   * acquisition parameters a reviewer wants to audit — PULPROG, SFO1, TD, SW, RG and thirty more —
+   * sit under `metadata.raw_upload_provenance`. Reading only the top level meant this card
+   * rendered nothing at all on every real raw-FID upload, and rendering nothing is indistinguish-
+   * able from "the instrument reported nothing", so there was no sign anything was missing.
+   */
+  const provenance = isRecord(payload.metadata) && isRecord(payload.metadata.raw_upload_provenance)
+    ? payload.metadata.raw_upload_provenance
+    : null
+  const meta = isRecord(payload[field])
+    ? (payload[field] as Record<string, unknown>)
+    : provenance && isRecord(provenance[field])
+      ? (provenance[field] as Record<string, unknown>)
+      : null
   if (!meta) return null
   const rows = Object.entries(meta)
     .filter(([, v]) => v !== null && v !== undefined && v !== "")
