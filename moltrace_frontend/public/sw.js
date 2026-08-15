@@ -1,4 +1,4 @@
-var SW_VERSION = "2026-06-08-pwa-defer-reload-v2"
+var SW_VERSION = "2026-08-14-http-cache-respected-v3"
 var STATIC_CACHE = "moltrace-static-" + SW_VERSION
 var RUNTIME_CACHE = "moltrace-runtime-" + SW_VERSION
 var OFFLINE_URL = "/offline"
@@ -53,8 +53,12 @@ function isReusableAsset(request, url) {
   return request.destination === "font" || request.destination === "image"
 }
 
+// Plain fetch, HTTP cache semantics intact. The old { cache: "no-store" } here
+// forbade even conditional revalidation, which cancelled the s-maxage /
+// stale-while-revalidate policy next.config.mjs sets for marketing pages — a
+// repeat visit re-downloaded full bodies where a 304 would do.
 function networkOnly(request) {
-  return fetch(request, { cache: "no-store" })
+  return fetch(request)
 }
 
 function precacheShell() {
@@ -90,7 +94,7 @@ function cacheFirst(request) {
 }
 
 function networkFirstCachedAsset(request) {
-  return fetch(request, { cache: "no-store" }).then(function (response) {
+  return fetch(request).then(function (response) {
     if (response && response.ok) {
       var copy = response.clone()
       caches.open(RUNTIME_CACHE).then(function (cache) {
@@ -168,8 +172,11 @@ self.addEventListener("fetch", function (event) {
   var request = event.request
   var url = new URL(request.url)
 
+  // Never-cached requests (every cross-origin URL included) are not handled at
+  // all: declining the event lets the browser fetch natively — no SW startup on
+  // the critical path, normal HTTP caching, and streaming without body proxying.
+  // The old respondWith(networkOnly(...)) added all three costs for zero value.
   if (request.method !== "GET" || isNeverCached(url)) {
-    event.respondWith(networkOnly(request))
     return
   }
 

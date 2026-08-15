@@ -181,17 +181,30 @@ const nextConfig = {
         source: "/manifest.json",
         headers: noStoreHeaders,
       },
+      // Icons are immutable per build: every reference carries ?v=PWA_ASSET_VERSION
+      // (app/layout.tsx, app/manifest.ts, sw.js), which is the documented
+      // cache-busting design in docs/pwa-icons.md. Serving them no-store made that
+      // mechanism decorative — tens to ~140 KB of identical PNGs refetched on
+      // every navigation. New artwork = bump the version query, never rely on TTL.
+      // The manifests and /sw.js above stay no-store so a new deploy is seen
+      // immediately.
       {
         source: "/icons/:path*",
-        headers: noStoreHeaders,
+        headers: [
+          { key: "Cache-Control", value: "public, max-age=31536000, immutable" },
+        ],
       },
       {
         source: "/icon.svg",
-        headers: noStoreHeaders,
+        headers: [
+          { key: "Cache-Control", value: "public, max-age=31536000, immutable" },
+        ],
       },
       {
         source: "/apple-icon.png",
-        headers: noStoreHeaders,
+        headers: [
+          { key: "Cache-Control", value: "public, max-age=31536000, immutable" },
+        ],
       },
       {
         source: "/api/backend/:path*",
