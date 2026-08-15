@@ -27,6 +27,14 @@ import {
   zipVendorFolder,
   type VendorFolderDetection,
 } from "@/src/lib/spectracheck/vendor-folder-drop"
+import {
+  isOfferedNucleus,
+  sniffArchiveAcquisition,
+  sniffExperimentAcquisition,
+  summarizeAcquisition,
+  type AcquisitionSummary,
+  type VendorAcquisitionFacts,
+} from "@/src/lib/spectracheck/vendor-acquisition"
 import { SpectraCheckRawFidBatch } from "@/components/spectracheck/spectracheck-raw-fid-batch"
 import {
   RAW_FID_BATCH_MAX_ITEMS,
@@ -557,6 +565,32 @@ export function SpectraCheckRawFidSection({
   const [folderBusy, setFolderBusy] = useState<string | null>(null)
   const [folderDetection, setFolderDetection] = useState<VendorFolderDetection | null>(null)
   const [folderError, setFolderError] = useState<string | null>(null)
+
+  /**
+   * What the instrument recorded, read out of the dropped dataset's own acqus/procpar before
+   * anything is uploaded. Null until something readable lands.
+   */
+  const [acquisition, setAcquisition] = useState<AcquisitionSummary | null>(null)
+
+  /**
+   * Reflect a drop's own acquisition parameters into the setup form.
+   *
+   * Only the NUCLEUS is written back, and only when every readable experiment agrees on a value
+   * the toggle can express. That is not timidity, it is matching the analyzer: `NUC1`/`tn` already
+   * override the requested nucleus server-side, so moving the toggle reports a decision that has
+   * effectively already been made. The solvent deliberately is NOT written back — there the
+   * request wins over the file, so quietly swapping it would make the form disagree with what
+   * actually runs. And a folder holding both a 1H and a 13C experiment has no single right answer,
+   * so the toggle is left alone and the disagreement is shown instead.
+   */
+  const applyDetectedAcquisition = useCallback(
+    (facts: readonly (VendorAcquisitionFacts | null)[]) => {
+      const summary = summarizeAcquisition(facts)
+      setAcquisition(summary.readCount > 0 ? summary : null)
+      if (isOfferedNucleus(summary.nucleus)) setNucleus(summary.nucleus)
+    },
+    [setNucleus],
+  )
   // Local state for the collapsible "Processing parameters" panel at the
   // bottom of the results. Reference data the reviewer only opens when they
   // need to audit the FID processing knobs, so the default is closed.
@@ -682,9 +716,15 @@ export function SpectraCheckRawFidSection({
     }
     try {
       const created: RawFidBatchItem[] = []
+      const detectedFacts: (VendorAcquisitionFacts | null)[] = []
       for (let index = 0; index < bundles.length; index++) {
         const bundle = bundles[index]
         const label = bundle.dir || bundle.archiveName
+        // Read this experiment's own parameter file. Done per bundle rather than once for the
+        // folder because the experiments in one folder are routinely different nuclei — reading a
+        // single acqus and applying it to all of them is the mistake this exists to prevent.
+        const facts = await sniffExperimentAcquisition(bundle.entries)
+        detectedFacts.push(facts)
         // Check the size rules BEFORE packaging. Zipping an experiment we already know will be
         // refused wastes the one part of this that is slow, and can be enough to exhaust the tab.
         const preflight = preflightRawFidArchive({
@@ -701,6 +741,7 @@ export function SpectraCheckRawFidSection({
               sourceDir: bundle.dir || null,
               fileCount: bundle.fileCount,
               uncompressedBytes: bundle.totalBytes,
+              detected: facts,
             }),
           )
           continue
@@ -720,10 +761,12 @@ export function SpectraCheckRawFidSection({
             sourceDir: bundle.dir || null,
             fileCount: bundle.fileCount,
             uncompressedBytes: bundle.totalBytes,
+            detected: facts,
           }),
         )
       }
       addBatchItems(created)
+      applyDetectedAcquisition(detectedFacts)
       const firstRunnable = created.find((item) => item.status === "queued")
       if (firstRunnable) attachFile(firstRunnable.file)
     } catch (err) {
@@ -747,10 +790,27 @@ export function SpectraCheckRawFidSection({
         // refuse — the queue rows already say why each one was turned away.
         clearSelectedFile()
       }
+
+      // Read each archive's parameters AFTER admitting it, not before. Opening a zip is the one
+      // slow step here, and making the rows wait on it would trade an instant queue for a stall
+      // on a readout that is only a hint. The rows appear now and fill in when the read lands.
+      void (async () => {
+        const facts = await Promise.all(
+          created.map((item) =>
+            sniffArchiveAcquisition(item.file).catch(() => null),
+          ),
+        )
+        created.forEach((item, i) => {
+          if (facts[i]) patchBatchItem(item.id, { detected: facts[i] })
+        })
+        // Nothing readable — a folder of .tar.gz, or archives past the sniff ceiling. Leave the
+        // form exactly as the chemist set it rather than clearing a readout it never had.
+        if (facts.some((f) => f != null)) applyDetectedAcquisition(facts)
+      })()
     },
     // attachFile / clearSelectedFile are function declarations in this component body — they are
     // re-created each render but never close over anything that changes their behaviour.
-    [addBatchItems],
+    [addBatchItems, applyDetectedAcquisition, patchBatchItem],
   )
 
   function attachFile(file: File) {
@@ -927,6 +987,35 @@ export function SpectraCheckRawFidSection({
     }
   }
 
+  /**
+   * Record a single-tile run on the queue row it came from.
+   *
+   * Dropping an archive enqueues it, but the Preview/Process tiles used to write only this
+   * section's own result state — the queue row sat at "Queued" after a successful run, and the
+   * Evidence Bench (which shows DONE queue rows) stayed empty even though the spectrum was
+   * processed. Processing must mean the same thing whichever button ran it. File identity is the
+   * join: every path that attaches a file created its queue item from the same File object.
+   */
+  const recordSingleRunOnQueue = useCallback(
+    (file: File, mode: RawFidBatchMode, result: unknown, durationMs: number) => {
+      updateWith((prev) => {
+        const item = prev.batchItems.find((entry) => entry.file === file)
+        if (!item) return {}
+        return {
+          batchItems: prev.batchItems.map((entry) =>
+            entry.id === item.id
+              ? { ...entry, status: "done" as const, mode, result, error: null, durationMs }
+              : entry,
+          ),
+          // Adopt the row as the shared selection only when nothing is selected — stealing an
+          // existing selection would also reset the per-dataset analysis panels.
+          ...(prev.batchActiveId == null ? { batchActiveId: item.id } : {}),
+        }
+      })
+    },
+    [updateWith],
+  )
+
   async function runPreview() {
     const file = getSelectedFile()
     if (!file) {
@@ -944,10 +1033,13 @@ export function SpectraCheckRawFidSection({
     update({ previewSpectrumError: "", previewSpectrumLoading: true, activeResultMode: "preview" })
     let shouldGenerateSpectrum = false
     let previewArchiveId: string | null = null
+    const startedAt = Date.now()
     try {
       const fd = buildFormData(file, false)
       const data = await apiFetch<unknown>("/nmr/raw-fid/preview", { method: "POST", body: fd })
       setPreviewResult(data)
+      // The tile ran the same endpoint the queue's Quick scan mode runs — the row records it.
+      recordSingleRunOnQueue(file, "scan", data, Date.now() - startedAt)
       pushDev("raw_fid_preview", data)
       shouldGenerateSpectrum = !applyPreviewSpectrumPayload(data, "balanced")
       previewArchiveId = extractRawArchiveId(data)
@@ -987,10 +1079,12 @@ export function SpectraCheckRawFidSection({
     // while the full process runs. ``processLoading`` drives the badge.
     // Clearing here was the source of the analyze-mode flash.
     update({ previewSpectrumError: "", activeResultMode: "process" })
+    const startedAt = Date.now()
     try {
       const fd = buildFormData(file, true)
       const data = await apiFetch<unknown>("/nmr/raw-fid/process", { method: "POST", body: fd })
       setProcessResult(data)
+      recordSingleRunOnQueue(file, "process", data, Date.now() - startedAt)
       pushDev("raw_fid_process", data)
     } catch (err) {
       if (isMissingNmrEndpoint(err)) setProcessError(RAW_FID_BACKEND_MSG)
@@ -1504,6 +1598,102 @@ export function SpectraCheckRawFidSection({
               </div>
             </div>
           </div>
+
+          {/* What the instrument itself recorded — read from the dropped dataset, before upload. */}
+          {acquisition ? (
+            <div
+              data-testid="raw-fid-acquisition-readout"
+              className="rounded-lg border border-[color:var(--mt-teal)]/30 bg-[color:var(--mt-teal-soft)]/30 px-3 py-2.5"
+            >
+              <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                Read from the instrument file
+                {acquisition.unreadCount > 0 ? (
+                  // Say so rather than letting a partial readout look like a complete one.
+                  <span className="ml-1 font-normal normal-case tracking-normal">
+                    · {acquisition.readCount} of {acquisition.readCount + acquisition.unreadCount}{" "}
+                    datasets
+                  </span>
+                ) : null}
+              </p>
+              <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 font-mono text-xs">
+                <span>
+                  <span className="text-muted-foreground">Nucleus </span>
+                  {acquisition.nuclei.length > 0 ? acquisition.nuclei.join(" + ") : "—"}
+                </span>
+                <span>
+                  <span className="text-muted-foreground">Solvent </span>
+                  {acquisition.solvents.length > 0 ? acquisition.solvents.join(" + ") : "not recorded"}
+                </span>
+                <span>
+                  <span className="text-muted-foreground">Vendor </span>
+                  {acquisition.vendor === "bruker"
+                    ? "Bruker"
+                    : acquisition.vendor === "varian"
+                    ? "Varian/Agilent"
+                    : "mixed"}
+                </span>
+                {acquisition.fieldMhz != null ? (
+                  <span>
+                    <span className="text-muted-foreground">Field </span>
+                    {acquisition.fieldMhz.toFixed(2)} MHz
+                  </span>
+                ) : null}
+              </div>
+
+              {/*
+                Everything below is a DISAGREEMENT between the file and the form. Each one names
+                which side the analysis will actually follow, because that differs per field and
+                guessing wrong is the whole risk this readout exists to remove.
+              */}
+              <div className="mt-2 space-y-1 text-[11px] leading-relaxed text-muted-foreground">
+                {acquisition.mixedNuclei ? (
+                  <p>
+                    This drop holds {acquisition.nuclei.join(" and ")} experiments, so the toggle
+                    above cannot describe all of them. Each dataset is read with the nucleus
+                    recorded in its own file.
+                  </p>
+                ) : null}
+
+                {acquisition.nucleus && !isOfferedNucleus(acquisition.nucleus) ? (
+                  <p>
+                    This dataset was acquired on {acquisition.nucleus}. This reader is built for 1H
+                    and 13C, so the results may not be interpretable.
+                  </p>
+                ) : null}
+
+                {/*
+                  Solvent is the one field where the FORM wins over the file — re-running an old
+                  dataset in a different solvent is a correction, not a contradiction. So this
+                  never silently swaps the value; it says which one will be used.
+                */}
+                {acquisition.solvent && solvent.trim() && acquisition.solvent !== solvent.trim() ? (
+                  <p>
+                    The instrument recorded {acquisition.solvent}. This session is set to{" "}
+                    {solvent.trim()}, and that is what the analysis will use — solvent selects the
+                    referencing window and the impurity library, so it is worth confirming.
+                  </p>
+                ) : null}
+
+                {acquisition.solvent && !solvent.trim() ? (
+                  <p>
+                    No solvent is set for this session, so the analysis will use the{" "}
+                    {acquisition.solvent} recorded in the file.
+                  </p>
+                ) : null}
+
+                {acquisition.vendor &&
+                vendor !== "auto" &&
+                vendor !== (acquisition.vendor === "bruker" ? "bruker" : "agilent") ? (
+                  <p>
+                    Vendor is set to {vendor === "bruker" ? "Bruker" : "Agilent"}, but these files
+                    are{" "}
+                    {acquisition.vendor === "bruker" ? "Bruker" : "Varian/Agilent"}. Switch to Auto
+                    unless you meant to override it.
+                  </p>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
 
           {/* Drop-zone file picker */}
           <div className="space-y-1.5">

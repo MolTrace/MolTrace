@@ -15,6 +15,8 @@
  *     while they do. Running them in sequence is not a limitation we accept, it is the only shape
  *     that is actually faster.
  */
+// Type-only, so this file stays free of runtime imports and testable without a DOM.
+import type { VendorAcquisitionFacts } from "@/src/lib/spectracheck/vendor-acquisition"
 
 /**
  * The analyzer's own limits, copied so a refusal can be explained here instead of after a
@@ -72,6 +74,12 @@ export type RawFidBatchItem = {
   fileCount: number | null
   /** Uncompressed bytes, when known — this is the figure the size limit is measured against. */
   uncompressedBytes: number | null
+  /**
+   * What the instrument itself recorded, read from this dataset's own acqus/procpar at drop time.
+   * Null when there was no parameter file to read (a .tar.gz, or a folder without one) — which is
+   * distinct from "read it and it was blank", and the UI has to keep those apart.
+   */
+  detected: VendorAcquisitionFacts | null
   status: RawFidBatchStatus
   /** Which analysis produced `result`. Null until it has run. */
   mode: RawFidBatchMode | null
@@ -263,6 +271,7 @@ export function createRawFidBatchItem(input: {
   sourceDir?: string | null
   fileCount?: number | null
   uncompressedBytes?: number | null
+  detected?: VendorAcquisitionFacts | null
 }): RawFidBatchItem {
   const preflight = preflightRawFidArchive({
     name: input.file.name,
@@ -277,6 +286,7 @@ export function createRawFidBatchItem(input: {
     sourceDir: input.sourceDir ?? null,
     fileCount: input.fileCount ?? null,
     uncompressedBytes: input.uncompressedBytes ?? null,
+    detected: input.detected ?? null,
     status: preflight.ok ? "queued" : "blocked",
     mode: null,
     error: preflight.ok ? null : preflight.reason,
@@ -293,6 +303,7 @@ export function createBlockedRawFidBatchItem(input: {
   sourceDir?: string | null
   fileCount?: number | null
   uncompressedBytes?: number | null
+  detected?: VendorAcquisitionFacts | null
 }): RawFidBatchItem {
   return {
     id: nextRawFidBatchItemId(),
@@ -303,6 +314,9 @@ export function createBlockedRawFidBatchItem(input: {
     sourceDir: input.sourceDir ?? null,
     fileCount: input.fileCount ?? null,
     uncompressedBytes: input.uncompressedBytes ?? null,
+    // A refused dataset still gets to say what it was — the reason it was refused is about size,
+    // not about the science, and hiding the readout makes the row harder to act on.
+    detected: input.detected ?? null,
     status: "blocked",
     mode: null,
     error: input.reason,
