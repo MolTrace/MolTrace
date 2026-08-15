@@ -307,11 +307,26 @@ def _run_candidate_ranking(
     # would put a maximum-certainty number above every review threshold on the
     # strength of having nothing to compare against. The fit statistics still stand.
     single_candidate = len(ranked) < 2
-    confidence: float | None = None if single_candidate else float(top.dp4_probability)
+    # Coverage gates the confidence for the same reason a set of one does. A DP4
+    # share is computed over the peaks a candidate MATCHED, so a top candidate
+    # explaining 3 of 12 signals can still take most of the probability mass and
+    # clear a review threshold on the strength of a fit to a quarter of the
+    # spectrum. Withholding the number routes the run to review; the share is
+    # still reported per candidate for a reader.
+    _observed_n = len(observed) if isinstance(observed, list) else 0
+    _top_fraction = (top.matched_peaks / _observed_n) if _observed_n else 0.0
+    low_coverage_top = _top_fraction < 0.75
+    confidence: float | None = (
+        None if (single_candidate or low_coverage_top) else float(top.dp4_probability)
+    )
     caveats = [
         "DP4 is a closed-world posterior: it distributes probability across the "
         "candidates supplied and assumes the correct structure is among them. It is "
         "not evidence that the candidate set is exhaustive.",
+        # The panel path (peak_categorization.build_dp4_candidate_ranking) has said
+        # this since the coverage work; this surface emitted the same numbers bare.
+        "DP4 probabilities are a relative ranking within the supplied set, not "
+        "calibrated probabilities of correctness.",
     ]
     if single_candidate:
         caveats.append(
@@ -319,22 +334,55 @@ def _run_candidate_ranking(
             "and carries no confidence. Judge the fit by the reported deviations, or "
             "supply the alternatives this candidate should be discriminated against."
         )
+    if low_coverage_top and not single_candidate:
+        caveats.append(
+            f"The leading candidate accounts for {top.matched_peaks} of {_observed_n} "
+            "observed signals, so its share is carried by a minority of the spectrum "
+            "and is not reported as a confidence. Review the unmatched signals before "
+            "accepting this ranking."
+        )
+
+    # The same disclosure the SpectraCheck panel path emits. Without it,
+    # `matched_peaks` cannot be read at all — 6 looks identical whether it is 6 of
+    # 6 or 6 of 12 — and the error figures silently describe only the paired
+    # peaks, so a candidate that explains a sixth of the spectrum can advertise a
+    # small MAE. Documented in docs/fe_handoff_dp4_ranking_coverage.md, which was
+    # written for exactly this failure on the other surface.
+    from .peak_categorization import DP4_MIN_COVERAGE, DP4_PROBABILITY_BASIS
+
+    observed_count = len(observed)
+
+    def _row(p: Any) -> dict[str, Any]:
+        matched_fraction = (p.matched_peaks / observed_count) if observed_count else 0.0
+        low_coverage = matched_fraction < DP4_MIN_COVERAGE
+        notes = list(p.notes)
+        if low_coverage:
+            notes.append(
+                f"This candidate accounts for {p.matched_peaks} of {observed_count} "
+                f"observed signals. The error figures describe only those "
+                f"{p.matched_peaks}, so they understate how far the rest of the "
+                "spectrum is from this structure."
+            )
+        return {
+            "candidate_id": p.candidate_id,
+            "smiles": p.smiles,
+            "dp4_probability": p.dp4_probability,
+            "matched_peaks": p.matched_peaks,
+            "observed_peak_count": observed_count,
+            "matched_fraction": matched_fraction,
+            "low_coverage": low_coverage,
+            "error_basis": "matched_peaks_only",
+            "mae_ppm": p.mae_ppm,
+            "rms_ppm": p.rms_ppm,
+            "probability_is_calibrated": False,
+            "probability_basis": DP4_PROBABILITY_BASIS,
+            "notes": notes,
+        }
 
     return EngineResult(
         output={
             "nucleus": nucleus,
-            "candidates": [
-                {
-                    "candidate_id": p.candidate_id,
-                    "smiles": p.smiles,
-                    "dp4_probability": p.dp4_probability,
-                    "matched_peaks": p.matched_peaks,
-                    "mae_ppm": p.mae_ppm,
-                    "rms_ppm": p.rms_ppm,
-                    "notes": list(p.notes),
-                }
-                for p in ranked
-            ],
+            "candidates": [_row(p) for p in ranked],
         },
         confidence=confidence,
         uncertainty={
