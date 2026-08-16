@@ -318,3 +318,74 @@ def test_unknown_compound_class_falls_through_without_audit() -> None:
 # test_nmr_frontend_upload_api.py, which uses a client factory that
 # initialises the audit_events table. The four tests above are unit-level
 # (calling compare_candidates directly) and avoid that dependency.
+
+
+class TestCorroborationDoesNotCompressTheRanking:
+    """2D and DEPT/APT scores are per-REQUEST, not per-candidate.
+
+    ``analyze_nmr2d_preview`` runs once on the spectrum, so every candidate in a
+    comparison received the identical 2D and DEPT numbers. Folding a constant
+    into a weighted mean cannot change the ORDER — but it drags every candidate
+    toward the same value, and the gap between the top two is exactly what a
+    reviewer reads as "how close was this call?". Measured before this change,
+    that constant was 22 % of the weight budget unclassed and up to 31 % for
+    glycoproteins, where the compound-class prior up-weights the very term that
+    cannot discriminate — so 1H evidence fell from 0.36 to 0.238 of the mean on
+    the class where 2D matters most.
+
+    The invariant: supplying corroborating evidence must not shrink the spread
+    between candidates that the discriminating evidence produced.
+    """
+
+    class _Stub2D:
+        evidence_score = 0.80
+
+    class _StubDept:
+        dept_apt_consistency_score = 0.80
+
+    def _request(self):
+        return CandidateComparisonRequest(
+            sample_id="EtOH-spread",
+            solvent="CDCl3",
+            proton_nmr_text=ETHANOL_1H,
+            carbon13_text=ETHANOL_13C,
+            candidates=[
+                CandidateInput(name="Ethanol", smiles="CCO", role="proposed"),
+                CandidateInput(name="Propanol", smiles="CCCO", role="side product"),
+            ],
+        )
+
+    def _spread(self, **kwargs) -> float:
+        result = compare_candidates(self._request(), **kwargs)
+        ranked = result.ranked_candidates
+        return ranked[0].total_score - ranked[1].total_score
+
+    def test_adding_2d_evidence_does_not_shrink_the_gap(self) -> None:
+        bare = self._spread()
+        with_2d = self._spread(nmr2d_result=self._Stub2D())
+        assert with_2d >= bare - 1e-9, (
+            f"a per-request 2D score compressed the candidate spread: "
+            f"{bare} -> {with_2d}"
+        )
+
+    def test_adding_dept_evidence_does_not_shrink_the_gap(self) -> None:
+        bare = self._spread()
+        with_dept = self._spread(dept_apt_result=self._StubDept())
+        assert with_dept >= bare - 1e-9, (
+            f"a per-request DEPT/APT score compressed the candidate spread: "
+            f"{bare} -> {with_dept}"
+        )
+
+    def test_corroborating_evidence_is_still_reported(self) -> None:
+        # Excluding it from the discriminating mean must not hide it: it is
+        # real evidence about the SPECTRUM, just not about which candidate.
+        result = compare_candidates(
+            self._request(),
+            nmr2d_result=self._Stub2D(),
+            dept_apt_result=self._StubDept(),
+        )
+        top = result.ranked_candidates[0]
+        assert top.score_breakdown.nmr2d_score == pytest.approx(0.80)
+        assert top.score_breakdown.dept_apt_score == pytest.approx(0.80)
+        assert "2D NMR" in result.evidence_layers_used
+        assert "DEPT/APT" in result.evidence_layers_used
