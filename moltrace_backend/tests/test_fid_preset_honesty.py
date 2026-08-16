@@ -163,7 +163,64 @@ def test_preview_route_rejects_unknown_preset_naming_it(
         data={"processing_preset": "imported_parameters"},
     )
     assert response.status_code == 422
-    assert "imported_parameters" in str(response.json().get("detail"))
+    body = response.json()
+    assert "imported_parameters" in str(body.get("detail"))
+    # Clients branch on the code, never on the sentence.
+    assert body.get("code") == "unknown_processing_preset"
+
+
+def test_rejected_preset_message_carries_no_engine_jargon(
+    client: TestClient, api_headers: dict[str, str]
+) -> None:
+    """The refusal reaches a user, so it must read like a sentence, not a dump.
+
+    The first version of this message appended every accepted id: "Choose one of:
+    balanced, baseline_preserve, custom, higher, higher_resolution,
+    no_baseline_correction, no_phase_correction, phase_preserve, resolution,
+    safe_automatic, sensitive, sensitive_weak_peaks, weak_peaks." — thirteen raw
+    ids in copy a person reads, and a list that would not match the labels on the
+    control they chose from. The vocabulary belongs in GET /fid/presets.
+    """
+    response = client.post(
+        "/nmr/raw-fid/preview",
+        headers=api_headers,
+        files={"file": ("sample.zip", _bruker_zip(title="route-422-copy"), "application/zip")},
+        data={"processing_preset": "imported_parameters"},
+    )
+    assert response.status_code == 422
+    detail = str(response.json().get("detail"))
+
+    # Both sides of the seam: engine preset ids and the product-facing aliases
+    # the picker sends. A raw snake_case id is jargon whichever side it came from.
+    for preset_id in (
+        "baseline_preserve",
+        "phase_preserve",
+        "sensitive_weak_peaks",
+        "higher_resolution",
+        "safe_automatic",
+        "no_baseline_correction",
+    ):
+        assert preset_id not in detail, f"preset id {preset_id!r} leaked into user-facing copy"
+    # No endpoint paths, HTTP verbs, status codes, or the word "backend".
+    for jargon in ("/nmr/", "/raw-fid", "HTTP", "422", "backend", "_json"):
+        assert jargon not in detail, f"backend jargon {jargon!r} leaked into user-facing copy"
+    # And it is still a sentence a person can act on.
+    assert detail.endswith(".")
+    assert "Choose a different processing preset." in detail
+
+
+def test_valid_preset_is_not_affected_by_the_coded_refusal(
+    client: TestClient, api_headers: dict[str, str]
+) -> None:
+    """The stated code must not bleed onto responses that succeed."""
+    response = client.post(
+        "/nmr/raw-fid/preview",
+        headers=api_headers,
+        files={"file": ("sample.zip", _bruker_zip(title="route-422-ok"), "application/zip")},
+        data={"processing_preset": "no_phase_correction"},
+    )
+    assert response.status_code == 200
+    assert "code" not in response.json()
 
 
 def test_preview_route_accepts_product_preset_ids(

@@ -14,6 +14,37 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.69.9 — A refusal a person can read, and the Part B handoff (2026-08-15)
+
+The preset refusal added in v0.69.8 dumped its whole accepted-id set into `detail`, which
+the frontend renders directly to a user. In full, for one rejected value:
+
+> Unknown processing preset 'imported_parameters'. Choose one of: balanced,
+> baseline_preserve, custom, higher, higher_resolution, no_baseline_correction,
+> no_phase_correction, phase_preserve, resolution, safe_automatic, sensitive,
+> sensitive_weak_peaks, weak_peaks.
+
+Thirteen raw ids — the six engine presets, every alias, and three internal shorthands
+(`higher`, `resolution`, `sensitive`) — as copy a person reads. Nor could the list be
+fixed by swapping in labels: those are the engine's labels, not the labels on the control
+the person actually chose from.
+
+`detail` is now prose with nothing to go stale — *"The processing preset 'x' is not one
+this analysis offers. Choose a different processing preset."* The machine-readable
+vocabulary lives where it belongs: the `FIDPresetId` enum in the generated contract and
+`GET /fid/presets`, which returns each id with its label.
+
+The signal a client needs did not disappear with the list. `error_codes` gains
+`unknown_processing_preset`, and `CodedHTTPException` lets a raise site state a specific
+code *beside* prose rather than inside `detail` — the two existing mechanisms could only
+express one or the other, and a structured `detail` is not a third option because the
+frontend would render it as "[object Object]". Pinned by a test asserting the copy carries
+no engine id, no endpoint path, no status code, and no `_json` field name.
+
+`docs/fe_handoff_instant_fid_part_b.md` hands the frontend half of Instant FID over as a
+numbered checklist, with every line reference re-derived against the current worktree
+rather than the state the investigation read.
+
 ## v0.69.8 — Instant FID: the preview/process path stops blocking, forgetting, and lying (2026-08-15)
 
 Measured baseline on a real 2.5 MB Bruker 1H archive: 6.8 s cold, 0.017 s on the

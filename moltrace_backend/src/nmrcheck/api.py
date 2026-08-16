@@ -2831,6 +2831,21 @@ def _sanitize_public_error_detail(value: Any) -> Any:
 PUBLIC_MACHINE_READABLE_403_DETAILS: frozenset[str] = error_codes.PUBLIC_CODES
 
 
+class CodedHTTPException(HTTPException):
+    """An HTTPException that states its own machine-readable ``code``.
+
+    ``detail`` is prose for a person and ``code`` is what a client branches on
+    (see ``error_codes``). The two existing ways to emit a specific code both
+    put it *in* ``detail``, which costs the prose — and the frontend renders
+    ``String(data.detail)``, so a structured detail is not an option either.
+    This carries the code beside the sentence instead.
+    """
+
+    def __init__(self, status_code: int, detail: Any, *, code: str) -> None:
+        super().__init__(status_code=status_code, detail=detail)
+        self.error_code = code
+
+
 def _safe_http_exception_detail(status_code: int, detail: Any) -> Any:
     if status_code == status.HTTP_401_UNAUTHORIZED:
         return PUBLIC_AUTH_REQUIRED_DETAIL
@@ -10791,16 +10806,40 @@ def _prompt_sidecar_guidance(
 
 
 def _resolve_processing_preset_or_422(value: Any) -> str:
-    """Resolve a product-facing preset id, or fail naming the id.
+    """Resolve a product-facing preset id, or refuse in words a person can act on.
 
     The lenient normalizer silently substituted "balanced" for unknown ids,
     so a preset the user chose could be replaced by different processing
     with no signal. Product routes refuse instead.
+
+    The refusal deliberately does not enumerate the alternatives. This sentence
+    reaches a user — the frontend renders ``detail`` directly — so listing ids
+    ("baseline_preserve", "phase_preserve", "safe_automatic", …) would be the
+    display jargon the conventions rule out, and listing engine *labels* would not
+    match the product labels on the control the person actually chose from. A
+    client that needs the vocabulary reads ``GET /fid/presets``, which returns each
+    canonical id with its label; one that needs to react programmatically branches
+    on ``code``.
+
+    Known gap, deliberately not closed here: ``GET /fid/presets`` reports the six
+    canonical ids, while ``_FID_PRESET_ALIASES`` also accepts seven product-facing
+    ids (the ones the SpectraCheck picker actually sends). The accepted *input*
+    set is therefore wider than anything the contract enumerates — the request
+    field is typed as a plain string, not an enum. Widening the presets endpoint
+    to publish its aliases is a contract change, so it belongs with the frontend
+    work that would consume it, not in a copy fix.
     """
     try:
         return resolve_fid_preset_id_strict(_unwrap_form_default(value))
     except UnknownFIDPresetError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
+        raise CodedHTTPException(
+            status_code=422,
+            detail=(
+                f"The processing preset '{exc.value}' is not one this analysis "
+                "offers. Choose a different processing preset."
+            ),
+            code=error_codes.UNKNOWN_PROCESSING_PRESET,
+        ) from exc
 
 
 def _fid_settings_from_form(
@@ -31774,7 +31813,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             # `code` is added beside it so they can stop.
             content = {
                 "detail": _safe_http_exception_detail(exc.status_code, exc.detail),
-                "code": error_codes.code_for(exc.status_code, exc.detail),
+                "code": error_codes.code_for(
+                    exc.status_code,
+                    exc.detail,
+                    stated_code=getattr(exc, "error_code", None),
+                ),
             }
             status_code = exc.status_code
         return JSONResponse(
