@@ -74,6 +74,14 @@ ROLE_REQUIRED = "role_required"
 # migrated. Never let absence of a specific code mean absence of the field —
 # a client that must handle "sometimes there is a code" gains nothing.
 # --------------------------------------------------------------------------- #
+#: A processing preset id that maps to no real engine behaviour. Split out from the
+#: generic 422 because the interface has a specific, useful reaction to it — re-open
+#: the preset picker on the offending control — and because the alternative was
+#: leaving the valid-id list in ``detail``, where it would reach a user as engine
+#: jargon (``baseline_preserve``, ``phase_preserve``, …). Not public: a 422 never
+#: crosses the 401/403 sanitizer.
+UNKNOWN_PROCESSING_PRESET = "unknown_processing_preset"
+
 BAD_REQUEST = "bad_request"
 UNAUTHENTICATED = "unauthenticated"
 FORBIDDEN = "forbidden"
@@ -101,6 +109,10 @@ REGISTRY: dict[str, ErrorCode] = {
             PRODUCT_NOT_PROVISIONED, "The product is enabled but not yet set up.", True
         ),
         ErrorCode(ROLE_REQUIRED, "Your role does not include this action.", True),
+        ErrorCode(
+            UNKNOWN_PROCESSING_PRESET,
+            "The requested processing preset is not one the engine implements.",
+        ),
         ErrorCode(BAD_REQUEST, "The request could not be understood."),
         ErrorCode(UNAUTHENTICATED, "Authentication is required."),
         ErrorCode(FORBIDDEN, "Access denied."),
@@ -128,15 +140,24 @@ _STATUS_FALLBACK: dict[int, str] = {
 }
 
 
-def code_for(status_code: int, detail: object) -> str:
+def code_for(status_code: int, detail: object, *, stated_code: str | None = None) -> str:
     """The code for a response, preferring one the raiser already stated.
 
     A ``detail`` that is exactly a registered code is treated as that code — which is how
     every pre-existing raise site is picked up without editing 800 routes. Anything else
     falls back to the status, so the field is always present and a client never has to
     handle its absence.
+
+    ``stated_code`` is for the case those two mechanisms cannot express together: a raise
+    site that wants a specific code *and* a ``detail`` written for a person. Putting the
+    code in ``detail`` costs the prose; writing prose costs the code. The frontend renders
+    ``String(data.detail)``, so a structured ``detail`` is not a third option — it would
+    reach a user as "[object Object]". An unregistered value is ignored rather than
+    trusted, so this cannot mint codes that are not in the registry above.
     """
 
+    if stated_code is not None and stated_code in REGISTRY:
+        return stated_code
     if isinstance(detail, str) and detail in REGISTRY:
         return detail
     if status_code >= 500:

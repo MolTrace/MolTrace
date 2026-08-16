@@ -313,7 +313,16 @@ _FID_PRESET_ALIASES: dict[str, FIDPresetId] = {
 
 
 class UnknownFIDPresetError(ValueError):
-    """A processing preset id that maps to no real engine behaviour."""
+    """A processing preset id that maps to no real engine behaviour.
+
+    Carries the rejected value as data rather than only in the message: the
+    HTTP layer writes its own sentence, because an engine id in a string a
+    user reads is exactly the jargon the display rules forbid.
+    """
+
+    def __init__(self, value: str | None) -> None:
+        self.value = value
+        super().__init__(f"Unknown processing preset {value!r}.")
 
 
 def _normalize_preset_token(value: str | None) -> str:
@@ -341,10 +350,7 @@ def resolve_fid_preset_id_strict(value: str | None) -> FIDPresetId:
     token = _normalize_preset_token(value)
     resolved = _FID_PRESET_ALIASES.get(token, token)
     if resolved not in _FID_PRESET_SETTINGS:
-        known = sorted({*_FID_PRESET_SETTINGS, *_FID_PRESET_ALIASES})
-        raise UnknownFIDPresetError(
-            f"Unknown processing preset '{value}'. Choose one of: {', '.join(known)}."
-        )
+        raise UnknownFIDPresetError(value)
     return resolved  # type: ignore[return-value]
 
 
