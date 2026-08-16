@@ -180,17 +180,44 @@ def compare_candidates(
         if global_2d_score is not None:
             evidence_summary.append(f"2D NMR evidence score: {global_2d_score:.2f}.")
 
-        components = {
+        # Only per-CANDIDATE evidence enters the ranking score.
+        #
+        # The DEPT/APT and 2D scores are computed once for the SPECTRUM, so every
+        # candidate in a comparison received the identical number. Folding a
+        # constant into a weighted mean cannot change the order, but it drags
+        # every candidate toward the same value — and the gap between the top two
+        # is precisely what a reviewer reads as "how close was this call?".
+        # Measured: that constant was 22 % of the weight budget unclassed and up
+        # to 31 % for glycoproteins, where the compound-class prior up-weights
+        # the one term that cannot discriminate, pushing 1H evidence from 0.36
+        # down to 0.238 of the mean on the class where 2D matters most.
+        #
+        # Both scores remain in the breakdown and the evidence summary: they are
+        # real evidence about the spectrum, just not about WHICH candidate.
+        discriminating_components = {
             "structure": structure_validity_score,
             "proton": proton_score,
             "carbon13": carbon_score,
-            "dept_apt": global_dept_score,
-            "nmr2d": global_2d_score,
         }
-        total_score = _weighted_score(components, scoring_weights) if valid else 0.0
-        if valid and not has_spectral_evidence:
+        total_score = _weighted_score(discriminating_components, scoring_weights) if valid else 0.0
+        has_discriminating_evidence = proton_score is not None or carbon_score is not None
+        if valid and not has_discriminating_evidence:
+            # Structure parsing alone cannot rank candidates, and neither can
+            # corroboration that is identical for all of them. Without this the
+            # cap would lift the moment a 2D score arrived, and a set of valid
+            # structures would all report a high score on evidence that never
+            # distinguished them.
             total_score = min(total_score, 0.35)
-            evidence_summary.append("No spectral evidence was available; valid structure parsing is not strong support.")
+            if has_spectral_evidence:
+                evidence_summary.append(
+                    "The only spectral evidence available (DEPT/APT and/or 2D) is scored "
+                    "for the spectrum as a whole and is the same for every candidate, so "
+                    "it corroborates but does not rank them."
+                )
+            else:
+                evidence_summary.append(
+                    "No spectral evidence was available; valid structure parsing is not strong support."
+                )
 
         raw_items.append(
             CandidateComparisonItem(
