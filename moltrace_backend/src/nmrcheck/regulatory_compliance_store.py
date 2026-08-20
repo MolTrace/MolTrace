@@ -730,23 +730,30 @@ def _best_impurity_trigger(
 
 def _q3ab_trigger(
     daily_dose_g: float, observed_level_percent: float, substance_type: str = "drug_substance"
-) -> str:
-    """ICH Q3A/B threshold band the observed impurity level falls in (deterministic
-    engine) when no tenant rule matches."""
+) -> tuple[str, str | None]:
+    """ICH Q3A/B threshold band for the observed level, plus an error note if any.
+
+    Fails CLOSED. An engine error used to return ``"none"`` — the register's
+    benign value, which maps to ``needs_review`` and creates no action item —
+    so a dose outside the validator's bounds or an unexpected substance_type
+    made an impurity that may exceed the qualification threshold
+    indistinguishable from one genuinely below reporting. The error now returns
+    ``review_required`` and hands back its cause for ``warnings_json``.
+    """
 
     try:
         from moltrace.regulatory.impurities import calculate_q3ab_thresholds
 
         thr = calculate_q3ab_thresholds(daily_dose_g, substance_type)
-    except Exception:
-        return "none"
+    except Exception as exc:  # noqa: BLE001 — the cause is data, not a crash
+        return "review_required", f"ICH Q3A/B band could not be computed: {exc}"
     if observed_level_percent >= thr.qualification_threshold.effective_percent:
-        return "qualification"
+        return "qualification", None
     if observed_level_percent >= thr.identification_threshold.effective_percent:
-        return "identification"
+        return "identification", None
     if observed_level_percent >= thr.reporting_threshold.effective_percent:
-        return "reporting"
-    return "none"
+        return "reporting", None
+    return "none", None
 
 
 def _m7_summary(structural_assignment: str | None) -> dict[str, Any] | None:
@@ -792,16 +799,31 @@ def create_impurity_risk_register(
         dose = (
             payload.daily_dose_g if payload.daily_dose_g is not None else dossier.max_daily_dose_g
         )
-        if payload.threshold_triggered is not None:
-            trigger = payload.threshold_triggered
-        elif rule is None and dose is not None and payload.observed_level_percent is not None:
+        warnings = list(payload.warnings_json)
+        if rule is None and dose is not None and payload.observed_level_percent is not None:
             # No tenant rule but a dose is available -> compute the ICH Q3A/B band from the
             # deterministic engine (overrides the default no-rule review_required signal).
-            trigger = _q3ab_trigger(
+            trigger, band_error = _q3ab_trigger(
                 dose, payload.observed_level_percent, dossier.substance_type or "drug_substance"
             )
+            if band_error:
+                warnings.append(band_error)
+        if payload.threshold_triggered is not None:
+            # A caller-supplied band ANNOTATES the deterministic verdict; it does
+            # not replace it. It used to be assigned before the engine ran at all,
+            # so posting threshold_triggered="none" for a 5 % impurity meant the
+            # band was never computed — the sole-arbiter contract bypassed by a
+            # request field. Escalation is still honoured (a company spec is
+            # normally tighter than ICH); a downgrade is recorded, not applied.
+            if _TRIGGER_ORDER.get(payload.threshold_triggered, 0) > _TRIGGER_ORDER.get(trigger, 0):
+                trigger = payload.threshold_triggered
+            elif payload.threshold_triggered != trigger:
+                warnings.append(
+                    f"Supplied threshold_triggered={payload.threshold_triggered!r} is less "
+                    f"strict than the {trigger!r} band computed from the observed level; "
+                    "the computed band stands."
+                )
         m7 = _m7_summary(payload.structural_assignment)
-        warnings = list(payload.warnings_json)
         notes = list(payload.notes_json) or [_COMPLIANCE_NOTE]
         action: RegulatoryActionItemORM | None = None
         status = payload.status or ("action_required" if trigger in {"reporting", "identification", "qualification", "review_required"} else "needs_review")
