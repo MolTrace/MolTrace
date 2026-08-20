@@ -15,7 +15,9 @@ from typing import Any
 
 from moltrace.regulatory.infra.eval import calculation_errors
 from moltrace.regulatory.validation.citation_map import (
+    REQUIRED_FORMULAS,
     implemented_formulas,
+    uncited_required_formulas,
     untraceable_formulas,
 )
 from moltrace.regulatory.validation.external_validation import (
@@ -83,14 +85,23 @@ def evaluate_launch_gate() -> LaunchGateResult:
         )
     )
 
-    # 2. Formula -> citation map complete (100% coverage, every formula traceable).
+    # 2. Formula -> citation map complete, measured against an INDEPENDENT list.
+    #
+    # This check used to compare implemented_formulas() with itself, so it could
+    # only ever report 100 % — an engine shipped without a citation entry simply
+    # was not counted, and the gate stayed green. Coverage is now measured
+    # against REQUIRED_FORMULAS, which is maintained by hand, so a regulated
+    # computation that reaches a route without a traceable citation fails here.
     untraceable = untraceable_formulas()
+    uncited = uncited_required_formulas()
     checks.append(
         CheckResult(
             "formula_citation_map",
-            not untraceable,
-            f"{len(implemented_formulas())} formulas, "
-            f"{len(untraceable)} untraceable: {untraceable}",
+            not untraceable and not uncited,
+            f"{len(implemented_formulas())} formulas traced, "
+            f"{len(REQUIRED_FORMULAS)} required; "
+            f"{len(untraceable)} untraceable: {untraceable}; "
+            f"{len(uncited)} required-but-uncited: {uncited}",
         )
     )
 

@@ -211,3 +211,54 @@ def test_launch_gate_covers_all_validation_dimensions() -> None:
         "external_ema",
         "external_ctd_module3",
     } <= names
+
+
+# --------------------------------------------------------------------------- #
+# The coverage check must be capable of failing.
+# --------------------------------------------------------------------------- #
+def test_formula_coverage_is_measured_against_an_independent_list() -> None:
+    """It used to compare implemented_formulas() with ITSELF.
+
+    A set compared to itself is 1.0 forever, so adding an engine without adding
+    its citation left the gate green — and the CSV/GAMP 5 package recorded full
+    traceability for arithmetic nothing could trace. The required list must be
+    maintained separately from the map it measures.
+    """
+    from moltrace.regulatory.validation import citation_map
+
+    assert citation_map.REQUIRED_FORMULAS, "the required list must not be empty"
+    # Every required formula is currently traceable...
+    assert citation_map.uncited_required_formulas() == []
+    # ...and the shipped dose-scaled limits and the cumulative sum are in it,
+    # since each is regulated arithmetic on a live route.
+    for formula in (
+        "q3c_option_2_dose_scaled_limit",
+        "q3d_concentration_limit",
+        "nitrosamine_cumulative_risk",
+    ):
+        assert formula in citation_map.REQUIRED_FORMULAS
+        assert formula in citation_map.formula_citation_map()
+
+
+def test_an_uncited_required_formula_fails_the_gate(monkeypatch) -> None:
+    """The point of the change: a regulated computation that ships uncited must
+    turn the gate red rather than pass unnoticed."""
+    from moltrace.regulatory.validation import citation_map, launch_gate
+
+    monkeypatch.setattr(
+        citation_map,
+        "REQUIRED_FORMULAS",
+        (*citation_map.REQUIRED_FORMULAS, "q6a_specification_limit"),
+    )
+    monkeypatch.setattr(
+        launch_gate,
+        "REQUIRED_FORMULAS",
+        citation_map.REQUIRED_FORMULAS,
+    )
+
+    assert citation_map.uncited_required_formulas() == ["q6a_specification_limit"]
+    result = launch_gate.evaluate_launch_gate()
+    coverage = next(c for c in result.checks if c.name == "formula_citation_map")
+    assert coverage.passed is False, "an uncited regulated formula left the gate green"
+    assert "q6a_specification_limit" in coverage.detail
+    assert result.passed is False
