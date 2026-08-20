@@ -32,7 +32,7 @@
 CVE-2025-32434
 
 # --- mlflow (moltrace_backend/pyproject.toml [project.optional-dependencies] infra; uv.lock) ---
-# Status: not_affected for all seven. Justification: vulnerable_code_not_in_execute_path.
+# Status: not_affected for all eight. Justification: vulnerable_code_not_in_execute_path.
 #   * mlflow is declared ONLY in the optional `infra` extra and present in uv.lock solely
 #     because uv locks all optional groups (marker extra=='infra'). It is intentionally never
 #     installed: prod deploy is `uv sync --no-dev --extra fid`; CI is `--extra fid --extra dev`.
@@ -53,7 +53,15 @@ CVE-2025-32434
 #     variable resolution in the mlflow AI Gateway (the deployments/proxy server). MolTrace does not
 #     run the AI Gateway at all — a repo-wide grep for mlflow gateway/deployments usage returns zero
 #     hits; the only mlflow surface used is the local-file tracking client.
-#   * All seven CVEs require running mlflow's SERVER / model-SERVING / AI-Gateway components, which
+#   * CVE-2026-64849 (GHSA, CVSS critical; fixed in mlflow 3.15.0) is an unauthenticated full-read
+#     SSRF in the tracking server's registry-webhook DELIVERY: _validate_webhook_url is bypassed, so
+#     a caller who can register/influence a webhook makes the SERVER fetch an arbitrary internal URL.
+#     Reaching it requires running the MLflow tracking server with webhooks configured. MolTrace runs
+#     no server: the entire mlflow surface across src/ is eight client logging calls (set_tracking_uri,
+#     set_experiment, start_run, end_run, log_params, log_metrics, log_artifact, set_tags — verified
+#     by grep), none of which register a webhook or start a server. Same not_affected class as above;
+#     the fix exists but remains a major 2.x -> 3.x jump for a package that is never installed.
+#   * All eight CVEs require running mlflow's SERVER / model-SERVING / AI-Gateway components, which
 #     MolTrace does not run.
 #   Re-evaluate if MolTrace ever ships the `infra` extra in a deploy target or runs an mlflow
 #   server/serving process — then bump to a patched mlflow (3.11.x covers CVE-2026-2651; some
@@ -65,3 +73,4 @@ CVE-2026-2635
 CVE-2026-0545
 CVE-2026-2651
 CVE-2026-4035
+CVE-2026-64849
