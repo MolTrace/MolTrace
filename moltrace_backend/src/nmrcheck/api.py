@@ -7792,7 +7792,7 @@ async def analyze_upload(
     session_factory = _state(request).session_factory
     reports: list[AnalysisReport] = []
     for item in payload.items:
-        report = analyze_inputs(item)
+        report = await run_in_threadpool(analyze_inputs, item)
         save_analysis(
             session_factory,
             report,
@@ -7835,7 +7835,8 @@ async def spectrum_preview(
     vertical_gain_value = _coerce_optional_form_float(vertical_gain, default=1.0)
     debug_preview_value = _coerce_optional_form_bool(debug_preview, default=False)
     try:
-        preview = parse_processed_spectrum(
+        preview = await run_in_threadpool(
+            parse_processed_spectrum,
             filename=filename,
             content=content,
             solvent=solvent,
@@ -7904,7 +7905,8 @@ async def spectrum_analyze(
     vertical_gain_value = _coerce_optional_form_float(vertical_gain, default=1.0)
     debug_preview_value = _coerce_optional_form_bool(debug_preview, default=False)
     try:
-        preview = parse_processed_spectrum(
+        preview = await run_in_threadpool(
+            parse_processed_spectrum,
             filename=filename,
             content=content,
             solvent=solvent,
@@ -7941,7 +7943,7 @@ async def spectrum_analyze(
         solvent=solvent,
     )
     _ensure_analysis_inputs_valid(generated_inputs)
-    report = analyze_inputs(generated_inputs)
+    report = await run_in_threadpool(analyze_inputs, generated_inputs)
     combined_notes = list(report.notes)
     if reviewed_nmr_text != preview.inferred_nmr_text:
         combined_notes.insert(
@@ -8080,7 +8082,7 @@ async def spectrum_analyze_gsd(
         field_mhz=payload.field_mhz,
     )
 
-    raw_peaks = gsd_peak_pick(spectrum, level=payload.level)
+    raw_peaks = await run_in_threadpool(gsd_peak_pick, spectrum, level=payload.level)
     classified = auto_classify(raw_peaks, spectrum, payload.solvent)
 
     category_counts: dict[str, int] = {}
@@ -10988,7 +10990,8 @@ async def nmr_processed_preview_route(
             content=content,
         )
         if nucleus == "1H":
-            preview = parse_processed_spectrum(
+            preview = await run_in_threadpool(
+                parse_processed_spectrum,
                 filename=parser_filename,
                 content=parser_content,
                 solvent=solvent,
@@ -11147,7 +11150,8 @@ async def nmr_processed_analyze_route(
                 if nmr_text and nmr_text.strip()
                 else shared_proton_text
             )
-            preview = parse_processed_spectrum(
+            preview = await run_in_threadpool(
+                parse_processed_spectrum,
                 filename=parser_filename,
                 content=parser_content,
                 solvent=solvent,
@@ -13072,7 +13076,7 @@ async def fid_process(
         solvent=solvent,
     )
     _ensure_analysis_inputs_valid(generated_inputs)
-    report = analyze_inputs(generated_inputs)
+    report = await run_in_threadpool(analyze_inputs, generated_inputs)
     combined_notes = list(report.notes)
     for note in reversed(
         _fid_processing_notes(
@@ -31765,9 +31769,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             },
         )
         response.headers["Server-Timing"] = f"app;dur={duration_ms:.1f}"
-        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
-        response.headers["Pragma"] = "no-cache"
-        response.headers["Expires"] = "0"
+        # setdefault, not assignment: a route that has deliberately declared its
+        # own policy keeps it. Direct assignment meant no endpoint could ever opt
+        # out — including genuinely static reference data (/fid/presets,
+        # /spectrum/solvents/known, /system/version), which was therefore
+        # refetched in full on every navigation. The default stays no-store, so
+        # live data is unaffected and a route must opt in explicitly.
+        response.headers.setdefault(
+            "Cache-Control", "no-store, no-cache, must-revalidate, max-age=0"
+        )
+        response.headers.setdefault("Pragma", "no-cache")
+        response.headers.setdefault("Expires", "0")
         response.headers["X-MolTrace-Backend-Version"] = settings.release_version
         response.headers[CORRELATION_ID_HEADER] = correlation_id
         response.headers[REQUEST_ID_HEADER] = correlation_id
