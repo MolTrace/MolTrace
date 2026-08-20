@@ -694,7 +694,15 @@ def create_ingestion_run(
     payload: IngestionRunCreate,
     *,
     storage_root: Path,
+    created_by_user_id: int | None = None,
 ) -> IngestionRun:
+    """Record an ingestion run, importing its files into managed storage.
+
+    ``created_by_user_id`` attributes the files this creates. It is the second
+    path that mints ``managed_file_records`` rows and it stamped no owner, which
+    is the read gate's failure mirrored: the gate refuses NULL-owner rows, so an
+    ingested file was unreadable by the very account that ingested it.
+    """
     run_id = _create_empty_ingestion_run(session_factory, payload)
     if not payload.files_json:
         existing = get_ingestion_run(session_factory, run_id)
@@ -757,6 +765,7 @@ def create_ingestion_run(
                 file_kind=file_input.file_kind,
                 metadata_json=metadata,
                 storage_root=storage_root,
+                created_by_user_id=created_by_user_id,
             )
             file_ids.append(record.id)
             file_hashes.append(record.sha256)
@@ -826,7 +835,15 @@ def scan_watch_folder(
     payload: InstrumentWatchFolderScanRequest,
     *,
     storage_root: Path,
+    created_by_user_id: int | None = None,
 ) -> IngestionRun:
+    """Import whatever the watch folder currently holds as an ingestion run.
+
+    ``created_by_user_id`` attributes the managed files that import creates; it
+    reaches them through :func:`create_ingestion_run`. A scan is the third path
+    that mints file rows, so it needs the stamp for the same reason the other
+    two do -- an unattributed file is refused to every non-admin by the read gate.
+    """
     with session_scope(session_factory) as session:
         row = session.get(InstrumentWatchFolderORM, watch_folder_id)
         if row is None:
@@ -879,7 +896,12 @@ def scan_watch_folder(
         notes_json=["Watch folder scan completed without modifying source files."],
         metadata_json={**payload.metadata_json, "watch_folder_scan": True},
     )
-    run = create_ingestion_run(session_factory, ingestion_payload, storage_root=storage_root)
+    run = create_ingestion_run(
+        session_factory,
+        ingestion_payload,
+        storage_root=storage_root,
+        created_by_user_id=created_by_user_id,
+    )
     with session_scope(session_factory) as session:
         row = session.get(InstrumentWatchFolderORM, watch_folder_id)
         if row is not None:
@@ -1103,14 +1125,38 @@ def _build_normalized_artifact(
         return "failed", None, warnings, "unsupported"
 
 
+def _managed_file_visible_to(
+    session: Session, file_id: int, owner_scope_id: int | None
+) -> bool:
+    """Whether ``owner_scope_id`` may see this managed file at all.
+
+    One definition shared by every normalization path, mirroring
+    ``orch_store.get_file_record``: a system key/admin (scope ``None``) sees
+    everything, a user sees only their own uploads, and a NULL-owner row is
+    refused to a scoped caller rather than read as unowned-and-public.
+    """
+    row = session.get(ManagedFileRecordORM, file_id)
+    if row is None:
+        return False
+    return owner_scope_id is None or row.created_by_user_id == owner_scope_id
+
+
 def normalize_file(
     session_factory: sessionmaker[Session],
     file_id: int,
     payload: FileNormalizationRequest,
     *,
     storage_root: Path,
+    owner_scope_id: int | None = None,
 ) -> FileNormalizationRun:
-    download = orch_store.get_file_download(session_factory, file_id, storage_root=storage_root)
+    # Normalization reads the source bytes and hands them back parsed, so an
+    # ungated file_id here leaks exactly what the download gate protects -- the
+    # same content, arriving as a derived artifact instead of a stream. The
+    # scope goes into the download itself so there is one owner check, and
+    # "not yours" raises the same KeyError as "missing" for a non-leaking 404.
+    download = orch_store.get_file_download(
+        session_factory, file_id, storage_root=storage_root, owner_scope_id=owner_scope_id
+    )
     if download is None:
         raise KeyError("Managed file not found.")
     _file_record, content = download
@@ -1188,8 +1234,19 @@ def list_normalization_runs_for_file(
     file_id: int,
     *,
     limit: int = 100,
+    owner_scope_id: int | None = None,
 ) -> list[FileNormalizationRun]:
+    """Normalization runs for one file, scoped to whoever owns that file.
+
+    Raises rather than returning ``[]`` for a file the caller may not see: an
+    empty list is what a file with no runs returns, so answering that way would
+    make "not yours" distinguishable from "missing" the moment the owner ran a
+    normalization. The runs also carry ``output_artifact_id``, the handle to
+    the derived bytes, so this is a live reference and not just metadata.
+    """
     with session_scope(session_factory) as session:
+        if not _managed_file_visible_to(session, file_id, owner_scope_id):
+            raise KeyError("Managed file not found.")
         stmt = (
             select(FileNormalizationRunORM)
             .where(FileNormalizationRunORM.file_id == file_id)
@@ -1202,10 +1259,22 @@ def list_normalization_runs_for_file(
 def get_normalization_run(
     session_factory: sessionmaker[Session],
     normalization_run_id: int,
+    *,
+    owner_scope_id: int | None = None,
 ) -> FileNormalizationRun | None:
+    """One run, gated on its source file's owner.
+
+    A run has no owner of its own, so ownership is inherited from the file it
+    derives from. Gating the by-file listing without this would move the same
+    leak one id along: run ids are just as guessable as file ids.
+    """
     with session_scope(session_factory) as session:
         row = session.get(FileNormalizationRunORM, normalization_run_id)
-        return _normalization_run_to_record(row) if row is not None else None
+        if row is None:
+            return None
+        if not _managed_file_visible_to(session, row.file_id, owner_scope_id):
+            return None
+        return _normalization_run_to_record(row)
 
 
 def create_external_record(
@@ -1855,6 +1924,9 @@ def import_reaction_experiment_table(
                 session, payload.reaction_project_id, owner_scope_id
             ):
                 raise KeyError("Reaction project not found.")
+    # The body-supplied file_id needs the same scope as the project id above: this
+    # normalizes the file and returns its parsed contents, so an unscoped id here
+    # is the /files/{id}/normalize content leak reached through a second door.
     normalization = normalize_file(
         session_factory,
         payload.file_id,
@@ -1867,6 +1939,7 @@ def import_reaction_experiment_table(
             },
         ),
         storage_root=storage_root,
+        owner_scope_id=owner_scope_id,
     )
     link_id = None
     if payload.external_record_id is not None and payload.reaction_project_id is not None:

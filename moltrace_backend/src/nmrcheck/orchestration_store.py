@@ -480,10 +480,27 @@ def get_file_download(
         return (_file_to_record(row), _read_file_bytes(row, Path(storage_root)))
 
 
-def delete_file_record(session_factory: sessionmaker[Session], file_id: int) -> bool:
+def delete_file_record(
+    session_factory: sessionmaker[Session],
+    file_id: int,
+    *,
+    owner_scope_id: int | None = None,
+) -> bool:
+    """Delete a managed file record and the SpectraCheck links that hang off it.
+
+    Returns False for "not yours" exactly as for "does not exist", so the
+    caller's 404 stays non-leaking and matches :func:`get_file_record`.
+
+    This is the destructive sibling of the read gate above and was left ungated
+    when that gate landed: the cascade below also removed the owner's session
+    links, so an unrelated account could not merely read another user's files
+    but destroy the record and its provenance trail with nothing but the id.
+    """
     with session_scope(session_factory) as session:
         row = session.get(ManagedFileRecordORM, file_id)
         if row is None:
+            return False
+        if owner_scope_id is not None and row.created_by_user_id != owner_scope_id:
             return False
         session.execute(delete(SpectraCheckSessionFileLinkORM).where(SpectraCheckSessionFileLinkORM.file_id == file_id))
         session.delete(row)
