@@ -9198,7 +9198,7 @@ async def regulatory_impurities_assess(
 
         cpca_out = None
         try:
-            cpca = classify_cpca(item.smiles)
+            cpca = classify_cpca(item.smiles, authority=payload.authority)
         except DataValidationError:
             cpca = None  # not a nitrosamine
         if cpca is not None:
@@ -9232,9 +9232,11 @@ async def regulatory_impurities_assess(
         )
 
     # 5. Nitrosamine cumulative risk (FDA Rev 2): sum(measured / AI) < 1.
+    # Same authority as the per-impurity limits above — a sum of ratios computed
+    # against FDA limits cannot be read as an EMA verdict.
     cumulative = None
     if nitrosamine_components:
-        cr = calculate_cumulative_risk(nitrosamine_components)
+        cr = calculate_cumulative_risk(nitrosamine_components, authority=payload.authority)
         cumulative = ImpurityCumulativeRiskOut(
             total_risk_ratio=cr.total_risk_ratio,
             passes=cr.passes,
@@ -9267,6 +9269,7 @@ async def regulatory_impurities_assess(
         route=payload.route,
         substance_type=payload.substance_type,
         duration_months=payload.duration_months,
+        authority=payload.authority,
         thresholds=thresholds,
         residual_solvents=solvent_outs,
         elemental_impurities=element_outs,

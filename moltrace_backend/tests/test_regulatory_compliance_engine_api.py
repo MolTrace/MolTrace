@@ -430,3 +430,83 @@ def test_regulatory_compliance_engine_endpoints_appear_in_openapi(client):
         "JurisdictionalRequirementMap",
     ]:
         assert schema in schemas
+
+
+# --------------------------------------------------------------------------- #
+# The deterministic band is the arbiter, and it fails closed.
+# --------------------------------------------------------------------------- #
+def test_a_supplied_band_cannot_downgrade_the_computed_one(client, api_headers):
+    """`threshold_triggered` used to be applied BEFORE the engine ran at all.
+
+    So posting "none" for an impurity above the qualification threshold meant
+    the ICH Q3A/B band was never computed, the row landed as `needs_review`,
+    and no action item was raised — the sole-arbiter contract bypassed by a
+    request field. A caller may still escalate (a company spec is normally
+    tighter than ICH); a downgrade is now recorded rather than applied.
+    """
+    headers = api_headers
+    with client:
+        juris = _jurisdiction(client, headers, "Downgrade guard US", "US")
+        dossier = _dossier(client, headers, juris["id"])
+        res = client.post(
+            f"/regulatory/dossiers/{dossier['id']}/impurity-risk-register",
+            headers=headers,
+            json={
+                "impurity_name": "Understated impurity",
+                "observed_level_percent": 0.12,  # >= 0.10 % qualification @ 1 g/day
+                "daily_dose_g": 1.0,
+                "threshold_triggered": "none",  # the caller's claim
+            },
+        )
+        assert res.status_code == 201, res.text
+        body = res.json()
+        assert body["threshold_triggered"] == "qualification", (
+            "a caller-supplied band overrode the deterministic engine"
+        )
+        assert any("less strict" in w for w in body["warnings_json"]), (
+            "the disagreement was applied or dropped instead of being recorded"
+        )
+
+
+def test_a_supplied_band_may_still_escalate(client, api_headers):
+    # Company specifications are routinely tighter than ICH; escalation is safe
+    # and must keep working.
+    headers = api_headers
+    with client:
+        juris = _jurisdiction(client, headers, "Escalate guard US", "US")
+        dossier = _dossier(client, headers, juris["id"])
+        body = client.post(
+            f"/regulatory/dossiers/{dossier['id']}/impurity-risk-register",
+            headers=headers,
+            json={
+                "impurity_name": "Tightly specified impurity",
+                "observed_level_percent": 0.02,  # below identification @ 1 g/day
+                "daily_dose_g": 1.0,
+                "threshold_triggered": "qualification",
+            },
+        ).json()
+        assert body["threshold_triggered"] == "qualification"
+
+
+def test_an_uncomputable_band_fails_closed() -> None:
+    """An engine error returned "none" — the register's BENIGN value.
+
+    "none" maps to `needs_review` and raises no action item, so an input the
+    Q3A/B validator refuses made a possibly-qualifying impurity
+    indistinguishable from one genuinely below reporting. It must resolve to
+    review, and say why.
+
+    Tested at the function's own level: the HTTP layer rejects a non-positive
+    dose before the engine sees it, so the API cannot reach this branch — which
+    is exactly why the branch was silently wrong for so long.
+    """
+    from nmrcheck.regulatory_compliance_store import _q3ab_trigger
+
+    trigger, note = _q3ab_trigger(0.0, 0.12, "drug_substance")
+    assert trigger == "review_required", f"an uncomputable band resolved to {trigger!r}"
+    assert note and "could not be computed" in note
+
+    # And the normal path is unchanged: 0.12 % at 1 g/day is a qualification band.
+    trigger, note = _q3ab_trigger(1.0, 0.12, "drug_substance")
+    assert trigger == "qualification"
+    assert note is None

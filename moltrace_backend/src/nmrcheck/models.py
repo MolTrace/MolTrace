@@ -3464,6 +3464,12 @@ class ImpurityAssessRequest(BaseModel):
     route: ImpurityAssessRoute = "oral"
     substance_type: ImpurityAssessSubstanceType = "drug_substance"
     duration_months: float = Field(default=120.0, gt=0.0, le=1200.0)
+    #: Which authority's nitrosamine Category-1 acceptable-intake limit applies —
+    #: FDA 26.5 ng/day (default) or EMA 18 ng/day. Categories 2-5 are common to
+    #: both. The limit was previously always FDA's, so an EU filing was assessed
+    #: against a limit 47 % more permissive than the one it will be judged by;
+    #: the resolved value is echoed on the response so the choice is auditable.
+    authority: Literal["FDA", "EMA"] = "FDA"
     residual_solvents: list[ImpuritySolventInput] = Field(default_factory=list, max_length=256)
     elemental_impurities: list[ImpurityElementInput] = Field(default_factory=list, max_length=64)
     structural_impurities: list[ImpurityStructuralInput] = Field(
@@ -3567,6 +3573,10 @@ class ImpurityAssessResult(BaseModel):
     route: str
     substance_type: str
     duration_months: float
+    #: The authority whose nitrosamine Category-1 limit was applied. Echoed so a
+    #: reader never has to assume which limit a verdict rests on: the same
+    #: measured value passes under FDA (26.5 ng/day) and fails under EMA (18).
+    authority: str = "FDA"
     thresholds: ImpurityThresholdsOut
     residual_solvents: list[ImpuritySolventOut] = Field(default_factory=list)
     elemental_impurities: list[ImpurityElementOut] = Field(default_factory=list)

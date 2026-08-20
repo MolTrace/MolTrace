@@ -177,3 +177,63 @@ def test_openapi_registers_the_contract(client):
     assert "ImpurityAssessRequest" in schemas
     assert "ImpurityAssessResult" in schemas
     assert "ImpurityCPCAOut" in schemas
+
+
+# --------------------------------------------------------------------------- #
+# Jurisdiction: the Category-1 nitrosamine limit is not the same number
+# everywhere, and the difference decides pass/fail.
+# --------------------------------------------------------------------------- #
+_NDMA = "CN(C)N=O"  # N-nitrosodimethylamine, a Category-1 nitrosamine
+
+
+def _assess_nitrosamine(client, measured_ng_per_day: float, authority: str | None):
+    body: dict = {
+        "daily_dose_g": 1.0,
+        "structural_impurities": [
+            {"smiles": _NDMA, "name": "NDMA", "measured_ng_per_day": measured_ng_per_day}
+        ],
+    }
+    if authority is not None:
+        body["authority"] = authority
+    response = _post(client, body)
+    assert response.status_code == 200, response.text
+    return response.json()
+
+
+def test_ema_applies_the_stricter_category_1_limit(client):
+    """26.5 (FDA) vs 18 (EMA) ng/day is a 47 % difference, and 20 sits between.
+
+    Every shipped path called classify_cpca() with the FDA default, so an EU
+    filing was assessed against a limit it will not be judged by — and the
+    verdict flipped silently on the most scrutinised number this module computes.
+    """
+    fda = _assess_nitrosamine(client, 20.0, "FDA")
+    ema = _assess_nitrosamine(client, 20.0, "EMA")
+
+    fda_cpca = fda["structural_impurities"][0]["cpca"]
+    ema_cpca = ema["structural_impurities"][0]["cpca"]
+    assert fda_cpca["ai_limit_ng_per_day"] == 26.5
+    assert ema_cpca["ai_limit_ng_per_day"] == 18.0
+    assert fda_cpca["within_ai_limit"] is True
+    assert ema_cpca["within_ai_limit"] is False
+
+
+def test_the_applied_authority_is_echoed_on_the_report(client):
+    # A reader must never have to assume which limit a verdict rests on.
+    assert _assess_nitrosamine(client, 20.0, "EMA")["authority"] == "EMA"
+    assert _assess_nitrosamine(client, 20.0, None)["authority"] == "FDA"
+
+
+def test_cumulative_risk_uses_the_same_authority(client):
+    """A sum of ratios computed against FDA limits cannot be read as an EMA verdict."""
+    ema = _assess_nitrosamine(client, 20.0, "EMA")
+    fda = _assess_nitrosamine(client, 20.0, "FDA")
+    assert (
+        ema["nitrosamine_cumulative_risk"]["total_risk_ratio"]
+        > fda["nitrosamine_cumulative_risk"]["total_risk_ratio"]
+    )
+
+
+def test_an_unknown_authority_is_refused_not_defaulted(client):
+    response = _post(client, {"daily_dose_g": 1.0, "authority": "MHRA"})
+    assert response.status_code == 422
