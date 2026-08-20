@@ -14218,7 +14218,14 @@ def delete_managed_file_route(
     request: Request,
     context: AccessContext = Depends(require_access_context),
 ) -> MessageResponse:
-    deleted = orch_store.delete_file_record(_state(request).session_factory, file_id)
+    # Same 404 for "not yours" as for "missing", matching the read routes above:
+    # this destroys the record and cascades over its session links, so it needed
+    # the owner gate more than they did, not less.
+    deleted = orch_store.delete_file_record(
+        _state(request).session_factory,
+        file_id,
+        owner_scope_id=_user_scope_for_context(context),
+    )
     if not deleted:
         raise HTTPException(status_code=404, detail="Managed file not found.")
     _audit_from_context(
@@ -14629,6 +14636,9 @@ def scan_instrument_watch_folder_route(
             watch_folder_id,
             payload,
             storage_root=_orchestration_storage_root(request),
+            # A scan imports files too, so it stamps the owner for the same
+            # reason /ingestion-runs does.
+            created_by_user_id=_user_scope_for_context(context),
         )
     except Exception as exc:
         _raise_interoperability_http_error(exc)
@@ -14666,6 +14676,10 @@ def create_ingestion_run_route(
             _state(request).session_factory,
             payload,
             storage_root=_orchestration_storage_root(request),
+            # Attributes the managed files this creates. Without it they land
+            # NULL-owned, and the read gate refuses those to everyone but an
+            # admin -- including whoever ingested them.
+            created_by_user_id=_user_scope_for_context(context),
         )
     except Exception as exc:
         _raise_interoperability_http_error(exc)
@@ -14739,6 +14753,7 @@ def normalize_file_route(
             file_id,
             payload,
             storage_root=_orchestration_storage_root(request),
+            owner_scope_id=_user_scope_for_context(context),
         )
     except Exception as exc:
         _raise_interoperability_http_error(exc)
@@ -14772,11 +14787,16 @@ def list_file_normalization_runs_route(
     limit: int = Query(default=100, ge=1, le=500),
     context: AccessContext = Depends(require_access_context),
 ) -> list[FileNormalizationRun]:
-    return interop_store.list_normalization_runs_for_file(
-        _state(request).session_factory,
-        file_id,
-        limit=limit,
-    )
+    try:
+        return interop_store.list_normalization_runs_for_file(
+            _state(request).session_factory,
+            file_id,
+            limit=limit,
+            owner_scope_id=_user_scope_for_context(context),
+        )
+    except Exception as exc:
+        _raise_interoperability_http_error(exc)
+        raise
 
 
 @router.get(
@@ -14789,9 +14809,11 @@ def get_normalization_run_route(
     request: Request,
     context: AccessContext = Depends(require_access_context),
 ) -> FileNormalizationRun:
+    # A run inherits its source file's owner; a non-owner gets the missing-run 404.
     record = interop_store.get_normalization_run(
         _state(request).session_factory,
         normalization_run_id,
+        owner_scope_id=_user_scope_for_context(context),
     )
     if record is None:
         raise HTTPException(status_code=404, detail="Normalization run not found.")
