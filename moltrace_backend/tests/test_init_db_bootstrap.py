@@ -18,6 +18,17 @@ say so before someone (again) tries:
   the next release to add a table silently ships without it, failing at the
   first request that touches it rather than at deploy time.
 
+And a sentinel of ``users`` specifically is the worst available choice, for a
+reason that only shows up on the failure path: the CI migrate job runs
+``alembic upgrade head`` BEFORE any app process starts. Against an empty
+database, revision 0001 creates ``users`` and commits — Alembic commits per
+revision — then the walk forward aborts at the first migration referencing a
+table ``create_all`` was supposed to have made. The job fails and the deploy
+stops, but the database is now left holding ``users`` and almost nothing else.
+The operator then runs the documented recovery (start the app so ``create_all``
+builds the schema, then ``alembic stamp``) and, under such a gate, it would do
+nothing at all — silently leaving a permanently half-built database.
+
 If the startup cost is ever worth attacking, the honest routes are to give the
 un-migrated tables real migrations first, or to move the probe off the critical
 path — not to make the call conditional.
