@@ -1,0 +1,215 @@
+# MolTrace Desktop — Linux WebKitGTK engine-floor probe
+#
+# READY TO ADOPT. Copy into .github/workflows/ when you want it to run.
+# Deliberately NOT placed there: that directory is tracked and a file in it executes on push.
+#
+# SELF-CONTAINED BY DESIGN. It generates its own probe and render harness inline. It does NOT
+# read anything from moltrace_desktop_phase0/, because that directory is gitignored and a CI
+# checkout receives none of it — a workflow that referenced it would fail on its first run.
+# Nothing proprietary is committed by adopting this file.
+#
+# What it answers: does each realistic Linux target ship a WebKitGTK at or above the measured
+# interface floor (~2.40)? It DISCOVERS versions rather than asserting them.
+#
+# It does NOT use Playwright. Playwright ships a custom WebKit build corresponding to no
+# distribution's webkit2gtk package, so a green Playwright run would prove nothing here.
+
+name: linux-engine-floor
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 6 1 * *"   # monthly: distributions rebase WebKitGTK within a release on CVE grounds
+
+permissions:
+  contents: read
+
+jobs:
+  # ===========================================================================
+  # TIER A — what does each distribution actually ship? No rendering, no build.
+  # This is most of the answer for the cost of a package query.
+  # ===========================================================================
+  package-versions:
+    name: "A · ${{ matrix.name }}"
+    runs-on: ubuntu-latest
+    continue-on-error: true     # one distro's repos moving must not mask the others
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: "Ubuntu 22.04 LTS", image: "ubuntu:22.04",     family: deb }
+          - { name: "Ubuntu 24.04 LTS", image: "ubuntu:24.04",     family: deb }
+          - { name: "Debian 12",        image: "debian:12",        family: deb }
+          - { name: "Debian 11",        image: "debian:11",        family: deb }
+          - { name: "Rocky 9 (RHEL 9)", image: "rockylinux:9",     family: rpm }
+          - { name: "Rocky 8 (RHEL 8)", image: "rockylinux:8",     family: rpm }
+          - { name: "openSUSE Leap 15", image: "opensuse/leap:15", family: rpm }
+    container: ${{ matrix.image }}
+    steps:
+      - name: Discover the WebKitGTK this distribution offers
+        shell: bash
+        run: |
+          set +e
+          echo "::group::${{ matrix.name }}"
+          if [ "${{ matrix.family }}" = "deb" ]; then
+            export DEBIAN_FRONTEND=noninteractive
+            apt-get update -qq >/dev/null 2>&1
+            for pkg in libwebkit2gtk-4.1-0 libwebkit2gtk-4.0-37; do
+              v=$(apt-cache policy "$pkg" 2>/dev/null | awk '/Candidate:/{print $2}')
+              echo "$pkg -> ${v:-ABSENT}"
+            done
+          else
+            if command -v dnf >/dev/null 2>&1; then
+              dnf -q makecache >/dev/null 2>&1
+              for pkg in webkit2gtk4.1 webkit2gtk3; do
+                v=$(dnf -q info "$pkg" 2>/dev/null | awk '/^Version/{print $3; exit}')
+                echo "$pkg -> ${v:-ABSENT}"
+              done
+            else
+              zypper -q --non-interactive refresh >/dev/null 2>&1
+              for pkg in webkit2gtk3-soup2 libwebkit2gtk-4_1-0 webkit2gtk3; do
+                v=$(zypper -q --non-interactive info "$pkg" 2>/dev/null | awk '/^Version/{print $3; exit}')
+                echo "$pkg -> ${v:-ABSENT}"
+              done
+            fi
+          fi
+          echo "::endgroup::"
+          echo
+          echo "Interface floor is ~WebKitGTK 2.40."
+          echo "ABSENT for the 4.1 package is decisive on its own: Tauri v2 requires webkit2gtk-4.1,"
+          echo "so a distribution without it cannot run a Tauri v2 shell whatever its engine version."
+
+  # ===========================================================================
+  # TIER B — render a real probe in that distribution's OWN WebKitGTK.
+  # Run where Tier A looks marginal. Exits non-zero on any hard failure, because
+  # a probe job that cannot fail proves nothing.
+  # ===========================================================================
+  render-probe:
+    name: "B · render on ${{ matrix.image }}"
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        image: ["ubuntu:22.04", "ubuntu:24.04", "debian:12"]
+    container:
+      image: ${{ matrix.image }}
+      options: --user root
+    steps:
+      - name: Install this distribution's own WebKitGTK
+        shell: bash
+        run: |
+          set -eux
+          export DEBIAN_FRONTEND=noninteractive
+          apt-get update -qq
+          apt-get install -y --no-install-recommends \
+            gir1.2-webkit2-4.1 libwebkit2gtk-4.1-0 \
+            python3 python3-gi gir1.2-gtk-3.0 xvfb ca-certificates
+          python3 - <<'PY'
+          import gi; gi.require_version("WebKit2","4.1")
+          from gi.repository import WebKit2
+          print("WebKitGTK %d.%d.%d" % (WebKit2.get_major_version(),
+                                        WebKit2.get_minor_version(),
+                                        WebKit2.get_micro_version()))
+          PY
+
+      # The probe is generated here, so this workflow needs nothing from the repository.
+      # ES5 ONLY in live code: it must parse on an engine BELOW the floor it measures,
+      # otherwise a parse-floor failure would silently produce no report at all — which
+      # looks identical to a machine that was never switched on.
+      - name: Write the floor probe
+        shell: bash
+        run: |
+          cat > /tmp/probe.html <<'HTML'
+          <!doctype html><meta charset="utf-8"><title>floor</title><body><script>
+          function parses(src){ try { new Function(src); return true; } catch (e) { return false; } }
+          function cssOK(prop, val){ try { return !!(window.CSS && CSS.supports && CSS.supports(prop, val)); } catch(e){ return false; } }
+          function cssRaw(cond){ try { return !!(window.CSS && CSS.supports && CSS.supports(cond)); } catch(e){ return false; } }
+          var HARD = [
+            ["CSS oklch()",              cssOK("color","oklch(0.5 0.1 200)")],
+            ["JS class static block",    parses("class P{static{}}")],
+            ["CSS @container",           cssRaw("(container-type: inline-size)")],
+            ["CSS :has()",               (function(){ try { return document.querySelector(":has(*)") !== undefined; } catch(e){ return false; } })()],
+            ["CSS @layer",               (function(){ try { var s=document.createElement("style"); s.textContent="@layer a;"; document.head.appendChild(s); var ok=s.sheet && s.sheet.cssRules.length>0; document.head.removeChild(s); return !!ok; } catch(e){ return false; } })()],
+            ["CSS :is()/:where()",       cssRaw("selector(:is(a))")],
+            ["CSS logical properties",   cssOK("padding-inline-start","1px")],
+            ["JS Object.hasOwn",         typeof Object.hasOwn === "function"],
+            ["JS Array.prototype.at",    typeof Array.prototype.at === "function"],
+            ["JS String.replaceAll",     typeof String.prototype.replaceAll === "function"],
+            ["JS WeakRef",               typeof WeakRef === "function"],
+            ["JS ResizeObserver",        typeof ResizeObserver === "function"],
+            ["JS IntersectionObserver",  typeof IntersectionObserver === "function"]
+          ];
+          var out = { ua: navigator.userAgent, features: [], pass: true };
+          for (var i = 0; i < HARD.length; i++) {
+            var ok = !!HARD[i][1];
+            out.features.push({ name: HARD[i][0], tier: "hard", pass: ok });
+            if (!ok) { out.pass = false; }
+          }
+          document.title = "DONE";
+          window.__result = JSON.stringify(out);
+          </script></body>
+          HTML
+          echo "probe written ($(wc -c < /tmp/probe.html) bytes)"
+
+      - name: Render it in real WebKitGTK and emit the verdict
+        shell: bash
+        run: |
+          cat > /tmp/render.py <<'PY'
+          import gi, json, sys
+          gi.require_version("Gtk", "3.0"); gi.require_version("WebKit2", "4.1")
+          from gi.repository import Gtk, WebKit2, GLib
+
+          result = {"error": "no result"}
+          view = WebKit2.WebView()
+          win = Gtk.OffscreenWindow(); win.add(view); win.show_all()
+
+          def finish(*_):
+              Gtk.main_quit()
+
+          def on_load(v, event):
+              if event != WebKit2.LoadEvent.FINISHED:
+                  return
+              def got(src, res):
+                  global result
+                  try:
+                      js = v.run_javascript_finish(res)
+                      result = json.loads(js.get_js_value().to_string())
+                  except Exception as e:
+                      result = {"error": "probe produced no result: %s" % e}
+                  finish()
+              v.run_javascript("window.__result", None, got, None)
+
+          view.connect("load-changed", on_load)
+          view.load_uri("file:///tmp/probe.html")
+          GLib.timeout_add_seconds(60, finish)   # never hang a CI job
+          Gtk.main()
+
+          ver = "%d.%d.%d" % (WebKit2.get_major_version(), WebKit2.get_minor_version(), WebKit2.get_micro_version())
+          result["webkitgtk"] = ver
+          print(json.dumps(result, indent=1))
+          open("/tmp/probe-result.json", "w").write(json.dumps(result, indent=1))
+          PY
+          xvfb-run -a python3 /tmp/render.py | tee /tmp/out.txt
+
+      - name: Fail the job if any hard requirement is missing
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json, sys
+          r = json.load(open("/tmp/probe-result.json"))
+          if "error" in r and not r.get("features"):
+              print("PROBE DID NOT REPORT:", r["error"])
+              print("Treat this as a FAILURE, not as absence of data — a parse-floor failure")
+              print("can prevent a report, and that must never be read as a pass.")
+              sys.exit(1)
+          bad = [f["name"] for f in r["features"] if f["tier"] == "hard" and not f["pass"]]
+          print("WebKitGTK", r.get("webkitgtk", "?"))
+          print("HARD FAILURES:", bad if bad else "none")
+          sys.exit(1 if bad else 0)
+          PY
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: "floor-${{ matrix.image }}"
+          path: /tmp/probe-result.json
