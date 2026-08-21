@@ -1424,6 +1424,12 @@ def list_sample_analyses(
         return [_analysis_to_record(row) for row in rows]
 
 
+#: Upper bound on rows a single sample timeline will pull per stream. The old
+#: shape was 200 *per analysis* with no cap on the analysis count, so a long
+#: history was unbounded in both queries and rows.
+_TIMELINE_MAX_ROWS = 1000
+
+
 def get_sample_timeline(
     session_factory: sessionmaker[Session],
     *,
@@ -1439,14 +1445,30 @@ def get_sample_timeline(
 
     decisions: list[ReviewDecisionRecord] = []
     audit_events: list[AuditEventRecord] = []
-    for analysis_id in analysis_ids:
-        decisions.extend(list_review_decisions(session_factory, analysis_id=analysis_id, limit=200))
+    # Two queries, not 2N — and bounded.
+    #
+    # This looped over every analysis, opening a session per call for BOTH the
+    # decisions and the audit events, with no cap on the analysis count: a
+    # sample with a long history cost 2N connection checkouts.
+    #
+    # The per-analysis limit of 200 was an artefact of that loop, not a product
+    # decision: a timeline is read newest-first for the SAMPLE, so a shared
+    # window is the more faithful shape. The cap scales with the analyses
+    # present so a typical sample sees everything it saw before, and stops at
+    # _TIMELINE_MAX_ROWS so a pathological history can no longer be unbounded.
+    timeline_limit = min(200 * max(1, len(analysis_ids)), _TIMELINE_MAX_ROWS)
+    if analysis_ids:
+        decisions.extend(
+            list_review_decisions(
+                session_factory, analysis_ids=list(analysis_ids), limit=timeline_limit
+            )
+        )
         audit_events.extend(
             list_audit_events(
                 session_factory,
-                limit=200,
+                limit=timeline_limit,
                 entity_type="analysis",
-                entity_id=analysis_id,
+                entity_ids=list(analysis_ids),
             )
         )
     decisions.sort(key=lambda item: item.created_at, reverse=True)
@@ -2929,13 +2951,24 @@ def list_review_decisions(
     session_factory: sessionmaker[Session],
     *,
     analysis_id: int | None = None,
+    analysis_ids: list[int] | None = None,
     reviewer_user_id: int | None = None,
     limit: int = 100,
 ) -> list[ReviewDecisionRecord]:
+    """Review decisions, newest first.
+
+    ``analysis_ids`` fetches a whole set in one ``IN`` query — the sample
+    timeline needs it, having previously opened a session per analysis.
+    """
+
     with session_scope(session_factory) as session:
         stmt = select(ReviewDecisionORM).order_by(ReviewDecisionORM.id.desc()).limit(limit)
         if analysis_id is not None:
             stmt = stmt.where(ReviewDecisionORM.analysis_id == analysis_id)
+        if analysis_ids is not None:
+            if not analysis_ids:
+                return []  # an empty set matches nothing, never "everything"
+            stmt = stmt.where(ReviewDecisionORM.analysis_id.in_(analysis_ids))
         if reviewer_user_id is not None:
             stmt = stmt.where(ReviewDecisionORM.reviewer_user_id == reviewer_user_id)
         rows = list(session.scalars(stmt).all())
@@ -2945,10 +2978,35 @@ def list_review_decisions(
 def list_admin_users(session_factory: sessionmaker[Session], *, limit: int = 100) -> list[AdminUserRecord]:
     with session_scope(session_factory) as session:
         users = list(session.scalars(select(UserORM).order_by(UserORM.id.desc()).limit(limit)).all())
+        # Two grouped aggregates instead of two counts PER USER. At the default
+        # limit of 100 this page issued 201 queries; it now issues 3, and the
+        # counts are scoped to the users actually on the page rather than
+        # counting the whole table once per row.
+        user_ids = [user.id for user in users]
+        analyses_by_user: dict[int, int] = {}
+        jobs_by_user: dict[int, int] = {}
+        if user_ids:
+            analyses_by_user = {
+                uid: int(count)
+                for uid, count in session.execute(
+                    select(AnalysisORM.user_id, func.count())
+                    .where(AnalysisORM.user_id.in_(user_ids))
+                    .group_by(AnalysisORM.user_id)
+                ).all()
+            }
+            jobs_by_user = {
+                uid: int(count)
+                for uid, count in session.execute(
+                    select(JobORM.user_id, func.count())
+                    .where(JobORM.user_id.in_(user_ids))
+                    .group_by(JobORM.user_id)
+                ).all()
+            }
         results: list[AdminUserRecord] = []
         for user in users:
-            analyses_count = session.scalar(select(func.count()).select_from(AnalysisORM).where(AnalysisORM.user_id == user.id)) or 0
-            jobs_count = session.scalar(select(func.count()).select_from(JobORM).where(JobORM.user_id == user.id)) or 0
+            # A user with no rows is absent from the grouped result, not zero-valued.
+            analyses_count = analyses_by_user.get(user.id, 0)
+            jobs_count = jobs_by_user.get(user.id, 0)
             results.append(
                 AdminUserRecord(
                     id=user.id,

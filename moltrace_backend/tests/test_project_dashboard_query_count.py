@@ -105,3 +105,88 @@ def test_dashboard_query_count_is_flat_as_samples_grow(tmp_path):
         f"query count grew with sample count: {c1.selects} at 5 samples, "
         f"{c2.selects} at 40 — that is the per-entity N+1 returning"
     )
+
+
+def test_admin_user_list_counts_are_grouped_not_per_user(tmp_path):
+    """The admin user page issued 1 + 2N queries — 201 at its default limit.
+
+    Correctness matters as much as the count here: a grouped aggregate omits
+    users with no rows entirely, so a naive rewrite silently drops them or
+    mis-maps counts between users.
+    """
+    from nmrcheck.analysis import analyze_inputs
+    from nmrcheck.database import list_admin_users, save_analysis
+    from nmrcheck.models import AnalysisInputs
+
+    factory = create_session_factory(f"sqlite:///{tmp_path / 'admin.sqlite3'}")
+    init_db(factory)
+
+    busy = create_user(factory, email="busy@example.com", password="correct-horse-1")
+    # `busy` gets analyses; this one deliberately gets none.
+    create_user(factory, email="quiet@example.com", password="correct-horse-2")
+
+    for _ in range(3):
+        payload = AnalysisInputs(
+            smiles="CCO",
+            nmr_text="1H NMR (400 MHz, CDCl3) delta 3.65 (q, 2H), 1.26 (t, 3H)",
+            solvent="CDCl3",
+        )
+        save_analysis(factory, analyze_inputs(payload), payload, user_id=busy.id)
+
+    with _QueryCounter(factory) as counter:
+        rows = list_admin_users(factory, limit=100)
+
+    by_email = {row.email: row for row in rows}
+    assert by_email["busy@example.com"].analyses_count == 3
+    # The user with no analyses must appear with a zero, not vanish and not
+    # inherit another user's count.
+    assert by_email["quiet@example.com"].analyses_count == 0
+    assert by_email["quiet@example.com"].jobs_count == 0
+    assert counter.selects <= 5, (
+        f"{counter.selects} SELECTs for 2 users — the per-user counts are back"
+    )
+
+
+def test_sample_timeline_does_not_open_a_session_per_analysis(tmp_path):
+    """The timeline looped over analyses, querying decisions AND audit events
+    for each — 2N sessions with no cap on N."""
+    from nmrcheck.analysis import analyze_inputs
+    from nmrcheck.database import get_sample_timeline, save_analysis
+    from nmrcheck.models import AnalysisInputs, ProjectSampleCreate
+
+    factory = create_session_factory(f"sqlite:///{tmp_path / 'timeline.sqlite3'}")
+    init_db(factory)
+    user = create_user(factory, email="tl@example.com", password="correct-horse-1")
+    project = create_project(factory, user_id=user.id, name="P", description=None)
+
+    analysis_id = None
+    for index in range(6):
+        payload = AnalysisInputs(
+            smiles="CCO",
+            nmr_text="1H NMR (400 MHz, CDCl3) delta 3.65 (q, 2H), 1.26 (t, 3H)",
+            solvent="CDCl3",
+        )
+        stored_id = save_analysis(factory, analyze_inputs(payload), payload, user_id=user.id)
+        if index == 0:
+            analysis_id = stored_id
+        create_project_sample(
+            factory,
+            project_id=project.id,
+            user_id=user.id,
+            payload=ProjectSampleCreate(
+                sample_id="S-1",
+                smiles="CCO",
+                nmr_text="1H NMR (400 MHz, CDCl3) delta 3.65 (q, 2H), 1.26 (t, 3H)",
+                solvent="CDCl3",
+                analysis_id=analysis_id if index == 0 else None,
+            ),
+        )
+
+    with _QueryCounter(factory) as counter:
+        timeline = get_sample_timeline(factory, user_id=user.id, sample_identity="S-1")
+
+    assert timeline is not None
+    assert counter.selects < 20, (
+        f"{counter.selects} SELECTs for a 6-analysis timeline — the per-analysis "
+        "decision/audit loop is back"
+    )
