@@ -11,7 +11,7 @@ from typing import Any, Iterator
 
 from sqlalchemy import create_engine, delete, func, select, update
 from sqlalchemy.engine import Connection, Engine
-from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.orm import Session, defer, sessionmaker
 
 from .models import (
     AdminSystemSummary,
@@ -1345,6 +1345,12 @@ def _analysis_rows_for_sample(
                 .where(AnalysisORM.user_id == user_id)
                 .where(AnalysisORM.sample_id == sample.sample_id)
                 .order_by(AnalysisORM.id.desc())
+                .limit(_SAMPLE_ANALYSES_MAX_ROWS)
+                # full_report_json is the largest column on the row and nothing
+                # on these list paths reads it — only get_full_analysis_by_id
+                # does, one row at a time in its own session. Deferring it stops
+                # every sample view dragging a full report off disk per analysis.
+                .options(defer(AnalysisORM.full_report_json))
             ).all()
         )
         rows_by_id.update({row.id: row for row in rows})
@@ -1369,6 +1375,8 @@ def _analysis_rows_for_sample(
                 .where(AnalysisORM.user_id == user_id)
                 .where(AnalysisORM.smiles == sample.smiles)
                 .order_by(AnalysisORM.id.desc())
+                .limit(_SAMPLE_ANALYSES_MAX_ROWS)
+                .options(defer(AnalysisORM.full_report_json))
             ).all()
         )
         rows_by_id.update({row.id: row for row in rows})
@@ -1423,6 +1431,14 @@ def list_sample_analyses(
         rows, _basis = _analysis_rows_for_sample(session, sample=sample, user_id=user_id)
         return [_analysis_to_record(row) for row in rows]
 
+
+#: Upper bound on the analyses one sample resolves to. Both lookups below were
+#: unbounded: the sample_id match returned a tenant's entire matching history,
+#: and the SMILES fallback filters an UNINDEXED Text column, so it degrades to a
+#: full scan. One physical specimen having more analyses than this is
+#: pathological, and the rows are ordered newest-first, so the cap costs a real
+#: workflow nothing.
+_SAMPLE_ANALYSES_MAX_ROWS = 200
 
 #: Upper bound on rows a single sample timeline will pull per stream. The old
 #: shape was 200 *per analysis* with no cap on the analysis count, so a long
