@@ -237,3 +237,91 @@ def test_cumulative_risk_uses_the_same_authority(client):
 def test_an_unknown_authority_is_refused_not_defaulted(client):
     response = _post(client, {"daily_dose_g": 1.0, "authority": "MHRA"})
     assert response.status_code == 422
+
+
+# --------------------------------------------------------------------------- #
+# The engine's reasoning must survive the API seam, and a caveat that changes
+# what a verdict MEANS must be visible at the top level.
+# --------------------------------------------------------------------------- #
+_DI_NITROSO = "O=NN1CCN(N=O)CC1"  # nitrosated piperazine: two N-nitroso centres
+
+
+def test_m7_reports_which_alert_fired_not_just_the_class(client):
+    """A Class arriving with no structural alert or reasoning is untraceable.
+
+    ImpurityStructuralOut kept 8 of M7Classification's 18 fields, so a reviewer
+    could read the verdict but never the basis — in a module whose selling
+    point is traceability.
+    """
+    response = _post(
+        client,
+        {
+            "daily_dose_g": 1.0,
+            "structural_impurities": [{"smiles": _NDMA, "name": "NDMA"}],
+        },
+    )
+    assert response.status_code == 200, response.text
+    structural = response.json()["structural_impurities"][0]
+    assert structural["structural_alerts"], "no structural alert reported for a nitrosamine"
+    assert structural["reasoning"]
+    assert structural["class_definition"]
+    assert structural["rule_set_version"], "the verdict is not tied to a rule-set version"
+
+
+def test_cpca_reports_the_features_behind_the_potency_score(client):
+    response = _post(
+        client,
+        {
+            "daily_dose_g": 1.0,
+            "structural_impurities": [
+                {"smiles": _NDMA, "name": "NDMA", "measured_ng_per_day": 20.0}
+            ],
+        },
+    )
+    cpca = response.json()["structural_impurities"][0]["cpca"]
+    # Which limit applied, and what the categorisation rested on.
+    assert cpca["authority"] == "FDA"
+    assert cpca["category_description"]
+    assert cpca["alpha_h_score"] is not None
+    assert isinstance(cpca["feature_evidence"], dict)
+    assert cpca["method_reference"]
+    assert cpca["rule_set_version"]
+
+
+def test_a_multi_centre_nitrosamine_says_so_at_the_top_level(client):
+    """Only the FIRST N-nitroso centre is scored.
+
+    That caveat lived in a nested notes list the seam dropped entirely, so a
+    di-nitrosamine returned a confident category indistinguishable from a
+    fully-assessed mono-nitrosamine. It must reach `warnings`, which every
+    client already renders.
+    """
+    response = _post(
+        client,
+        {
+            "daily_dose_g": 1.0,
+            "structural_impurities": [
+                {"smiles": _DI_NITROSO, "name": "di-nitrosopiperazine"}
+            ],
+        },
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert any(
+        "only the first" in warning.lower() for warning in body["warnings"]
+    ), f"multi-centre caveat absent from warnings: {body['warnings']}"
+    # And it names the impurity, so a multi-impurity request stays readable.
+    assert any("di-nitrosopiperazine" in warning for warning in body["warnings"])
+    # The nested notes still carry it too.
+    assert any(
+        "only the first" in note.lower()
+        for note in body["structural_impurities"][0]["cpca"]["notes"]
+    )
+
+
+def test_a_single_centre_nitrosamine_raises_no_multi_centre_warning(client):
+    body = _post(
+        client,
+        {"daily_dose_g": 1.0, "structural_impurities": [{"smiles": _NDMA, "name": "NDMA"}]},
+    ).json()
+    assert not any("only the first" in warning.lower() for warning in body["warnings"])

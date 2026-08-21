@@ -3537,6 +3537,26 @@ class ImpurityCPCAOut(BaseModel):
     within_ai_limit: bool | None = None
     regulatory_basis: str
 
+    # --- Why this category, not just which one -------------------------------
+    # The engine computes all of this and the seam used to drop it, so a
+    # reviewer could see the verdict but never the reasoning: which features
+    # summed to the potency score, or that only one of several N-nitroso
+    # centres was scored. Optional so an older client is unaffected.
+    authority: str | None = None
+    category_description: str | None = None
+    alpha_h_score: int | None = None
+    alpha_h_distribution: str | None = None
+    activating_features: list[str] = Field(default_factory=list)
+    deactivating_features: list[str] = Field(default_factory=list)
+    feature_evidence: dict[str, int] = Field(default_factory=dict)
+    method_reference: str | None = None
+    rule_set_version: str | None = None
+    #: Engine notes — includes the multi-centre caveat ("only the first was
+    #: scored") and the forced-Category-5 rationale. Dropping these was the
+    #: reason a di-nitrosamine returned a confident category indistinguishable
+    #: from a fully-assessed mono-nitrosamine.
+    notes: list[str] = Field(default_factory=list)
+
 
 class ImpurityStructuralOut(BaseModel):
     """ICH M7 (+ CPCA when a nitrosamine) assessment for one structural impurity."""
@@ -3552,6 +3572,20 @@ class ImpurityStructuralOut(BaseModel):
     regulatory_action_required: str
     cpca: ImpurityCPCAOut | None = None
     regulatory_basis: str
+
+    # --- The basis for the class ---------------------------------------------
+    # Traceability is the selling point of this module, and the seam kept 8 of
+    # the engine's 18 fields: a Class 3 arrived with no indication of WHICH
+    # structural alert fired or why. Optional, so this is additive.
+    class_definition: str | None = None
+    duration_band: str | None = None
+    structural_alerts: list[str] = Field(default_factory=list)
+    in_silico_concordance: str | None = None
+    coc_categories: list[str] = Field(default_factory=list)
+    data_basis: str | None = None
+    reasoning: str | None = None
+    class_scheme_reference: str | None = None
+    rule_set_version: str | None = None
 
 
 class ImpurityCumulativeRiskOut(BaseModel):
