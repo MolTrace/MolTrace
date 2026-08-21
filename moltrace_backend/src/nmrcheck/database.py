@@ -1571,24 +1571,39 @@ def build_project_dashboard(
         likely_impurity_flags = sum(
             1 for row in analysis_rows if row.label == "possible_impurity_or_incorrect_assignment"
         )
+        # Three queries, not up to 101.
+        #
+        # This asked for one entity at a time — a project, then every sample,
+        # then every analysis — and each call opened its OWN session_scope,
+        # nested inside this one. On a 50-sample project that was 101 connection
+        # checkouts (each with a pool pre-ping round trip) and 101 queries to
+        # render a panel that keeps `activity[:12]`. Up to 5,050 rows were
+        # fetched to display twelve.
+        #
+        # Batching per entity TYPE returns the same twelve: an event in the
+        # global top 12 is necessarily inside its own type's most-recent 50, so
+        # the union of three 50-row windows still contains it.
         activity: list[AuditEventRecord] = []
-        activity.extend(list_audit_events(session_factory, limit=50, entity_type="project", entity_id=project_id))
-        for sample in samples[:50]:
+        activity.extend(
+            list_audit_events(session_factory, limit=50, entity_type="project", entity_id=project_id)
+        )
+        sample_ids = [sample.id for sample in samples[:50]]
+        if sample_ids:
             activity.extend(
                 list_audit_events(
                     session_factory,
                     limit=50,
                     entity_type="project_sample",
-                    entity_id=sample.id,
+                    entity_ids=sample_ids,
                 )
             )
-        for analysis_id in analysis_ids[:50]:
+        if analysis_ids[:50]:
             activity.extend(
                 list_audit_events(
                     session_factory,
                     limit=50,
                     entity_type="analysis",
-                    entity_id=analysis_id,
+                    entity_ids=list(analysis_ids[:50]),
                 )
             )
         activity.sort(key=lambda item: item.created_at, reverse=True)
@@ -2650,6 +2665,7 @@ def list_audit_events(
     event_types: list[str] | None = None,
     entity_type: str | None = None,
     entity_id: int | None = None,
+    entity_ids: list[int] | None = None,
     since: datetime | None = None,
 ) -> list[AuditEventRecord]:
     """Query the audit-event log with optional filters.
@@ -2661,6 +2677,10 @@ def list_audit_events(
     supplied, they AND together (event must equal ``event_type`` AND be
     in ``event_types``); this is intentional so callers can layer
     filters without one silently overriding the other.
+
+    ``entity_ids`` is the same idea for entities: one ``IN`` query for a whole
+    set instead of one query per id. The project dashboard needs it — it was
+    asking for one entity at a time and opening a fresh session for each.
     """
 
     with session_scope(session_factory) as session:
@@ -2675,6 +2695,10 @@ def list_audit_events(
             stmt = stmt.where(AuditEventORM.entity_type == entity_type)
         if entity_id is not None:
             stmt = stmt.where(AuditEventORM.entity_id == entity_id)
+        if entity_ids is not None:
+            if not entity_ids:
+                return []  # an empty set matches nothing; do not fall through to "all"
+            stmt = stmt.where(AuditEventORM.entity_id.in_(entity_ids))
         if since is not None:
             # ``audit_events.created_at`` is timestamp-with-timezone in
             # production (Postgres) and naive UTC in the SQLite test

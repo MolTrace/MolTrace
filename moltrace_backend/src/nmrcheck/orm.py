@@ -490,6 +490,10 @@ class AnalysisORM(Base):
     __tablename__ = "analyses"
     __table_args__ = (
         Index("ix_analyses_user_created", "user_id", "created_at"),
+        # Sample detail/timeline/reports all filter (user_id, sample_id);
+        # sample_id carried no index, so the planner used user_id and then
+        # matched sample_id row by row across that tenant's whole history.
+        Index("ix_analyses_user_sample", "user_id", "sample_id"),
         Index("ix_analyses_job_created", "job_id", "created_at"),
         Index("ix_analyses_label_created", "label", "created_at"),
         Index("ix_analyses_review_status", "review_status", "created_at"),
@@ -7316,6 +7320,11 @@ class AuditEventORM(Base):
     __table_args__ = (
         Index("ix_audit_events_created", "created_at"),
         Index("ix_audit_events_type_created", "event_type", "created_at"),
+        # entity_id alone was indexed and entity_type not at all, so every
+        # "what happened to this thing?" lookup filtered on an unindexed column
+        # after the id match. The composite covers the pair the way the queries
+        # actually ask for it.
+        Index("ix_audit_events_entity", "entity_type", "entity_id"),
         # Tamper-evident chain monotonicity guard (Prompt 10): UNIQUE forces a forked
         # chain to fail at INSERT on both Postgres and SQLite (the concurrency backstop).
         Index("ux_audit_events_chain_seq", "chain_seq", unique=True),
