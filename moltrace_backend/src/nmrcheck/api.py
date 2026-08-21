@@ -1983,8 +1983,14 @@ async def get_optional_access_context(
     The result is memoised on ``request.state``, which Starlette creates per
     request, so this is a within-request memo and never shared between callers.
     The inputs are fixed for the life of a request (one header, one bearer, one
-    query parameter), so the second resolution could only ever reach the same
-    answer. A raised 401 is not cached: it ends the request.
+    query parameter), so a second resolution could only ever reach the same
+    answer.
+
+    A failed resolution is never memoised — the 401 is raised BEFORE the record
+    is written. That, not "the request ends", is the property to preserve: one
+    of the three callers (``_abuse_rate_limit_gate``) deliberately swallows the
+    HTTPException and lets the request continue to the route's own dependency,
+    which must then be free to re-resolve and refuse it.
     """
 
     cached = getattr(request.state, _ACCESS_CONTEXT_STATE_ATTR, _ACCESS_CONTEXT_UNRESOLVED)
@@ -2024,11 +2030,19 @@ def _enforce_mfa_satisfied(request: Request, context: AccessContext) -> None:
         return
     # Same within-request memo as the credential resolution above, and for the
     # same reason: the router-level gate runs this, then the route's own
-    # ``require_access_context`` runs it again on identical inputs (same user,
-    # same token, same path), costing a second session and MFA-policy lookup on
-    # every authenticated request. Only a PASS is remembered — a failure raises
-    # and ends the request, so there is no failed verdict to reuse.
-    if getattr(request.state, _MFA_SATISFIED_STATE_ATTR, None) is True:
+    # ``require_access_context`` runs it again on identical inputs, costing a
+    # second session and MFA-policy lookup on every authenticated request. Only
+    # a PASS is remembered — a failure raises, and the raise happens before the
+    # record below, so a failed verdict can never be reused.
+    #
+    # Keyed on the PRINCIPAL, not just the request. Today both callers hold the
+    # same AccessContext instance (the resolver memo hands back one object), so
+    # a bare boolean would be correct — but only by a coincidence that is
+    # invisible here. This module builds second-principal AccessContexts for
+    # audit in a dozen places; the day one of those reaches this function, a
+    # boolean would clear the gate for a principal that was never checked.
+    principal = (context.user.id, context.raw_token)
+    if getattr(request.state, _MFA_SATISFIED_STATE_ATTR, None) == principal:
         return
     state = _state(request)
     ok, detail = mfa_store.mfa_satisfied_for_session(
@@ -2040,7 +2054,7 @@ def _enforce_mfa_satisfied(request: Request, context: AccessContext) -> None:
     )
     if not ok:
         raise mfa_webauthn.MFAError(detail or "mfa_required", 403)
-    setattr(request.state, _MFA_SATISFIED_STATE_ATTR, True)
+    setattr(request.state, _MFA_SATISFIED_STATE_ATTR, principal)
 
 
 #: Marks that this request's MFA gate has already passed (see _enforce_mfa_satisfied).

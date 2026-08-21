@@ -198,3 +198,55 @@ def test_local_auth_disabled_still_short_circuits(tmp_path):
     # no api key), so it is driven through those, not set directly.
     with TestClient(_app(tmp_path, app_env="development", disable_auth=True)) as client:
         assert client.get("/history").status_code == 200
+
+
+def test_the_mfa_memo_does_not_vouch_for_a_second_principal(tmp_path):
+    """The MFA pass is remembered per PRINCIPAL, not per request.
+
+    Both callers happen to hold the same AccessContext today, so a bare boolean
+    would be correct — by a coincidence invisible at the call site. This module
+    builds second-principal AccessContexts for audit in a dozen places, and the
+    day one reaches _enforce_mfa_satisfied, a boolean would clear an
+    MFA-enforcing tenant's gate for a principal that was never checked.
+    """
+    from types import SimpleNamespace
+
+    from nmrcheck.api import _MFA_SATISFIED_STATE_ATTR, _enforce_mfa_satisfied
+
+    checked: list[int] = []
+
+    class _Store:
+        @staticmethod
+        def mfa_satisfied_for_session(_factory, _settings, *, user_id, email, raw_token):
+            checked.append(user_id)
+            return True, None
+
+    app_state = SimpleNamespace(settings=SimpleNamespace(), session_factory=None)
+    request = SimpleNamespace(
+        state=SimpleNamespace(),
+        url=SimpleNamespace(path="/history"),
+        app=SimpleNamespace(state=app_state),
+    )
+
+    first = SimpleNamespace(user=SimpleNamespace(id=1, email="a@x.com"), system_api_key=False,
+                            raw_token="token-a")
+    second = SimpleNamespace(user=SimpleNamespace(id=2, email="b@x.com"), system_api_key=False,
+                             raw_token="token-b")
+
+    import nmrcheck.api as api_mod
+
+    original_store, original_state = api_mod.mfa_store, api_mod._state
+    api_mod.mfa_store = _Store
+    api_mod._state = lambda _request: app_state
+    try:
+        _enforce_mfa_satisfied(request, first)
+        _enforce_mfa_satisfied(request, first)   # memo hit: no second lookup
+        assert checked == [1], f"the same principal was checked {len(checked)} times"
+        _enforce_mfa_satisfied(request, second)  # different principal: must re-check
+        assert checked == [1, 2], (
+            "a second principal inherited the first one's MFA pass"
+        )
+    finally:
+        api_mod.mfa_store, api_mod._state = original_store, original_state
+
+    assert getattr(request.state, _MFA_SATISFIED_STATE_ATTR) == (2, "token-b")
