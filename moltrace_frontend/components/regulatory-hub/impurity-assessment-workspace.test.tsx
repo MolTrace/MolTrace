@@ -97,6 +97,75 @@ describe("ImpurityAssessmentWorkspace", () => {
     expect(exportBtn).toBeEnabled()
   })
 
+  it("sends the chosen assessing authority, so an EU filing is not judged by the FDA limit", async () => {
+    const { default: userEvent } = await import("@testing-library/user-event")
+    const user = userEvent.setup()
+    mockApiFetch.mockResolvedValue(RESULT)
+
+    render(<ImpurityAssessmentWorkspace />)
+
+    // FDA is the default; EMA applies a Category-1 limit of 18 ng/day rather than 26.5.
+    await user.click(screen.getByRole("radio", { name: "EMA" }))
+    await user.click(screen.getByRole("button", { name: "Assess" }))
+
+    await waitFor(() => expect(mockApiFetch).toHaveBeenCalled())
+    const [, init] = mockApiFetch.mock.calls[0] as [string, { body: Record<string, unknown> }]
+    expect(init.body.authority).toBe("EMA")
+  })
+
+  it("names how each residual-solvent limit was derived", async () => {
+    const { default: userEvent } = await import("@testing-library/user-event")
+    const user = userEvent.setup()
+    // Toluene at 50 g/day: the dose-scaled limit is 178 ppm, while the Option-1 table
+    // constant is 890. Benzene keeps its fixed Class 1 limit at any dose. Showing both
+    // numbers in one column without saying which rule produced them is the ambiguity
+    // this label exists to close.
+    mockApiFetch.mockResolvedValue({
+      ...RESULT,
+      daily_dose_g: 50.0,
+      residual_solvents: [
+        {
+          identifier: "toluene",
+          matched: true,
+          solvent_name: "Toluene",
+          class_number: 2,
+          pde_mg_per_day: 8.9,
+          concentration_limit_ppm: 890.0,
+          measured_ppm: null,
+          permitted_ppm: 178.0,
+          limit_basis: "option_2_dose_scaled",
+          passed: null,
+          margin_ppm: null,
+          regulatory_basis: "ICH Q3C(R8): Impurities: Guideline for Residual Solvents",
+        },
+        {
+          identifier: "benzene",
+          matched: true,
+          solvent_name: "Benzene",
+          class_number: 1,
+          pde_mg_per_day: null,
+          concentration_limit_ppm: 2.0,
+          measured_ppm: null,
+          permitted_ppm: 2.0,
+          limit_basis: "class_1_fixed",
+          passed: null,
+          margin_ppm: null,
+          regulatory_basis: "ICH Q3C(R8): Impurities: Guideline for Residual Solvents",
+        },
+      ],
+    })
+
+    render(<ImpurityAssessmentWorkspace />)
+    await user.click(screen.getByRole("button", { name: "Assess" }))
+    await waitFor(() => expect(screen.getByText("Assessment report")).toBeInTheDocument())
+    await user.click(screen.getByRole("tab", { name: /Residual solvents/ }))
+
+    expect(await screen.findByText("scaled to dose")).toBeInTheDocument()
+    expect(screen.getByText("fixed Class 1 limit")).toBeInTheDocument()
+    // The wire token itself must never reach the reader.
+    expect(screen.queryByText("option_2_dose_scaled")).not.toBeInTheDocument()
+  })
+
   it("blocks a non-positive dose client-side without calling the API", async () => {
     const { default: userEvent } = await import("@testing-library/user-event")
     const user = userEvent.setup()

@@ -272,6 +272,10 @@ export async function assessImpurities(inputs: GoldenPathInputs): Promise<Impuri
     route: inputs.route,
     substance_type: inputs.substanceType,
     duration_months: inputs.durationMonths,
+    // Pinned, not defaulted: the golden path is a fixed reproducible scenario, and the
+    // authority chooses the Category-1 nitrosamine limit (FDA 26.5 vs EMA 18 ng/day),
+    // so leaving it implicit would let a server-side default change the pilot's numbers.
+    authority: "FDA",
   }
   return apiFetch<ImpurityAssessResult>("/regulatory/impurities/assess", { method: "POST", body: payload })
 }

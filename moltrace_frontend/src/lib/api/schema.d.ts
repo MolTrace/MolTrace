@@ -22588,6 +22588,15 @@ export interface components {
         /**
          * ImpuritySolventOut
          * @description ICH Q3C assessment for one residual solvent.
+         *
+         *     Two limits appear here and they are not interchangeable. ``concentration_limit_ppm`` is
+         *     the Option-1 table constant, defined at a 10 g/day reference dose and therefore
+         *     dose-independent. ``permitted_ppm`` is the limit actually applied at this report's daily
+         *     dose, and ``limit_basis`` names which rule produced it -- Option 2 scales the PDE to the
+         *     dose, a Class 1 solvent keeps its fixed concentration limit, and ``option_1_10g`` means
+         *     the dose-scaled form was unavailable and the 10 g/day constant was used instead. The two
+         *     coincide only at 10 g/day; at 50 g/day the Option-1 number is five times the permitted
+         *     one, and at 2 g/day it is a fifth of it.
          */
         ImpuritySolventOut: {
             /** Identifier */
@@ -22606,6 +22615,8 @@ export interface components {
             measured_ppm?: number | null;
             /** Permitted Ppm */
             permitted_ppm?: number | null;
+            /** Limit Basis */
+            limit_basis?: ("option_1_10g" | "option_2_dose_scaled" | "class_1_fixed") | null;
             /** Passed */
             passed?: boolean | null;
             /** Margin Ppm */

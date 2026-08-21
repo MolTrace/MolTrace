@@ -101,6 +101,100 @@ def test_unknown_solvent_is_explicit_not_an_error(client):
     assert sol["class_number"] is None
 
 
+def test_a_matched_solvent_is_dose_scaled_without_a_measurement(client):
+    """The permitted limit must follow the dose even when nothing was measured yet.
+
+    ICH Q3C Option 1 is a concentration limit computed at a 10 g/day reference dose; Option 2
+    scales the PDE to the actual dose. Reporting the Option-1 number unlabeled at a dose other
+    than 10 g/day is wrong in both directions: at 50 g/day it is 5x too permissive, and at
+    2 g/day it is 5x too strict (toluene PDE 8.9 mg/day -> Option-1 890 ppm vs Option-2 178 and
+    4450 ppm). A caller pricing a specification off the wrong one either passes a batch it
+    should not, or rejects a good one.
+    """
+
+    with client:
+        high = _post(
+            client,
+            {"daily_dose_g": 50.0, "residual_solvents": [{"identifier": "toluene"}]},
+        )
+        low = _post(
+            client,
+            {"daily_dose_g": 2.0, "residual_solvents": [{"identifier": "toluene"}]},
+        )
+    assert high.status_code == 200, high.text
+    assert low.status_code == 200, low.text
+
+    hi = high.json()["residual_solvents"][0]
+    lo = low.json()["residual_solvents"][0]
+
+    # PDE 8.9 mg/day * 1000 / dose_g
+    assert hi["permitted_ppm"] == 178.0
+    assert lo["permitted_ppm"] == 4450.0
+    assert hi["limit_basis"] == "option_2_dose_scaled"
+    assert lo["limit_basis"] == "option_2_dose_scaled"
+
+    # The Option-1 table value stays available and stays dose-independent.
+    assert hi["concentration_limit_ppm"] == 890.0
+    assert lo["concentration_limit_ppm"] == 890.0
+
+
+def test_at_the_reference_dose_both_options_agree(client):
+    """10 g/day is the dose Option 1 is defined at, so the two must coincide exactly."""
+
+    with client:
+        res = _post(client, {"daily_dose_g": 10.0, "residual_solvents": [{"identifier": "toluene"}]})
+    assert res.status_code == 200, res.text
+    sol = res.json()["residual_solvents"][0]
+    assert sol["permitted_ppm"] == sol["concentration_limit_ppm"] == 890.0
+
+
+def test_a_class_1_solvent_does_not_dose_scale(client):
+    """Class 1 carries a fixed concentration limit; scaling it would invent a limit ICH does not give."""
+
+    with client:
+        tight = _post(client, {"daily_dose_g": 0.1, "residual_solvents": [{"identifier": "benzene"}]})
+        loose = _post(client, {"daily_dose_g": 50.0, "residual_solvents": [{"identifier": "benzene"}]})
+    assert tight.status_code == 200, tight.text
+    assert loose.status_code == 200, loose.text
+
+    for res in (tight, loose):
+        sol = res.json()["residual_solvents"][0]
+        assert sol["class_number"] == 1
+        assert sol["permitted_ppm"] == 2.0
+        assert sol["limit_basis"] == "class_1_fixed"
+
+
+def test_an_unencoded_solvent_has_no_limit_basis(client):
+    """No limit was applied, so no basis may be claimed for one."""
+
+    with client:
+        res = _post(client, {"daily_dose_g": 1.0, "residual_solvents": [{"identifier": "unobtainium"}]})
+    assert res.status_code == 200, res.text
+    sol = res.json()["residual_solvents"][0]
+    assert sol["matched"] is False
+    assert sol["permitted_ppm"] is None
+    assert sol["limit_basis"] is None
+
+
+def test_a_measured_solvent_still_reports_its_verdict(client):
+    """Dose-scaling without a measurement must not disturb the measured path."""
+
+    with client:
+        res = _post(
+            client,
+            {
+                "daily_dose_g": 50.0,
+                "residual_solvents": [{"identifier": "toluene", "measured_ppm": 500.0}],
+            },
+        )
+    assert res.status_code == 200, res.text
+    sol = res.json()["residual_solvents"][0]
+    assert sol["permitted_ppm"] == 178.0
+    assert sol["passed"] is False  # 500 ppm against a 178 ppm limit
+    assert sol["margin_ppm"] == -322.0
+    assert sol["limit_basis"] == "option_2_dose_scaled"
+
+
 def test_an_unencoded_solvent_warns_at_the_top_level(client):
     """A measured solvent outside the encoded table must warn, like every other gap here.
 
