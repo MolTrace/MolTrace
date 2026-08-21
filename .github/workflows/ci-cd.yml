@@ -707,7 +707,7 @@ jobs:
         working-directory: moltrace_backend
         run: |
           gcloud builds submit --config cloudbuild.yaml \
-            --substitutions=_TAG="${{ github.sha }}" --project moltrace-prod
+            --substitutions=_TAG="${{ github.sha }}",_GIT_SHA="${{ github.sha }}" --project moltrace-prod
       - name: Apply DB migrations (Cloud Run job)
         run: |
           gcloud run jobs update moltrace-migrate --image "$IMAGE" \

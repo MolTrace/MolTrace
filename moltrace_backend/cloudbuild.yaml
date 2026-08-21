@@ -12,6 +12,10 @@ substitutions:
   _REPO: moltrace
   _IMAGE: backend
   _TAG: latest
+  # Separate from _TAG on purpose. _TAG falls back to "latest" for a manual build, and
+  # "latest" is not a revision — stamping it into provenance would be a plausible lie.
+  # Empty falls through to an honest "unknown". See the Dockerfile's MOLTRACE_GIT_SHA block.
+  _GIT_SHA: ""
 
 options:
   logging: CLOUD_LOGGING_ONLY
@@ -48,6 +52,7 @@ steps:
       - |
         build() {
           docker build \
+            --build-arg MOLTRACE_GIT_SHA="${_GIT_SHA}" \
             --tag "${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/${_IMAGE}:${_TAG}" \
             --tag "${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/${_IMAGE}:latest" \
             .

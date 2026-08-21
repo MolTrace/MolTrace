@@ -456,6 +456,20 @@ def validate_startup_settings(settings: Settings) -> list[str]:
             "MOLTRACE_HOSE_KB is not set in production; shift prediction would run on the "
             "16-molecule seed table instead of the full NMRShiftDB2 index."
         )
+    # Every regulated result records the code revision that produced it, and that revision
+    # resolves $MOLTRACE_GIT_SHA -> `git rev-parse` -> the literal "unknown" without ever
+    # raising. The deployed image can satisfy neither of the first two: .dockerignore
+    # excludes .git/ and the runtime base has no git binary. So an unset variable does not
+    # degrade provenance a little, it removes it entirely -- and silently, at the one place
+    # an auditor would look to ask which code produced a number.
+    if settings.app_env == "production":
+        from moltrace.spectroscopy.infra.versioning import current_git_sha
+
+        if current_git_sha() == "unknown":
+            issues.append(
+                "MOLTRACE_GIT_SHA is not set and no git revision is resolvable; every "
+                "regulated result would record its code revision as 'unknown'."
+            )
     if settings.app_env == "production" and settings.disable_auth:
         issues.append("DISABLE_BACKEND_AUTH must not be enabled in production.")
     if settings.app_env == "production" and settings.debug:
