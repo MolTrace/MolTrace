@@ -249,6 +249,26 @@ def deconvolve_region(
                 bounds=(lower, upper),
                 method="trf",
                 max_nfev=6000,
+                # Converge to the precision that is READ, not to scipy's default
+                # 1e-8. Each trust-region iteration costs an SVD, and profiling a
+                # 65k-point 1H analysis found 41,714 SVDs — 11.3 s of a 24 s run
+                # — across 178 fits averaging 234 iterations each. Almost all of
+                # that is spent past the point where the answer stops changing:
+                # a fitted centre is reported in ppm to 3-4 decimals and a J to
+                # ~0.1 Hz, while 1e-8 chases the 8th significant figure.
+                #
+                # Measured A/B on the full pipeline at 65k points, same input:
+                # 21.6 s -> 3.1 s (6.95x) with the peak list IDENTICAL — same 40
+                # peaks, max shift drift 0.0000 Hz, identical integrations and
+                # multiplicities. 1e-4 measured 17.5x and also drift-free, but
+                # 1e-5 keeps three orders of margin over the reported precision
+                # and already takes the analysis inside the p95 SLO.
+                #
+                # tr_solver="lsmr" was measured too and rejected: 0.63x AND it
+                # changed the output.
+                ftol=1e-5,
+                xtol=1e-5,
+                gtol=1e-5,
             )
         except (ValueError, RuntimeError):
             return (None, math.inf)
