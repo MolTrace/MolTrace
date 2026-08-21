@@ -27750,6 +27750,12 @@ def history(
     return list_recent_analyses(_state(request).session_factory, limit=limit, user_id=user_id)
 
 
+#: Rows a history export returns when the caller names no limit. Matches the
+#: ``le`` already declared on the query parameter, so the default is the
+#: advertised maximum rather than an unbounded scan of a tenant's history.
+_HISTORY_EXPORT_DEFAULT_ROWS = 10_000
+
+
 @router.get("/history/export.csv", dependencies=[Depends(require_access_context)])
 def history_export_csv(
     request: Request,
@@ -27757,9 +27763,21 @@ def history_export_csv(
     context: AccessContext = Depends(require_access_context),
 ) -> StreamingResponse:
     user_id = None if context.system_api_key else context.user_id
-    csv_text = export_history_csv(_state(request).session_factory, limit=limit, user_id=user_id)
+    # A supplied limit was already capped at 10,000 — but the DEFAULT was None,
+    # i.e. unlimited, so the guard existed and the common call bypassed it. The
+    # default is now that same declared maximum rather than a new number: the
+    # ceiling the API already advertises, applied when the caller names none.
+    effective_limit = limit if limit is not None else _HISTORY_EXPORT_DEFAULT_ROWS
+    rows = export_history_csv(
+        _state(request).session_factory, limit=effective_limit, user_id=user_id
+    )
     headers = {"Content-Disposition": 'attachment; filename="nmrcheck-history.csv"'}
-    return StreamingResponse(_stream_text(csv_text), media_type="text/csv", headers=headers)
+    # Encode per row. The previous shape built the whole export as a str and
+    # then encoded it whole, so the StreamingResponse yielded a single chunk —
+    # decorative streaming over two full in-memory copies.
+    return StreamingResponse(
+        (row.encode("utf-8") for row in rows), media_type="text/csv", headers=headers
+    )
 
 
 @router.get(
