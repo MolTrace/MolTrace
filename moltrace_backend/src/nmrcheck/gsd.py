@@ -249,26 +249,28 @@ def deconvolve_region(
                 bounds=(lower, upper),
                 method="trf",
                 max_nfev=6000,
-                # Converge to the precision that is READ, not to scipy's default
-                # 1e-8. Each trust-region iteration costs an SVD, and profiling a
-                # 65k-point 1H analysis found 41,714 SVDs — 11.3 s of a 24 s run
-                # — across 178 fits averaging 234 iterations each. Almost all of
-                # that is spent past the point where the answer stops changing:
-                # a fitted centre is reported in ppm to 3-4 decimals and a J to
-                # ~0.1 Hz, while 1e-8 chases the 8th significant figure.
+                # scipy's default 1e-8, restored. A previous change loosened these
+                # to 1e-5 for speed on the premise that the fit "stops changing"
+                # long before 1e-8 — measured true on one 65k-point spectrum (same
+                # 40 peaks, 0.0000 Hz drift, identical multiplicities, 6.95x faster).
                 #
-                # Measured A/B on the full pipeline at 65k points, same input:
-                # 21.6 s -> 3.1 s (6.95x) with the peak list IDENTICAL — same 40
-                # peaks, max shift drift 0.0000 Hz, identical integrations and
-                # multiplicities. 1e-4 measured 17.5x and also drift-free, but
-                # 1e-5 keeps three orders of margin over the reported precision
-                # and already takes the analysis inside the p95 SLO.
+                # It is NOT true across the fixture corpus. Multiplicity is a
+                # DISCRETE label read off the resolved line COUNT, and for real
+                # spectra the count is still moving between 1e-5 and 1e-8: measured,
+                # nmrshiftdb2 40256149 peak 2 reads a generic "m" at 1e-8 and flips
+                # to "t" at 1e-5 / 1e-6 / 1e-7 alike — i.e. 1e-5 reports an
+                # UNDER-converged fit, not a faster-but-equal one. No tolerance
+                # between 1e-5 and 1e-7 reproduces the goldens; only 1e-8 does. The
+                # output-invariance goldens (test_fid_pipeline_invariants.py) caught
+                # exactly this, which is their job.
                 #
-                # tr_solver="lsmr" was measured too and rejected: 0.63x AND it
-                # changed the output.
-                ftol=1e-5,
-                xtol=1e-5,
-                gtol=1e-5,
+                # A discrete classifier has to sit on a converged fit. If the SVD
+                # cost matters, the lever is fewer/cheaper fits or better initial
+                # guesses (output-preserving), not a looser stop that changes which
+                # multiplet the chemist is shown.
+                ftol=1e-8,
+                xtol=1e-8,
+                gtol=1e-8,
             )
         except (ValueError, RuntimeError):
             return (None, math.inf)

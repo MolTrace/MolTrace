@@ -193,7 +193,18 @@ def _assert_matches_golden(observed: dict[str, Any], golden: dict[str, Any]) -> 
             gold["integration_h"], abs=INTEGRAL_TOL_H
         ), f"peak {i} integration"
 
-    assert observed["preview"]["n"] == golden["preview"]["n"]
+    # preview.n is the CARDINALITY of the down-sampled display trace, not a
+    # scientific quantity — the meaningful content of the preview is pinned by
+    # y_max / x_at_y_max / y_sum below, each already with a tolerance. The count
+    # itself is |{per-bucket min/max indices} ∪ {LTTB-selected indices}| (see
+    # nmrcheck.spectrum._downsample_points), and LTTB runs in a C extension built
+    # from source with no pinned wheel, so which index it selects at a near-tie —
+    # and therefore how many collide with the min/max set — varies by platform and
+    # even by CI-runner microarchitecture. Fixture 60000016 was observed at 9561
+    # and 9563 on different Linux runners for this reason. Tolerate that display
+    # jitter (a real down-sampler regression moves the count by hundreds, not a
+    # handful); keep the content assertions strict.
+    assert observed["preview"]["n"] == pytest.approx(golden["preview"]["n"], abs=16)
     assert observed["preview"]["y_max"] == pytest.approx(
         golden["preview"]["y_max"], rel=1e-6
     )
