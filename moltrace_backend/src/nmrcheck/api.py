@@ -1954,26 +1954,61 @@ def _raw_archive_audit_trail(
     ]
 
 
+#: Sentinel for "this request has not resolved credentials yet". A resolved
+#: ``None`` (no credentials presented) is a real answer and must be cached too,
+#: so absence cannot be represented by ``None``.
+_ACCESS_CONTEXT_UNRESOLVED = object()
+_ACCESS_CONTEXT_STATE_ATTR = "_moltrace_access_context"
+
+
 async def get_optional_access_context(
     request: Request,
     x_api_key: str | None = Header(default=None, alias="x-api-key"),
     bearer_token: str | None = Depends(oauth2_scheme),
     access_token: str | None = Query(default=None, alias="access_token"),
 ) -> AccessContext | None:
+    """Resolve the caller's credentials — at most once per request.
+
+    ``_baseline_access_gate`` calls this as a plain function rather than a
+    ``Depends`` parameter, deliberately, so that a stale credential riding along
+    on a public route cannot become a 401 (see that function). The cost of
+    stepping outside the dependency graph is that FastAPI's per-request
+    ``dependency_cache`` does not cover it, so a route's own
+    ``Depends(require_access_context)`` resolved the SAME credential a second
+    time — a second ``session_scope``, the same SELECTs, and a second
+    ``last_used_at`` UPDATE + COMMIT (a WAL fsync on Postgres) on the hottest
+    row in the system, before the handler did any work at all. For scale,
+    ``analyze_inputs`` on aspirin measures 0.6 ms warm.
+
+    The result is memoised on ``request.state``, which Starlette creates per
+    request, so this is a within-request memo and never shared between callers.
+    The inputs are fixed for the life of a request (one header, one bearer, one
+    query parameter), so the second resolution could only ever reach the same
+    answer. A raised 401 is not cached: it ends the request.
+    """
+
+    cached = getattr(request.state, _ACCESS_CONTEXT_STATE_ATTR, _ACCESS_CONTEXT_UNRESOLVED)
+    if cached is not _ACCESS_CONTEXT_UNRESOLVED:
+        return cached  # type: ignore[return-value]
+
     state = _state(request)
     if state.settings.local_auth_disabled:
-        return AccessContext(system_api_key=True)
-    if x_api_key is not None:
-        if state.api_key and hmac.compare_digest(x_api_key, state.api_key):
-            return AccessContext(system_api_key=True)
-        raise HTTPException(status_code=401, detail=PUBLIC_AUTH_REQUIRED_DETAIL)
-    token_value = bearer_token or access_token
-    if token_value:
-        user = get_user_by_token(state.session_factory, token_value)
-        if user is None:
+        resolved: AccessContext | None = AccessContext(system_api_key=True)
+    elif x_api_key is not None:
+        if not (state.api_key and hmac.compare_digest(x_api_key, state.api_key)):
             raise HTTPException(status_code=401, detail=PUBLIC_AUTH_REQUIRED_DETAIL)
-        return AccessContext(user=user, raw_token=token_value)
-    return None
+        resolved = AccessContext(system_api_key=True)
+    else:
+        token_value = bearer_token or access_token
+        if token_value:
+            user = get_user_by_token(state.session_factory, token_value)
+            if user is None:
+                raise HTTPException(status_code=401, detail=PUBLIC_AUTH_REQUIRED_DETAIL)
+            resolved = AccessContext(user=user, raw_token=token_value)
+        else:
+            resolved = None
+    setattr(request.state, _ACCESS_CONTEXT_STATE_ATTR, resolved)
+    return resolved
 
 
 def _enforce_mfa_satisfied(request: Request, context: AccessContext) -> None:
@@ -1987,6 +2022,14 @@ def _enforce_mfa_satisfied(request: Request, context: AccessContext) -> None:
         return
     if request.url.path.startswith("/auth/"):
         return
+    # Same within-request memo as the credential resolution above, and for the
+    # same reason: the router-level gate runs this, then the route's own
+    # ``require_access_context`` runs it again on identical inputs (same user,
+    # same token, same path), costing a second session and MFA-policy lookup on
+    # every authenticated request. Only a PASS is remembered — a failure raises
+    # and ends the request, so there is no failed verdict to reuse.
+    if getattr(request.state, _MFA_SATISFIED_STATE_ATTR, None) is True:
+        return
     state = _state(request)
     ok, detail = mfa_store.mfa_satisfied_for_session(
         state.session_factory,
@@ -1997,6 +2040,11 @@ def _enforce_mfa_satisfied(request: Request, context: AccessContext) -> None:
     )
     if not ok:
         raise mfa_webauthn.MFAError(detail or "mfa_required", 403)
+    setattr(request.state, _MFA_SATISFIED_STATE_ATTR, True)
+
+
+#: Marks that this request's MFA gate has already passed (see _enforce_mfa_satisfied).
+_MFA_SATISFIED_STATE_ATTR = "_moltrace_mfa_satisfied"
 
 
 async def require_access_context(
