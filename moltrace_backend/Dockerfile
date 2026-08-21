@@ -93,6 +93,22 @@ RUN if [ "$REQUIRE_HOSE_KB" = "1" ] && [ ! -s "$MOLTRACE_HOSE_KB" ]; then \
       exit 1; \
     fi
 
+# Build provenance. `current_git_sha()` (spectroscopy/infra/versioning.py:109) resolves
+# $MOLTRACE_GIT_SHA -> `git rev-parse` -> the literal "unknown", and never raises. In this
+# image the middle step cannot succeed: .dockerignore:4 excludes .git/, and the runtime
+# stage is a bare `python` base with no git installed. Nothing set the variable, so every
+# RegistryEntry.code_sha in production has been "unknown" — the one field that says which
+# code produced a regulated result.
+#
+# Deliberately defaulted to EMPTY rather than to the image tag. An empty value is falsy in
+# Python, so it falls through to the honest "unknown"; baking the `_TAG` default of "latest"
+# would instead stamp every record with a plausible-looking value that is not a revision.
+# A degenerate provenance field must look degenerate.
+#
+# Placed last so it invalidates no earlier layer: this argument changes on every commit.
+ARG MOLTRACE_GIT_SHA=""
+ENV MOLTRACE_GIT_SHA=${MOLTRACE_GIT_SHA}
+
 USER app
 EXPOSE 8080
 

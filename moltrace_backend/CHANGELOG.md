@@ -14,6 +14,41 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.69.10 — Every regulated result in production recorded its code revision as "unknown" (2026-08-21)
+
+`RegistryEntry.code_sha` answers the question an auditor asks first: which code produced
+this number. It resolves `$MOLTRACE_GIT_SHA` -> `git rev-parse` -> the literal string
+`"unknown"`, and `current_git_sha()` never raises, because provenance must not break a run.
+
+In the deployed image neither of the first two steps could succeed. `.dockerignore:4`
+excludes `.git/` from the build context, and the runtime stage is `COPY --from=build`
+onto a bare `python:3.13-slim` with no git binary. `MOLTRACE_GIT_SHA` was set nowhere in
+the deployment path — the only two occurrences in the tree were the function that reads it
+and one test that monkeypatches it. So the third step always won, and every `code_sha`
+written by the Cloud Run service was `"unknown"`.
+
+The value was available the whole time: CI already passes `github.sha` to Cloud Build as
+`_TAG`. It just never reached the runtime. A new `_GIT_SHA` substitution now carries it in
+as a build argument, and the Dockerfile exports it.
+
+`_GIT_SHA` is deliberately separate from `_TAG` rather than reusing it. `_TAG` falls back
+to `latest` for a manual build, and stamping `latest` into a provenance field would be
+worse than the bug it replaced — a plausible-looking value that is not a revision. The
+build argument defaults to the empty string instead, which is falsy in Python and falls
+through to the honest `"unknown"`. **A degenerate provenance field must look degenerate.**
+
+Wiring alone would only fix the one path that was found, so the degraded state is now
+visible where the analogous HOSE knowledge-base gap already is: `validate_startup_settings`
+reports it in production. That catches any future route to absent provenance, not just this
+one. `tests/test_git_sha_provenance_guard.py` pins the runtime half — including that an
+empty variable is never treated as a revision, which is what makes the Dockerfile's default
+safe.
+
+Found while writing the desktop active-versions contract, which wanted a code revision as
+an ordering input and could not use one.
+
+---
+
 ## v0.69.9 — A refusal a person can read, and the Part B handoff (2026-08-15)
 
 The preset refusal added in v0.69.8 dumped its whole accepted-id set into `detail`, which
