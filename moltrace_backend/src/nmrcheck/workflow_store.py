@@ -868,7 +868,14 @@ def _selected_evidence_rows(session: Session, run: WorkflowRunORM, inputs: dict[
     return list(session.scalars(stmt.order_by(SpectraCheckEvidenceRecordORM.id.asc())).all())
 
 
-def _execute_unified_step(session: Session, run: WorkflowRunORM, step: WorkflowRunStepORM, inputs: dict[str, Any]) -> dict[str, Any]:
+def _execute_unified_step(
+    session: Session,
+    run: WorkflowRunORM,
+    step: WorkflowRunStepORM,
+    inputs: dict[str, Any],
+    *,
+    created_by_user_id: int | None = None,
+) -> dict[str, Any]:
     evidence_rows = _selected_evidence_rows(session, run, inputs)
     if not evidence_rows:
         raise WorkflowError("Unified evidence step requires selected evidence records.")
@@ -912,6 +919,10 @@ def _execute_unified_step(session: Session, run: WorkflowRunORM, step: WorkflowR
         sha256=None,
         storage_key=None,
         artifact_json=_json_dump(result, default={}),
+        # Stamped with the actor advancing the run. An unstamped artifact is
+        # NULL-owned, and the read gate refuses those to every non-admin --
+        # including the person whose workflow produced it.
+        created_by_user_id=created_by_user_id,
         metadata_json=_json_dump({"workflow_run_id": run.id, "step_id": step.step_id}, default={}),
     )
     session.add(artifact)
@@ -927,7 +938,14 @@ def _execute_unified_step(session: Session, run: WorkflowRunORM, step: WorkflowR
     return {"artifact_id": artifact.id, "unified_evidence": result}
 
 
-def _execute_report_step(session: Session, run: WorkflowRunORM, step: WorkflowRunStepORM, inputs: dict[str, Any]) -> dict[str, Any]:
+def _execute_report_step(
+    session: Session,
+    run: WorkflowRunORM,
+    step: WorkflowRunStepORM,
+    inputs: dict[str, Any],
+    *,
+    created_by_user_id: int | None = None,
+) -> dict[str, Any]:
     latest = _latest_output(session, run.id)
     report = {
         "report_title": inputs.get("report_title") or f"{run.name} review report",
@@ -944,6 +962,7 @@ def _execute_report_step(session: Session, run: WorkflowRunORM, step: WorkflowRu
         title=str(report["report_title"]),
         content_type="application/json",
         artifact_json=_json_dump(report, default={}),
+        created_by_user_id=created_by_user_id,
         metadata_json=_json_dump({"workflow_run_id": run.id, "step_id": step.step_id}, default={}),
     )
     session.add(artifact)
@@ -1085,11 +1104,21 @@ def _execute_step_external(
             return ("succeeded", _execute_add_to_queue_step(session, run, step, inputs), None)
         if step_id == "unified_evidence":
             try:
-                return ("succeeded", _execute_unified_step(session, run, step, inputs), None)
+                return (
+                    "succeeded",
+                    _execute_unified_step(
+                        session, run, step, inputs, created_by_user_id=actor_id
+                    ),
+                    None,
+                )
             except WorkflowError as exc:
                 return ("blocked", None, str(exc))
         if step_id == "report_compose":
-            return ("succeeded", _execute_report_step(session, run, step, inputs), None)
+            return (
+                "succeeded",
+                _execute_report_step(session, run, step, inputs, created_by_user_id=actor_id),
+                None,
+            )
         if step_id == "review_gate":
             return ("succeeded", {"human_review_required": True, "status": "requires_review"}, None)
         if step.step_type == "manual":

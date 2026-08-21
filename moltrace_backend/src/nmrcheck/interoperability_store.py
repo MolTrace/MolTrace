@@ -1196,6 +1196,12 @@ def normalize_file(
                 sha256=hashlib.sha256(serialized.encode("utf-8")).hexdigest(),
                 storage_key=None,
                 artifact_json=serialized,
+                # A derived output follows the DATA, not whoever pressed the
+                # button: stamped with the source file's owner so a system-key
+                # normalisation of someone's spectrum still produces an artifact
+                # that person can read. Without any stamp the row is NULL-owned
+                # and the read gate refuses it to everyone but an admin.
+                created_by_user_id=file_row.created_by_user_id,
                 metadata_json=_json_dump(
                     {
                         "source_file_id": file_row.id,

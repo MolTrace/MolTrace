@@ -648,7 +648,17 @@ def _create_artifact(
     artifact_json: dict[str, Any] | None = None,
     storage_key: str | None = None,
     metadata_json: dict[str, Any] | None = None,
+    created_by_user_id: int | None = None,
 ) -> ArtifactRecordORM:
+    """Build a derived artifact row for a job or session.
+
+    ``created_by_user_id`` is who submitted the job. Migration 0043 added the
+    column and wired ``get_artifact_record``/``get_artifact_download`` to it,
+    but no creation site ever wrote it -- so every artifact was NULL-owned, and
+    a NULL owner is refused to every scoped caller. The gate that was meant to
+    stop cross-tenant reads instead hid each user's own artifacts from them.
+    Anything that adds another artifact writer must stamp it here too.
+    """
     serialized = _json_dump(artifact_json, default={}) if artifact_json is not None else None
     sha256 = (
         hashlib.sha256(serialized.encode("utf-8")).hexdigest()
@@ -664,6 +674,7 @@ def _create_artifact(
         sha256=sha256,
         storage_key=storage_key,
         artifact_json=serialized,
+        created_by_user_id=created_by_user_id,
         metadata_json=_json_dump(metadata_json or {}, default={}),
     )
     if job_id is not None:
@@ -682,6 +693,7 @@ def _execute_processed_preview(
     *,
     row: AnalysisJobORM,
     storage_root: Path,
+    created_by_user_id: int | None = None,
 ) -> dict[str, Any]:
     input_ids = _json_list(row.input_file_ids_json)
     if not input_ids:
@@ -718,6 +730,7 @@ def _execute_processed_preview(
         content_type="application/json",
         artifact_json=result,
         metadata_json={"input_file_id": file_row.id, "source_sha256": file_row.sha256},
+        created_by_user_id=created_by_user_id,
     )
     return result
 
@@ -727,8 +740,11 @@ def _execute_processed_analyze(
     *,
     row: AnalysisJobORM,
     storage_root: Path,
+    created_by_user_id: int | None = None,
 ) -> dict[str, Any]:
-    preview = _execute_processed_preview(session, row=row, storage_root=storage_root)
+    preview = _execute_processed_preview(
+        session, row=row, storage_root=storage_root, created_by_user_id=created_by_user_id
+    )
     peaks = list(preview.get("inferred_peaks") or [])
     result = {
         "sample_id": row.sample_id,
@@ -759,6 +775,7 @@ def _execute_processed_analyze(
         title="Processed NMR peak table",
         content_type="application/json",
         artifact_json=result,
+        created_by_user_id=created_by_user_id,
     )
     return result
 
@@ -768,15 +785,20 @@ def _execute_job(
     *,
     row: AnalysisJobORM,
     storage_root: Path,
+    created_by_user_id: int | None = None,
 ) -> dict[str, Any]:
     if row.job_type not in SUPPORTED_JOB_TYPES:
         raise OrchestrationError(
             f"Unsupported job_type '{row.job_type}'. Supported job types: {', '.join(sorted(SUPPORTED_JOB_TYPES))}."
     )
     if row.job_type == "nmr_processed_preview":
-        return _execute_processed_preview(session, row=row, storage_root=storage_root)
+        return _execute_processed_preview(
+            session, row=row, storage_root=storage_root, created_by_user_id=created_by_user_id
+        )
     if row.job_type == "nmr_processed_analyze":
-        return _execute_processed_analyze(session, row=row, storage_root=storage_root)
+        return _execute_processed_analyze(
+            session, row=row, storage_root=storage_root, created_by_user_id=created_by_user_id
+        )
     if row.job_type == "unified_confidence":
         params = _json_dict(row.parameters_json)
         result = params.get("unified_evidence_json") or params.get("result_json") or {
@@ -794,6 +816,7 @@ def _execute_job(
             title="Unified confidence evidence",
             content_type="application/json",
             artifact_json=result,
+            created_by_user_id=created_by_user_id,
         )
         return result
     if row.job_type == "report_compose":
@@ -809,6 +832,7 @@ def _execute_job(
             title=str(params.get("report_title") or "Structure elucidation report JSON"),
             content_type="application/json",
             artifact_json=report_json,
+            created_by_user_id=created_by_user_id,
         )
         return {"report_json": report_json, "human_review_required": True}
     raise OrchestrationError(
@@ -876,7 +900,12 @@ def create_analysis_job(
             progress_percent=25.0,
         )
         try:
-            result = _execute_job(session, row=row, storage_root=storage_root)
+            # The artifacts this produces are stamped with the submitting actor;
+            # without it they land NULL-owned and the read gate hides them from
+            # the very person who ran the job.
+            result = _execute_job(
+                session, row=row, storage_root=storage_root, created_by_user_id=actor_id
+            )
         except OrchestrationError as exc:
             row.status = "failed"
             row.progress_percent = 100.0
