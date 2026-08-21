@@ -150,45 +150,6 @@ def _axis_has_reference_ppm(spectrum: NMRSpectrum, expected_ppm: float, toleranc
     )
 
 
-# Cross-platform regression guard tolerances for the real-FID fingerprint test.
-# numpy/scipy use platform-specific BLAS backends and SIMD paths, so a byte-exact
-# hash of the rounded spectrum is not portable across OS/arch (it diverged between
-# macOS/arm64 and the Linux/x86_64 CI runner). Peak positions and heights
-# normalized to the spectrum max, however, agree across platforms to far better
-# than these tolerances while still catching any real regression in the
-# FID-processing pipeline. ppm tol ~8 axis bins; intensity tol 0.5% of full scale.
-_REAL_FID_PEAK_PPM_TOL = 0.05
-_REAL_FID_PEAK_INTENSITY_ATOL = 0.005
-
-
-def _assert_reference_peak_values(
-    spectrum: NMRSpectrum,
-    reference_peaks: list[dict[str, float]],
-    *,
-    window_ppm: float = 0.04,
-) -> None:
-    scale = float(np.max(np.abs(spectrum.data)))
-    assert scale > 0.0, "spectrum is flat — cannot normalize peak heights"
-    for peak in reference_peaks:
-        target = float(peak["ppm"])
-        mask = np.abs(spectrum.ppm_axis - target) <= window_ppm
-        assert np.any(mask), f"ppm window missing for {target}"
-        local_axis = spectrum.ppm_axis[mask]
-        local_data = spectrum.data[mask]
-        idx = int(np.argmax(local_data))
-        position = float(local_axis[idx])
-        norm_intensity = float(local_data[idx]) / scale
-        assert position == pytest.approx(target, abs=_REAL_FID_PEAK_PPM_TOL), (
-            f"peak position {position:.4f} ppm off reference {target:.4f} ppm"
-        )
-        assert norm_intensity == pytest.approx(
-            float(peak["norm_intensity"]), abs=_REAL_FID_PEAK_INTENSITY_ATOL
-        ), (
-            f"peak height {norm_intensity:.5f} off reference "
-            f"{float(peak['norm_intensity']):.5f} at {target:.4f} ppm"
-        )
-
-
 def test_bruker_fid_reader_matches_reference_ppm_count_and_metadata(tmp_path: Path) -> None:
     dataset = _write_bruker_dataset(tmp_path)
 
@@ -284,43 +245,55 @@ def test_bruker_13c_reader_uses_carbon_apodization_and_ppm_scale(tmp_path: Path)
     _assert_reference_peaks_match(spectrum, REFERENCE_13C_PEAKS)
 
 
-def test_real_nmrglue_varian_fixture_reads_metadata_and_fingerprint() -> None:
+def test_real_nmrglue_varian_fixture_is_arrayed_and_is_refused() -> None:
+    """The nmrglue Varian example is an *arrayed* dataset, so it must be refused.
+
+    RE-BASELINED 2026-08-20. This test previously asserted a full processed
+    spectrum for this fixture: 39,000 input points (26 records x 1500,
+    concatenated), a 65,536-point FFT, a ppm axis from 198.92 to -198.91, and four
+    13C "reference peaks" all at negative ppm. Every one of those numbers came
+    from `reshape(-1)` joining the 26 records end to end -- a measurement of
+    nothing. The test passed because it had recorded the bug's own output as
+    truth; see `tests/test_fid_dimensionality_refusal.py` for the invariant.
+
+    What is still worth pinning here is the *vendor-format* coverage the fixture
+    was added for (see fixtures/nmrglue/varian/README.md): detection classifies
+    the directory as Varian and the real `procpar` parses. The 1D processing path
+    is covered by the synthetic Varian datasets built above.
+    """
+    from moltrace.spectroscopy.io.fid_reader import (
+        FIDReaderError,
+        _detect_dataset,
+        _extract_field_mhz,
+        _extract_nucleus,
+        _read_varian,
+    )
+
     fixture_root = Path(__file__).parent / "fixtures" / "nmrglue" / "varian"
-    expected_path = fixture_root / "expected" / "example_separate_1d_varian.json"
-    fixture_spec = json.loads(expected_path.read_text(encoding="utf-8"))
+    fixture_spec = json.loads(
+        (fixture_root / "expected" / "example_separate_1d_varian.json").read_text(encoding="utf-8")
+    )
     expected = fixture_spec["expected"]
+    shape = fixture_spec["dataset_shape"]
     dataset = fixture_root / fixture_spec["dataset_path"]
     archive = fixture_root / "raw" / "example_separate_1d_varian.zip"
 
-    spectrum = read_fid(dataset)
-    repeated = read_fid(dataset)
-    from_archive = read_fid(archive)
+    # The Varian format still parses -- that is what this fixture is for.
+    vendor, dataset_root = _detect_dataset(dataset)
+    assert vendor == expected["vendor_detected"]
+    _dictionary, params, raw = _read_varian(ng, dataset_root)
+    assert _extract_nucleus(params) == expected["nucleus"]
+    assert _extract_field_mhz(params) == pytest.approx(expected["field_mhz"])
 
-    assert spectrum.metadata["vendor"] == expected["vendor"]
-    assert spectrum.nucleus == expected["nucleus"]
-    assert spectrum.solvent == expected["solvent"]
-    assert spectrum.field_mhz == pytest.approx(expected["field_mhz"])
-    assert spectrum.metadata["sweep_width_hz"] == pytest.approx(expected["sweep_width_hz"])
-    assert spectrum.metadata["zero_fill_points"] == expected["zero_fill_points"]
-    assert spectrum.metadata["input_points"] == expected["input_points"]
-    assert spectrum.data.shape == (expected["zero_fill_points"],)
-    assert spectrum.ppm_axis[0] == pytest.approx(expected["ppm_axis_start"])
-    assert spectrum.ppm_axis[-1] == pytest.approx(expected["ppm_axis_end"])
-    assert spectrum.acquisition_time == datetime.fromisoformat(expected["acquisition_time"])
-    assert spectrum.metadata["peak_count"] == expected["peak_count"]
-    # Cross-platform regression guard on the FFT output: assert spectral
-    # features (peak positions + heights normalized to the spectrum max) with
-    # tolerance instead of a byte-exact hash. A hash of the rounded spectrum is
-    # not portable across OS/arch (numpy/scipy BLAS + SIMD differences diverged
-    # it between macOS and the Linux CI runner), but these features agree to far
-    # better than the tolerances while still catching real pipeline regressions.
-    _assert_reference_peak_values(spectrum, expected["reference_peaks"])
-    # The fingerprint's actual contract is "identical input -> identical id", so
-    # validate format + within-run determinism (matching
-    # test_nmrshiftdb2_bruker_20_fids_match_processed_references below).
-    assert len(spectrum.fingerprint_hash) == 64
-    assert repeated.fingerprint_hash == spectrum.fingerprint_hash
-    assert from_archive.fingerprint_hash == spectrum.fingerprint_hash
+    # And it is arrayed, which is why no spectrum may come out of it.
+    assert raw.shape == (shape["records"], shape["points_per_record"])
+
+    for entry_point in (dataset, archive):
+        with pytest.raises(FIDReaderError) as caught:
+            read_fid(entry_point)
+        message = str(caught.value)
+        for token in expected["refusal_names"]:
+            assert token in message, f"refusal does not name {token!r}: {message}"
 
 
 def test_nmrshiftdb2_bruker_20_fids_match_processed_references() -> None:

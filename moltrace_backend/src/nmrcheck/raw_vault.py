@@ -539,6 +539,18 @@ def _detect_dataset(files_found: list[str]) -> tuple[str, str | None, list[str],
         warnings.append(
             f"{best_vendor} dataset-like files were found, but required raw/acquisition files are incomplete."
         )
+    # A `ser` dataset is complete as an *archive* and unusable as a *1D spectrum*.
+    # The vault still takes custody -- refusing to store what the instrument
+    # produced would lose data -- but saying nothing lets an operator believe the
+    # work was done, and they would only find out when processing fails later.
+    if best_vendor == "Bruker" and best_root is not None:
+        raw_present = best_meta.get("raw_files_present") or []
+        if "ser" in raw_present and "fid" not in raw_present:
+            warnings.append(
+                "This dataset stores its raw data in `ser`, which a 2D or arrayed experiment "
+                "writes instead of `fid`. The archive is stored and its integrity is protected, "
+                "but it cannot be processed into a 1D spectrum."
+            )
     return best_vendor, best_root, warnings, best_meta
 
 

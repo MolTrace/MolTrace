@@ -815,6 +815,40 @@ Measured, not inferred:
   `contour_preview_affects_evidence_score: false`, and warns that raw 2D
   processing is not performed.
 
+### CORRECTION (2026-08-20) — the boundary held for Bruker only
+
+The claim above, "no vendor 2D dataset can enter the system at all", was measured
+against Bruker and does not generalise. It rested on a vendor accident: Bruker
+writes 2D to `ser`, and dataset detection looks for `fid`. **Varian/Agilent writes
+2D and arrayed experiments to a file named `fid`, next to `procpar`** — exactly the
+pair detection accepts. Those datasets were detected, read, and then silently
+concatenated by `reshape(-1)` in the reader's `_flatten_1d_fid`.
+
+Measured on `tests/fixtures/nmrglue/varian/.../arrayed_data.dir`, a real vendor
+arrayed dataset already tracked in this repository:
+
+* `nmrglue` returned shape `(26, 1500)`; the reader joined it into a
+  39,000-point pseudo-FID and returned a 65,536-point "13C spectrum" spanning
+  198.92 to -198.91 ppm. **No exception, no warning, no metadata flag.**
+* `tests/fixtures/nmrglue/varian/expected/example_separate_1d_varian.json` had
+  recorded that output as the golden — including four 13C "reference peaks" at
+  -56.76, -66.57, -70.55 and -72.67 ppm. Every 13C peak at negative ppm across a
+  ~398 ppm span is the tell that the golden described nothing measured.
+
+This was the failure mode `tests/test_nmr2d_ingestion_boundary.py` warned about,
+occurring on the vendor path its detection-level guard never covered. The guard is
+now stated at the **engine**, where it is vendor-independent: `_flatten_1d_fid` is
+replaced by `_as_1d_fid`, which refuses a real second dimension and names the
+record count and record length in plain language. `.squeeze()` is kept, so a
+genuine trailing length-1 axis still reads. `nmrcheck.fid` carried its own copy of
+the same flatten and got the same treatment. Pinned by
+`tests/test_fid_dimensionality_refusal.py`.
+
+The corrected statement: **no 2D or arrayed acquisition can be processed into a 1D
+spectrum, and the refusal now says why.** C2 remains blocked for the reason given
+below — there is still no 2D handling to validate — but it is blocked by a
+deliberate refusal rather than by a vendor filename coincidence.
+
 So this is a **declared boundary, not a hidden defect** — the code says what it
 does not do. The consequence is the finding: axis assignment, referencing,
 phase-sensitivity and folding are all decided by whatever produced the uploaded

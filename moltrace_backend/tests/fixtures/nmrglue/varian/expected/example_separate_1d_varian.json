@@ -5,23 +5,22 @@
     "archive_sha256": "7f45584e03265f565d809d3140286b11f5797ab0cd182c5318ff537292c3f613"
   },
   "dataset_path": "extracted/example_separate_1d_varian/separate_1d_varian/arrayed_data.dir",
+  "dataset_shape": {
+    "records": 26,
+    "points_per_record": 1500,
+    "note": "An *arrayed* acquisition. The nmrglue example exists to demonstrate separating it into individual 1D datasets; the archive contains no 1D dataset of its own."
+  },
   "expected": {
     "vendor": "Varian/Agilent",
+    "vendor_detected": "varian",
     "nucleus": "13C",
-    "solvent": "none",
     "field_mhz": 125.6811106,
-    "sweep_width_hz": 50000.0,
-    "zero_fill_points": 65536,
-    "input_points": 39000,
-    "ppm_axis_start": 198.91612892860607,
-    "ppm_axis_end": -198.9100584901012,
-    "peak_count": 75,
-    "acquisition_time": "2010-02-17T13:46:17+00:00",
-    "reference_peaks": [
-      {"ppm": -56.7586, "norm_intensity": 0.8402},
-      {"ppm": -66.5745, "norm_intensity": 0.65663},
-      {"ppm": -70.5506, "norm_intensity": 1.0},
-      {"ppm": -72.6692, "norm_intensity": 0.77628}
-    ]
+    "read_fid_refuses": true,
+    "refusal_names": ["26", "1500", "arrayed"]
+  },
+  "rebaselined": {
+    "date": "2026-08-20",
+    "why": "This block previously recorded a processed spectrum for this dataset: input_points 39000 (= 26 x 1500 concatenated), a 65536-point FFT, a ppm axis spanning 198.92 to -198.91, and four 13C 'reference peaks' at -56.76, -66.57, -70.55 and -72.67 ppm. Those numbers were the output of flattening the 26 records into one pseudo-FID, not a measurement -- a 13C spectrum whose every peak sits at negative ppm across a ~398 ppm span is the tell. The reader now refuses a real second dimension, so the golden records the refusal instead. Do not restore the old values; they describe a spectrum that was never acquired.",
+    "one_dimensional_varian_coverage": "tests/test_fid_reader.py builds synthetic 1D Varian datasets via _write_varian_dataset; the Varian procpar/format path is still exercised end to end there."
   }
 }

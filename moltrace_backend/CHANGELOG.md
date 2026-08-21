@@ -14,6 +14,49 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.69.10 — An arrayed dataset stops coming back as a spectrum (2026-08-20)
+
+The raw FID reader accepted multi-dimensional data and flattened it. `_flatten_1d_fid`
+ended with `if fid.ndim > 1: fid = fid.reshape(-1)` — no error, no warning — which
+concatenates the indirect dimension onto the direct one and hands the result to
+apodization, FT, phasing and baseline correction. What comes out has peaks, a plausible
+ppm axis, and nothing wrong with it on inspection.
+
+`tests/test_nmr2d_ingestion_boundary.py` had described this exact failure and pinned a
+guard against it. That guard was at dataset *detection* and turned out to be vendor-shaped:
+Bruker writes 2D to `ser`, detection looks for `fid`, so Bruker 2D was never found. **Varian
+and Agilent write 2D and arrayed experiments to a file named `fid`, beside `procpar`** — the
+exact pair detection accepts. That path was never covered.
+
+It reproduced on a fixture already in this repository. `tests/fixtures/nmrglue/varian/…/
+arrayed_data.dir`, the nmrglue `separate_1d_varian` example, is a 26 × 1500 arrayed
+acquisition. `read_fid` returned a 65,536-point "13C spectrum" built from a 39,000-point
+pseudo-FID, spanning 198.92 to −198.91 ppm. Its golden file had recorded that as expected
+output, four "reference peaks" included — all at negative 13C shifts, across ~398 ppm, which
+is what a measurement of nothing looks like once it is written down.
+
+`_flatten_1d_fid` is now `_as_1d_fid` and refuses a real second dimension, naming the record
+count and record length in a chemist's vocabulary rather than reporting an array shape.
+`.squeeze()` is kept, so a genuine trailing length-1 axis still reads. The name changed
+because the old one asked for the bug: a function called *flatten* invites someone to
+restore the flatten.
+
+`nmrcheck.fid` carried its own copy of the same function, reached by the Varian branch of
+the upload path, and got the same treatment. The other `reshape(-1)`/`ravel()`/`flatten()`
+sites in `moltrace.spectroscopy` and `nmrcheck` were enumerated in the same pass: the rest
+operate on already-1D axes, value vectors, feature vectors, or order-independent statistics,
+and are normalisation rather than a silent join.
+
+Two goldens were re-baselined visibly rather than quietly re-recorded, each carrying the
+numbers it used to assert and why they were wrong.
+
+Separately, the vault and the reader no longer disagree about the same folder. A directory
+holding `ser` + `acqus` scored as a complete Bruker dataset at ingest, so custody was taken
+and storage consumed for something processing would then refuse. The archive is still
+stored — a raw-data vault should not discard what the instrument produced — but the record
+now carries a warning saying it holds `ser` rather than `fid`, that this is what a 2D or
+arrayed experiment writes, and that it cannot be processed into a 1D spectrum.
+
 ## v0.69.9 — A refusal a person can read, and the Part B handoff (2026-08-15)
 
 The preset refusal added in v0.69.8 dumped its whole accepted-id set into `detail`, which

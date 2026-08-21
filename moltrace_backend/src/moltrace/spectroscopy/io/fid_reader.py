@@ -67,7 +67,7 @@ def read_fid(path: Path) -> NMRSpectrum:
         else:  # pragma: no cover - defensive guard for future vendor additions.
             raise FIDReaderError(f"Unsupported FID vendor: {vendor}")
 
-        fid_1d = _flatten_1d_fid(fid)
+        fid_1d = _as_1d_fid(fid)
         nucleus = _extract_nucleus(params)
         solvent = _extract_solvent(params)
         field_mhz = _extract_field_mhz(params)
@@ -705,12 +705,40 @@ def _read_varian(ng: Any, dataset_root: Path) -> tuple[dict[str, Any], dict[str,
     return dictionary, params, np.asarray(data)
 
 
-def _flatten_1d_fid(data: np.ndarray) -> np.ndarray:
+def _multidimensional_fid_message(shape: tuple[int, ...]) -> str:
+    """Explain, in a chemist's vocabulary, why multi-record data is refused.
+
+    Kept deliberately identical in wording to the copy in ``nmrcheck.fid``; the
+    two readers are separate but a user can reach either, and they must not
+    disagree about what happened. ``tests/test_fid_dimensionality_refusal.py``
+    holds both to the same contract.
+    """
+    records = int(np.prod(shape[:-1]))
+    points = int(shape[-1])
+    return (
+        f"This dataset holds {records} separate records of {points} points each, so it is a "
+        "2D or arrayed experiment rather than a single 1D acquisition. Joining the records "
+        "end to end would produce a spectrum that looks ordinary but describes nothing that "
+        "was measured, so it is refused instead. Process the records as individual 1D "
+        "acquisitions, or use an analysis that handles 2D data."
+    )
+
+
+def _as_1d_fid(data: np.ndarray) -> np.ndarray:
+    """Return the FID as a 1D complex array, refusing a real second dimension.
+
+    ``squeeze`` still removes genuine length-1 axes, so a ``(N, 1)`` export reads
+    normally. A real second dimension is *refused* rather than concatenated: a 2D
+    or arrayed acquisition read as one long FID transforms into a spectrum with
+    peaks and a plausible ppm axis and no outward sign of being wrong, which is
+    worse than a rejection. See ``tests/test_nmr2d_ingestion_boundary.py`` for the
+    same invariant stated at the Bruker dataset-detection boundary.
+    """
     fid = np.asarray(data).squeeze()
     if fid.ndim == 0:
         raise FIDReaderError("The raw FID did not contain a usable 1D array.")
     if fid.ndim > 1:
-        fid = fid.reshape(-1)
+        raise FIDReaderError(_multidimensional_fid_message(fid.shape))
     if fid.size < 8:
         raise FIDReaderError("The raw FID is too short to process.")
     return fid.astype(np.complex128, copy=False)

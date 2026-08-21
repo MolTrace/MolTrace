@@ -1476,12 +1476,39 @@ def _is_complex_fid(data: np.ndarray) -> bool:
     return bool(np.iscomplexobj(np.asarray(data)))
 
 
-def _flatten_1d_fid(data: np.ndarray) -> np.ndarray:
+def _multidimensional_fid_message(shape: tuple[int, ...]) -> str:
+    """Explain, in a chemist's vocabulary, why multi-record data is refused.
+
+    Kept deliberately identical in wording to the copy in
+    ``moltrace.spectroscopy.io.fid_reader``; the two readers are separate but a
+    user can reach either, and they must not disagree about what happened.
+    ``tests/test_fid_dimensionality_refusal.py`` holds both to the same contract.
+    """
+    records = int(np.prod(shape[:-1]))
+    points = int(shape[-1])
+    return (
+        f"This dataset holds {records} separate records of {points} points each, so it is a "
+        "2D or arrayed experiment rather than a single 1D acquisition. Joining the records "
+        "end to end would produce a spectrum that looks ordinary but describes nothing that "
+        "was measured, so it is refused instead. Process the records as individual 1D "
+        "acquisitions, or use an analysis that handles 2D data."
+    )
+
+
+def _as_1d_fid(data: np.ndarray) -> np.ndarray:
+    """Return the raw fid as a 1D complex array, refusing a real second dimension.
+
+    ``squeeze`` still removes genuine length-1 axes. A real second dimension is
+    *refused* rather than concatenated: a 2D or arrayed acquisition read as one
+    long FID transforms into a spectrum with peaks and a plausible ppm axis and no
+    outward sign of being wrong. Varian/Agilent reaches this with a file named
+    `fid`, so dataset detection cannot be the only guard.
+    """
     data = np.asarray(data).squeeze()
     if data.ndim == 0:
         raise FIDProcessingError("The raw fid data did not contain a usable 1D array.")
     if data.ndim > 1:
-        data = data.reshape(-1)
+        raise FIDProcessingError(_multidimensional_fid_message(data.shape))
     if data.size < 8:
         raise FIDProcessingError("The raw fid data is too short to process.")
     return data.astype(np.complex128, copy=False)
@@ -1507,7 +1534,7 @@ def _maybe_remove_group_delay(
                 corrected = ng.bruker.remove_digital_filter(dic, data)
             if _is_complex_fid(fid) and not _is_complex_fid(np.asarray(corrected)):
                 raise FIDProcessingError("nmrglue returned non-complex corrected data.")
-            corrected = _flatten_1d_fid(np.asarray(corrected))
+            corrected = _as_1d_fid(np.asarray(corrected))
             if corrected.size >= 8:
                 return (corrected, True)
         except Exception:
@@ -2971,7 +2998,7 @@ def process_bruker_1d_zip(
             params = _read_varian_procpar(varian_dataset.procpar_path)
             ng_params, data = _read_varian_with_nmrglue(varian_dataset)
             params = {**params, **ng_params}
-            fid = np.array(_flatten_1d_fid(np.asarray(data)), dtype=np.complex128, copy=True)
+            fid = np.array(_as_1d_fid(np.asarray(data)), dtype=np.complex128, copy=True)
             nmrglue_used = True
             group_delay_applied = False
             digital_filter_correction_status = "not_applicable"
@@ -3013,7 +3040,7 @@ def process_bruker_1d_zip(
                         "the raw interleaved real/imaginary fid reader to preserve "
                         "spectrum orientation."
                     )
-            fid = np.array(_flatten_1d_fid(np.asarray(fid)), dtype=np.complex128, copy=True)
+            fid = np.array(_as_1d_fid(np.asarray(fid)), dtype=np.complex128, copy=True)
             fid, group_delay_applied = _maybe_remove_group_delay(
                 fid,
                 params,
