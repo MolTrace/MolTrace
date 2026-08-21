@@ -252,6 +252,24 @@ def test_compliance_class1_uses_fixed_limit_not_dose_scaled():
     assert low.permitted_ppm == high.permitted_ppm == 2.0
 
 
+def test_a_class_1_limit_is_not_described_as_option_1():
+    """Options 1 and 2 are two ways to derive a Class 2/3 limit from a PDE.
+
+    A Class 1 solvent has no PDE at all -- its limit is a fixed Appendix value that no dose
+    changes -- so calling it "Option 1" names a derivation that never ran and implies a
+    10 g/day reference the number does not depend on. The frozen worked-example corpus
+    already describes it correctly as "fixed, dose-independent"; the runtime note did not.
+    """
+
+    note = " ".join(check_residual_solvent_limits({"benzene": 1.0}, daily_dose_g=1.0)[0].notes)
+    assert "Option 1" not in note
+    assert "fixed" in note.lower() and "dose-independent" in note.lower()
+
+    # A Class 2 solvent genuinely is Option 2 here, and must still say so.
+    tol = " ".join(check_residual_solvent_limits({"toluene": 1.0}, daily_dose_g=1.0)[0].notes)
+    assert "Option 2" in tol
+
+
 def test_compliance_unknown_solvent_not_judged():
     res = check_residual_solvent_limits({"unobtainium": 100.0}, daily_dose_g=1.0)
     r = res[0]
