@@ -111,12 +111,13 @@ class TestFitConvergesToThePrecisionThatIsRead:
     default ftol/xtol/gtol of 1e-8 to 1e-5 measured 6.95x faster with the peak
     list identical ON THAT SPECTRUM.
 
-    It was reverted to 1e-8. On the fixture corpus the peak list is NOT identical:
-    the multiplicity is read off the resolved line COUNT, and for real spectra the
-    count is still moving between 1e-5 and 1e-8 (nmrshiftdb2 40256149 peak 2 reads
-    "m" at 1e-8 and "t" at 1e-5) — i.e. 1e-5 is under-converged for this stage, not
-    faster-but-equal. The output-invariance goldens caught it. See the note in
-    nmrcheck.gsd deconvolve_region.
+    A few ambiguous multiplets have a discrete label (read off the line COUNT)
+    that is not robust to the tolerance OR the platform: 40256149 peak 2 is "m" at
+    1e-8 and "t" at 1e-5 on macOS, and 40256175 peak 6 is "s" on macOS but "d" on
+    Linux at both tolerances. That is a different local minimum per LAPACK, not an
+    under-converged fit, so the tolerance does not fix it — the output-invariance
+    goldens are minted on Linux (production) instead. See the note in nmrcheck.gsd
+    deconvolve_region.
 
     These tests pin the accuracy side regardless of tolerance, so any future change
     has to answer to the same numbers: line COUNT, centre positions in Hz, and
