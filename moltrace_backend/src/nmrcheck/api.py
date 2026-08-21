@@ -9279,7 +9279,27 @@ async def regulatory_impurities_assess(
                 measured_ng_per_day=item.measured_ng_per_day,
                 within_ai_limit=within,
                 regulatory_basis=cpca.regulatory_basis,
+                authority=cpca.authority,
+                category_description=cpca.category_description,
+                alpha_h_score=cpca.alpha_h_score,
+                alpha_h_distribution=cpca.alpha_h_distribution,
+                activating_features=list(cpca.activating_features),
+                deactivating_features=list(cpca.deactivating_features),
+                feature_evidence=dict(cpca.feature_evidence),
+                method_reference=cpca.method_reference,
+                rule_set_version=cpca.rule_set_version,
+                notes=list(cpca.notes),
             )
+            # A caveat that changes what the verdict MEANS belongs in the
+            # top-level warnings, not only in a nested notes list a client may
+            # never render. A di-nitrosamine scored on one centre otherwise
+            # returns a category indistinguishable from a fully-assessed
+            # mono-nitrosamine.
+            label = item.name or item.smiles
+            for note in cpca.notes:
+                lowered = note.lower()
+                if "only the first" in lowered or "category 5" in lowered:
+                    warnings.append(f"{label}: {note}")
 
         structural_outs.append(
             ImpurityStructuralOut(
@@ -9292,6 +9312,15 @@ async def regulatory_impurities_assess(
                 regulatory_action_required=m7.regulatory_action_required,
                 cpca=cpca_out,
                 regulatory_basis=m7.regulatory_basis,
+                class_definition=m7.class_definition,
+                duration_band=m7.duration_band,
+                structural_alerts=list(m7.structural_alerts),
+                in_silico_concordance=m7.in_silico_concordance,
+                coc_categories=list(m7.coc_categories),
+                data_basis=m7.data_basis,
+                reasoning=m7.reasoning,
+                class_scheme_reference=m7.class_scheme_reference,
+                rule_set_version=m7.rule_set_version,
             )
         )
 
