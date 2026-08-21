@@ -14283,7 +14283,7 @@ export interface components {
             /** Split Recommendation */
             split_recommendation?: ("train" | "validation" | "test" | "holdout" | "unknown") | null;
             /** Leakage Risk Label */
-            leakage_risk_label?: ("low" | "medium" | "high" | "unknown") | null;
+            leakage_risk_label?: ("high" | "medium" | "low" | "unknown") | null;
             /** Quality Flags Json */
             quality_flags_json?: string[] | null;
             /** Metadata Json */
@@ -22324,6 +22324,12 @@ export interface components {
              * @default 120
              */
             duration_months: number;
+            /**
+             * Authority
+             * @default FDA
+             * @enum {string}
+             */
+            authority: "FDA" | "EMA";
             /** Residual Solvents */
             residual_solvents?: components["schemas"]["ImpuritySolventInput"][];
             /** Elemental Impurities */
@@ -22344,6 +22350,11 @@ export interface components {
             substance_type: string;
             /** Duration Months */
             duration_months: number;
+            /**
+             * Authority
+             * @default FDA
+             */
+            authority: string;
             thresholds: components["schemas"]["ImpurityThresholdsOut"];
             /** Residual Solvents */
             residual_solvents?: components["schemas"]["ImpuritySolventOut"][];
@@ -22388,6 +22399,28 @@ export interface components {
             within_ai_limit?: boolean | null;
             /** Regulatory Basis */
             regulatory_basis: string;
+            /** Authority */
+            authority?: string | null;
+            /** Category Description */
+            category_description?: string | null;
+            /** Alpha H Score */
+            alpha_h_score?: number | null;
+            /** Alpha H Distribution */
+            alpha_h_distribution?: string | null;
+            /** Activating Features */
+            activating_features?: string[];
+            /** Deactivating Features */
+            deactivating_features?: string[];
+            /** Feature Evidence */
+            feature_evidence?: {
+                [key: string]: number;
+            };
+            /** Method Reference */
+            method_reference?: string | null;
+            /** Rule Set Version */
+            rule_set_version?: string | null;
+            /** Notes */
+            notes?: string[];
         };
         /**
          * ImpurityCumulativeRiskOut
@@ -22622,6 +22655,24 @@ export interface components {
             cpca?: components["schemas"]["ImpurityCPCAOut"] | null;
             /** Regulatory Basis */
             regulatory_basis: string;
+            /** Class Definition */
+            class_definition?: string | null;
+            /** Duration Band */
+            duration_band?: string | null;
+            /** Structural Alerts */
+            structural_alerts?: string[];
+            /** In Silico Concordance */
+            in_silico_concordance?: string | null;
+            /** Coc Categories */
+            coc_categories?: string[];
+            /** Data Basis */
+            data_basis?: string | null;
+            /** Reasoning */
+            reasoning?: string | null;
+            /** Class Scheme Reference */
+            class_scheme_reference?: string | null;
+            /** Rule Set Version */
+            rule_set_version?: string | null;
         };
         /** ImpurityThresholdRule */
         ImpurityThresholdRule: {
