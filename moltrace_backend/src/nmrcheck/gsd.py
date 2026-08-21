@@ -268,6 +268,14 @@ def deconvolve_region(
                 # cost matters, the lever is fewer/cheaper fits or better initial
                 # guesses (output-preserving), not a looser stop that changes which
                 # multiplet the chemist is shown.
+                #
+                # Convergence is necessary but not sufficient: a few genuinely-
+                # ambiguous multiplets still land in a different local minimum under
+                # Linux/x86 LAPACK than under macOS/ARM at 1e-8, because their label
+                # turns on a resolved line count or a spacing-symmetry test that the
+                # data does not settle. Those are named with their measured evidence
+                # in tests/golden/fid_invariants/boundary_register.json — do not
+                # reach for the tolerance again to chase them.
                 ftol=1e-8,
                 xtol=1e-8,
                 gtol=1e-8,
