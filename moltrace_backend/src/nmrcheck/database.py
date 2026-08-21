@@ -2391,16 +2391,39 @@ def get_full_analysis_by_id(session_factory: sessionmaker[Session], analysis_id:
 
 
 
+#: Rows fetched per round trip while streaming an export. Small enough that
+#: peak memory is a batch rather than a tenant's whole history, large enough
+#: that the round trips do not dominate.
+_EXPORT_BATCH_ROWS = 500
+
+
 def iter_analyses(session_factory: sessionmaker[Session], *, limit: int | None = None, user_id: int | None = None) -> Iterable[StoredAnalysisRecord]:
+    """Stream stored analyses newest-first, a batch at a time.
+
+    This was a generator in shape only: it did ``list(...all())`` first, so the
+    entire result set — every row carrying nmr_text, smiles, notes_json and
+    full_report_json — was resident before the first record was yielded. The
+    session now stays open across the iteration and rows arrive in batches, so
+    peak memory is one batch. Closing the generator early (a client
+    disconnecting mid-download) unwinds the ``with`` and releases the
+    connection.
+
+    full_report_json is deferred: it is the largest column on the row and no
+    consumer of this function reads it.
+    """
+
     with session_scope(session_factory) as session:
-        stmt = select(AnalysisORM).order_by(AnalysisORM.id.desc())
+        stmt = (
+            select(AnalysisORM)
+            .order_by(AnalysisORM.id.desc())
+            .options(defer(AnalysisORM.full_report_json))
+        )
         if user_id is not None:
             stmt = stmt.where(AnalysisORM.user_id == user_id)
         if limit is not None:
             stmt = stmt.limit(limit)
-        rows = list(session.scalars(stmt).all())
-    for row in rows:
-        yield _analysis_to_record(row)
+        for row in session.scalars(stmt).yield_per(_EXPORT_BATCH_ROWS):
+            yield _analysis_to_record(row)
 
 
 
@@ -2435,21 +2458,39 @@ def list_job_analyses(session_factory: sessionmaker[Session], job_id: int, *, us
 
 
 
-def export_history_csv(session_factory: sessionmaker[Session], *, limit: int | None = None, user_id: int | None = None) -> str:
-    output = io.StringIO()
-    writer = csv.writer(output)
-    writer.writerow([
+def export_history_csv(
+    session_factory: sessionmaker[Session], *, limit: int | None = None, user_id: int | None = None
+) -> Iterator[str]:
+    """Yield the history export one CSV row at a time.
+
+    This used to accumulate the whole export in a StringIO and return
+    ``getvalue()``, which the route then encoded whole — so a tenant's entire
+    history existed as ORM rows, as a str, AND as bytes before the first byte
+    reached the client. Inside a memory-capped Cloud Run container an OOM kill
+    is a restart, and a restart costs every other request on that instance a
+    cold start.
+
+    A row at a time keeps peak memory flat. The caller writes each row through
+    its own one-row csv.writer so quoting and escaping stay identical to the
+    module that produced the old output.
+    """
+
+    def _row(values: list[object]) -> str:
+        buffer = io.StringIO()
+        csv.writer(buffer).writerow(values)
+        return buffer.getvalue()
+
+    yield _row([
         "id", "created_at", "label", "sample_id", "solvent", "smiles", "nmr_text", "expected_total_h",
         "observed_total_h", "confidence", "parsed_peak_count", "delta_total_h", "job_id", "notes",
     ])
     for record in iter_analyses(session_factory, limit=limit, user_id=user_id):
-        writer.writerow([
+        yield _row([
             record.id, record.created_at.isoformat(), record.label, record.sample_id or "", record.solvent or "",
             record.smiles, record.nmr_text, record.expected_total_h, record.observed_total_h,
             record.confidence, record.parsed_peak_count, record.delta_total_h, record.job_id or "",
             " | ".join(record.notes),
         ])
-    return output.getvalue()
 
 
 
