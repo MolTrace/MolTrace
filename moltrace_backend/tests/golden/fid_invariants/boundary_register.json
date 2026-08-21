@@ -1,0 +1,138 @@
+{
+  "_comment": [
+    "Boundary register for the raw-FID output-invariance goldens.",
+    "",
+    "Multiplicity is a DISCRETE label derived by thresholding a CONTINUOUS quantity:",
+    "the resolved line COUNT and the adjacent-line SPACINGS that come out of",
+    "the deconvolution's least_squares fit. A quantity of that shape inherits the fit's",
+    "spread at its band edges, and for a few genuinely-ambiguous multiplets that spread is",
+    "wider than the gap between two labels. Those peaks land in a different local minimum",
+    "under Linux/x86 LAPACK than under macOS/ARM Accelerate, at a converged 1e-8 fit, so no",
+    "convergence tolerance reconciles them and minting per platform would mean maintaining",
+    "two golden sets forever.",
+    "",
+    "Each entry relaxes ONE peak's discrete label to a stated set of labels. Nothing else is",
+    "relaxed: the peak must still exist, and its shift_ppm and integration_h must still pass",
+    "SHIFT_TOL_PPM and INTEGRAL_TOL_H. A registered peak that vanishes, moves, or",
+    "re-integrates is still a failure.",
+    "",
+    "RULES, enforced by tests in tests/test_fid_pipeline_invariants.py:",
+    "  * A fixture may NOT be moved here to make a failing run pass. Every entry carries the",
+    "    measurement that establishes the ambiguity; an entry with no recorded reason is not",
+    "    admissible.",
+    "  * The register may not grow silently. Its size is pinned by",
+    "    EXPECTED_BOUNDARY_REGISTER_ENTRIES in the test module, so adding an entry is a",
+    "    two-file edit. A register that grows between releases is a signal that a tolerance",
+    "    or a band edge is wrong, not routine maintenance.",
+    "  * An entry whose recorded platforms have collapsed onto a single label is stale: the",
+    "    peak now agrees across platforms and the entry must be removed, not kept.",
+    "",
+    "The ambiguity of each entry was established by perturbing the region trace by the stated",
+    "relative amount in both sign directions and refitting — a nudge some seven orders of",
+    "magnitude below one ADC count, i.e. far below the precision the data itself carries. A",
+    "label that moves under it is not determined by the data. A peak that does NOT move under",
+    "it does not belong here; a disagreement there is a real defect to investigate."
+  ],
+  "entries": [
+    {
+      "case": "40256149_1h_unguided",
+      "peak": 2,
+      "shift_ppm": 6.884,
+      "allowed_multiplicity": [
+        "m",
+        "t"
+      ],
+      "observed": {
+        "darwin-arm64": "m",
+        "linux-x86_64": "t"
+      },
+      "reason": "The optimiser reaches two different solutions of the same 4-seed region. macOS resolves four narrow lines and reads 'm' off their uneven spacings; Linux resolves three evenly spaced ones and reads a triplet. The region is never reproduced within the noise floor, so the elimination pass that would prune a redundant line never runs and the line set is not pinned down by the data.",
+      "evidence": {
+        "measurement": "Region 6.87115-6.92760 ppm, 278 points, 4 seed maxima. macOS keeps 4 lines at 6.873981 / 6.889816 / 6.894117 / 6.900294 ppm, adjacent spacings 6.33 / 1.72 / 2.47 Hz - neither uniform (worst deviation 2.83 Hz against a 0.63 Hz tolerance) nor dd-symmetric (3.86 Hz asymmetry against that same tolerance) - so it reports 'm'. The accepted fit's max residual is 1.23e6, 7.66x the 5-sigma acceptance tolerance of 1.61e5, so the backward elimination pass is never entered. Perturbing the trace by a relative 1e-12 in either sign direction moves the fit to a different solution: the two narrow lines at 6.889816 and 6.894117 (hwhm ~0.0011 ppm) are replaced by a single line 3.4x wider at 6.892551 (hwhm 0.0037), the weak outer line moves 6.900294 -> 6.909773 and halves to 1.03x the inclusion cut, and the three survivors read 't' - the Linux label. It is the solution that moves, not a line crossing a threshold: every line macOS keeps sits at 2.01x the inclusion cut or above, and no two are closer than 9.4x the distance at which lines are merged.",
+        "flip_perturbation_relative": 1e-12,
+        "resolved_line_count": {
+          "m": 4,
+          "t": 3
+        },
+        "fit_residual_over_acceptance_tolerance": 7.66
+      },
+      "added": "2026-08-21",
+      "added_by": "sirmcdoe"
+    },
+    {
+      "case": "40256149_1h_guided",
+      "peak": 2,
+      "shift_ppm": 6.884,
+      "allowed_multiplicity": [
+        "m",
+        "t"
+      ],
+      "observed": {
+        "darwin-arm64": "m",
+        "linux-x86_64": "t"
+      },
+      "reason": "The same multiplet and, as measured, the same deconvolution as 40256149_1h_unguided peak 2. The structure-guided sweep settles on a different detection sensitivity here (0.04 against 0.06), but the cluster at 6.884 ppm comes out identical, so the fit and its divergence are the same ones.",
+      "evidence": {
+        "measurement": "Verified by instrumenting both configurations of this spectrum: despite the different chosen sensitivity, the deconvolution of this multiplet receives the same region 6.87115-6.92760 ppm and the same 4 seed maxima, resolves the same 4 lines at 6.873981 / 6.889816 / 6.894117 / 6.900294 ppm, carries the same 7.66x-tolerance residual, and collapses to the same 3-line solution and 't' under a relative 1e-12 perturbation.",
+        "flip_perturbation_relative": 1e-12,
+        "resolved_line_count": {
+          "m": 4,
+          "t": 3
+        },
+        "fit_residual_over_acceptance_tolerance": 7.66
+      },
+      "added": "2026-08-21",
+      "added_by": "sirmcdoe"
+    },
+    {
+      "case": "40256175_1h_unguided",
+      "peak": 6,
+      "shift_ppm": 3.877,
+      "allowed_multiplicity": [
+        "s",
+        "d"
+      ],
+      "observed": {
+        "darwin-arm64": "s",
+        "linux-x86_64": "d"
+      },
+      "reason": "One dominant line in a wide region - 33 seed maxima across 0.469 ppm (188 Hz) over a single 2.8e7-count peak. macOS fits it with one narrow line and reads 's'; Linux resolves a broad shoulder beside it and reads 'd'. The fit does not settle that shoulder: where it appears, its separation from the main line is close to the distance at which two lines are collapsed into one, and the main line's own fitted amplitude varies by 1.8x between runs differing only in the last bits of the input.",
+      "evidence": {
+        "measurement": "Region 3.43406-3.90280 ppm, 2301 points, 33 seed maxima. The region height is 2.82e7 counts against a measured noise sigma of only 1.43e3, so the noise floor max(sigma, 0.005 x height) resolves to the height term at 1.41e5 and the 3x inclusion cut sits at 4.24e5 - 1.500% of the tallest line, 99x above the actual noise. macOS keeps exactly one line, amplitude 1.51e7 at 3.879382 ppm (hwhm 0.00067), and the accepted fit still misses the region by 1.69x the 5-sigma acceptance tolerance. Perturbing the trace by a relative 1e-12 in either sign direction yields two lines and 'd': a broad shoulder at 3.8772-3.8775 ppm (hwhm 0.0028, 4.2x wider) carrying 2.70-3.10x the inclusion cut - a real line by amplitude - separated from the main line by only 1.36-1.40x the merge distance, while the main line itself refits anywhere between 1.60e7 and 2.71e7. Corroborated on macOS alone by the committed goldens: the structure-guided run of this spectrum settles on a different detection sensitivity (0.12 against 0.06), fits this multiplet from a different cluster, and labels it (40256175_1h_guided peak 5, 3.878 ppm) 'd'. Two legitimate detections of one multiplet, on one platform, already disagree on the label.",
+        "flip_perturbation_relative": 1e-12,
+        "resolved_line_count": {
+          "s": 1,
+          "d": 2
+        },
+        "fit_residual_over_acceptance_tolerance": 1.69
+      },
+      "added": "2026-08-21",
+      "added_by": "sirmcdoe"
+    },
+    {
+      "case": "40256175_1h_guided",
+      "peak": 8,
+      "shift_ppm": 1.265,
+      "allowed_multiplicity": [
+        "dd",
+        "m"
+      ],
+      "observed": {
+        "darwin-arm64": "dd",
+        "linux-x86_64": "m"
+      },
+      "reason": "A weak, very broad outer line whose fitted position the data does not constrain. The doublet-of-doublets test is read off the four line positions, so when that line moves the label follows it from 'dd' to 'm'. The line count is not the fragile part here - the position is.",
+      "evidence": {
+        "measurement": "Region 1.22018-1.32942 ppm, 537 points, 7 seed maxima, 4 resolved lines at 1.222857 / 1.265383 / 1.270561 / 1.315726 ppm. Adjacent spacings 17.01 / 2.07 / 18.06 Hz, so the dd symmetry test compares |17.01 - 18.06| = 1.06 Hz against a 2.23 Hz tolerance and passes with 47% of the margin used. The fit is accepted at 0.56x the 5-sigma tolerance and its weakest line (1.222857 ppm, 1.87x the inclusion cut) is retained by a 1.33x-tolerance margin. Perturbing the trace by a relative 1e-12 keeps the count at 4 but moves the outermost line from 1.315726 to 1.300668 ppm - 6.0 Hz - and broadens it from hwhm 0.0204 to 0.0655; the spacings become 17.00 / 1.16 / 12.94 Hz and the dd asymmetry rises from 0.47x to 2.18x tolerance, so the test fails and the label is 'm'. The other sign direction holds 'dd' at 0.27x. That outer line carries only 2.00x the inclusion cut, which is why its position is the least determined thing in the region.",
+        "flip_perturbation_relative": 1e-12,
+        "resolved_line_count": {
+          "dd": 4,
+          "m": 4
+        },
+        "fit_residual_over_acceptance_tolerance": 0.56
+      },
+      "added": "2026-08-21",
+      "added_by": "sirmcdoe"
+    }
+  ]
+}
