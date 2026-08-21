@@ -14279,6 +14279,23 @@ def _is_internal_super_admin(context: AccessContext) -> bool:
     return bool(context.system_api_key or (context.user and context.user.is_admin))
 
 
+def _require_tenant_ops_role(context: AccessContext) -> None:
+    """The role half of :func:`_require_tenant_ops_access`, callable before any database work.
+
+    The routes keyed by a *tenant* id can run the whole gate up front. The ones keyed by a child
+    id (an entitlement, an environment, a profile) cannot check tenant consistency until they have
+    loaded the record — but they can, and must, check the role first. Doing the lookup first meant
+    the update store call had already committed by the time the 403 was raised, so the denial
+    returned a status code and kept the write; it also answered 404 for an id that does not exist
+    and 403 for one that does, which enumerates the table. Both follow from ordering alone.
+    """
+    if not _is_internal_super_admin(context):
+        raise HTTPException(
+            status_code=403,
+            detail="Tenant administration access is required.",
+        )
+
+
 def _require_tenant_ops_access(
     *,
     context: AccessContext,
@@ -14298,11 +14315,7 @@ def _require_tenant_ops_access(
     is denied. The header is still honoured as a *consistency* check for the callers that send it,
     so a mis-targeted console request fails loudly instead of quietly editing the wrong tenant.
     """
-    if not _is_internal_super_admin(context):
-        raise HTTPException(
-            status_code=403,
-            detail="Tenant administration access is required.",
-        )
+    _require_tenant_ops_role(context)
     if requested_tenant_id is not None:
         try:
             tenant_store.ensure_tenant_scope(requested_tenant_id, actual_tenant_id)
@@ -16901,6 +16914,7 @@ def update_tenant_environment_route(
     x_tenant_id: int | None = Header(default=None, alias="x-tenant-id"),
     context: AccessContext = Depends(require_access_context),
 ) -> TenantEnvironment:
+    _require_tenant_ops_role(context)
     try:
         record = tenant_store.update_environment(
             _state(request).session_factory,
@@ -17065,6 +17079,7 @@ def update_tenant_entitlement_route(
     x_tenant_id: int | None = Header(default=None, alias="x-tenant-id"),
     context: AccessContext = Depends(require_access_context),
 ) -> TenantEntitlement:
+    _require_tenant_ops_role(context)
     try:
         record = tenant_store.update_entitlement(
             _state(request).session_factory,
@@ -17255,6 +17270,7 @@ def get_pilot_program_route(
     x_tenant_id: int | None = Header(default=None, alias="x-tenant-id"),
     context: AccessContext = Depends(require_access_context),
 ) -> PilotProgram:
+    _require_tenant_ops_role(context)
     record = tenant_store.get_pilot_program(_state(request).session_factory, pilot_id)
     if record is None:
         raise HTTPException(status_code=404, detail="Pilot program not found.")
@@ -17278,6 +17294,7 @@ def update_pilot_program_route(
     x_tenant_id: int | None = Header(default=None, alias="x-tenant-id"),
     context: AccessContext = Depends(require_access_context),
 ) -> PilotProgram:
+    _require_tenant_ops_role(context)
     try:
         record = tenant_store.update_pilot_program(_state(request).session_factory, pilot_id, payload)
     except Exception as exc:
@@ -17371,6 +17388,7 @@ def get_onboarding_project_route(
     x_tenant_id: int | None = Header(default=None, alias="x-tenant-id"),
     context: AccessContext = Depends(require_access_context),
 ) -> CustomerOnboardingProject:
+    _require_tenant_ops_role(context)
     record = tenant_store.get_onboarding_project(_state(request).session_factory, project_id)
     if record is None:
         raise HTTPException(status_code=404, detail="Onboarding project not found.")
@@ -17394,6 +17412,7 @@ def update_onboarding_project_route(
     x_tenant_id: int | None = Header(default=None, alias="x-tenant-id"),
     context: AccessContext = Depends(require_access_context),
 ) -> CustomerOnboardingProject:
+    _require_tenant_ops_role(context)
     try:
         record = tenant_store.update_onboarding_project(_state(request).session_factory, project_id, payload)
     except Exception as exc:
@@ -17431,6 +17450,7 @@ def create_implementation_task_route(
     x_tenant_id: int | None = Header(default=None, alias="x-tenant-id"),
     context: AccessContext = Depends(require_access_context),
 ) -> ImplementationTask:
+    _require_tenant_ops_role(context)
     project = tenant_store.get_onboarding_project(_state(request).session_factory, project_id)
     if project is None:
         raise HTTPException(status_code=404, detail="Onboarding project not found.")
@@ -17471,6 +17491,7 @@ def list_implementation_tasks_route(
     x_tenant_id: int | None = Header(default=None, alias="x-tenant-id"),
     context: AccessContext = Depends(require_access_context),
 ) -> list[ImplementationTask]:
+    _require_tenant_ops_role(context)
     project = tenant_store.get_onboarding_project(_state(request).session_factory, project_id)
     if project is None:
         raise HTTPException(status_code=404, detail="Onboarding project not found.")
@@ -17498,6 +17519,7 @@ def update_implementation_task_route(
     x_tenant_id: int | None = Header(default=None, alias="x-tenant-id"),
     context: AccessContext = Depends(require_access_context),
 ) -> ImplementationTask:
+    _require_tenant_ops_role(context)
     task_tenant_id = tenant_store.get_implementation_task_tenant_id(
         _state(request).session_factory,
         task_id,
@@ -17601,6 +17623,7 @@ def update_tenant_data_boundary_route(
     x_tenant_id: int | None = Header(default=None, alias="x-tenant-id"),
     context: AccessContext = Depends(require_access_context),
 ) -> TenantDataBoundary:
+    _require_tenant_ops_role(context)
     try:
         record = tenant_store.update_data_boundary(_state(request).session_factory, boundary_id, payload)
     except Exception as exc:
@@ -17698,6 +17721,7 @@ def update_tenant_security_profile_route(
     x_tenant_id: int | None = Header(default=None, alias="x-tenant-id"),
     context: AccessContext = Depends(require_access_context),
 ) -> TenantSecurityProfile:
+    _require_tenant_ops_role(context)
     try:
         record = tenant_store.update_security_profile(_state(request).session_factory, profile_id, payload)
     except Exception as exc:
@@ -17795,6 +17819,7 @@ def update_tenant_validation_profile_route(
     x_tenant_id: int | None = Header(default=None, alias="x-tenant-id"),
     context: AccessContext = Depends(require_access_context),
 ) -> TenantValidationProfile:
+    _require_tenant_ops_role(context)
     try:
         record = tenant_store.update_validation_profile(_state(request).session_factory, profile_id, payload)
     except Exception as exc:
@@ -17961,6 +17986,7 @@ def get_procurement_package_route(
     x_tenant_id: int | None = Header(default=None, alias="x-tenant-id"),
     context: AccessContext = Depends(require_access_context),
 ) -> ProcurementEvidencePackage:
+    _require_tenant_ops_role(context)
     record = tenant_store.get_procurement_package(_state(request).session_factory, package_id)
     if record is None:
         raise HTTPException(status_code=404, detail="Procurement evidence package not found.")
@@ -18018,6 +18044,7 @@ def get_tenant_audit_export_route(
     x_tenant_id: int | None = Header(default=None, alias="x-tenant-id"),
     context: AccessContext = Depends(require_access_context),
 ) -> TenantAuditExport:
+    _require_tenant_ops_role(context)
     record = tenant_store.get_audit_export(_state(request).session_factory, export_id)
     if record is None:
         raise HTTPException(status_code=404, detail="Tenant audit export not found.")
