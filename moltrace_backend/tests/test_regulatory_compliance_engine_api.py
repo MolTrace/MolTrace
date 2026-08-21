@@ -502,11 +502,13 @@ def test_an_uncomputable_band_fails_closed() -> None:
     """
     from nmrcheck.regulatory_compliance_store import _q3ab_trigger
 
-    trigger, note = _q3ab_trigger(0.0, 0.12, "drug_substance")
+    trigger, note, version = _q3ab_trigger(0.0, 0.12, "drug_substance")
     assert trigger == "review_required", f"an uncomputable band resolved to {trigger!r}"
     assert note and "could not be computed" in note
+    assert version is None, "a band that could not be computed must not claim an engine version"
 
     # And the normal path is unchanged: 0.12 % at 1 g/day is a qualification band.
-    trigger, note = _q3ab_trigger(1.0, 0.12, "drug_substance")
+    trigger, note, version = _q3ab_trigger(1.0, 0.12, "drug_substance")
     assert trigger == "qualification"
     assert note is None
+    assert version, "a computed band must carry the engine's pinned rule set version"

@@ -465,6 +465,28 @@ def _active_rule_sets(session: Session, dossier: RegulatoryDossierORM) -> list[R
     return list(session.scalars(stmt.order_by(RegulatoryRuleSetORM.id.desc())).all())
 
 
+def _rule_set_provenance(rule_sets: list[RegulatoryRuleSetORM]) -> dict[int, dict[str, Any]]:
+    """Attribution for a configured rule, keyed by rule set id.
+
+    A configured rule *shadows* the version-pinned ICH engine: where the engine answers, the
+    record carries ``source``/``regulatory_basis``/``rule_set_version``, but where a rule set
+    answered it carried none of that, so a house 1 ppm toluene limit and ICH Q3C's 890 ppm were
+    indistinguishable in the stored result. Overriding is legitimate; overriding *anonymously* is
+    what breaks the deterministic-first contract, because a reviewer cannot tell that the number
+    in front of them is not the guidance value.
+    """
+    return {
+        row.id: {
+            "source": "configured_rule_set",
+            "rule_set_id": row.id,
+            "rule_set_name": row.name,
+            "rule_set_version": row.version,
+            "rule_set_source_type": row.source_type,
+        }
+        for row in rule_sets
+    }
+
+
 def _action_to_record(row: RegulatoryActionItemORM) -> RegulatoryActionItem:
     metadata = _json_dict(row.metadata_json)
     warnings = [str(item) for item in metadata.get("warnings", [])] if isinstance(metadata.get("warnings"), list) else []
@@ -699,12 +721,18 @@ def _best_impurity_trigger(
     *,
     observed_level_percent: float | None,
     observed_amount: float | None,
-) -> tuple[str, ImpurityThresholdRuleORM | None]:
+) -> tuple[str, ImpurityThresholdRuleORM | None, dict[str, Any]]:
     best_trigger = "none"
     best_rule: ImpurityThresholdRuleORM | None = None
-    rule_set_ids = [row.id for row in _active_rule_sets(session, dossier)]
+    active_rule_sets = _active_rule_sets(session, dossier)
+    provenance = _rule_set_provenance(active_rule_sets)
+    rule_set_ids = [row.id for row in active_rule_sets]
     if not rule_set_ids:
-        return ("review_required" if observed_level_percent is not None or observed_amount is not None else "none", None)
+        return (
+            "review_required" if observed_level_percent is not None or observed_amount is not None else "none",
+            None,
+            {},
+        )
     rules = session.scalars(
         select(ImpurityThresholdRuleORM).where(ImpurityThresholdRuleORM.rule_set_id.in_(rule_set_ids))
     ).all()
@@ -725,13 +753,26 @@ def _best_impurity_trigger(
         if triggered and _TRIGGER_ORDER.get(rule.rule_type, 0) >= _TRIGGER_ORDER.get(best_trigger, 0):
             best_trigger = rule.rule_type
             best_rule = rule
-    return best_trigger, best_rule
+    if best_rule is None:
+        return best_trigger, None, {}
+    return (
+        best_trigger,
+        best_rule,
+        {
+            **provenance.get(best_rule.rule_set_id, {"source": "configured_rule_set"}),
+            "rule_id": best_rule.id,
+            "rule_type": best_rule.rule_type,
+            "threshold_percent": best_rule.threshold_percent,
+            "threshold_amount_mg_per_day": best_rule.threshold_amount_mg_per_day,
+        },
+    )
 
 
 def _q3ab_trigger(
     daily_dose_g: float, observed_level_percent: float, substance_type: str = "drug_substance"
-) -> tuple[str, str | None]:
-    """ICH Q3A/B threshold band for the observed level, plus an error note if any.
+) -> tuple[str, str | None, str | None]:
+    """ICH Q3A/B threshold band for the observed level, an error note if any, and the
+    engine's pinned rule set version so the band can be attributed in the record.
 
     Fails CLOSED. An engine error used to return ``"none"`` — the register's
     benign value, which maps to ``needs_review`` and creates no action item —
@@ -746,14 +787,15 @@ def _q3ab_trigger(
 
         thr = calculate_q3ab_thresholds(daily_dose_g, substance_type)
     except Exception as exc:  # noqa: BLE001 — the cause is data, not a crash
-        return "review_required", f"ICH Q3A/B band could not be computed: {exc}"
+        return "review_required", f"ICH Q3A/B band could not be computed: {exc}", None
+    version = thr.rule_set_version
     if observed_level_percent >= thr.qualification_threshold.effective_percent:
-        return "qualification", None
+        return "qualification", None, version
     if observed_level_percent >= thr.identification_threshold.effective_percent:
-        return "identification", None
+        return "identification", None, version
     if observed_level_percent >= thr.reporting_threshold.effective_percent:
-        return "reporting", None
-    return "none", None
+        return "reporting", None, version
+    return "none", None, version
 
 
 def _m7_summary(structural_assignment: str | None) -> dict[str, Any] | None:
@@ -789,7 +831,7 @@ def create_impurity_risk_register(
         dossier = _require_dossier(session, dossier_id)
         _require_compound(session, payload.compound_id)
         _require_evidence_link(session, payload.evidence_link_id)
-        trigger, rule = _best_impurity_trigger(
+        trigger, rule, threshold_provenance = _best_impurity_trigger(
             session,
             dossier,
             observed_level_percent=payload.observed_level_percent,
@@ -803,11 +845,19 @@ def create_impurity_risk_register(
         if rule is None and dose is not None and payload.observed_level_percent is not None:
             # No tenant rule but a dose is available -> compute the ICH Q3A/B band from the
             # deterministic engine (overrides the default no-rule review_required signal).
-            trigger, band_error = _q3ab_trigger(
+            trigger, band_error, band_version = _q3ab_trigger(
                 dose, payload.observed_level_percent, dossier.substance_type or "drug_substance"
             )
             if band_error:
                 warnings.append(band_error)
+            else:
+                threshold_provenance = {
+                    "source": "ich_q3ab_engine",
+                    "regulatory_basis": "ICH Q3A/B",
+                    "rule_set_version": band_version,
+                    "daily_dose_g": dose,
+                    "substance_type": dossier.substance_type or "drug_substance",
+                }
         if payload.threshold_triggered is not None:
             # A caller-supplied band ANNOTATES the deterministic verdict; it does
             # not replace it. It used to be assigned before the engine ran at all,
@@ -817,6 +867,11 @@ def create_impurity_risk_register(
             # normally tighter than ICH); a downgrade is recorded, not applied.
             if _TRIGGER_ORDER.get(payload.threshold_triggered, 0) > _TRIGGER_ORDER.get(trigger, 0):
                 trigger = payload.threshold_triggered
+                threshold_provenance = {
+                    "source": "caller_supplied_escalation",
+                    "escalated_from": threshold_provenance.get("source", "unattributed"),
+                    "superseded_provenance": threshold_provenance or None,
+                }
             elif payload.threshold_triggered != trigger:
                 warnings.append(
                     f"Supplied threshold_triggered={payload.threshold_triggered!r} is less "
@@ -856,6 +911,13 @@ def create_impurity_risk_register(
         _impurity_metadata = dict(payload.metadata_json)
         if m7 is not None:
             _impurity_metadata["m7"] = m7
+        # Which rule decided the band. Without this a house threshold and the ICH Q3A/B
+        # engine leave the same record, so a reviewer cannot tell a configured override
+        # from the guidance value it displaced.
+        _impurity_metadata["threshold_provenance"] = threshold_provenance or {
+            "source": "no_active_rule_set",
+            "rule_set_version": None,
+        }
         row = ImpurityRiskRegisterORM(
             dossier_id=dossier_id,
             impurity_name=payload.impurity_name,
@@ -1015,7 +1077,9 @@ def create_residual_solvent_assessment(
         dossier = _require_dossier(session, dossier_id)
         _require_batch(session, payload.batch_id)
         _require_compound(session, payload.compound_id)
-        rule_set_ids = [row.id for row in _active_rule_sets(session, dossier)]
+        active_rule_sets = _active_rule_sets(session, dossier)
+        rule_set_ids = [row.id for row in active_rule_sets]
+        provenance = _rule_set_provenance(active_rule_sets)
         rules = session.scalars(select(ResidualSolventRuleORM).where(ResidualSolventRuleORM.rule_set_id.in_(rule_set_ids))).all() if rule_set_ids else []
         by_name = {_solvent_key(rule.solvent_name): rule for rule in rules}
         matches: list[dict[str, Any]] = []
@@ -1045,6 +1109,10 @@ def create_residual_solvent_assessment(
                         "solvent_class": rule.solvent_class,
                         "concentration_limit": rule.concentration_limit,
                         "permitted_daily_exposure": rule.permitted_daily_exposure,
+                        # Name the rule set that displaced ICH Q3C for this solvent, so the
+                        # limit below is readable as a house value rather than the guidance one.
+                        "limit_basis": "Configured rule set (overrides the ICH Q3C default)",
+                        **provenance.get(rule.rule_set_id, {"source": "configured_rule_set"}),
                     }
                 )
                 if observed_value is not None and rule.concentration_limit is not None and observed_value >= rule.concentration_limit:
@@ -1306,7 +1374,9 @@ def create_nitrosamine_watch(
         cpca = _cpca_summary(payload.structure_text)
         if cpca is not None:
             possible = True  # a parseable nitrosamine SMILES is a definitive structural signal
-        rule_set_ids = [row.id for row in _active_rule_sets(session, dossier)]
+        active_rule_sets = _active_rule_sets(session, dossier)
+        rule_set_ids = [row.id for row in active_rule_sets]
+        provenance = _rule_set_provenance(active_rule_sets)
         rules = session.scalars(select(NitrosamineRiskRuleORM).where(NitrosamineRiskRuleORM.rule_set_id.in_(rule_set_ids))).all() if rule_set_ids else []
         matched_rules = [
             {
@@ -1315,6 +1385,9 @@ def create_nitrosamine_watch(
                 "structural_pattern": rule.structural_pattern,
                 "acceptable_intake": rule.acceptable_intake,
                 "ai_limit": rule.ai_limit,
+                # An acceptable-intake limit is a regulated number: it has to name the
+                # rule set it came from, the same as the FDA CPCA engine's own AI does.
+                **provenance.get(rule.rule_set_id, {"source": "configured_rule_set"}),
             }
             for rule in rules
             if possible and rule.risk_category in {"n_nitroso_motif", "nitrosamine_possible", "cpca_review_required"}
@@ -1715,7 +1788,14 @@ def create_jurisdictional_map(
             dossier_id=dossier_id,
             jurisdiction_id=payload.jurisdiction_id,
             rule_set_id=payload.rule_set_id,
-            requirement_summary_json=_json_dump({"active_rule_sets": [rule.id for rule in target_rule_sets]}),
+            requirement_summary_json=_json_dump(
+                {
+                    "active_rule_sets": [rule.id for rule in target_rule_sets],
+                    # Ids alone do not pin a comparison: a rule set can be edited after the map
+                    # is stored, and the thresholds below would then no longer be reproducible.
+                    "active_rule_set_versions": {str(rule.id): rule.version for rule in target_rule_sets},
+                }
+            ),
             threshold_summary_json=_json_dump(target_thresholds),
             differences_json=_json_dump(differences),
             warnings_json=_json_dump(warnings),

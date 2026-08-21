@@ -1566,6 +1566,14 @@ def _create_impurity_actions(
             "identification thresholds."
         )
         return []
+    # The band is the *minimum* across every active rule set, so the deciding rule set is not
+    # recoverable from the threshold alone. Record the set that was in scope, and its versions,
+    # so a triggered action item can be traced back to the rules that triggered it.
+    threshold_provenance = {
+        "source": "configured_rule_set",
+        "rule_set_ids": rule_set_ids,
+        "rule_set_versions": {str(row.id): row.version for row in rule_sets},
+    }
     action_ids: list[int] = []
     for signal in impurity_signals:
         level = (
@@ -1600,6 +1608,7 @@ def _create_impurity_actions(
                 metadata={
                     "observed_level_percent": level,
                     "threshold_percent": threshold,
+                    "threshold_provenance": threshold_provenance,
                     "signal": signal,
                     "spectracheck_evidence_item_id": evidence_id,
                     "requires_review": True,
