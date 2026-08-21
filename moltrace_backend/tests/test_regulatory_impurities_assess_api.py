@@ -101,6 +101,67 @@ def test_unknown_solvent_is_explicit_not_an_error(client):
     assert sol["class_number"] is None
 
 
+def test_an_unencoded_solvent_warns_at_the_top_level(client):
+    """A measured solvent outside the encoded table must warn, like every other gap here.
+
+    The encoded Q3C table is a curated subset of Appendices 1-3, so routine modern solvents
+    (DMAc, cumene, 2-MeTHF, sulfolane) return ``matched=false``. Every other unassessable
+    condition on this endpoint -- unsupported route, unknown element, unparseable SMILES --
+    raises a top-level warning; this one was silent, leaving "we have no limit encoded"
+    indistinguishable from "ICH does not list it" unless the caller inspected a row flag.
+    """
+
+    with client:
+        res = _post(
+            client,
+            {
+                "daily_dose_g": 1.0,
+                "residual_solvents": [{"identifier": "N,N-dimethylacetamide", "measured_ppm": 900.0}],
+            },
+        )
+    assert res.status_code == 200, res.text
+    j = res.json()
+
+    # Still reported, still explicit, still not an error.
+    sol = j["residual_solvents"][0]
+    assert sol["matched"] is False
+    assert sol["passed"] is None
+
+    warning = next(
+        (w for w in j["warnings"] if "N,N-dimethylacetamide" in w),
+        None,
+    )
+    assert warning is not None, j["warnings"]
+    # The warning must say the table is ours, not ICH's -- an absent row is not a finding
+    # of "unregulated", and must never read as one.
+    assert "not" in warning.lower()
+    assert "appendices" in warning.lower() or "appendix" in warning.lower()
+
+
+def test_an_unencoded_solvent_without_a_measurement_also_warns(client):
+    """Classification-only lookups need the same caveat -- the gap is the table, not the dose."""
+
+    with client:
+        res = _post(client, {"daily_dose_g": 1.0, "residual_solvents": [{"identifier": "unobtainium"}]})
+    assert res.status_code == 200, res.text
+    j = res.json()
+    assert any("unobtainium" in w for w in j["warnings"]), j["warnings"]
+
+
+def test_an_encoded_solvent_raises_no_coverage_warning(client):
+    """The warning must key on the table gap, not fire on every solvent."""
+
+    with client:
+        res = _post(
+            client,
+            {"daily_dose_g": 1.0, "residual_solvents": [{"identifier": "methanol", "measured_ppm": 100.0}]},
+        )
+    assert res.status_code == 200, res.text
+    j = res.json()
+    assert j["residual_solvents"][0]["matched"] is True
+    assert not [w for w in j["warnings"] if "methanol" in w.lower()], j["warnings"]
+
+
 def test_unknown_element_degrades_to_warning(client):
     with client:
         res = _post(client, {"daily_dose_g": 1.0, "elemental_impurities": [{"element": "Fe"}]})
