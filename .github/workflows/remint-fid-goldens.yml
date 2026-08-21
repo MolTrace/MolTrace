@@ -16,6 +16,14 @@
 # The tolerance is DECOUPLED from this: the job re-mints whatever the code currently converges to,
 # so it works whether gsd.py is on 1e-5 or 1e-8. Pick the tolerance first, then run this.
 #
+# STILL USEFUL, NO LONGER THE DURABLE FIX. The four multiplets that actually diverge are now
+# named, with the measurement that establishes their ambiguity, in
+# moltrace_backend/tests/golden/fid_invariants/boundary_register.json, and the invariance test
+# relaxes ONLY their discrete label — so one committed golden set passes on both platforms and
+# there is no per-platform golden set to maintain. Reach for this job when a deliberate science
+# change needs the whole corpus re-minted on the platform CI runs, not to make a red run green:
+# a divergence the register does not already cover is a finding to investigate first.
+#
 # SAFETY. Manual trigger only; commits NOTHING. Regenerates every golden, prints the diff to the
 # job summary, and uploads the files as an artifact for a human to review and commit.
 name: Re-mint FID goldens (manual)
