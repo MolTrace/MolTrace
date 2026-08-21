@@ -19,6 +19,15 @@ it Fourier-transforms into something with peaks, a plausible ppm axis, and no
 outward sign of being wrong. Every downstream number would then be confident
 nonsense about a spectrum that does not exist. So the rejection is the invariant,
 and it must be replaced by real 2D handling rather than merely relaxed.
+
+UPDATE (2026-08-20): this file's guard turned out to be vendor-shaped, and the
+failure above had already happened on the other vendor. Varian/Agilent writes 2D
+and *arrayed* data to a file named `fid`, so detection accepted it and the reader
+concatenated the records exactly as described. That hole is closed at the engine
+by `_as_1d_fid`, and pinned vendor-independently in
+`tests/test_fid_dimensionality_refusal.py`. These tests still pin the Bruker
+detection boundary; they are no longer the only thing standing between a 2D
+dataset and a meaningless spectrum.
 """
 
 from __future__ import annotations

@@ -279,8 +279,19 @@ def test_raw_fid_prompt_fixture_report_can_include_varian_fixture() -> None:
     assert row["fixture_id"] == "nmrglue_example_separate_1d_varian"
     assert row["vendor"] == "Varian/Agilent"
     assert row["nucleus"] == "13C"
-    assert row["prompt_status"] == "ok"
-    assert row["prompt_hash_present"] is True
+
+    # RE-BASELINED 2026-08-20. This asserted `prompt_status == "ok"` and a present
+    # prompt hash. The nmrglue example is an *arrayed* dataset (26 records x 1500
+    # points), and "ok" meant the reader had concatenated those records into one
+    # pseudo-FID and hashed the resulting spectrum -- a stable hash over a
+    # measurement of nothing. The reader now refuses a real second dimension, so
+    # the row records the refusal. The report still *includes* the Varian fixture,
+    # which is what this test is named for.
+    assert row["prompt_status"] == "failed"
+    reasons = " ".join(row["failure_reasons"])
+    assert "arrayed" in reasons and "26 separate records" in reasons, (
+        f"the report does not carry the cause of the refusal: {reasons}"
+    )
 
 
 def test_admin_raw_fid_prompt_fixture_report_route_is_reporting_only(tmp_path: Path) -> None:
