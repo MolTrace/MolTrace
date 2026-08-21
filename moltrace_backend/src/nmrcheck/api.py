@@ -9185,6 +9185,20 @@ async def regulatory_impurities_assess(
                     warnings.append(f"residual solvent {item.identifier!r}: {exc}")
                     continue
                 rule_set_versions["q3c"] = cls.rule_set_version
+                if not cls.matched:
+                    # Surface the table gap at the top level, the way every other
+                    # unassessable condition on this endpoint already does. The encoded
+                    # table is a curated subset of the appendices, so routine modern
+                    # solvents miss it; silence left "we hold no limit for this" looking
+                    # exactly like "ICH does not restrict this" to anyone reading the
+                    # warnings rather than each row's match flag.
+                    warnings.append(
+                        f"Residual solvent {item.identifier!r} is not in the encoded ICH "
+                        "Q3C(R8) table, which covers a curated subset of Appendices 1-3, so "
+                        "no limit was applied. This is not a determination that ICH leaves "
+                        "the solvent unrestricted; classify it against the official ICH "
+                        "Q3C(R8) Appendices 1-3 before relying on this report."
+                    )
                 permitted_ppm = passed = margin_ppm = None
                 if item.measured_ppm is not None and cls.matched:
                     comp = check_residual_solvent_limits(

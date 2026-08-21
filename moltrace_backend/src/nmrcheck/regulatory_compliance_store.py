@@ -1065,8 +1065,12 @@ def create_residual_solvent_assessment(
                         match["review_required"] = True
                 else:
                     warnings.append(
-                        f"source_needed: no configured rule or ICH Q3C entry matched "
-                        f"{name or 'unknown solvent'}."
+                        # Keep the "source_needed:" prefix verbatim -- the dossier
+                        # workspace and the action queue both key on that token.
+                        f"source_needed: no configured rule or encoded ICH Q3C(R8) entry "
+                        f"matched {name or 'unknown solvent'}. The encoded table covers a "
+                        "curated subset of Appendices 1-3, so this is not a determination "
+                        "that ICH leaves the solvent unrestricted."
                     )
                     match["review_required"] = True
             if match.get("threshold_triggered") or match.get("review_required"):
