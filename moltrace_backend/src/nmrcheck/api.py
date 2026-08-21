@@ -9200,6 +9200,28 @@ async def regulatory_impurities_assess(
                         "Q3C(R8) Appendices 1-3 before relying on this report."
                     )
                 permitted_ppm = passed = margin_ppm = None
+                limit_basis: str | None = None
+                if cls.matched:
+                    # The permitted limit is a property of the solvent and the daily dose,
+                    # not of whether anyone has measured the batch yet. Deriving it only
+                    # alongside a measurement left a classification-only lookup carrying the
+                    # Option-1 constant alone -- which is defined at 10 g/day and is wrong in
+                    # both directions away from it: 5x too permissive at 50 g/day, 5x too
+                    # strict at 2 g/day, and unlabeled either way.
+                    if cls.class_number == 1:
+                        # Class 1 carries a fixed concentration limit; scaling it would
+                        # invent a limit the guideline does not give.
+                        permitted_ppm = cls.concentration_limit_ppm
+                        limit_basis = "class_1_fixed"
+                    elif cls.pde_mg_per_day is not None:
+                        permitted_ppm = cls.pde_mg_per_day * 1000.0 / payload.daily_dose_g
+                        limit_basis = "option_2_dose_scaled"
+                    elif cls.concentration_limit_ppm is not None:
+                        # No PDE to scale: fall back to the 10 g/day constant and say so,
+                        # rather than reporting a dose-scaled number we could not compute.
+                        permitted_ppm = cls.concentration_limit_ppm
+                        limit_basis = "option_1_10g"
+
                 if item.measured_ppm is not None and cls.matched:
                     comp = check_residual_solvent_limits(
                         {item.identifier: item.measured_ppm},
@@ -9221,6 +9243,7 @@ async def regulatory_impurities_assess(
                         concentration_limit_ppm=cls.concentration_limit_ppm,
                         measured_ppm=item.measured_ppm,
                         permitted_ppm=permitted_ppm,
+                        limit_basis=limit_basis,
                         passed=passed,
                         margin_ppm=margin_ppm,
                         regulatory_basis=cls.regulatory_basis,

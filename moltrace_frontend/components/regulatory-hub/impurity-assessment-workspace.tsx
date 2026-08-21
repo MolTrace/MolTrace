@@ -66,6 +66,7 @@ type AssessRequest = components["schemas"]["ImpurityAssessRequest"]
 type AssessResult = components["schemas"]["ImpurityAssessResult"]
 type Route = AssessRequest["route"]
 type SubstanceType = AssessRequest["substance_type"]
+type Authority = AssessRequest["authority"]
 type TriState = "positive" | "negative" | "unset"
 
 const IMPURITY_ASSESSMENT_COVERAGE_TOOLTIP =
@@ -85,6 +86,25 @@ const SUBSTANCE_OPTIONS: { value: SubstanceType; label: string }[] = [
   { value: "drug_substance", label: "Drug substance" },
   { value: "drug_product", label: "Drug product" },
 ]
+
+const AUTHORITY_OPTIONS: { value: Authority; label: string }[] = [
+  { value: "FDA", label: "FDA" },
+  { value: "EMA", label: "EMA" },
+]
+
+/** How the permitted concentration was derived, in the reader's language rather than the
+ *  wire's. ICH Q3C Option 1 is a constant defined at a 10 g/day reference dose; Option 2
+ *  scales the PDE to the actual dose; a Class 1 solvent keeps its fixed Appendix limit.
+ *  Without this the same column shows numbers that differ five-fold at 50 g/day with
+ *  nothing to say why. */
+const LIMIT_BASIS_LABEL: Record<string, string> = {
+  option_2_dose_scaled: "scaled to dose",
+  class_1_fixed: "fixed Class 1 limit",
+  option_1_10g: "10 g/day reference",
+}
+
+const AUTHORITY_TOOLTIP =
+  "Sets the acceptable-intake limit applied to Category 1 nitrosamines: FDA 26.5 ng/day, EMA 18 ng/day. Categories 2-5 are the same under both. Assessing an EU filing against the FDA limit judges it against a figure 47% more permissive than the one it will actually be held to."
 
 const DEFAULT_DURATION_MONTHS = 120
 
@@ -178,6 +198,7 @@ export function ImpurityAssessmentWorkspace() {
   const [dailyDose, setDailyDose] = useState("1.0")
   const [route, setRoute] = useState<Route>("oral")
   const [substanceType, setSubstanceType] = useState<SubstanceType>("drug_substance")
+  const [authority, setAuthority] = useState<Authority>("FDA")
   const [durationMonths, setDurationMonths] = useState(String(DEFAULT_DURATION_MONTHS))
 
   const [solvents, setSolvents] = useState<SolventRow[]>([])
@@ -224,6 +245,7 @@ export function ImpurityAssessmentWorkspace() {
       route,
       substance_type: substanceType,
       duration_months: Math.round(duration),
+      authority,
     }
 
     const solventInputs = solvents
@@ -415,6 +437,32 @@ export function ImpurityAssessmentWorkspace() {
                       "px-3 py-1.5 text-xs transition-colors",
                       idx > 0 ? "border-l" : "",
                       substanceType === opt.value ? "bg-foreground text-background" : "text-muted-foreground hover:bg-muted/40",
+                    )}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center gap-1.5">
+                <Label>Assessing authority</Label>
+                <InfoTooltip label="Assessing authority" content={AUTHORITY_TOOLTIP} />
+              </div>
+              <div role="radiogroup" aria-label="Assessing authority" className="inline-flex overflow-hidden rounded-md border bg-card">
+                {AUTHORITY_OPTIONS.map((opt, idx) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    role="radio"
+                    aria-checked={authority === opt.value}
+                    disabled={submitting}
+                    onClick={() => setAuthority(opt.value)}
+                    className={cn(
+                      "px-3 py-1.5 text-xs transition-colors",
+                      idx > 0 ? "border-l" : "",
+                      authority === opt.value ? "bg-foreground text-background" : "text-muted-foreground hover:bg-muted/40",
                     )}
                   >
                     {opt.label}
@@ -711,7 +759,14 @@ export function ImpurityAssessmentWorkspace() {
                               <span className="text-muted-foreground">unknown — verify against Q3C</span>
                             )}
                           </TableCell>
-                          <TableCell className="text-right tabular-nums">{num(s.permitted_ppm)}</TableCell>
+                          <TableCell className="text-right tabular-nums">
+                            {num(s.permitted_ppm)}
+                            {s.limit_basis ? (
+                              <span className="block text-[10px] font-normal text-muted-foreground">
+                                {LIMIT_BASIS_LABEL[s.limit_basis] ?? s.limit_basis}
+                              </span>
+                            ) : null}
+                          </TableCell>
                           <TableCell className="text-right tabular-nums">{num(s.measured_ppm)}</TableCell>
                           <TableCell className="text-right tabular-nums">{num(s.margin_ppm)}</TableCell>
                           <TableCell>{s.matched ? <PassChip passed={s.passed} /> : <Badge variant="outline" className="font-normal text-muted-foreground">not assessed</Badge>}</TableCell>
