@@ -1125,20 +1125,27 @@ def _build_normalized_artifact(
         return "failed", None, warnings, "unsupported"
 
 
-def _managed_file_visible_to(
+def _visible_managed_file(
     session: Session, file_id: int, owner_scope_id: int | None
-) -> bool:
-    """Whether ``owner_scope_id`` may see this managed file at all.
+) -> ManagedFileRecordORM | None:
+    """The managed file if ``owner_scope_id`` may see it, else None.
 
-    One definition shared by every normalization path, mirroring
-    ``orch_store.get_file_record``: a system key/admin (scope ``None``) sees
-    everything, a user sees only their own uploads, and a NULL-owner row is
-    refused to a scoped caller rather than read as unowned-and-public.
+    One definition shared by every path in this module that takes a file id,
+    mirroring ``orch_store.get_file_record``: a system key/admin (scope
+    ``None``) sees everything, a user sees only their own uploads, and a
+    NULL-owner row is refused to a scoped caller rather than read as
+    unowned-and-public.
+
+    Returns the row rather than a bool so callers that need it do not look it
+    up twice, and so "missing" and "not yours" collapse into one None that maps
+    to a single non-leaking 404.
     """
     row = session.get(ManagedFileRecordORM, file_id)
     if row is None:
-        return False
-    return owner_scope_id is None or row.created_by_user_id == owner_scope_id
+        return None
+    if owner_scope_id is not None and row.created_by_user_id != owner_scope_id:
+        return None
+    return row
 
 
 def normalize_file(
@@ -1245,7 +1252,7 @@ def list_normalization_runs_for_file(
     the derived bytes, so this is a live reference and not just metadata.
     """
     with session_scope(session_factory) as session:
-        if not _managed_file_visible_to(session, file_id, owner_scope_id):
+        if _visible_managed_file(session, file_id, owner_scope_id) is None:
             raise KeyError("Managed file not found.")
         stmt = (
             select(FileNormalizationRunORM)
@@ -1272,7 +1279,7 @@ def get_normalization_run(
         row = session.get(FileNormalizationRunORM, normalization_run_id)
         if row is None:
             return None
-        if not _managed_file_visible_to(session, row.file_id, owner_scope_id):
+        if _visible_managed_file(session, row.file_id, owner_scope_id) is None:
             return None
         return _normalization_run_to_record(row)
 
@@ -1637,14 +1644,28 @@ def create_submission_package(
     session_factory: sessionmaker[Session],
     dossier_id: int,
     payload: RegulatorySubmissionPackageCreate,
+    *,
+    owner_scope_id: int | None = None,
 ) -> RegulatorySubmissionPackage:
+    """Assemble an export package manifest over the files and artifacts named.
+
+    ``owner_scope_id`` scopes ``file_ids_json``. The route's dossier gate is a
+    PATH gate and cannot reach into the body, so without this a caller with a
+    dossier of their own could name another tenant's file ids and read back
+    their original_filename, sha256 and source_path -- and filenames in this
+    domain carry compound codes and project names.
+
+    A file the caller may not see is skipped with the same warning a missing one
+    gets, rather than failing the request: this endpoint's contract is a
+    manifest plus warnings, and the two cases have to stay indistinguishable.
+    """
     with session_scope(session_factory) as session:
         if session.get(RegulatoryDossierORM, dossier_id) is None:
             raise KeyError("Regulatory dossier not found.")
         files = []
         warnings = list(payload.warnings_json)
         for file_id in payload.file_ids_json:
-            file_row = session.get(ManagedFileRecordORM, file_id)
+            file_row = _visible_managed_file(session, file_id, owner_scope_id)
             if file_row is None:
                 warnings.append(f"File {file_id} was not found for the export package manifest.")
                 continue
@@ -1787,7 +1808,10 @@ def import_spectracheck_file(
             ):
                 raise KeyError("SpectraCheck session not found.")
     with session_scope(session_factory) as session:
-        file_row = session.get(ManagedFileRecordORM, payload.file_id)
+        # The file_id needs its own scope, not just the session id above: this
+        # confirms the file exists and records its sha256, so an unscoped id
+        # here still discloses another tenant's upload one field at a time.
+        file_row = _visible_managed_file(session, payload.file_id, owner_scope_id)
         if file_row is None:
             raise KeyError("Managed file not found.")
         run = IngestionRunORM(
@@ -1852,7 +1876,9 @@ def import_regulatory_source(
             if not _dossier_owned_by(session, payload.dossier_id, owner_scope_id):
                 raise KeyError("Regulatory dossier not found.")
     with session_scope(session_factory) as session:
-        file_row = session.get(ManagedFileRecordORM, payload.file_id)
+        # As in import_spectracheck_file: the dossier scope above does not cover
+        # the file_id, and this one returns the file's sha256 to the caller.
+        file_row = _visible_managed_file(session, payload.file_id, owner_scope_id)
         if file_row is None:
             raise KeyError("Managed file not found.")
         link_id = None

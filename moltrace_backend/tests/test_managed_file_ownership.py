@@ -275,6 +275,140 @@ def test_a_stranger_cannot_normalize_your_upload_through_the_reaction_import(cli
     assert "ppm" not in imported.text
 
 
+def test_a_stranger_cannot_import_your_upload_into_spectracheck(client, api_headers):
+    """This importer scoped its session id and left its file id alone.
+
+    Sending only ``file_id`` isolates the file gate from the session gate: with
+    no session in the body there is nothing else left to refuse the request, so
+    a 201 here is the file check missing rather than the session check passing.
+    """
+    alice = _signup(client, "file-alice17@example.com")
+    bob = _signup(client, "file-bob17@example.com")
+    fid = _upload(client, alice, "alice_private.csv")
+
+    imported = client.post(
+        "/integrations/spectracheck/import-file", headers=bob, json={"file_id": fid}
+    )
+    assert imported.status_code == 404, (
+        f"a stranger imported the file: {imported.status_code} {imported.text[:200]}"
+    )
+
+
+def test_a_stranger_cannot_import_your_upload_as_a_regulatory_source(client, api_headers):
+    """Same gap, and this one hands the file's sha256 back in the response."""
+    alice = _signup(client, "file-alice18@example.com")
+    bob = _signup(client, "file-bob18@example.com")
+    fid = _upload(client, alice, "alice_private.csv")
+
+    sha = client.get(f"/files/{fid}", headers=alice).json()["sha256"]
+    imported = client.post(
+        "/integrations/regulatory/import-source",
+        headers=bob,
+        json={"file_id": fid, "source_citation_json": {"source": "test"}},
+    )
+    assert imported.status_code == 404, (
+        f"a stranger imported the file: {imported.status_code} {imported.text[:200]}"
+    )
+    assert sha not in imported.text, "the response disclosed the file's sha256"
+
+
+def test_a_stranger_cannot_manifest_your_upload_into_a_submission_package(client, api_headers):
+    """The route gates the dossier in the path but not the file ids in the body.
+
+    So a user with a dossier of their own could name another tenant's file ids
+    and read back a manifest of them. ``original_filename`` is the sharp edge:
+    filenames here carry compound codes and project names.
+
+    A file the caller may not see is skipped with the same warning a missing one
+    gets, rather than 404-ing the whole package -- this endpoint's contract is a
+    manifest plus warnings, and the two cases must stay indistinguishable.
+    """
+    alice = _signup(client, "file-alice20@example.com")
+    bob = _signup(client, "file-bob20@example.com")
+    fid = _upload(client, alice, "PRJ-4471_compound-12b.csv")
+    sha = client.get(f"/files/{fid}", headers=alice).json()["sha256"]
+
+    dossier = client.post(
+        "/regulatory/dossiers",
+        headers=bob,
+        json={
+            "title": "Bob's own dossier",
+            "product_name": "fixture",
+            "compound_name": "fixture",
+            "intended_use": "Ownership test fixture.",
+        },
+    )
+    assert dossier.status_code == 201, dossier.text
+
+    package = client.post(
+        f"/regulatory/dossiers/{dossier.json()['id']}/submission-package",
+        headers=bob,
+        json={"file_ids_json": [fid]},
+    )
+    assert package.status_code == 201, package.text
+    assert "PRJ-4471" not in package.text, "the manifest disclosed another tenant's filename"
+    assert sha not in package.text, "the manifest disclosed another tenant's sha256"
+
+    absent = client.post(
+        f"/regulatory/dossiers/{dossier.json()['id']}/submission-package",
+        headers=bob,
+        json={"file_ids_json": [99999]},
+    )
+    # Compare the message SHAPE with the id normalised out: the warning quotes
+    # the id the caller themselves supplied, so a literal comparison would
+    # differ for a reason that discloses nothing.
+    mine = [w.replace(str(fid), "N") for w in package.json()["package_manifest_json"]["warnings"]]
+    theirs = [w.replace("99999", "N") for w in absent.json()["package_manifest_json"]["warnings"]]
+    assert mine == theirs, (
+        "a file that exists but is not yours warns differently from a missing one"
+    )
+    assert package.json()["package_manifest_json"]["files"] == [], (
+        "the manifest listed a file the caller does not own"
+    )
+
+
+def test_the_owner_keeps_their_own_submission_package_manifest(client, api_headers):
+    alice = _signup(client, "file-alice21@example.com")
+    fid = _upload(client, alice, "alice_private.csv")
+    dossier = client.post(
+        "/regulatory/dossiers",
+        headers=alice,
+        json={
+            "title": "Alice's dossier",
+            "product_name": "fixture",
+            "compound_name": "fixture",
+            "intended_use": "Ownership test fixture.",
+        },
+    )
+    package = client.post(
+        f"/regulatory/dossiers/{dossier.json()['id']}/submission-package",
+        headers=alice,
+        json={"file_ids_json": [fid]},
+    )
+    assert package.status_code == 201, package.text
+    assert "alice_private.csv" in package.text, "the owner lost their own file from the manifest"
+    manifest = package.json()["package_manifest_json"]
+    assert [row["file_id"] for row in manifest["files"]] == [fid]
+    assert manifest["warnings"] == []
+
+
+def test_the_owner_keeps_both_importers(client, api_headers):
+    alice = _signup(client, "file-alice19@example.com")
+    fid = _upload(client, alice, "alice_private.csv")
+
+    spectracheck = client.post(
+        "/integrations/spectracheck/import-file", headers=alice, json={"file_id": fid}
+    )
+    assert spectracheck.status_code == 201, spectracheck.text
+
+    regulatory = client.post(
+        "/integrations/regulatory/import-source",
+        headers=alice,
+        json={"file_id": fid, "source_citation_json": {"source": "test"}},
+    )
+    assert regulatory.status_code == 201, regulatory.text
+
+
 def test_the_owner_keeps_the_write_paths(client, api_headers):
     """The same guard against over-correction the read paths already carry."""
     alice = _signup(client, "file-alice13@example.com")
