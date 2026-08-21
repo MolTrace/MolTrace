@@ -1,0 +1,83 @@
+# Re-mint the FID pipeline golden fixtures on Linux — the platform CI and production run on.
+#
+# WHY (confirmed, not speculative). tests/test_fid_pipeline_invariants.py pins the raw-FID
+# pipeline's multiplet labels to golden files that were generated on macOS/ARM. For a few
+# genuinely-ambiguous multiplets the deconvolution (a scipy least_squares TRF fit) lands in a
+# DIFFERENT local minimum under Linux/x86 LAPACK than under macOS Accelerate, and no convergence
+# tolerance reconciles them — measured: nmrshiftdb2 40256175 peak 6 is "s" on macOS at both 1e-5
+# and 1e-8 but "d" on Linux; 40256149 peak 2 is "m" on macOS (1e-8) but "t" on Linux. The first
+# CI run after a 1e-8 revert still failed on Linux, which is what proved this is platform-inherent
+# rather than an under-converged fit. So the goldens must be minted where they are checked.
+#
+# The fast tier (fixture 60000023, run in the default `-m 'not slow'` suite) is NOT among the
+# divergent fixtures, so a Linux re-mint of the slow corpus does not disturb local macOS dev.
+# preview.n jitter (60000016) is already handled by a tolerance in the test, not by re-minting.
+#
+# The tolerance is DECOUPLED from this: the job re-mints whatever the code currently converges to,
+# so it works whether gsd.py is on 1e-5 or 1e-8. Pick the tolerance first, then run this.
+#
+# SAFETY. Manual trigger only; commits NOTHING. Regenerates every golden, prints the diff to the
+# job summary, and uploads the files as an artifact for a human to review and commit.
+name: Re-mint FID goldens (manual)
+
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  remint:
+    name: Re-mint · FID pipeline goldens (Linux)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: moltrace_backend
+    # Same BLAS thread pins as the slow-regression job: OpenBLAS initialised
+    # before a fork is a known Linux crash, and pinning also removes thread count
+    # as a source of numeric drift while minting.
+    env:
+      OMP_NUM_THREADS: "1"
+      OPENBLAS_NUM_THREADS: "1"
+      MKL_NUM_THREADS: "1"
+      NUMEXPR_NUM_THREADS: "1"
+      VECLIB_MAXIMUM_THREADS: "1"
+    steps:
+      - uses: actions/checkout@v5
+      - name: Setup uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+        with:
+          python-version: "3.13.5"
+          enable-cache: true
+          cache-dependency-glob: moltrace_backend/uv.lock
+      - name: Install dependencies
+        run: uv sync --frozen --extra fid --extra dev
+      # `-m ''` clears the default `-m 'not slow'` so the full corpus is re-minted;
+      # the test's MOLTRACE_REGEN_FID_GOLDEN branch writes each observed result to
+      # disk. No MOLTRACE_HOSE_KB is set, matching the slow suite (seed table).
+      - name: Regenerate goldens
+        env:
+          MOLTRACE_REGEN_FID_GOLDEN: "1"
+        run: uv run pytest tests/test_fid_pipeline_invariants.py -m '' -q
+      - name: Show golden diff
+        run: |
+          {
+            echo '## FID golden re-mint diff (Linux)'
+            echo
+            if git diff --quiet -- tests/golden/fid_invariants/; then
+              echo 'No changes — the committed goldens already match Linux output.'
+            else
+              echo 'These are the pinned values Linux produces that the macOS-minted goldens did not.'
+              echo 'Review, then commit the regenerated files.'
+              echo
+              echo '```diff'
+              git diff -- tests/golden/fid_invariants/
+              echo '```'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload regenerated goldens
+        uses: actions/upload-artifact@v4
+        with:
+          name: fid-goldens-linux-reminted
+          path: moltrace_backend/tests/golden/fid_invariants/*.json
+          if-no-files-found: error
