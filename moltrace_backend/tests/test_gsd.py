@@ -100,3 +100,85 @@ def test_multiplicity_from_lines_handles_degenerate_input() -> None:
     assert multiplicity_from_lines([2.4], frequency_mhz=400.0) == ("s", ())
     # No frequency -> cannot compute J, reports a generic multiplet.
     assert multiplicity_from_lines([2.4, 2.41], frequency_mhz=None) == ("m", ())
+
+
+class TestFitConvergesToThePrecisionThatIsRead:
+    """The fit tolerance is a latency lever, so it needs an accuracy contract.
+
+    Profiling a 65k-point 1H analysis found 41,714 SVD calls — 11.3 s of a 24 s
+    run — across 178 least-squares fits averaging 234 trust-region iterations
+    each. Nearly all of that is spent past the point where the answer stops
+    changing: scipy's default ftol/xtol/gtol of 1e-8 chases the eighth
+    significant figure, while a fitted centre is reported in ppm to 3-4 decimals
+    and a coupling to about 0.1 Hz. Loosening to 1e-5 measured 6.95x faster with
+    the peak list identical.
+
+    These pin the accuracy side of that trade, so a future tightening or
+    loosening has to answer to the same numbers: line COUNT, centre positions in
+    Hz, and analytic areas must all survive.
+    """
+
+    MHZ = 400.0
+
+    def _multiplet(self, j_hz: float, n_lines: int, linewidth_hz: float, span_ppm: float):
+        import numpy as np
+
+        rng = np.random.default_rng(11)
+        j_ppm = j_hz / self.MHZ
+        hwhm = linewidth_hz / 2.0 / self.MHZ
+        centers = [3.5 + (i - (n_lines - 1) / 2) * j_ppm for i in range(n_lines)]
+        mid = float(np.mean(centers))
+        x = np.linspace(mid - span_ppm / 2, mid + span_ppm / 2, 8192)
+        y = np.zeros_like(x)
+        for c in centers:
+            lorentz = 0.6 / (1.0 + ((x - c) / hwhm) ** 2)
+            gauss = 0.4 * np.exp(-np.log(2) * ((x - c) / hwhm) ** 2)
+            y += 100.0 * (lorentz + gauss)
+        return list(x), list(y + rng.normal(0.0, 0.35, x.size)), centers
+
+    def test_resolves_the_tightest_coupling_a_chemist_would_report(self) -> None:
+        # J = 1.2 Hz at a 0.6 Hz linewidth: the lines are barely two linewidths
+        # apart, which is where a loose fit would merge them into a singlet.
+        x, y, centers = self._multiplet(1.2, 2, 0.6, 0.05)
+        lines = deconvolve_region(x, y, centers, noise_sigma=0.35)
+        assert len(lines) == 2, f"a 1.2 Hz doublet resolved as {len(lines)} line(s)"
+        got = sorted(line[0] for line in lines)
+        separation_hz = (got[1] - got[0]) * self.MHZ
+        assert abs(separation_hz - 1.2) < 0.15, (
+            f"recovered J = {separation_hz:.3f} Hz from a 1.2 Hz doublet"
+        )
+
+    def test_recovers_multiplet_centres_well_inside_reported_precision(self) -> None:
+        # A coupling is read to ~0.1 Hz; the fit must be far better than that.
+        for j_hz, n_lines, linewidth, span in (
+            (7.2, 4, 0.7, 0.10),
+            (6.8, 7, 0.9, 0.20),
+            (2.0, 2, 0.7, 0.06),
+        ):
+            x, y, centers = self._multiplet(j_hz, n_lines, linewidth, span)
+            lines = deconvolve_region(x, y, centers, noise_sigma=0.35)
+            assert len(lines) == n_lines, (
+                f"J={j_hz} Hz multiplet gave {len(lines)} lines, expected {n_lines}"
+            )
+            got = sorted(line[0] for line in lines)
+            worst = max(
+                abs(g - c) * self.MHZ for g, c in zip(got, sorted(centers), strict=True)
+            )
+            assert worst < 0.05, (
+                f"J={j_hz} Hz multiplet centres drifted {worst:.3f} Hz from truth"
+            )
+
+    def test_a_broad_singlet_is_not_split_by_the_looser_tolerance(self) -> None:
+        # The failure mode in the other direction: stopping early on a broad,
+        # noisy line and calling the residual structure a second transition.
+        x, y, centers = self._multiplet(0.0, 1, 3.0, 0.20)
+        lines = deconvolve_region(x, y, centers, noise_sigma=0.35)
+        assert len(lines) == 1, f"a broad singlet was split into {len(lines)} lines"
+
+    def test_fitted_areas_stay_analytic_and_positive(self) -> None:
+        x, y, centers = self._multiplet(7.2, 4, 0.7, 0.10)
+        lines = deconvolve_region(x, y, centers, noise_sigma=0.35)
+        assert lines
+        for _centre, height, hwhm, area in lines:
+            assert height > 0.0 and hwhm > 0.0
+            assert area > 0.0, "an analytic pseudo-Voigt area cannot be non-positive"
