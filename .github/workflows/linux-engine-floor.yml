@@ -213,3 +213,51 @@ jobs:
         with:
           name: "floor-${{ matrix.image }}"
           path: /tmp/probe-result.json
+
+  # ===========================================================================
+  # GATE — the only job whose red/green means anything.
+  #
+  # The matrix legs above carry continue-on-error so that one distribution's
+  # failure does not mask the others' results. That is useful and it is also a
+  # trap: with it set, a FAILED probe still leaves the run looking green. This
+  # job exists so the run has one honest signal. It fails if any leg reported a
+  # hard failure, and it fails if a leg produced no verdict at all -- a probe
+  # that cannot report is not a probe that passed.
+  # ===========================================================================
+  floor-gate:
+    name: "GATE · did Linux meet the floor?"
+    needs: render-probe
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with: { pattern: "floor-*", path: results, merge-multiple: false }
+      - name: Decide
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json, glob, sys
+          files = sorted(glob.glob("results/**/probe-result.json", recursive=True))
+          if not files:
+              print("NO RESULTS AT ALL — every leg failed to report. Treat as FAILURE.")
+              sys.exit(1)
+          bad, quiet = [], []
+          for f in files:
+              try:
+                  r = json.load(open(f))
+              except Exception as e:
+                  quiet.append("%s (unreadable: %s)" % (f, e)); continue
+              feats = r.get("features") or []
+              if not feats:
+                  quiet.append("%s (%s)" % (f, r.get("error", "no features"))); continue
+              miss = [x["name"] for x in feats if x["tier"] == "hard" and not x["pass"]]
+              print("%-40s WebKitGTK %-10s %s" % (f, r.get("webkitgtk","?"),
+                    ("MISSING: " + ", ".join(miss)) if miss else "all hard requirements met"))
+              if miss: bad.append(f)
+          for q in quiet:
+              print("NO VERDICT:", q)
+          if bad or quiet:
+              print("\nRESULT: Linux does NOT clear the floor on every image tested.")
+              sys.exit(1)
+          print("\nRESULT: every image tested cleared the floor.")
+          PY
