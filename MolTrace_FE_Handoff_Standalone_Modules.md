@@ -103,17 +103,23 @@ reports exactly one included product.
 A refused product route returns:
 
 - **Status:** `403`
-- **Body:** `{"detail": "module_not_licensed"}`
+- **Body:** `{"code": "module_not_licensed", "detail": "<generic access-denied copy>"}`
 - **Header:** `X-MolTrace-Module: regulatory_hub` (the product that was refused)
+
+**Branch on `code` or on the header — never on `detail`.** The proxy replaces `detail` on every
+401/403, including when it forwards a recognised `code`, because that prose is human copy and
+matching it would turn a copy edit into a breaking change.
 
 **Use the header.** I verified the proxy at `moltrace_frontend/app/api/backend/[...path]/route.ts`
 builds `responseHeaders` from the upstream response and preserves them even on the sanitized
 branch — so `X-MolTrace-Module` **already reaches the browser today with no proxy change.** The
 body is still replaced with the generic access-denied string on that path.
 
-*Optional, cleaner:* extend the existing 401 passthrough (route.ts ~line 109) to also allow
-`"detail":"module_not_licensed"` through on 403, so the code is available in the body too. Purely
-additive — the same pattern already ships for the 401 codes.
+*This has since shipped, in a better shape than the one suggested here.* The proxy no longer
+matches on `detail` at all: it reads the body's `code` field against `PUBLIC_ERROR_CODES` — a
+nine-member allowlist mirroring `error_codes.PUBLIC_CODES`, covering `module_not_licensed`, the
+four session/step-up codes and the four upgrade states — forwards a recognised code, and sanitizes
+an unrecognised one. `detail` is still replaced in every case.
 
 Central handling belongs in `apiFetch`: on a 403 carrying that header, raise a distinct
 "module not included" signal rather than a generic access error, so callers can render the
