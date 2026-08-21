@@ -103,19 +103,24 @@ def test_multiplicity_from_lines_handles_degenerate_input() -> None:
 
 
 class TestFitConvergesToThePrecisionThatIsRead:
-    """The fit tolerance is a latency lever, so it needs an accuracy contract.
+    """The fit tolerance feeds a discrete classifier, so it needs an accuracy contract.
 
     Profiling a 65k-point 1H analysis found 41,714 SVD calls — 11.3 s of a 24 s
     run — across 178 least-squares fits averaging 234 trust-region iterations
-    each. Nearly all of that is spent past the point where the answer stops
-    changing: scipy's default ftol/xtol/gtol of 1e-8 chases the eighth
-    significant figure, while a fitted centre is reported in ppm to 3-4 decimals
-    and a coupling to about 0.1 Hz. Loosening to 1e-5 measured 6.95x faster with
-    the peak list identical.
+    each, so the fit tolerance was tried as a latency lever: loosening scipy's
+    default ftol/xtol/gtol of 1e-8 to 1e-5 measured 6.95x faster with the peak
+    list identical ON THAT SPECTRUM.
 
-    These pin the accuracy side of that trade, so a future tightening or
-    loosening has to answer to the same numbers: line COUNT, centre positions in
-    Hz, and analytic areas must all survive.
+    It was reverted to 1e-8. On the fixture corpus the peak list is NOT identical:
+    the multiplicity is read off the resolved line COUNT, and for real spectra the
+    count is still moving between 1e-5 and 1e-8 (nmrshiftdb2 40256149 peak 2 reads
+    "m" at 1e-8 and "t" at 1e-5) — i.e. 1e-5 is under-converged for this stage, not
+    faster-but-equal. The output-invariance goldens caught it. See the note in
+    nmrcheck.gsd deconvolve_region.
+
+    These tests pin the accuracy side regardless of tolerance, so any future change
+    has to answer to the same numbers: line COUNT, centre positions in Hz, and
+    analytic areas must all survive.
     """
 
     MHZ = 400.0
