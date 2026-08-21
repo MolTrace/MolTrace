@@ -247,6 +247,61 @@ def test_residual_solvent_uses_q3c_engine_when_no_tenant_rule(client, api_header
         assert match["threshold_triggered"] is True  # 5000 ppm > 410 ppm limit
 
 
+def test_a_dossier_without_a_daily_dose_says_the_limit_is_the_reference_one(client, api_headers):
+    """A missing dose silently produced the 10 g/day reference limit; Q3D already warns here.
+
+    The reference limit is not this product's limit, and the gap between them is unbounded --
+    five-fold at 50 g/day. Falling back is correct; doing it without a word on the record is
+    what made the number unreadable.
+    """
+
+    headers = api_headers
+    with client:
+        juris = _jurisdiction(client, headers, "Q3C nodose US", "US")
+        dossier = _dossier(client, headers, juris["id"])
+        res = client.post(
+            f"/regulatory/dossiers/{dossier['id']}/residual-solvent-assessment",
+            headers=headers,
+            json={"solvents_json": [{"solvent_name": "toluene", "observed_ppm": 100}]},
+        )
+        assert res.status_code == 201, res.text
+        body = res.json()
+
+    match = body["residual_solvent_summary_json"]["matched_solvents"][0]
+    assert match["concentration_limit"] == 890.0  # Option 1, the 10 g/day reference
+    assert "10 g/day reference dose" in match["limit_basis"]
+
+    warning = next((w for w in body["warnings"] if "toluene" in w), None)
+    assert warning is not None, body["warnings"]
+    assert "10 g/day" in warning
+    # This is not a missing source document, so it must not raise that affordance.
+    assert "source_needed" not in warning
+
+
+def test_a_class_1_dossier_limit_is_not_labelled_option_1(client, api_headers):
+    """Class 1 has no PDE to scale, so neither Option applies -- the limit is a fixed value."""
+
+    headers = api_headers
+    with client:
+        juris = _jurisdiction(client, headers, "Q3C class1 US", "US")
+        dossier = _dossier(client, headers, juris["id"])
+        res = client.post(
+            f"/regulatory/dossiers/{dossier['id']}/residual-solvent-assessment",
+            headers=headers,
+            json={"solvents_json": [{"solvent_name": "benzene", "observed_ppm": 1}]},
+        )
+        assert res.status_code == 201, res.text
+        body = res.json()
+
+    match = body["residual_solvent_summary_json"]["matched_solvents"][0]
+    assert match["solvent_class"] == "class_1"
+    assert match["concentration_limit"] == 2.0
+    assert "Option 1" not in match["limit_basis"]
+    assert "fixed" in match["limit_basis"].lower()
+    # A Class 1 solvent is not a dose-scaling gap, so it raises no missing-dose warning.
+    assert not [w for w in body["warnings"] if "10 g/day" in w], body["warnings"]
+
+
 def test_residual_solvent_unknown_still_source_needed(client, api_headers):
     # A solvent outside the encoded Q3C subset keeps the source-needed fallback.
     headers = api_headers

@@ -351,7 +351,10 @@ def check_residual_solvent_limits(
 
         if classification.class_number == 1:
             permitted_ppm = float(classification.concentration_limit_ppm or 0.0)
-            basis_note = "Class 1 concentration limit (ICH Q3C Option 1)."
+            # Not Option 1: Options 1 and 2 are the two ways to derive a Class 2/3
+            # limit from a PDE. A Class 1 solvent has no PDE at all -- its limit is a
+            # fixed Appendix value that no dose changes.
+            basis_note = "Class 1 fixed concentration limit (ICH Q3C, dose-independent)."
         else:
             pde = float(classification.pde_mg_per_day or 0.0)
             permitted_ppm = pde * 1000.0 / daily_dose_g  # Option 2, dose-scaled

@@ -985,10 +985,15 @@ def _q3c_default(name: str, daily_dose_g: float | None = None) -> dict[str, Any]
     if not cls.matched:
         return None
     limit_ppm = cls.concentration_limit_ppm
-    limit_basis = "ICH Q3C Option 1 (10 g/day reference)"
-    if daily_dose_g is not None and cls.pde_mg_per_day is not None:
+    if cls.class_number == 1:
+        # A Class 1 solvent carries a fixed Appendix limit and has no PDE to scale, so it is
+        # neither Option 1 nor Option 2 -- both of those are ways to derive a Class 2/3 limit.
+        limit_basis = "ICH Q3C Class 1 fixed concentration limit (dose-independent)"
+    elif daily_dose_g is not None and cls.pde_mg_per_day is not None:
         limit_ppm = cls.pde_mg_per_day * 1000.0 / daily_dose_g  # Option 2, dose-scaled
         limit_basis = "ICH Q3C Option 2 (dose-scaled to the dossier daily dose)"
+    else:
+        limit_basis = "ICH Q3C Option 1 (10 g/day reference dose, not this product's dose)"
     return {
         "fields": {
             "solvent_class": f"class_{cls.class_number}",
@@ -1055,6 +1060,17 @@ def create_residual_solvent_assessment(
                 engine = _q3c_default(name, dossier.max_daily_dose_g)
                 if engine is not None:
                     match.update(engine["fields"])
+                    if dossier.max_daily_dose_g is None and not engine["class_1"]:
+                        # The Q3D path in this file already says when the dose is missing;
+                        # Q3C fell back to the 10 g/day reference limit in silence, which is
+                        # the reference dose and not this product's, so the number can be far
+                        # off in either direction with nothing on the record to say so.
+                        warnings.append(
+                            f"No maximum daily dose is recorded for this dossier, so "
+                            f"{name or 'this solvent'} was limited against the ICH Q3C "
+                            "10 g/day reference dose rather than the product's own dose. "
+                            "Record the daily dose to obtain the dose-scaled limit."
+                        )
                     if (
                         observed_value is not None
                         and engine["limit_ppm"] is not None

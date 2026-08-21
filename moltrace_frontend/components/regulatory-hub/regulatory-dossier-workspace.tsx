@@ -3763,15 +3763,36 @@ export function RegulatoryDossierWorkspace() {
                                 )
                                 const pde = m.permitted_daily_exposure
                                 const lim = m.concentration_limit
+                                // Units are only known for rows the ICH Q3C engine produced
+                                // (mg/day and ppm). A tenant rule stores bare numbers with no
+                                // unit recorded anywhere, so naming one here would invent it.
+                                const fromEngine =
+                                  readRecordString(m, "source") === "ich_q3c_engine"
+                                const limitBasis = readRecordString(m, "limit_basis")
                                 const pdeLim =
                                   (typeof pde === "number" && Number.isFinite(pde)) ||
                                   (typeof lim === "number" && Number.isFinite(lim)) ? (
-                                    <span className="font-mono text-[11px]">
+                                    <span className="text-[11px]">
                                       {typeof pde === "number" && Number.isFinite(pde) ? (
-                                        <span className="block">permitted_daily_exposure: {pde}</span>
+                                        <span className="block">
+                                          Permitted daily exposure{" "}
+                                          <span className="font-mono">
+                                            {pde}
+                                            {fromEngine ? " mg/day" : ""}
+                                          </span>
+                                        </span>
                                       ) : null}
                                       {typeof lim === "number" && Number.isFinite(lim) ? (
-                                        <span className="block">concentration_limit: {lim}</span>
+                                        <span className="block">
+                                          Concentration limit{" "}
+                                          <span className="font-mono">
+                                            {lim}
+                                            {fromEngine ? " ppm" : ""}
+                                          </span>
+                                        </span>
+                                      ) : null}
+                                      {limitBasis ? (
+                                        <span className="block text-muted-foreground">{limitBasis}</span>
                                       ) : null}
                                     </span>
                                   ) : (
