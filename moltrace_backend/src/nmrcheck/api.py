@@ -15196,6 +15196,10 @@ def create_regulatory_submission_package_route(
             _state(request).session_factory,
             dossier_id,
             payload,
+            # require_dossier_access gates the path id only; file_ids_json rides
+            # in the body, where the manifest would otherwise disclose another
+            # tenant's filenames and hashes.
+            owner_scope_id=_user_scope_for_context(context),
         )
     except Exception as exc:
         _raise_interoperability_http_error(exc)
