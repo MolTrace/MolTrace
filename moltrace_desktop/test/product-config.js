@@ -83,6 +83,34 @@ check('a CONFIGURED baked build IGNORES the overlay — no redirection primitive
   }
 })
 
+check('the inert default does NOT carry the official product name', () => {
+  // BUSL withholds trademark rights, but a licence clause does not stop a rebuilt
+  // binary from LOOKING official to whoever runs it. VS Code's public config names
+  // itself "Code - OSS" for exactly this reason.
+  assert.notStrictEqual(product.baked.productName, product.OFFICIAL_PRODUCT_NAME,
+    'the committed default is branded — an unofficial build would present itself as MolTrace')
+  const v = product.validate()
+  assert.deepStrictEqual(v.problems, [])
+})
+
+check('branding an unconfigured build is rejected', () => {
+  const v = product.validate({ ...product.baked, productName: product.OFFICIAL_PRODUCT_NAME })
+  assert.ok(v.problems.some((p) => /present itself as MolTrace/.test(p)),
+    'a branded unconfigured build was not rejected')
+})
+
+check('a CONFIGURED build may carry the official name', () => {
+  const v = product.validate({
+    ...product.baked,
+    productName: product.OFFICIAL_PRODUCT_NAME,
+    workspaceUrl: 'https://example.invalid',
+    entitlementRootPublicKey: 'ed25519:' + 'a'.repeat(64),
+    entitlementRootKeyId: 'mtroot1:abcdef123456',
+  })
+  assert.deepStrictEqual(v.problems, [], 'the official build was wrongly refused the brand')
+  assert.strictEqual(v.configured, true)
+})
+
 for (const [s, n] of results) console.log(`  ${s === 'PASS' ? '✓' : '✗'} ${n}`)
 const failed = results.filter(([s]) => s === 'FAIL').length
 console.log(failed ? `\nPRODUCT CONFIG FAILED (${failed})` : `\nPRODUCT CONFIG OK — ${results.length} assertions`)
