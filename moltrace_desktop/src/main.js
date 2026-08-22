@@ -5,6 +5,7 @@ const { createWindow } = require('./window-factory')
 const product = require('./product')
 const serviceCredential = require('./service-credential')
 const capabilities = require('./capabilities')
+const capabilityView = require('./capability-view')
 
 // Generated once per launch and held in this closure. It is NOT put on
 // app.state, not exported, and never crosses the contextBridge — a renderer that
@@ -45,7 +46,7 @@ ipcMain.handle('moltrace:capability-readout', () => {
     service: null,      // from the reachable local service
     role: null,
   }
-  return capabilities.readout(DECLARED_CAPABILITIES, world)
+  return capabilities.readout(DECLARED_CAPABILITIES, world).map(capabilityView.present)
 })
 
 function applyCsp() {

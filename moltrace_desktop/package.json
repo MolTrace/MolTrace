@@ -7,12 +7,13 @@
   "type": "commonjs",
   "scripts": {
     "start": "electron .",
-    "test": "node test/modules-committed.js && node test/product-config.js && node test/service-credential.js && node test/capabilities.js && MOLTRACE_PRODUCT_CONFIG=$PWD/test/fixtures-product.json electron test/confinement-runner.js",
+    "test": "node test/modules-committed.js && node test/product-config.js && node test/service-credential.js && node test/capabilities.js && node test/upgrade-states.js && MOLTRACE_PRODUCT_CONFIG=$PWD/test/fixtures-product.json electron test/confinement-runner.js",
     "test:product": "node test/product-config.js",
     "test:confinement": "MOLTRACE_PRODUCT_CONFIG=$PWD/test/fixtures-product.json electron test/confinement-runner.js",
     "test:credential": "node test/service-credential.js",
     "test:modules": "node test/modules-committed.js",
-    "test:capabilities": "node test/capabilities.js"
+    "test:capabilities": "node test/capabilities.js",
+    "test:upgrade": "node test/upgrade-states.js"
   },
   "dependencies": {
     "electron": "43.4.1"

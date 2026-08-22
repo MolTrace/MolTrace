@@ -1,15 +1,47 @@
 'use strict'
 // Renderer. No Node reach by construction — everything native comes through
-// window.capabilities, the single contextBridge surface.
+// window.moltrace, the single contextBridge surface.
+//
+// Renders the four upgrade states distinctly. A capability that is unavailable
+// says WHY and what to do next; §4.2's four causes imply four different next
+// actions, and rendering them all as one disabled control throws that away at
+// the last step.
 ;(async () => {
-  const el = document.getElementById('status')
+  const root = document.getElementById('root')
+  const status = document.getElementById('status')
+  let readout
   try {
-    const caps = await window.moltrace.capabilities.read()
-    const open = caps.filter((c) => c.available)
-    el.textContent = open.length
-      ? `${open.length} of ${caps.length} capabilities available`
-      : caps[0]?.reason || 'No capabilities are available yet.'
+    readout = await window.moltrace.capabilities.read()
   } catch (err) {
-    el.textContent = `capability readout unavailable: ${err.message}`
+    status.textContent = `Capabilities could not be read: ${err.message}`
+    return
   }
+
+  status.remove()
+  const list = document.createElement('ul')
+  list.className = 'capabilities'
+  for (const c of readout) {
+    const li = document.createElement('li')
+    li.className = `cap cap--${c.tone}`
+    li.dataset.code = c.code || ''
+    li.dataset.available = String(c.available)
+
+    const name = document.createElement('strong')
+    name.textContent = c.displayName
+    li.append(name)
+
+    const head = document.createElement('span')
+    head.className = 'cap__headline'
+    head.textContent = c.headline
+    li.append(head)
+
+    if (c.action) {
+      const act = document.createElement('p')
+      act.className = 'cap__action'
+      act.textContent = c.action
+      li.append(act)
+    }
+    list.append(li)
+  }
+  root.append(list)
 })()

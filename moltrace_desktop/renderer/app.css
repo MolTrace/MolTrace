@@ -1,2 +1,13 @@
 :root { color-scheme: light dark; font-family: system-ui, sans-serif; }
 body { margin: 0; padding: 2rem; }
+.capabilities { list-style: none; padding: 0; display: grid; gap: .75rem; max-width: 34rem; }
+.cap { border: 1px solid currentColor; border-radius: .5rem; padding: .75rem 1rem; display: grid; gap: .25rem; }
+.cap__headline { font-size: .875rem; opacity: .85; }
+.cap__action { margin: .25rem 0 0; font-size: .875rem; }
+/* The four states are visually distinct, not one grey box. */
+.cap--available  { border-left: 4px solid #2e7d32; }
+.cap--upgrade    { border-left: 4px solid #6a1b9a; }
+.cap--admin      { border-left: 4px solid #1565c0; }
+.cap--setup      { border-left: 4px solid #ef6c00; }
+.cap--permission { border-left: 4px solid #546e7a; }
+.cap--unknown    { border-left: 4px solid #c62828; }
