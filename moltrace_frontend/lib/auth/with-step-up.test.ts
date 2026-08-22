@@ -2,7 +2,16 @@ import { describe, expect, it, vi } from "vitest"
 import { withStepUp } from "@/lib/auth/with-step-up"
 import { ApiError } from "@/lib/api/client"
 
-const stepUp401 = () => new ApiError(401, { detail: "step_up_required" }, "step up required")
+// The shape a browser actually receives: `code` carries the signal, and `detail` is the
+// proxy's generic copy. Built with `detail: "step_up_required"` — as this did — these tests
+// passed against a body no client is ever sent, which is why the live defect in
+// `isStepUpRequired` survived having a green test suite.
+const stepUp401 = () =>
+  new ApiError(
+    401,
+    { code: "step_up_required", detail: "Sign in to access live MolTrace data." },
+    "step up required",
+  )
 
 describe("withStepUp", () => {
   it("returns the result without any ceremony when the call succeeds", async () => {
@@ -41,9 +50,9 @@ describe("withStepUp", () => {
 
   it("does not trigger step-up on an ordinary error (403 / non-step-up 401)", async () => {
     const ensure = vi.fn<() => Promise<boolean>>()
-    const forbidden = new ApiError(403, { detail: "forbidden" }, "no")
+    const forbidden = new ApiError(403, { code: "forbidden" }, "no")
     await expect(withStepUp(async () => { throw forbidden }, ensure)).rejects.toBe(forbidden)
-    const plain401 = new ApiError(401, { detail: "not authenticated" }, "no")
+    const plain401 = new ApiError(401, { code: "unauthenticated" }, "no")
     await expect(withStepUp(async () => { throw plain401 }, ensure)).rejects.toBe(plain401)
     expect(ensure).not.toHaveBeenCalled()
   })
