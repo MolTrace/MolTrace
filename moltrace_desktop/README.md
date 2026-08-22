@@ -66,6 +66,30 @@ bridge surface for credential-shaped keys, because a renderer that can read it c
 service directly and defeat the peer check, the header discipline and the rebinding refusals at
 once.
 
+## The capability readout
+
+No server endpoint aggregates this. `GET /system/capabilities` reports only which products a
+*deployment* includes — it says nothing about the entitlement, the local pack inventory, or whether
+the science service is reachable. So the desktop assembles the answer from those four sources, and
+`src/capabilities.js` is the one place that combination happens.
+
+**The invariant is that a capability is never rendered as available and then fails on click.** That
+makes the default *deny*: an input that is absent, unreadable or unreachable is not "probably fine",
+it is unknown, and unknown is not available. Every gate must affirmatively say yes. The test checks
+this exhaustively rather than by example — it drops each input in turn and asserts nothing survives.
+
+Four causes of a locked capability are kept **distinguishable**, because they imply four different
+next actions and presenting them as one denial sends a person to the wrong place: the deployment
+does not serve the product, it is not switched on here, the local side is not provisioned, or the
+account lacks permission. Those four codes are the platform's existing vocabulary and a test rejects
+a fifth — the desktop and the web surface must name the same situation identically.
+
+The role check runs **last**, so a permission refusal is never used to mask a provisioning gap an
+operator ought to see.
+
+The renderer receives verdicts, never inputs. A page that can see the entitlement or the service
+versions can reason about them; availability is decided once, in one place.
+
 ## The confinement test
 
 `test/confinement-runner.js` asserts §8.3 of the desktop specification in three layers, because no
