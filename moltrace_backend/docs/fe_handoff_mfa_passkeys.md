@@ -27,6 +27,14 @@ The backend pins WebAuthn server-side: `WEBAUTHN_RP_ID` (e.g. `moltrace.co` / `l
 `WEBAUTHN_ORIGIN` (full scheme+host, e.g. `https://moltrace.co`) **must** equal what the browser
 serves the SPA from. A mismatch silently breaks every passkey ceremony.
 
+When more than one origin legitimately shares that one `rp_id` — an apex and a subdomain, say —
+`WEBAUTHN_ADDITIONAL_ORIGINS` accepts a comma-separated list of further **exact** origins at
+verification time. Matching is whole-string equality: no prefix, no suffix, no wildcard, and never
+the literal `null`. `WEBAUTHN_RP_ID` stays a single value and is **not** widened — options are
+always minted against it, because varying it per ceremony creates credentials that cannot verify
+against each other. Unset (the default) leaves behaviour exactly as above. In production the
+service refuses to start if any entry is loopback or plaintext.
+
 ## 3. MFA-at-login (the 202 branch)
 
 `POST /auth/login` (and `/auth/sign-in`, `/auth/token`) now returns **HTTP 202** instead of a token
