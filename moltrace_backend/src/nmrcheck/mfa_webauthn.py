@@ -1,7 +1,11 @@
 """WebAuthn / FIDO2 passkey second factor (Security Prompt 3).
 
 Phishing resistance comes from the server ALWAYS supplying the expected ``rp_id`` and ``origin``
-(from settings, never the client) and from requiring User Verification on every assertion. The two
+(from settings, never the client) and from requiring User Verification on every assertion. The
+origin side is a SET — one ``rp_id``, several accepted origins, each matched by whole-string
+equality and never by a pattern (:func:`nmrcheck.settings.webauthn_accepted_origins`). Options
+generation is deliberately NOT widened: it still mints against the single ``rp_id``, because
+varying it per ceremony would create credentials that cannot verify against each other. The two
 network-equivalent verify calls — :func:`verify_registration` / :func:`verify_authentication` — are
 module-level so tests can monkeypatch them with a synthetic authenticator (no real device), exactly
 like :mod:`oidc_client`. Challenges are server-minted, single-use, and TTL-bounded; the
@@ -32,7 +36,7 @@ from webauthn.helpers.structs import (
 
 from .database import session_scope
 from .orm import MFAWebAuthnChallengeORM, MFAWebAuthnCredentialORM, UserORM, utcnow
-from .settings import Settings
+from .settings import Settings, webauthn_accepted_origins
 
 _CHALLENGE_TTL_MINUTES = 5
 
@@ -49,6 +53,25 @@ class MFAError(Exception):
 # --------------------------------------------------------------------- pure py_webauthn seams
 
 
+def _expected_origin(settings: Settings) -> str | list[str]:
+    """The origin(s) a ceremony may claim, for py_webauthn to match by whole-string equality.
+
+    A single accepted origin is passed as the bare string it has always been, so a deployment that
+    has not set ``WEBAUTHN_ADDITIONAL_ORIGINS`` verifies -- and refuses -- byte-identically to
+    before. py_webauthn matches a list by membership, which is that same exact equality; it is
+    never handed a prefix, suffix, wildcard or regular expression to interpret.
+    """
+    accepted = webauthn_accepted_origins(settings)
+    if not accepted:
+        # Nothing configured can ever match, so refuse with a nameable cause rather than letting
+        # it surface as a puzzling verification failure. validate_startup_settings says which
+        # value is at fault.
+        raise MFAError("Passkeys are not usable: no valid WebAuthn origin is configured.", 500)
+    if len(accepted) == 1:
+        return accepted[0]
+    return list(accepted)
+
+
 def verify_registration(
     credential: dict[str, Any], *, expected_challenge: bytes, settings: Settings
 ):
@@ -57,7 +80,7 @@ def verify_registration(
         credential=json.dumps(credential),
         expected_challenge=expected_challenge,
         expected_rp_id=settings.webauthn_rp_id,
-        expected_origin=settings.webauthn_origin,
+        expected_origin=_expected_origin(settings),
         require_user_verification=True,
     )
 
@@ -75,7 +98,7 @@ def verify_authentication(
         credential=json.dumps(credential),
         expected_challenge=expected_challenge,
         expected_rp_id=settings.webauthn_rp_id,
-        expected_origin=settings.webauthn_origin,
+        expected_origin=_expected_origin(settings),
         credential_public_key=public_key,
         credential_current_sign_count=current_sign_count,
         require_user_verification=True,
