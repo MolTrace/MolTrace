@@ -30,6 +30,7 @@ from webauthn.helpers.structs import (
     UserVerificationRequirement,
 )
 
+from . import error_codes
 from .database import session_scope
 from .orm import MFAWebAuthnChallengeORM, MFAWebAuthnCredentialORM, UserORM, utcnow
 from .settings import Settings
@@ -38,12 +39,19 @@ _CHALLENGE_TTL_MINUTES = 5
 
 
 class MFAError(Exception):
-    """An MFA failure rendered to the client as ``{status} {detail}`` (default 400)."""
+    """An MFA failure rendered to the client as ``{status} {detail}`` (default 400).
 
-    def __init__(self, detail: str, status: int = 400) -> None:
+    ``code`` is the machine-readable situation for the 401/403 cases, where ``detail`` is
+    replaced by fixed generic copy before it reaches the wire and is therefore no longer able
+    to carry a signal. At 400/409/500 ``detail`` still reaches the client unchanged and
+    ``code`` is optional.
+    """
+
+    def __init__(self, detail: str, status: int = 400, *, code: str | None = None) -> None:
         super().__init__(detail)
         self.detail = detail
         self.status = status
+        self.error_code = code
 
 
 # --------------------------------------------------------------------- pure py_webauthn seams
@@ -307,7 +315,16 @@ def verify_assertion_for_user(
     # Clone detection: a non-zero counter must strictly advance. (Synced passkeys report 0 — never
     # downgrade a previously non-zero counter to 0.)
     if row.sign_count > 0 and new_count <= row.sign_count:
-        raise MFAError("Passkey clone/replay detected (sign count did not advance).", 401)
+        # The caller is told only that the factor was not accepted. Naming the sign-counter
+        # check here tells whoever holds a cloned credential that the clone was detected and
+        # which check caught it; the person who OWNS the credential learns of it through the
+        # audit chain and the account's notification path, which reaches the owner rather than
+        # the copy.
+        raise MFAError(
+            "Passkey clone/replay detected (sign count did not advance).",
+            401,
+            code=error_codes.MFA_FACTOR_INVALID,
+        )
     if new_count > row.sign_count:
         row.sign_count = new_count
     row.last_used_at = utcnow()
