@@ -484,6 +484,21 @@ jobs:
       - name: Install
         run: npm ci
 
+      # Electron 43 has NO postinstall script — `npm ci` installs the package but
+      # never downloads the binary, and reports success either way. Verified from
+      # the package itself: node_modules/electron/package.json has no `scripts`
+      # block at all, and exposes `install-electron` as a bin instead. The binary
+      # must therefore be fetched explicitly.
+      #
+      # This was invisible locally, because an earlier `npx electron` run had
+      # already populated dist/ — so the working tree looked correct while a clean
+      # checkout had no binary at all. Two CI failures were spent on the symptom
+      # (a missing chrome-sandbox) before the cause was read off the package.
+      - name: Download the Electron binary
+        run: |
+          npx --no-install install-electron
+          node -e "const fs=require('fs'),p=require('electron');if(!fs.existsSync(p)){console.error('::error::electron binary missing after install: '+p);process.exit(1)}console.log('electron binary: '+p)"
+
       - name: Electron version is EXACTLY the pin
         # A caret would accept a different Chromium, and the engine identity is
         # what makes the artifact qualifiable (§7.1, §10.2).
