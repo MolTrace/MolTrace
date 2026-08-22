@@ -263,6 +263,10 @@ def issue_statement(
         # for an installation that is not theirs.
         assert_device_session_visible(row, actor=actor)
 
+        # Device facts are answered before the deployment-level one below, and that IS the
+        # intended order rather than a consequence of where this computation sits: the person
+        # holding the installation can act on "this installation was withdrawn", and can do
+        # nothing at all about which products the workspace licenses.
         refusal_code = _refusal_for(row, payload)
         modules = tuple(
             module
@@ -346,6 +350,15 @@ def _refusal_for(row: MobileDeviceSessionORM, payload: EntitlementIssuanceReques
         return "device_revoked"
     if row.status == "expired":
         return "device_expired"
+    # ALLOWLIST, not a denylist, and the difference is load-bearing. ``MobileSessionStatus``
+    # constrains what the patch route accepts; the column behind it is a plain ``String(32)``
+    # with no enum and no check constraint, so it constrains nothing about what is stored, and
+    # the vocabulary can grow. Naming the two bad values and granting everything else would
+    # make every status added later a grant by default — and what is granted here is a signed
+    # credential good for the whole offline period, which nothing can retract once issued,
+    # because withdrawal is expressed by declining to reissue.
+    if row.status != "active":
+        return "device_not_in_good_standing"
     if row.device_type != "desktop":
         # An installation that was never registered as a desktop one has not been enrolled for
         # offline use at all — a different answer from one that has, but holds no identity yet.
