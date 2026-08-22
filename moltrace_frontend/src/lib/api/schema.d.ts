@@ -89,6 +89,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/system/active-versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * System Active Versions Route
+         * @description The versions of the science this workspace is actually running.
+         *
+         *     An installation that keeps its own copy of the rule sets compares against this before
+         *     producing a regulated result, so a result computed from a rule set this workspace has not
+         *     adopted is never presented as though it were.
+         *
+         *     **Authenticated, deliberately.** The catalogue names which regulated rule sets a customer has
+         *     adopted and which model artifacts they serve — a description of their validated
+         *     configuration, which is not ours to publish. `/system/version` is anonymous and carries build
+         *     metadata only; this is a different thing and does not belong beside it.
+         *
+         *     Deployment-scoped rather than user-scoped, so every authenticated caller of a workspace sees
+         *     the same answer and no owner scope applies. Clients must cache it against the API base URL
+         *     and never against the signed-in user: a per-user cache would let one person's stale catalogue
+         *     decide whether another person's result is current.
+         */
+        get: operations["system_active_versions_route_system_active_versions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/system/capabilities": {
         parameters: {
             query?: never;
@@ -8006,6 +8040,58 @@ export interface paths {
         patch: operations["update_mobile_device_session_route_mobile_device_sessions__device_session_id__patch"];
         trace?: never;
     };
+    "/desktop/entitlement-statements": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Issue Entitlement Statement Route
+         * @description Issue or refresh an offline licence for one enrolled installation.
+         *
+         *     A refusal comes back as a successful response carrying ``issued=false`` — it is a licensing
+         *     answer, not a fault, and the installation treats it as a withdrawal rather than retrying.
+         *     A deployment that cannot issue at all is a different thing entirely and is reported as
+         *     unavailability, so a misconfigured deployment never tells a customer they were withdrawn.
+         */
+        post: operations["issue_entitlement_statement_route_desktop_entitlement_statements_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/desktop/entitlement-authority": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Entitlement Authority Route
+         * @description Whether this deployment is set up to license offline installations, and until when.
+         *
+         *     **Public material only.** The deployment's signing key appears in no field of this
+         *     response, and there is no route anywhere that returns it.
+         *
+         *     This is also where a provisioning fault explains itself, because a 5xx body cannot: the
+         *     shared error handler replaces a 5xx response's prose and its machine code with fixed
+         *     constants, so neither field on that path can name a cause.
+         */
+        get: operations["get_entitlement_authority_route_desktop_entitlement_authority_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/mobile/dashboard": {
         parameters: {
             query?: never;
@@ -13106,6 +13192,43 @@ export interface components {
                 [key: string]: unknown;
             } | null;
         };
+        /**
+         * ActiveVersionEntry
+         * @description One artifact this deployment is running, positioned so it can be compared.
+         *
+         *     ``identity`` and ``revision`` answer different questions. ``identity`` is a content address
+         *     and supports equality only — sha256 has no order, so it can say "the same bytes" and never
+         *     "newer". ``revision`` is the declared ordered version, and is ``null`` whenever this
+         *     deployment cannot state one; a client must treat that as *not comparable* and refuse, never
+         *     as agreement.
+         */
+        ActiveVersionEntry: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "rule_set" | "model_artifact" | "reference_pack" | "method_defaults";
+            /**
+             * Lineage
+             * @description Ordering namespace. Two versions are comparable only when these match.
+             */
+            lineage: string;
+            /**
+             * Display Name
+             * @description Human copy for display. Not an identifier.
+             */
+            display_name: string;
+            /**
+             * Identity
+             * @description `sha256:<hex>` content address. Equality only, never order.
+             */
+            identity?: string | null;
+            /**
+             * Revision
+             * @description Declared ordered version. Null means not comparable — refuse, do not assume.
+             */
+            revision?: string | null;
+        };
         /** AdminSystemSummary */
         AdminSystemSummary: {
             /** Users */
@@ -14283,7 +14406,7 @@ export interface components {
             /** Split Recommendation */
             split_recommendation?: ("train" | "validation" | "test" | "holdout" | "unknown") | null;
             /** Leakage Risk Label */
-            leakage_risk_label?: ("high" | "medium" | "low" | "unknown") | null;
+            leakage_risk_label?: ("low" | "medium" | "high" | "unknown") | null;
             /** Quality Flags Json */
             quality_flags_json?: string[] | null;
             /** Metadata Json */
@@ -20003,6 +20126,180 @@ export interface components {
             body: string;
             /** Purpose */
             purpose?: ("verify_email" | "reset_password") | null;
+        };
+        /**
+         * EntitlementAuthorityStatus
+         * @description Operator diagnostic: is this deployment set up to license offline installations?
+         *
+         *     Public material only — never the issuing seed, in any field. This route is also where a
+         *     provisioning cause is delivered: a 5xx body cannot carry one, because the shared error
+         *     handler replaces both its prose and its machine code with fixed constants.
+         */
+        EntitlementAuthorityStatus: {
+            /** Provisioned */
+            provisioned: boolean;
+            /** Root Key Id */
+            root_key_id?: string | null;
+            /** Issuing Key Id */
+            issuing_key_id?: string | null;
+            certificate?: components["schemas"]["EntitlementCertificate"] | null;
+            /** Certificate Bytes B64 */
+            certificate_bytes_b64?: string | null;
+            /** Certificate Signature */
+            certificate_signature?: string | null;
+            /** Offline Period Days */
+            offline_period_days?: number | null;
+            /** Statement Validity Hours */
+            statement_validity_hours?: number | null;
+            /** Unavailable Code */
+            unavailable_code?: ("authority_not_provisioned" | "authority_certificate_invalid" | "authority_certificate_expired" | "issuing_key_unreadable" | "issuing_key_mismatch" | "offline_period_not_published" | "statement_validity_not_published" | "licence_class_not_published" | "licence_class_not_permitted") | null;
+            /** Unavailable Detail */
+            unavailable_detail?: string | null;
+        };
+        /**
+         * EntitlementCertificate
+         * @description The MolTrace-signed binding of one sub-key to one deployment. Public material.
+         *
+         *     It travels inside the issuance envelope, so an installation always holds it whenever it
+         *     holds a statement to verify, and the verifier never needs the network.
+         */
+        EntitlementCertificate: {
+            /**
+             * Certificate Schema
+             * @constant
+             */
+            certificate_schema: "moltrace.deployment.certificate/1";
+            /** Certificate Id */
+            certificate_id: string;
+            /** Deployment Id */
+            deployment_id: string;
+            /** Tenant Key */
+            tenant_key: string;
+            /** Issuing Public Key */
+            issuing_public_key: string;
+            /** Issuing Key Id */
+            issuing_key_id: string;
+            /** Permitted Modules */
+            permitted_modules: ("spectracheck" | "regulatory_hub" | "reaction_optimization")[];
+            /** Permitted Licence Classes */
+            permitted_licence_classes: ("commercial" | "no_charge" | "evaluation" | "perpetual")[];
+            /**
+             * Not Before
+             * Format: date-time
+             */
+            not_before: string;
+            /**
+             * Not After
+             * Format: date-time
+             */
+            not_after: string;
+            /** Root Key Id */
+            root_key_id: string;
+        };
+        /**
+         * EntitlementIssuance
+         * @description The envelope. ``issued=False`` is a licensing ANSWER, not an error.
+         */
+        EntitlementIssuance: {
+            /** Issued */
+            issued: boolean;
+            statement?: components["schemas"]["EntitlementStatement"] | null;
+            /** Statement Bytes B64 */
+            statement_bytes_b64?: string | null;
+            /** Statement Signature */
+            statement_signature?: string | null;
+            certificate?: components["schemas"]["EntitlementCertificate"] | null;
+            /** Certificate Bytes B64 */
+            certificate_bytes_b64?: string | null;
+            /** Certificate Signature */
+            certificate_signature?: string | null;
+            /** Root Key Id */
+            root_key_id?: string | null;
+            /** Exchange Nonce */
+            exchange_nonce: string;
+            /**
+             * Observed At
+             * Format: date-time
+             */
+            observed_at: string;
+            /** Exchange Signature */
+            exchange_signature: string;
+            /** Refusal Code */
+            refusal_code?: ("device_not_enrolled" | "device_identity_key_missing" | "device_identity_key_mismatch" | "device_revoked" | "device_expired" | "device_not_in_good_standing" | "no_licensed_modules") | null;
+            /** Refusal Detail */
+            refusal_detail?: string | null;
+        };
+        /** EntitlementIssuanceRequest */
+        EntitlementIssuanceRequest: {
+            /** Device Session Id */
+            device_session_id: number;
+            /** Device Identity Key */
+            device_identity_key: string;
+            /** Package Profiles */
+            package_profiles: ("desktop_shell" | "scientific_runtime" | "reference_rule_packs" | "model_packs" | "site_integration_packs")[];
+            /** Exchange Nonce */
+            exchange_nonce: string;
+        };
+        /**
+         * EntitlementStatement
+         * @description The signed fact. Every field here is inside the signature.
+         *
+         *     This typed object is **display material**. A verifier verifies over the canonical bytes and
+         *     nothing else; re-serializing this object to check a signature is the drift this programme
+         *     has been bitten by elsewhere.
+         */
+        EntitlementStatement: {
+            /**
+             * Statement Schema
+             * @constant
+             */
+            statement_schema: "moltrace.entitlement.statement/1";
+            /** Statement Id */
+            statement_id: string;
+            tenant: components["schemas"]["EntitlementStatementTenant"];
+            deployment: components["schemas"]["EntitlementStatementDeployment"];
+            device: components["schemas"]["EntitlementStatementDevice"];
+            /** Modules */
+            modules: ("spectracheck" | "regulatory_hub" | "reaction_optimization")[];
+            /** Package Profiles */
+            package_profiles: ("desktop_shell" | "scientific_runtime" | "reference_rule_packs" | "model_packs" | "site_integration_packs")[];
+            /**
+             * Licence Class
+             * @enum {string}
+             */
+            licence_class: "commercial" | "no_charge" | "evaluation" | "perpetual";
+            /**
+             * Issued At
+             * Format: date-time
+             */
+            issued_at: string;
+            /** Expires At */
+            expires_at?: string | null;
+            /** Offline Period Days */
+            offline_period_days: number;
+            /** Issuing Key Id */
+            issuing_key_id: string;
+        };
+        /** EntitlementStatementDeployment */
+        EntitlementStatementDeployment: {
+            /** Deployment Id */
+            deployment_id: string;
+            /** Workspace Url */
+            workspace_url: string;
+        };
+        /** EntitlementStatementDevice */
+        EntitlementStatementDevice: {
+            /** Device Id */
+            device_id: number;
+            /** Identity Public Key */
+            identity_public_key: string;
+        };
+        /** EntitlementStatementTenant */
+        EntitlementStatementTenant: {
+            /** Tenant Key */
+            tenant_key: string;
+            /** Display Name */
+            display_name: string;
         };
         /** EnvironmentCheckResponse */
         EnvironmentCheckResponse: {
@@ -26999,6 +27296,10 @@ export interface components {
             metadata_json?: {
                 [key: string]: unknown;
             };
+            /** Identity Public Key */
+            identity_public_key?: string | null;
+            /** Identity Key Enrolled At */
+            identity_key_enrolled_at?: string | null;
         };
         /** MobileDeviceSessionCreate */
         MobileDeviceSessionCreate: {
@@ -27039,6 +27340,8 @@ export interface components {
             metadata_json?: {
                 [key: string]: unknown;
             } | null;
+            /** Identity Public Key */
+            identity_public_key?: string | null;
         };
         /** MobileJobsSummary */
         MobileJobsSummary: {
@@ -40779,6 +41082,21 @@ export interface components {
             };
         };
         /**
+         * SystemActiveVersions
+         * @description The versions of the science this deployment is actually running.
+         *
+         *     A client compares its own copy against this to decide whether a regulated result it is about
+         *     to produce would match what this workspace would produce. It is deployment-scoped, not
+         *     user-scoped: every authenticated caller sees the same catalogue.
+         *
+         *     Cache it against the API base URL, never against the signed-in user. A per-user cache would
+         *     let one person's stale catalogue decide whether another person's result is current.
+         */
+        SystemActiveVersions: {
+            /** Versions */
+            versions?: components["schemas"]["ActiveVersionEntry"][];
+        };
+        /**
          * SystemCapabilities
          * @description What this workspace includes, so the interface only offers what is actually available.
          */
@@ -43974,6 +44292,39 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+        };
+    };
+    system_active_versions_route_system_active_versions_get: {
+        parameters: {
+            query?: {
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SystemActiveVersions"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -65238,6 +65589,76 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MobileDeviceSession"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    issue_entitlement_statement_route_desktop_entitlement_statements_post: {
+        parameters: {
+            query?: {
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EntitlementIssuanceRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EntitlementIssuance"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_entitlement_authority_route_desktop_entitlement_authority_get: {
+        parameters: {
+            query?: {
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EntitlementAuthorityStatus"];
                 };
             };
             /** @description Validation Error */
