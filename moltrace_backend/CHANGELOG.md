@@ -14,6 +14,50 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.69.13 — An installation could not tell whether its science matched the workspace's (2026-08-22)
+
+A desktop installation keeps its own copy of the deterministic rule sets. Nothing on the wire
+said which ones this workspace had adopted: `/system/version` returns build metadata,
+`/system/capabilities` returns module inclusion, and a rule-set version appeared only inside an
+individual assessment response. So a result computed locally could differ from what this
+workspace would produce, and nobody could see that it had.
+
+`GET /system/active-versions` publishes four axes as comparable coordinates — the five rule
+sets, whatever the model registry currently resolves as serving, the reference pack by digest,
+and the compiled-in method constants as one content address. Authenticated, because the
+catalogue describes a customer's validated configuration.
+
+**Nothing here could order two versions before.** Every identifier the platform carried for a
+rule set was a content address, and sha256 has no order — it answers "the same bytes" and never
+"newer". `RegistryEntry.semver` looked like the answer and was a caller default of "1.0.0"
+applied to all five engines at once. So each engine now declares an ordered version beside the
+content it orders, routed through a function that computes the identity hash *from* the payload
+so the two cannot drift. Every published `rule_set_version` is byte-identical to before, checked
+per engine — stored regulatory results carry it as provenance.
+
+The comparison refuses rather than guessing. Six of its eight branches produce *unknown*, each
+naming the measure that failed: an absent version, an unparseable one, identical bytes declared
+at two versions, one version over two different contents. `"conformal-v1"` is not a version;
+`"1.10.0"` sorts before `"1.9.0"` as a string while being newer.
+
+**An installation that is AHEAD computes and exports, with the adoption gap stamped on the
+record, and cannot sign.** Being ahead is the expected steady state, not a rare race: a desktop
+auto-updates on our release schedule while a validated deployment upgrades only in a
+requalification window, so refusing would take every installation out of service on a cadence we
+set. A refusal produces no record; a stamp produces an attributable one, and Part 11 bites at
+signature. Behind and unknown refuse unchanged. This permits where refusing would deny, so it
+rests on a test that fails when a rule set's content moves and its declared version does not.
+
+The catalogue is signed by the same deployment key and chain as an offline entitlement
+statement, but as a separate document — binding content versions into a commercial credential
+would make every pack release invalidate outstanding entitlements, and would let a content
+release expire something, which nothing should.
+
+Reading, exporting and verifying existing records are untouched by any currency state, asserted
+structurally: no function other than the catalogue's own route may consult it.
+
+---
+
 ## v0.70.0 — A deployment can license its own offline installations, without ever calling home (2026-08-22)
 
 An offline installation cannot ask the server whether the customer is still entitled, and a
