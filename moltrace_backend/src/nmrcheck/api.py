@@ -2981,6 +2981,73 @@ _AUTH_ERROR_RESPONSES: dict[int | str, dict[str, Any]] = {
     },
 }
 
+#: Names for the two hoisted response components (see ``_hoist_auth_responses``).
+_AUTH_RESPONSE_COMPONENT_NAMES: dict[str, str] = {
+    "401": "AuthenticationRequired",
+    "403": "AccessDenied",
+}
+
+_ERROR_RESPONSE_REF = "#/components/schemas/ErrorResponse"
+
+
+def _is_generated_auth_response(status_code: str, response: object) -> bool:
+    """True for a response object this module injected, rather than one a route declared.
+
+    Structural rather than an equality check against a captured sample, so a route that later
+    declares its own 401 with a different body is left alone instead of being silently
+    flattened into the shared one.
+    """
+
+    if not isinstance(response, dict):
+        return False
+    expected = _AUTH_ERROR_RESPONSES[int(status_code)]
+    if response.get("description") != expected["description"]:
+        return False
+    schema = (
+        response.get("content", {}).get("application/json", {}).get("schema")
+        if isinstance(response.get("content"), dict)
+        else None
+    )
+    return isinstance(schema, dict) and schema.get("$ref") == _ERROR_RESPONSE_REF
+
+
+def _hoist_auth_responses(schema: dict[str, Any]) -> dict[str, Any]:
+    """Collapse the repeated 401/403 response objects into two shared components.
+
+    Declaring the sanitized error body on every route that can emit one is the point — a
+    client should be able to see which operations refuse and what the body looks like. But
+    FastAPI writes the whole response object into each of ~900 operations, and
+    openapi-typescript expands each into a six-line block: measured, that grew the generated
+    frontend types by **24.3%**, past the 15% the contract budgets. Hoisting the two objects
+    into ``components/responses`` and referencing them costs **4.7%** for the same
+    information — each operation becomes one line that still resolves to ``ErrorResponse``.
+
+    Measured rather than assumed, because the naive shape is the one that trips the budget and
+    the budget is there to be checked, not to be argued with.
+    """
+
+    paths = schema.get("paths")
+    if not isinstance(paths, dict):
+        return schema
+    hoisted: dict[str, Any] = {}
+    for methods in paths.values():
+        if not isinstance(methods, dict):
+            continue
+        for operation in methods.values():
+            if not isinstance(operation, dict):
+                continue
+            responses = operation.get("responses")
+            if not isinstance(responses, dict):
+                continue
+            for status_code, name in _AUTH_RESPONSE_COMPONENT_NAMES.items():
+                if not _is_generated_auth_response(status_code, responses.get(status_code)):
+                    continue
+                hoisted.setdefault(name, responses[status_code])
+                responses[status_code] = {"$ref": f"#/components/responses/{name}"}
+    if hoisted:
+        schema.setdefault("components", {}).setdefault("responses", {}).update(hoisted)
+    return schema
+
 
 def _log_refusal(request: Request, exc: BaseException) -> None:
     """Send the cause of a 401/403 to the operator, since it may not go to the caller.
@@ -32194,6 +32261,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         dependencies=[Depends(_abuse_rate_limit_gate), Depends(_module_licence_gate)],
         responses=_AUTH_ERROR_RESPONSES,
     )
+    # The 401/403 bodies are declared on every route above; this collapses the ~900 repeated
+    # copies into two shared components so the generated frontend types stay inside their
+    # size budget. Wraps rather than replaces FastAPI's generator, and is idempotent because
+    # FastAPI caches into `app.openapi_schema`.
+    _fastapi_openapi = app.openapi
+
+    def _openapi_with_shared_auth_responses() -> dict[str, Any]:
+        return _hoist_auth_responses(_fastapi_openapi())
+
+    app.openapi = _openapi_with_shared_auth_responses  # type: ignore[method-assign]
+
     app.state.session_factory = session_factory
     app.state.settings = settings
     app.state.api_key = settings.api_key
