@@ -462,12 +462,26 @@ def test_an_administrator_cannot_smuggle_another_write_alongside_the_revocation(
         f"installation's entitlement: {smuggled.status_code} {smuggled.text[:200]}"
     )
 
+    # Nothing was written on the way to refusing — checked twice, on purpose. The row is
+    # ground truth; the owner's own view is what they would actually experience, and it runs
+    # through the read mapper, so a refusal that stored the key but failed to surface it would
+    # still be caught.
     with app.state.session_factory() as session:
         row = session.get(orm.MobileDeviceSessionORM, device_id)
         assert row.identity_public_key is None, (
             "an identity key was written by a caller who does not own the installation"
         )
         assert row.status == "active", "the smuggled patch also revoked"
+
+    owner_view = next(
+        record
+        for record in client.get("/mobile/device-sessions", headers=owner).json()
+        if record["id"] == device_id
+    )
+    assert owner_view["status"] != "revoked", "the owner sees their installation withdrawn"
+    assert not owner_view["identity_public_key"], (
+        "the owner sees an identity key they never registered"
+    )
 
     # The bare transition, from the same caller, still works — the extra field is the guard.
     assert (
