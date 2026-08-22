@@ -39,23 +39,32 @@ export type MfaChallenge = {
 type WebAuthnGetOptions = Parameters<typeof startAuthentication>[0]["optionsJSON"]
 type WebAuthnCreateOptions = Parameters<typeof startRegistration>[0]["optionsJSON"]
 
-/** Detail string the backend uses on a 401 when the session must re-authenticate
- *  before a privileged (signing / admin) action. Distinct from a normal auth 401. */
+/** The code the backend sends on a 401 when the session must re-authenticate before a
+ *  privileged (signing / admin) action. Distinct from a normal auth 401. */
 export const STEP_UP_REQUIRED = "step_up_required"
 
 export { browserSupportsWebAuthn }
 
-function errorDetail(err: unknown): string {
+function errorCode(err: unknown): string {
   if (err instanceof ApiError && err.data && typeof err.data === "object") {
-    const d = (err.data as { detail?: unknown }).detail
-    if (typeof d === "string") return d
+    const code = (err.data as { code?: unknown }).code
+    if (typeof code === "string") return code
   }
   return ""
 }
 
-/** True when a 401 means "re-authenticate" (step-up), not "not signed in". */
+/** True when a 401 means "re-authenticate" (step-up), not "not signed in".
+ *
+ *  Reads `code`, not `detail`. This branched on `detail` and therefore never fired in
+ *  production: the /api/backend proxy replaces `detail` on every 401/403 — including when it
+ *  forwards a recognised code — so `detail` was always the generic sign-in sentence here and
+ *  this returned false for every step-up. `withStepUp` consequently never ran the ceremony
+ *  and never retried, which the e-signature create path depends on.
+ *
+ *  `client.ts` had already moved to `codeOf()` for exactly this reason, with a comment saying
+ *  so; this was the one reader that was never migrated with it. */
 export function isStepUpRequired(err: unknown): boolean {
-  return err instanceof ApiError && err.status === 401 && errorDetail(err) === STEP_UP_REQUIRED
+  return err instanceof ApiError && err.status === 401 && errorCode(err) === STEP_UP_REQUIRED
 }
 
 /** Discriminate the 202 MFA-challenge body from a normal token response. */
