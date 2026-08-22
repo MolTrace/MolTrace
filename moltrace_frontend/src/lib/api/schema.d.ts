@@ -113,6 +113,12 @@ export interface paths {
          *     the same answer and no owner scope applies. Clients must cache it against the API base URL
          *     and never against the signed-in user: a per-user cache would let one person's stale catalogue
          *     decide whether another person's result is current.
+         *
+         *     The catalogue is signed by this workspace's issuing key when it has one, so an installation
+         *     can keep verifying it offline. The certificate needed to check that signature is **not**
+         *     repeated here — an installation already holds it from its entitlement exchange, and
+         *     publishing the same public material on a second route widens the surface without answering
+         *     anything new.
          */
         get: operations["system_active_versions_route_system_active_versions_get"];
         put?: never;
@@ -41095,6 +41101,11 @@ export interface components {
         SystemActiveVersions: {
             /** Versions */
             versions?: components["schemas"]["ActiveVersionEntry"][];
+            /**
+             * Assertion Signature
+             * @description Signature over the canonical catalogue, by this workspace's issuing key. Null when the workspace does not license offline installations. Verify against the certificate you already hold; do not trust an unsigned catalogue offline.
+             */
+            assertion_signature?: string | null;
         };
         /**
          * SystemCapabilities
