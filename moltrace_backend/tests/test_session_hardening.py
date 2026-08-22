@@ -106,7 +106,7 @@ def test_reuse_detection_revokes_family(tmp_path):
         second = client.post("/auth/refresh", json={"refresh_token": first["refresh_token"]}).json()
         # Replay the already-rotated (old) refresh -> reuse -> family revoked.
         replay = client.post("/auth/refresh", json={"refresh_token": first["refresh_token"]})
-        assert replay.status_code == 401 and replay.json()["detail"] == "token_reuse_detected"
+        assert replay.status_code == 401 and replay.json()["code"] == "token_reuse_detected"
         # The whole family is dead, incl. the access from the legitimate rotation.
         assert client.get("/auth/me", headers=_bearer(second["access_token"])).status_code == 401
         # An audit event was written.
@@ -231,7 +231,7 @@ def test_idle_timeout_rejects_without_revoking_family(tmp_path):
             rt.expires_at = _past(1)  # idle window elapsed
             s.commit()
         res = client.post("/auth/refresh", json={"refresh_token": body["refresh_token"]})
-        assert res.status_code == 401 and res.json()["detail"] == "token_expired"
+        assert res.status_code == 401 and res.json()["code"] == "token_expired"
         with app.state.session_factory() as s:
             fam = s.scalar(select(SessionFamilyORM))
             assert fam.revoked_at is None  # idle expiry is benign, not a theft signal
@@ -248,7 +248,7 @@ def test_absolute_cap_rejects_even_with_activity(tmp_path):
             fam.absolute_expires_at = _past(1)  # hard cap exceeded
             s.commit()
         res = client.post("/auth/refresh", json={"refresh_token": body["refresh_token"]})
-        assert res.status_code == 401 and res.json()["detail"] == "token_expired"
+        assert res.status_code == 401 and res.json()["code"] == "token_expired"
 
 
 # --------------------------------------------------------------------------- #
@@ -296,4 +296,4 @@ def test_invalid_refresh_token_rejected(tmp_path):
     with TestClient(app) as client:
         _signup(client, "inv@x.com")
         res = client.post("/auth/refresh", json={"refresh_token": "nonexistent-token-value"})
-        assert res.status_code == 401 and res.json()["detail"] == "token_invalid"
+        assert res.status_code == 401 and res.json()["code"] == "token_invalid"

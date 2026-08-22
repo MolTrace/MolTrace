@@ -152,7 +152,7 @@ def test_sign_requires_step_up(tmp_path):
                 "reason": "r",
             },
         )
-        assert blocked.status_code == 401 and blocked.json()["detail"] == "step_up_required"
+        assert blocked.status_code == 401 and blocked.json()["code"] == "step_up_required"
 
 
 def test_signer_identity_is_server_authoritative(tmp_path):
