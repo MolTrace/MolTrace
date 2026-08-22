@@ -447,6 +447,78 @@ jobs:
             echo "Passing these guardrails does not activate Prompt 1/2 for runtime spectra."
           } >> "$GITHUB_STEP_SUMMARY"
 
+  desktop-tests:
+    name: Desktop · confinement + product config
+    # NOT in any deploy job's `needs:`, deliberately. The deploy jobs ship the
+    # backend to Cloud Run and the frontend to Vercel; neither ships the desktop.
+    # Gating them on a desktop regression would block a backend hotfix on an
+    # unrelated failure, which is the wrong coupling.
+    #
+    # To make this protective, add "Desktop · confinement + product config" as a
+    # REQUIRED STATUS CHECK in branch protection. Until that is done this job
+    # reports and blocks nothing — the same state `reviewer-guardrails` is in.
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: moltrace_desktop
+    steps:
+      - name: Checkout
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22.14.0
+          cache: npm
+          cache-dependency-path: moltrace_desktop/package-lock.json
+
+      # Electron's binary is ~100 MB and does not change between runs while the
+      # version is pinned, so cache it on the pinned version rather than the lock
+      # hash — the lock changes for reasons the binary does not.
+      - name: Cache the Electron binary
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4
+        with:
+          path: ~/.cache/electron
+          key: electron-${{ runner.os }}-43.4.1
+
+      - name: Install
+        run: npm ci
+
+      - name: Electron version is EXACTLY the pin
+        # A caret would accept a different Chromium, and the engine identity is
+        # what makes the artifact qualifiable (§7.1, §10.2).
+        run: |
+          actual=$(node -p "require('electron/package.json').version")
+          echo "electron: $actual"
+          [ "$actual" = "43.4.1" ] || { echo "::error::expected 43.4.1, got $actual"; exit 1; }
+
+      - name: Product config — inert, unbranded, no key material
+        run: npm run test:product
+
+      - name: Transport credential
+        run: npm run test:credential
+
+      # The renderer confinement test drives a real Electron window, so Linux
+      # needs a virtual display. macOS runners provide one.
+      - name: Renderer confinement (Linux)
+        if: runner.os == 'Linux'
+        run: xvfb-run --auto-servernum npm run test:confinement
+
+      - name: Renderer confinement (macOS)
+        if: runner.os == 'macOS'
+        run: npm run test:confinement
+
+      # Cheap, and it is the failure this repository has actually had: a commit
+      # that references a module it did not add. Static resolution rather than
+      # require-and-see, because running main.js outside Electron throws for
+      # unrelated reasons and a grep on the runtime error would lie.
+      - name: Every local reference is committed
+        run: npm run test:modules
+
   deployment-gate:
     name: Deployment gate · fail-closed release control
     # The Prompt 18 release gate. It `needs` both test suites, so the gate's
