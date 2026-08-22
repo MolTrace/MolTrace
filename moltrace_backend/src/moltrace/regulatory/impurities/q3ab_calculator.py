@@ -41,7 +41,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from moltrace.regulatory.infra.validation import assert_valid_dose
-from moltrace.regulatory.infra.versioning import content_hash, rule_set_version
+from moltrace.regulatory.infra.versioning import artifact_for, content_hash
 
 __all__ = [
     "GUIDANCE_Q3A",
@@ -252,7 +252,26 @@ def q3ab_rule_set() -> dict[str, Any]:
 
 
 # Content address of the encoded rule-set; ties every result to this exact table set.
-_RULE_SET_VERSION = rule_set_version(q3ab_rule_set())
+#: The ORDERED version of this encoding, declared here so it is bumped in the same commit
+#: that changes the rule set above. A content address answers "are these the same bytes?" and
+#: nothing more — sha256(A) < sha256(B) says nothing about which was authored first — so an
+#: installation cannot tell whether it is behind a deployment from the hash alone.
+#:
+#: Bump it whenever ``q3ab_rule_set()`` changes. ``tests/test_rule_set_revisions.py`` fails when the
+#: content hash moves and this does not, which is the only thing standing between a forgotten
+#: bump and an installation silently believing it is current.
+_RULE_SET_SEMVER = "1.0.0"
+
+#: Identity and ordered version travel together, so the two cannot drift apart: the hash is
+#: computed FROM the payload rather than pasted beside it.
+_RULE_SET_ARTIFACT = artifact_for(
+    "rule_set",
+    q3ab_rule_set(),
+    semver=_RULE_SET_SEMVER,
+    source_guidance=f"{GUIDANCE_Q3A['guideline']} / {GUIDANCE_Q3B['guideline']}",
+    effective_date=GUIDANCE_Q3A["effective_year"],
+)
+_RULE_SET_VERSION = _RULE_SET_ARTIFACT.identity_hash
 
 _DECISION_SUPPORT_NOTE = (
     "Decision-support only: verify each threshold against the official ICH source "
