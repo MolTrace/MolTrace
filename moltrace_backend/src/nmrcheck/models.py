@@ -6268,6 +6268,51 @@ class SystemCapabilities(BaseModel):
     modules: list[ModuleCapability] = Field(default_factory=list)
 
 
+ActiveVersionKind = Literal["rule_set", "model_artifact", "reference_pack", "method_defaults"]
+
+
+class ActiveVersionEntry(BaseModel):
+    """One artifact this deployment is running, positioned so it can be compared.
+
+    ``identity`` and ``revision`` answer different questions. ``identity`` is a content address
+    and supports equality only — sha256 has no order, so it can say "the same bytes" and never
+    "newer". ``revision`` is the declared ordered version, and is ``null`` whenever this
+    deployment cannot state one; a client must treat that as *not comparable* and refuse, never
+    as agreement.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    kind: ActiveVersionKind
+    lineage: str = Field(
+        description="Ordering namespace. Two versions are comparable only when these match."
+    )
+    display_name: str = Field(description="Human copy for display. Not an identifier.")
+    identity: str | None = Field(
+        default=None, description="`sha256:<hex>` content address. Equality only, never order."
+    )
+    revision: str | None = Field(
+        default=None,
+        description="Declared ordered version. Null means not comparable — refuse, do not assume.",
+    )
+
+
+class SystemActiveVersions(BaseModel):
+    """The versions of the science this deployment is actually running.
+
+    A client compares its own copy against this to decide whether a regulated result it is about
+    to produce would match what this workspace would produce. It is deployment-scoped, not
+    user-scoped: every authenticated caller sees the same catalogue.
+
+    Cache it against the API base URL, never against the signed-in user. A per-user cache would
+    let one person's stale catalogue decide whether another person's result is current.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    versions: list[ActiveVersionEntry] = Field(default_factory=list)
+
+
 ProductProgramStatus = Literal["active", "hidden", "deprecated"]
 ModulePriorityContext = Literal[
     "global",
