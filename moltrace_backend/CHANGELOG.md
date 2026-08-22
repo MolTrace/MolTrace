@@ -14,6 +14,91 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.70.0 — A deployment can license its own offline installations, without ever calling home (2026-08-22)
+
+An offline installation cannot ask the server whether the customer is still entitled, and a
+licence that requires a callback gets rejected by pharmaceutical IT before the science is
+evaluated. So a deployment now issues a **signed entitlement statement** that an installation
+verifies offline, against a certificate chain rooted in a MolTrace root key pinned in the
+application.
+
+Two levels. MolTrace holds an **offline root** and signs one certificate per deployment, binding
+that deployment's own issuing sub-key to its deployment and tenant identifiers and capping what
+it may grant. The deployment then signs its own statements locally — no call to MolTrace on
+issuance, and no availability dependency on it. A deployment cut off from the vendor keeps
+entitling its own installations, which is what makes a perpetual licence survivable rather than
+a promise. The issuing key is generated **on** the deployment and never leaves it, so the private
+half never travels: there is no transport to compromise and no copy at MolTrace to leak.
+
+**No second signing scheme.** The Ed25519 encoding, the hex-seed key format, the
+prefix-tagged-signature idiom and the byte canonicalization are all `audit_chain`'s, and a test
+pins the two serializers byte-equal over nesting, lists, integers, explicit nulls, non-ASCII and
+reversed key order. Four domain-separation prefixes keep a statement, a certificate, an exchange
+and a version assertion from ever being replayed as one another, checked in both directions.
+
+**The anti-replay control is device binding and monotonicity, not a nonce.** A statement must
+verify from local storage across an offline restart, so nothing that needs a live challenge can
+be a condition of validity. A nonce exists only in the online exchange, proving *that* exchange
+was fresh, and is then discarded. The load-bearing test is the negative one: verification
+succeeds given only four public artefacts on disk, with no nonce, no observed time and the
+network hard-disabled.
+
+**Nothing is stored server-side.** No statement table, no issuance table, no key table — a
+statement is derived from configuration plus the device row, signed, and returned. A stored
+statement would be a second source of truth that can disagree with what it came from, and the
+signature already carries the fact. Issuance and refusal land in the existing audit trail, which
+the chain listener links in for free; a test asserts no key material reaches it.
+
+**Reading, exporting and verifying existing records never stops.** Whatever the entitlement
+state — never provisioned, certificate expired, installation withdrawn, statement long lapsed —
+twenty behavioural cells assert that reading a record, reading it in full, exporting the set,
+verifying the trail behind it and verifying a signature on it all keep answering. A customer is
+not locked out of their own regulated records by a commercial term; an expired licence that made
+a batch record unreadable during an inspection would be a data-integrity failure caused by a
+billing system. What entitlement governs is *new* work. The decision type makes the lockout
+unrepresentable rather than merely discouraged: it carries only `granted_*` capability sets, and
+the empty decision is a fully working installation.
+
+**Three things this change is deliberately honest about**, because each was designed as a
+stronger claim first:
+
+- **The local high-water mark cannot be authenticated.** It lives on hardware the customer
+  controls, and authenticating it would need a key on that same hardware — and a key that
+  verifies is a key that forges, which is `audit_chain`'s own stated reason for keeping its
+  server-side mark HMAC-sealed and unpublished. A local seal would make the gap *look* closed.
+  Time evaluation defeats accidental clock skew and casual tampering; the real bound on a
+  determined local attacker is declining to reissue plus the statement's own expiry. No
+  assertion, message or docstring here claims otherwise, and a test pins that.
+- **A pure module is not a structurally unattachable one.** The entitlement modules import no
+  FastAPI and export no `require_*`, and a test holds that — but `module_access` has exactly the
+  same shape and is nonetheless the entire basis of the router-level product gate. The
+  structural test is a speed bump; the behavioural cells are the control.
+- **The certificate's expiry is the only thing that reaches an installation which never
+  reconnects and never updates.** It is a security parameter, and the provisioning tool says so
+  where the operator chooses it.
+
+Two commercial terms have **no defaults**: how long an installation may work offline, and how
+long a statement lasts. Neither has been measured, and a plausible-looking round number would be
+signed into every statement. Unset, the deployment declines to issue and names the missing
+decision — the same discipline that keeps bounds off round numbers elsewhere.
+
+Withdrawing offline use is expressed by declining to reissue. That path did not previously work
+for the person expected to perform it: the device-session route is owner-scoped, so an
+administrator revoking someone else's installation got the non-leaking 404 and the installation
+was never withdrawn. The fix is scoped to that **one transition** and resolved through the policy
+engine rather than by reading a role at the call site — widening the visibility predicate instead
+would have silently granted every administrator read access to every user's devices, which is a
+privacy expansion wearing a bug fix. An administrator gains nothing else, and the audit row names
+who performed the withdrawal.
+
+Migration 0050 adds the device identity key, nullable and **not** backfilled: a device enrolled
+before the column existed has no provable identity, and inventing one would assert something that
+never happened. NULL is refused, never implicitly granted.
+
+`python -m nmrcheck.entitlement_provision` provisions the whole thing across the two machines.
+It writes signing keys owner-only, prints them nowhere, refuses to overwrite one, and refuses to
+sign a certificate on a machine with a network route unless told to.
+
 ## v0.69.10 — Every regulated result in production recorded its code revision as "unknown" (2026-08-21)
 
 `RegistryEntry.code_sha` answers the question an auditor asks first: which code produced

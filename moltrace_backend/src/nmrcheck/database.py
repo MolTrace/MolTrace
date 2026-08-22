@@ -162,6 +162,27 @@ def _ensure_sqlite_schema(engine: Engine) -> None:
                 connection.exec_driver_sql(
                     f"ALTER TABLE {revisioned_table} ADD COLUMN {revision_column} INTEGER"
                 )
+        # Migration 0050 added the device identity key an offline entitlement statement binds
+        # to. Dev SQLite databases built before it have the table but not the columns, and
+        # create_all() only creates tables it has never seen -- it will not alter one that
+        # already exists. Skipping this is green on a fresh database and an "no such column"
+        # error on the maintainer's existing one, which is why it is written down.
+        if "mobile_device_sessions" in tables:
+            device_existing = {
+                str(row[1])
+                for row in connection.exec_driver_sql(
+                    "PRAGMA table_info(mobile_device_sessions)"
+                ).fetchall()
+            }
+            if "identity_public_key" not in device_existing:
+                connection.exec_driver_sql(
+                    "ALTER TABLE mobile_device_sessions ADD COLUMN identity_public_key VARCHAR(80)"
+                )
+            if "identity_key_enrolled_at" not in device_existing:
+                connection.exec_driver_sql(
+                    "ALTER TABLE mobile_device_sessions "
+                    "ADD COLUMN identity_key_enrolled_at TIMESTAMP"
+                )
         if "fid_runs" in tables:
             existing = {
                 str(row[1])

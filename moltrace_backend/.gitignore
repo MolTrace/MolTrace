@@ -142,3 +142,13 @@ data/hose/*
 # The checksum that pins WHICH table CI deploys (fetched from GCS) is tracked —
 # updating the table is a deliberate, reviewable change to this file.
 !data/hose/hose_index.json.gz.sha256
+
+# Entitlement signing material the provisioning CLI can write beside itself. A seed in the
+# repository would be a signing key in a PUBLIC repository, and the root seed signs every
+# deployment's authority. The certification request is public material, but it names a customer's
+# deployment and tenant, which does not belong in a public tree either.
+# *.seed IS blanket on purpose, unlike the *.output rule above: every file with that extension
+# is private key material, so a new one appearing must be ignored by default rather than caught
+# by review. The named files below are what this CLI writes by default.
+*.seed
+entitlement_certification_request.json

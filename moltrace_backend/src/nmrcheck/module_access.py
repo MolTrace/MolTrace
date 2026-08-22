@@ -116,6 +116,10 @@ PLATFORM_ROUTE_PREFIXES: tuple[str, ...] = (
     # round-trip confirmation outright. The path keeps its ``/reactions/`` spelling because
     # the frontend already calls it; the name is the misleading part, not the placement.
     "/reactions/structures",
+    # Licensing and device entitlement ship with every SKU — a deployment must be able to
+    # entitle its own installations whichever products it serves, and a deployment that could
+    # not would have no way to license the one product it does sell.
+    "/desktop",
     # service surface
     "/",
     "/health",

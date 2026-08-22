@@ -64,6 +64,7 @@ from . import authz as authz
 from . import collaboration_store as collab_store
 from . import compound_registry_store as compound_store
 from . import detections as detections
+from . import entitlement_store as entitlement_store
 from . import error_codes as error_codes
 from . import esign as esign
 
@@ -378,6 +379,9 @@ from .models import (
     ElementalImpurityAssessmentRequest,
     EmailActionRequest,
     EmailOutboxRecord,
+    EntitlementAuthorityStatus,
+    EntitlementIssuance,
+    EntitlementIssuanceRequest,
     EnvironmentCheckResponse,
     ErrorAnalysisSlice,
     ErrorAnalysisSliceCreate,
@@ -2723,10 +2727,23 @@ def _raise_product_http_error(exc: Exception) -> None:
 
 
 def _mobile_actor(context: AccessContext) -> mobile_store.MobileActor:
+    """Reduce the request principal to what the mobile surface needs.
+
+    ``may_revoke_any_device`` is resolved here, through the central policy engine, rather than
+    by reading ``is_admin`` at a call site — the policy set is the single place an authority
+    decision belongs, and a role read further down is how a capability quietly becomes a
+    bypass. It is one capability scoped to one transition: withdrawing offline use from an
+    installation the caller does not own. Everything else on this surface stays owner-scoped.
+    """
     return mobile_store.MobileActor(
         user_id=context.user_id,
         email=context.user.email if context.user is not None else None,
         system_api_key=context.system_api_key,
+        may_revoke_any_device=authz.authorize(
+            authz.principal_from_access_context(context),
+            authz.Action("device_session:revoke"),
+            authz.Resource("mobile_device_session"),
+        ).allowed,
     )
 
 
@@ -22036,6 +22053,84 @@ def update_mobile_device_session_route(
     except Exception as exc:
         _raise_mobile_http_error(exc)
         raise
+
+
+# --------------------------------------------------------------------------- #
+# Signed offline entitlement statements (desktop, §9.2).
+#
+# An offline installation cannot call back to ask whether the customer is still entitled, and a
+# licence that needs a callback is rejected by pharmaceutical IT before the science is evaluated.
+# So the deployment signs a statement the installation verifies offline against a certificate
+# chain rooted in a key pinned in the application.
+#
+# There is deliberately no read route for a statement: the installation holds its own copy, and
+# a server-side read would add a surface while answering nothing it needs. An operator queries
+# issuance through the audit trail.
+# --------------------------------------------------------------------------- #
+@router.post(
+    "/desktop/entitlement-statements",
+    response_model=EntitlementIssuance,
+    dependencies=[Depends(require_access_context)],
+)
+def issue_entitlement_statement_route(
+    payload: EntitlementIssuanceRequest,
+    request: Request,
+    context: AccessContext = Depends(require_access_context),
+) -> EntitlementIssuance:
+    """Issue or refresh an offline licence for one enrolled installation.
+
+    A refusal comes back as a successful response carrying ``issued=false`` — it is a licensing
+    answer, not a fault, and the installation treats it as a withdrawal rather than retrying.
+    A deployment that cannot issue at all is a different thing entirely and is reported as
+    unavailability, so a misconfigured deployment never tells a customer they were withdrawn.
+    """
+    state = _state(request)
+    try:
+        return entitlement_store.issue_statement(
+            state.session_factory,
+            state.settings,
+            payload,
+            actor=_mobile_actor(context),
+            enabled_modules=getattr(
+                request.app.state, "enabled_modules", module_access.ALL_MODULES
+            ),
+        )
+    except entitlement_store.AuthorityUnavailable as exc:
+        # The operator's cause travels on the authority diagnostic, not here: this body is
+        # replaced wholesale by the shared 5xx handler, prose and machine code alike, so
+        # nothing route-specific can survive in it. A configuration fault does not belong in a
+        # 5xx body anyway.
+        logger.warning(
+            "offline entitlement issuance is unavailable",
+            extra={"correlation_id": _request_correlation_id(request), "cause": exc.code},
+        )
+        raise HTTPException(
+            status_code=503, detail=entitlement_store.ENTITLEMENT_UNAVAILABLE_DETAILS[exc.code]
+        ) from exc
+    except Exception as exc:
+        _raise_mobile_http_error(exc)
+        raise
+
+
+@router.get(
+    "/desktop/entitlement-authority",
+    response_model=EntitlementAuthorityStatus,
+    dependencies=[Depends(require_admin)],
+)
+def get_entitlement_authority_route(
+    request: Request,
+    context: AccessContext = Depends(require_admin),
+) -> EntitlementAuthorityStatus:
+    """Whether this deployment is set up to license offline installations, and until when.
+
+    **Public material only.** The deployment's signing key appears in no field of this
+    response, and there is no route anywhere that returns it.
+
+    This is also where a provisioning fault explains itself, because a 5xx body cannot: the
+    shared error handler replaces a 5xx response's prose and its machine code with fixed
+    constants, so neither field on that path can name a cause.
+    """
+    return entitlement_store.authority_status(_state(request).settings)
 
 
 @router.get(
