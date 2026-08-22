@@ -108,6 +108,15 @@ status gets its own refusal rather than a borrowed one: "withdrawn" and "never e
 specific claims about what happened and both are false for an installation whose standing merely
 cannot be established.
 
+Every provisioning fault names its own cause, because the operator diagnostic is the only channel
+that can carry one. Four conditions previously reported a code belonging to a different condition:
+an unpublished statement lifetime reported as an unpublished offline period — a setting the
+operator has already got right, on the path every operator takes, since neither term has a default
+— and a wrong licence-class setting, an unreadable signing key and a mismatched signing key all
+reported as the authorisation not being genuine, which sends someone to re-request an authorisation
+or suspect tampering over a value they pasted. A certificate that verified against the pinned root
+is genuine, and nothing else may say otherwise.
+
 Migration 0050 adds the device identity key, nullable and **not** backfilled: a device enrolled
 before the column existed has no provable identity, and inventing one would assert something that
 never happened. NULL is refused, never implicitly granted.

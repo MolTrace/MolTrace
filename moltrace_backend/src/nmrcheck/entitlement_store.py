@@ -122,16 +122,19 @@ def resolve_authority(settings: Settings, *, now: datetime | None = None) -> Ent
 
     # The seed must be the half of the pair the certificate names, or this deployment would be
     # signing statements no verifier could check against its own certificate.
+    # A fault in the KEY is not a fault in the authorisation. The certificate has already
+    # verified against the pinned root by this point, so it IS genuine; saying otherwise sends
+    # an operator to re-request one, or to suspect tampering, over a value they pasted.
     try:
         issuing_public = es.public_key_hex_from_seed(seed)
     except es.EntitlementKeyError as exc:
-        raise AuthorityUnavailable("authority_certificate_invalid") from exc
+        raise AuthorityUnavailable("issuing_key_unreadable") from exc
     if issuing_public != certificate.get("issuing_public_key"):
-        raise AuthorityUnavailable("authority_certificate_invalid")
+        raise AuthorityUnavailable("issuing_key_mismatch")
 
     issuing_key_id = es.public_key_id("d", es.ISSUING_KEY_TAG, str(issuing_public))
     if certificate.get("issuing_key_id") != issuing_key_id:
-        raise AuthorityUnavailable("authority_certificate_invalid")
+        raise AuthorityUnavailable("issuing_key_mismatch")
 
     try:
         not_before = es.parse_iso(str(certificate["not_before"]))
@@ -147,9 +150,12 @@ def resolve_authority(settings: Settings, *, now: datetime | None = None) -> Ent
     offline_period_days = settings.entitlement_offline_period_days
     if not offline_period_days or offline_period_days < 1:
         raise AuthorityUnavailable("offline_period_not_published")
+    # Its own cause. These are two separate commercial decisions and neither has a default, so
+    # every operator passes through "one set, one not" — reusing the other's code names a
+    # setting they have already got right and leaves them nothing else to check.
     validity_hours = settings.entitlement_statement_validity_hours
     if not validity_hours or validity_hours < 1:
-        raise AuthorityUnavailable("offline_period_not_published")
+        raise AuthorityUnavailable("statement_validity_not_published")
 
     permitted_classes = [str(value) for value in certificate.get("permitted_licence_classes") or ()]
     licence_class = settings.entitlement_licence_class
@@ -160,7 +166,7 @@ def resolve_authority(settings: Settings, *, now: datetime | None = None) -> Ent
         else:
             raise AuthorityUnavailable("licence_class_not_published")
     if licence_class not in permitted_classes:
-        raise AuthorityUnavailable("authority_certificate_invalid")
+        raise AuthorityUnavailable("licence_class_not_permitted")
 
     return EntitlementAuthority(
         certificate=certificate,

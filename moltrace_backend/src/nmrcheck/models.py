@@ -15440,8 +15440,12 @@ EntitlementUnavailableCode = Literal[
     "authority_not_provisioned",
     "authority_certificate_invalid",
     "authority_certificate_expired",
+    "issuing_key_unreadable",
+    "issuing_key_mismatch",
     "offline_period_not_published",
+    "statement_validity_not_published",
     "licence_class_not_published",
+    "licence_class_not_permitted",
 ]
 
 #: The refusals a customer can see. Each names its cause.
@@ -15492,13 +15496,34 @@ ENTITLEMENT_UNAVAILABLE_DETAILS: dict[str, str] = {
     "authority_certificate_expired": (
         "This workspace's licensing authorisation has expired and must be renewed."
     ),
+    # These two are about the KEY, never about the authorisation. A certificate that verified
+    # against the root is genuine, and telling an operator otherwise sends them to re-request
+    # one, or to suspect tampering, when the fix is the value they pasted.
+    "issuing_key_unreadable": (
+        "The signing key set up for this workspace could not be read."
+    ),
+    "issuing_key_mismatch": (
+        "The signing key set up for this workspace is not the one its licensing authorisation "
+        "covers."
+    ),
     "offline_period_not_published": (
         "This workspace has not published how long an installation may work offline, so an "
         "offline licence cannot be issued."
     ),
+    # Its OWN cause, not the offline period's. Neither term has a default, on purpose, so every
+    # operator provisioning a deployment passes through "one set, one not" — naming the wrong
+    # one misdirects on the normal path rather than in a corner.
+    "statement_validity_not_published": (
+        "This workspace has not published how long an offline licence stays valid before it "
+        "must be renewed, so an offline licence cannot be issued."
+    ),
     "licence_class_not_published": (
         "This workspace's authorisation allows more than one kind of licence and has not said "
         "which one it issues, so an offline licence cannot be issued."
+    ),
+    "licence_class_not_permitted": (
+        "This workspace is set to issue a kind of licence that its licensing authorisation "
+        "does not allow."
     ),
 }
 
