@@ -111,13 +111,23 @@ class TestFitConvergesToThePrecisionThatIsRead:
     default ftol/xtol/gtol of 1e-8 to 1e-5 measured 6.95x faster with the peak
     list identical ON THAT SPECTRUM.
 
-    A few ambiguous multiplets have a discrete label (read off the line COUNT)
-    that is not robust to the tolerance OR the platform: 40256149 peak 2 is "m" at
-    1e-8 and "t" at 1e-5 on macOS, and 40256175 peak 6 is "s" on macOS but "d" on
-    Linux at both tolerances. That is a different local minimum per LAPACK, not an
-    under-converged fit, so the tolerance does not fix it — the output-invariance
-    goldens are minted on Linux (production) instead. See the note in nmrcheck.gsd
-    deconvolve_region.
+    It was reverted to 1e-8. TWO things are true here and they are independent —
+    an earlier revert-of-the-revert conflated them, so keep them apart:
+
+    1. 1e-5 is UNDER-CONVERGED for this stage. On the fixture corpus the peak list
+       is not identical: multiplicity is read off the resolved line COUNT, and the
+       count still moves between 1e-5 and 1e-8. Measured on one machine, with no
+       platform variable in play, 3 of 177 labels differ (40256149 peak 2 in both
+       configs "m" -> "t"; 40256175 guided peak 8 "dd" -> "m"), and only 1e-8
+       reproduces the committed goldens.
+    2. A few multiplets ALSO diverge by PLATFORM at a fully converged fit —
+       40256175 unguided peak 6 is "s" on macOS/ARM and "d" on Linux/x86 at 1e-8.
+       No tolerance reconciles that one; it is a different local minimum per
+       LAPACK, and it is handled by the boundary register, not by ftol.
+
+    So convergence is necessary but not sufficient. Fixing (1) does not fix (2),
+    and (2) is not a reason to give up on (1). See the note in nmrcheck.gsd
+    deconvolve_region and tests/golden/fid_invariants/boundary_register.json.
 
     These tests pin the accuracy side regardless of tolerance, so any future change
     has to answer to the same numbers: line COUNT, centre positions in Hz, and
