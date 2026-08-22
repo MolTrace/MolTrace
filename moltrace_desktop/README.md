@@ -46,6 +46,26 @@ npm test                 # product-config assertions + the renderer confinement 
 npm start                # refuses to start unconfigured, and says why
 ```
 
+## The transport credential
+
+`src/service-credential.js` implements §7.1's local-service credential: 256 bits from a CSPRNG,
+fresh every launch, passed to the service over an **inherited handle (fd 3)** and closed
+immediately — never argv, never an environment variable, never a file. Each exclusion answers a
+real exposure: argv is readable by any local process and captured in crash reports; the environment
+is inherited by every child and dumped by most diagnostic tooling; a file outlives the launch and
+lands in backups and sync clients. A pipe ends when the process does.
+
+It is presented in **one named header** and the module offers **no helper for any other position** —
+no query, path, cookie or body affordance exists to reach for under deadline. A URL-borne credential
+is the one form a subresource load can carry, which is why that position is closed by construction
+rather than by rule.
+
+The value lives in a closure, not a property, so it cannot be reached by a `JSON.stringify` in a log
+line or an error report. And it **never crosses the contextBridge** — the confinement test hunts the
+bridge surface for credential-shaped keys, because a renderer that can read it can talk to the
+service directly and defeat the peer check, the header discipline and the rebinding refusals at
+once.
+
 ## The confinement test
 
 `test/confinement-runner.js` asserts §8.3 of the desktop specification in three layers, because no

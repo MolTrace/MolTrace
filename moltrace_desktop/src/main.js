@@ -3,6 +3,13 @@ const path = require('node:path')
 const { app, session, ipcMain } = require('electron')
 const { createWindow } = require('./window-factory')
 const product = require('./product')
+const serviceCredential = require('./service-credential')
+
+// Generated once per launch and held in this closure. It is NOT put on
+// app.state, not exported, and never crosses the contextBridge — a renderer that
+// can read it can talk to the local scientific service directly, which is the
+// whole thing the transport controls exist to prevent (§7.1).
+let localServiceCredential = null
 
 // Collected per webContents id so the confinement test can assert on the
 // environment each preload actually got, not on what was declared.
@@ -42,6 +49,10 @@ app.whenReady().then(() => {
     console.error('MolTrace cannot start — ' + product.unconfiguredMessage(cfg.missing))
     return app.exit(78)
   }
+
+  // §7.1: a fresh 256-bit credential every launch, over an inherited handle when
+  // the service is spawned. Created here so its lifetime is exactly the app's.
+  localServiceCredential = serviceCredential.create()
 
   applyCsp()
   const win = createWindow()

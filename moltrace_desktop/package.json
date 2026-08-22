@@ -7,9 +7,10 @@
   "type": "commonjs",
   "scripts": {
     "start": "electron .",
-    "test": "node test/product-config.js && MOLTRACE_PRODUCT_CONFIG=$PWD/test/fixtures-product.json electron test/confinement-runner.js",
+    "test": "node test/product-config.js && node test/service-credential.js && MOLTRACE_PRODUCT_CONFIG=$PWD/test/fixtures-product.json electron test/confinement-runner.js",
     "test:product": "node test/product-config.js",
-    "test:confinement": "MOLTRACE_PRODUCT_CONFIG=$PWD/test/fixtures-product.json electron test/confinement-runner.js"
+    "test:confinement": "MOLTRACE_PRODUCT_CONFIG=$PWD/test/fixtures-product.json electron test/confinement-runner.js",
+    "test:credential": "node test/service-credential.js"
   },
   "dependencies": {
     "electron": "43.4.1"

@@ -23,6 +23,17 @@ const PROBE = `(() => {
     // contextIsolation canary: the preload writes this onto its OWN isolated
     // global. If the renderer can see it, the worlds are not isolated.
     seesPreloadIsolatedMarker: has('__moltrace_preload_isolated_world_marker__'),
+    // The local-service credential must be unreachable from the page. A renderer
+    // that can read it can talk to the scientific service directly, which defeats
+    // the peer check, the header discipline and the rebinding refusals at once.
+    credentialReachable: (() => {
+      const hunt = (o, d) => {
+        if (d > 3 || !o || typeof o !== 'object') return false
+        return Object.keys(o).some((k) =>
+          /credential|token|secret/i.test(k) || hunt(o[k], d + 1))
+      }
+      return hunt(globalThis.moltrace, 0)
+    })(),
     // The bridge is the ONE sanctioned surface (spec §5.1).
     bridgeKeys: (globalThis.moltrace && typeof globalThis.moltrace === 'object')
       ? Object.keys(globalThis.moltrace).sort()
@@ -96,6 +107,9 @@ function assertRendererConfined(url, probe) {
     .filter((k) => probe[k])
   if (reachable.length) {
     problems.push(`renderer reaches Node (${reachable.join(', ')}) — nodeIntegration/sandbox regressed`)
+  }
+  if (probe.credentialReachable) {
+    problems.push('a credential-shaped key is reachable on the contextBridge — the renderer can reach the local service directly')
   }
   if (probe.seesPreloadIsolatedMarker) {
     problems.push('renderer sees the preload isolated-world marker — contextIsolation regressed')
