@@ -249,26 +249,45 @@ def deconvolve_region(
                 bounds=(lower, upper),
                 method="trf",
                 max_nfev=6000,
-                # 1e-5, not scipy's 1e-8 default: each trust-region iteration costs
-                # an SVD, and profiling a 65k-point 1H run found 41,714 SVDs (11.3 s
-                # of 24 s) across 178 fits averaging 234 iterations. 1e-5 keeps three
-                # orders of margin over the reported precision (centres to 3-4 ppm
-                # decimals, J to ~0.1 Hz) and measured 6.95x faster with the peak
-                # list identical on that spectrum.
+                # scipy's default 1e-8, restored. A previous change loosened these
+                # to 1e-5 for speed on the premise that the fit "stops changing"
+                # long before 1e-8 — measured true on one 65k-point spectrum (same
+                # 40 peaks, 0.0000 Hz drift, identical multiplicities, 6.95x faster).
                 #
-                # BEWARE, and do NOT chase this with the tolerance: a few ambiguous
-                # multiplets have a DISCRETE label (read off the resolved line count)
-                # that is not robust. nmrshiftdb2 40256149 peak 2 is "m" at 1e-8 and
-                # "t" at 1e-5 on macOS, and 40256175 peak 6 is "s" on macOS but "d"
-                # on Linux at BOTH tolerances — the fit lands in a different local
-                # minimum per platform's LAPACK, and no ftol reconciles it (verified:
-                # tightening to 1e-8 still failed on Linux CI). Because the choice is
-                # platform-inherent, the fit tolerance is a pure latency lever again;
-                # the output-invariance goldens are minted on Linux (production) to
-                # match — see .github/workflows/remint-fid-goldens.yml.
-                ftol=1e-5,
-                xtol=1e-5,
-                gtol=1e-5,
+                # It is NOT true across the fixture corpus. Multiplicity is a
+                # DISCRETE label read off the resolved line COUNT, and for real
+                # spectra the count is still moving between 1e-5 and 1e-8: measured,
+                # nmrshiftdb2 40256149 peak 2 reads a generic "m" at 1e-8 and flips
+                # to "t" at 1e-5 / 1e-6 / 1e-7 alike — i.e. 1e-5 reports an
+                # UNDER-converged fit, not a faster-but-equal one. No tolerance
+                # between 1e-5 and 1e-7 reproduces the goldens; only 1e-8 does. The
+                # output-invariance goldens (test_fid_pipeline_invariants.py) caught
+                # exactly this, which is their job.
+                #
+                # Re-measured over the whole corpus on ONE machine, so no platform
+                # variable is in play: 3 of 177 labels differ between the two — that
+                # peak in both guidance configs, plus 40256175 guided peak 8
+                # ("dd" -> "m"). At 1e-8 all 177 reproduce the committed goldens
+                # exactly; at 1e-5 those three do not. Note the direction, because
+                # it is the opposite of the intuition and makes 1e-5 look good in a
+                # spot check: 1e-5 is MORE repeatable under a perturbed input and
+                # LESS correct, since a looser stop halts nearer the initial guess —
+                # so the label is then set partly by that guess, not by the data.
+                #
+                # This was loosened a second time (aad2174) on the premise that the
+                # goldens would be re-minted on Linux to match. That re-mint is a
+                # manual workflow and never ran, so main shipped a fit whose labels
+                # disagreed with its own committed goldens on the very platform they
+                # were minted on. Restored here; if you loosen it again, re-mint in
+                # the SAME commit or the corpus tier is red the moment it runs.
+                #
+                # A discrete classifier has to sit on a converged fit. If the SVD
+                # cost matters, the lever is fewer/cheaper fits or better initial
+                # guesses (output-preserving), not a looser stop that changes which
+                # multiplet the chemist is shown.
+                ftol=1e-8,
+                xtol=1e-8,
+                gtol=1e-8,
             )
         except (ValueError, RuntimeError):
             return (None, math.inf)
