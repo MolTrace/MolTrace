@@ -14,6 +14,72 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.69.11 — A 401 or 403 said more to a direct caller than to a browser (2026-08-22)
+
+The `/api/backend` proxy replaces `detail` on every 401 and 403, so a browser never sees
+the backend's prose on those statuses. A client that talks to the API directly — a desktop
+build, a partner integration, anything that is not the SPA — inherits none of that. The
+confidentiality control lived in the frontend, which meant it did not exist for anyone who
+did not go through it.
+
+Most of it was already on the server. `_safe_http_exception_detail` has always replaced the
+detail on both statuses for every input, with no environment switch and no way for a caller
+to ask for the verbose form. What leaked was a bypass set: three exception handlers
+registered beside the sanitizing one that returned the raiser's prose verbatim, plus two
+carve-outs inside the sanitizer itself. Those are closed and the sanitizer is now total.
+
+Off the wire as a result: MFA prose ("Invalid authentication code.", "Incorrect
+password."); two environment-variable names, `ENABLE_2D_CONTOUR_PREVIEW` and
+`ENABLE_RAW_2D_FID_BETA`, which `web.py` was rendering into the page the backend serves;
+and "Passkey clone/replay detected (sign count did not advance)." That last one told the
+holder of a cloned credential that the clone had been caught and named the check that
+caught it. The refusal is unchanged — only the telling goes. The person who owns the
+credential learns of it through the audit chain and the account's notification path, which
+reaches the owner rather than whoever holds the copy.
+
+There is deliberately **no** client-declared "direct mode". A denial body reaches exactly
+one party — the caller who was denied — so any discriminator that caller sets is one they
+can omit, and a control an adversary can switch off is not a control. The inversion is to
+withhold from everyone, which costs nothing because no consumer wanted the verbose form.
+Where an operator genuinely needs the cause it goes to the log with the correlation id, via
+a `log_context` on `CodedHTTPException` that is never serialised — so "the flag name does
+not reach the wire" is a property of the type rather than a discipline every future raise
+site has to remember.
+
+Clients branch on `code`. Five new registered codes, all public, because a total sanitizer
+without them is a regression — a user typing an authenticator code would be told "Sign in
+to access live MolTrace data.": `credentials_invalid`, `mfa_required`,
+`mfa_enrollment_required`, `mfa_factor_invalid`, `feature_not_enabled`. `PUBLIC_CODES` goes
+from 9 to 14. `mfa_required` and `mfa_enrollment_required` are split because they need
+different screens — step up with the factor you have, or enrol a first one — and with
+`detail` fixed to one sentence, `code` is the only carrier left.
+
+A 403 `detail` that was exactly a public code used to be echoed verbatim so a client could
+branch on the prose. That is gone: `code` carries the signal, and keeping the passthrough
+meant every newly registered public code silently widened what a 403 `detail` may say, as a
+side effect of registration. The frontend was unaffected — it already read `code` — and the
+backend test defending the passthrough justified itself with a premise ("the SPA branches
+on `detail` today") that had stopped holding before this change.
+
+SCIM is the one handler deliberately **not** sanitized. Okta and Entra parse the SCIM
+`Error` envelope; reshaping it would break provisioning for every customer on enterprise
+SSO. It is pinned by a test, because "sanitize every handler" is the natural reading of the
+rule the other three now follow.
+
+The 401/403 body is declared in the OpenAPI contract for the first time, as a shared
+`components/responses` pair rather than inlined on ~900 operations: inlining grew the
+generated frontend types by 24.3%, past the 15% budget, while the hoisted form carries the
+same information for 4.81%.
+
+Also fixed, found while enumerating the readers: `isStepUpRequired` in the frontend
+branched on `detail` and therefore never fired in production, so `withStepUp` never ran the
+step-up ceremony the e-signature create path depends on. Its tests passed because they
+built a body no browser is ever sent.
+
+No migration; no ORM object is touched.
+
+---
+
 ## v0.69.10 — Every regulated result in production recorded its code revision as "unknown" (2026-08-21)
 
 `RegistryEntry.code_sha` answers the question an auditor asks first: which code produced
