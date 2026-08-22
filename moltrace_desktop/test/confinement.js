@@ -49,6 +49,28 @@ const ALLOWED_BRIDGE_KEYS = ['capabilities']
 // blind to nodeIntegration and sandbox while contextIsolation holds — MEASURED,
 // not assumed: flipping either left a main-world-only test green. So these two
 // are asserted from the preload environment instead.
+// LAYER 0 — the OS-level sandbox, which is a DIFFERENT control from the
+// `sandbox` webPreference despite the shared word, and which nothing else here
+// can see.
+//
+// MEASURED 2026-08-22: running under `--no-sandbox`, `process.sandboxed` stayed
+// TRUE and node:fs stayed unreachable. The webPreference restricts the renderer's
+// JS context; the switch disables Chromium's process-level sandbox. Every other
+// layer in this file observes the first and is blind to the second.
+//
+// This matters because of how it would have been reached for: Electron refuses to
+// start on a Linux CI runner whose chrome-sandbox is not setuid root, and the
+// one-line fix everyone applies is `--no-sandbox`. That turns the runner green
+// while disabling the control the whole test exists to assert. The correct fix is
+// to configure chrome-sandbox; this layer makes the incorrect one impossible.
+const FORBIDDEN_SWITCHES = ['no-sandbox', 'disable-setuid-sandbox', 'disable-gpu-sandbox']
+
+function assertOsSandboxNotDisabled(commandLine) {
+  return FORBIDDEN_SWITCHES
+    .filter((sw) => commandLine.hasSwitch(sw))
+    .map((sw) => `[process] started with --${sw} — the OS-level sandbox is disabled, and no other assertion here can see that`)
+}
+
 // LAYER 2 — the DECLARED settings, and why a behavioural test is not enough.
 //
 // MEASURED 2026-08-22 on Electron 43.4.1: with `sandbox: true` set EXPLICITLY,
@@ -125,4 +147,4 @@ function assertRendererConfined(url, probe) {
   return problems.map((p) => `[${url}] ${p}`)
 }
 
-module.exports = { PROBE, ALLOWED_BRIDGE_KEYS, REQUIRED_DECLARED, assertRendererConfined, assertPreloadConfined, assertDeclaredConfinement }
+module.exports = { PROBE, ALLOWED_BRIDGE_KEYS, REQUIRED_DECLARED, FORBIDDEN_SWITCHES, assertOsSandboxNotDisabled, assertRendererConfined, assertPreloadConfined, assertDeclaredConfinement }
