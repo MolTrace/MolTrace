@@ -8,7 +8,7 @@
 // while the child renderer exists and holds whatever authority it was given.
 
 const { app } = require('electron')
-const { PROBE, assertRendererConfined, assertPreloadConfined, assertDeclaredConfinement } = require('./confinement')
+const { PROBE, assertRendererConfined, assertPreloadConfined, assertDeclaredConfinement, assertOsSandboxNotDisabled } = require('./confinement')
 const fs = require('node:fs')
 const path = require('node:path')
 
@@ -39,6 +39,10 @@ async function run() {
   }
 
   const problems = []
+
+  // Layer 0: the OS-level sandbox. Checked first because if it is off, every
+  // layer below is reporting on a weaker process than the one that ships.
+  problems.push(...assertOsSandboxNotDisabled(require('electron').app.commandLine))
 
   // Layer 2: the declared settings in the single construction site.
   problems.push(...assertDeclaredConfinement(require('../src/window-factory.js').CONFINEMENT))
