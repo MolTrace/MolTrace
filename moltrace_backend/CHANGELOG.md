@@ -86,10 +86,17 @@ Withdrawing offline use is expressed by declining to reissue. That path did not 
 for the person expected to perform it: the device-session route is owner-scoped, so an
 administrator revoking someone else's installation got the non-leaking 404 and the installation
 was never withdrawn. The fix is scoped to that **one transition** and resolved through the policy
-engine rather than by reading a role at the call site — widening the visibility predicate instead
-would have silently granted every administrator read access to every user's devices, which is a
-privacy expansion wearing a bug fix. An administrator gains nothing else, and the audit row names
-who performed the withdrawal.
+engine rather than by reading a role at the call site. Owner scope is asked first and the
+capability consulted only where it refused, so there is one notion of ownership rather than two.
+Relaxing that predicate instead would have handed an administrator every **write** on any
+installation — relabelling it, re-pointing whose it is, putting a withdrawn one back into service
+— which is an authority expansion wearing a bug fix. It would have leaked no *reads*: the
+predicate guards that one write and gates none. The capability is the transition and not the
+field, so a patch that revokes *and* writes an identity key is refused as a whole — that key is
+what a licence binds to, and writing one onto an installation you do not own would move its
+entitlement to hardware of your choosing. The audit row records a withdrawal made outside owner
+scope, and does not record one when the owner is themselves an administrator, because they
+crossed nothing.
 
 Migration 0050 adds the device identity key, nullable and **not** backfilled: a device enrolled
 before the column existed has no provable identity, and inventing one would assert something that
