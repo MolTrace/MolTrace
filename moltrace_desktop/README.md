@@ -90,6 +90,26 @@ operator ought to see.
 The renderer receives verdicts, never inputs. A page that can see the entitlement or the service
 versions can reason about them; availability is decided once, in one place.
 
+## The key hierarchy
+
+§8.2's own framing: *"Version 1.0 required protected storage and never said what protects what."*
+`src/key-hierarchy.js` is that answer in one place — six key classes, each declaring where it lives
+and how it rotates, so moving one into a weaker class is a visible diff against a test rather than a
+quiet edit. It holds no key material.
+
+**`isEncryptionAvailable()` is not protection, and trusting it is the way this ships a lie.**
+Measured on Electron 43.4.1: on Linux it returns `true` while the selected backend is `basic_text`,
+which keeps its password in memory rather than in a system keyring. So the assessment checks the
+backend, treats `basic_text` and `unknown` as **not** OS-backed, and fails closed on anything
+unrecognised — an unnamed backend is not evidence of a good one.
+
+**The residual limit is stated, never implied.** §8.2 requires binding the key-store entry to the
+signed application "where the platform supports it, and state per platform where it cannot be".
+None of macOS Keychain, Windows DPAPI or a Linux keyring binds to the signed application, so all
+three report the same limit, in words a person reads: *anything running as your operating-system
+user can read these keys; they are protected from other people who use this computer, not from
+other software running as you.* A test proves that softening it to a reassurance turns the suite red.
+
 ## The four upgrade states
 
 `src/capabilities.js` decides *whether* something is available; `src/capability-view.js` decides what
