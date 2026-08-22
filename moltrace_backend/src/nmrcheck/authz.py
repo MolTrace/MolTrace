@@ -359,6 +359,25 @@ POLICY_SET: tuple[Policy, ...] = (
         resource_types=None,
         description="Floor: authenticated principals pass the baseline gate.",
     ),
+    # 7. Withdrawing offline use from an installation someone else owns. Scoped to that ONE
+    #    transition: it is declared here, rather than inferred from is_admin at the call site,
+    #    so the decision lives where every other authority decision lives. #1 and #2 already
+    #    grant it to SYSTEM and ADMIN through their "*" permits; this entry exists to name the
+    #    action and to make the absence of a USER permit explicit, since a device's owner
+    #    reaches their own device through the mobile surface's own owner scope, not through
+    #    this action.
+    Policy(
+        id="permit-unrestricted-device-session-revoke",
+        effect=Effect.PERMIT,
+        principal_kinds=frozenset({PrincipalKind.SYSTEM, PrincipalKind.ADMIN}),
+        actions=frozenset({"device_session:revoke"}),
+        resource_types=frozenset({"mobile_device_session"}),
+        description=(
+            "System key / admin may withdraw offline use from any installation. Scoped to the "
+            "revoked transition only; every other device-session read and write stays "
+            "owner-scoped."
+        ),
+    ),
     # NOTE: there is intentionally NO permit for a USER on admin:* / surveillance:write /
     # sso:manage / scim_token:manage / tenant:admin. With only #1 and #2 granting those, a
     # USER hits default-deny → the route layer renders 403; ANONYMOUS hits default-deny

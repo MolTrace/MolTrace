@@ -6924,6 +6924,21 @@ class MobileDeviceSessionORM(Base):
     status: Mapped[str] = mapped_column(String(32), default="active", index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     metadata_json: Mapped[str] = mapped_column(Text, default="{}")
+    # A signed offline entitlement statement binds to this key: it is what makes device binding
+    # (rather than a live nonce) the anti-replay control, which is what lets a statement verify
+    # from local storage across an offline restart.
+    #
+    # Nullable and NOT backfilled, for 0043's reason: a device enrolled before this column
+    # existed has no provable identity key, and inventing one would assert something that never
+    # happened. NULL means "predates offline enrolment" and is refused, never granted.
+    #
+    # String(80) is 8 + 64 characters plus headroom for one longer algorithm prefix — the
+    # measured maximum, not a round number. No index: the lookup is always by primary key, and
+    # an index here would only serve a "who holds this key" query no route performs.
+    identity_public_key: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    identity_key_enrolled_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
 
 class MobileViewPreferenceORM(Base):

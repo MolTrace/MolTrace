@@ -6722,6 +6722,10 @@ class MobileDeviceSessionPatch(BaseModel):
     browser: str | None = Field(default=None, max_length=120)
     status: MobileSessionStatus | None = None
     metadata_json: dict[str, Any] | None = None
+    #: Write-once. A signed offline entitlement statement binds to this key, so re-pointing it
+    #: at a different key would silently move an installation's entitlement to other hardware.
+    #: Supplying the same value again is the normal re-enrolment path and is idempotent.
+    identity_public_key: str | None = Field(default=None, pattern=r"^ed25519:[0-9a-f]{64}$")
 
 
 class MobileDeviceSession(BaseModel):
@@ -6737,6 +6741,10 @@ class MobileDeviceSession(BaseModel):
     status: MobileSessionStatus
     created_at: datetime
     metadata_json: dict[str, Any] = Field(default_factory=dict)
+    #: None means this installation predates offline enrolment and has no provable identity —
+    #: which is refused, never implicitly granted.
+    identity_public_key: str | None = None
+    identity_key_enrolled_at: datetime | None = None
 
 
 class MobileViewPreferencePatch(BaseModel):
@@ -15391,6 +15399,231 @@ class SubscriptionPlan(BaseModel):
     status: SubscriptionPlanStatus
     created_at: datetime
     metadata_json: dict[str, Any] = Field(default_factory=dict)
+
+
+# --------------------------------------------------------------------------- #
+# Signed offline entitlement statements (desktop, §9.2).
+#
+# These sit beside the tenant/commerce models because they are commercial facts, but they are a
+# different object at a different grain from ``TenantEntitlement`` below: those are per-tenant,
+# per-``feature_key`` rows for a future pooled deployment, which nothing consults today. A
+# statement is a per-DEPLOYMENT, per-DEVICE fact, signed, and bound by a MolTrace-signed
+# certificate. The statement is not derived from those rows and does not gate on them; deriving
+# it from a substrate that is editable by an internal super-admin and verified by nothing would
+# make the signature attest to something unverified.
+# --------------------------------------------------------------------------- #
+EntitlementLicenceClass = Literal["commercial", "no_charge", "evaluation", "perpetual"]
+
+EntitlementPackageProfile = Literal[
+    "desktop_shell",
+    "scientific_runtime",
+    "reference_rule_packs",
+    "model_packs",
+    "site_integration_packs",
+]
+
+#: A licensing ANSWER about this installation. Returned with a successful response, never as an
+#: error — a refresh that succeeds and returns no entitlement is a refusal to reissue.
+EntitlementRefusalCode = Literal[
+    "device_not_enrolled",
+    "device_identity_key_missing",
+    "device_identity_key_mismatch",
+    "device_revoked",
+    "device_expired",
+    "no_licensed_modules",
+]
+
+#: A fault in THIS deployment's own provisioning. Never reported to a customer as a licensing
+#: decision about them: a misconfigured deployment must not tell a customer they were revoked.
+EntitlementUnavailableCode = Literal[
+    "authority_not_provisioned",
+    "authority_certificate_invalid",
+    "authority_certificate_expired",
+    "offline_period_not_published",
+    "licence_class_not_published",
+]
+
+#: The refusals a customer can see. Each names its cause.
+#:
+#: Two of the six also restate the records guarantee, and the other four deliberately do not:
+#: the guarantee answers a fear that only arises on a *loss* of access, and appending "your
+#: existing records remain available" to "this installation has not been enrolled yet" answers a
+#: question nobody asked. Reassurance that appears everywhere stops being read anywhere. Pinned
+#: both ways in ``tests/test_entitlement_never_gates_reads.py``.
+ENTITLEMENT_REFUSAL_DETAILS: dict[str, str] = {
+    "device_not_enrolled": "This installation has not been enrolled for offline use yet.",
+    "device_identity_key_missing": (
+        "This installation has not registered an identity for offline use yet."
+    ),
+    "device_identity_key_mismatch": (
+        "The identity offered does not match the one registered for this installation."
+    ),
+    "device_revoked": (
+        "Offline use has been withdrawn for this installation. Your existing records remain "
+        "available to read, export and verify."
+    ),
+    "device_expired": (
+        "The enrolment for this installation has lapsed. Your existing records remain available "
+        "to read, export and verify."
+    ),
+    "no_licensed_modules": (
+        "This workspace does not currently license any product for offline use."
+    ),
+}
+
+#: Operator-facing. Deliberately excluded from the records guarantee: an operator reading a
+#: provisioning diagnostic is not the person who fears losing their records.
+ENTITLEMENT_UNAVAILABLE_DETAILS: dict[str, str] = {
+    "authority_not_provisioned": (
+        "This workspace has not been set up to license offline installations."
+    ),
+    "authority_certificate_invalid": (
+        "This workspace's licensing authorisation could not be confirmed as genuine."
+    ),
+    "authority_certificate_expired": (
+        "This workspace's licensing authorisation has expired and must be renewed."
+    ),
+    "offline_period_not_published": (
+        "This workspace has not published how long an installation may work offline, so an "
+        "offline licence cannot be issued."
+    ),
+    "licence_class_not_published": (
+        "This workspace's authorisation allows more than one kind of licence and has not said "
+        "which one it issues, so an offline licence cannot be issued."
+    ),
+}
+
+
+class EntitlementStatementTenant(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    tenant_key: str
+    display_name: str
+
+
+class EntitlementStatementDeployment(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    deployment_id: str
+    workspace_url: str
+
+
+class EntitlementStatementDevice(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    device_id: int
+    identity_public_key: str
+
+
+class EntitlementStatement(BaseModel):
+    """The signed fact. Every field here is inside the signature.
+
+    This typed object is **display material**. A verifier verifies over the canonical bytes and
+    nothing else; re-serializing this object to check a signature is the drift this programme
+    has been bitten by elsewhere.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    statement_schema: Literal["moltrace.entitlement.statement/1"]
+    statement_id: str
+    tenant: EntitlementStatementTenant
+    deployment: EntitlementStatementDeployment
+    device: EntitlementStatementDevice
+    modules: list[ProductProgramKey]
+    package_profiles: list[EntitlementPackageProfile]
+    licence_class: EntitlementLicenceClass
+    issued_at: datetime
+    #: None only when the licence class is perpetual.
+    expires_at: datetime | None = None
+    offline_period_days: int = Field(ge=1)
+    issuing_key_id: str
+
+
+class EntitlementCertificate(BaseModel):
+    """The MolTrace-signed binding of one sub-key to one deployment. Public material.
+
+    It travels inside the issuance envelope, so an installation always holds it whenever it
+    holds a statement to verify, and the verifier never needs the network.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    certificate_schema: Literal["moltrace.deployment.certificate/1"]
+    certificate_id: str
+    deployment_id: str
+    tenant_key: str
+    issuing_public_key: str
+    issuing_key_id: str
+    #: The ceiling the sub-key may not exceed — what stops a compromised deployment from
+    #: self-upgrading its own commercial terms.
+    permitted_modules: list[ProductProgramKey]
+    permitted_licence_classes: list[EntitlementLicenceClass]
+    not_before: datetime
+    not_after: datetime
+    root_key_id: str
+
+
+class EntitlementIssuanceRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    device_session_id: int = Field(ge=1)
+    device_identity_key: str = Field(pattern=r"^ed25519:[0-9a-f]{64}$")
+    package_profiles: list[EntitlementPackageProfile] = Field(min_length=1, max_length=5)
+    exchange_nonce: str = Field(min_length=32, max_length=128, pattern=r"^[A-Za-z0-9_-]+$")
+
+
+class EntitlementIssuance(BaseModel):
+    """The envelope. ``issued=False`` is a licensing ANSWER, not an error."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    issued: bool
+    # --- present only when issued is True -------------------------------------------------- #
+    statement: EntitlementStatement | None = None
+    #: base64url, unpadded, of the CANONICAL PAYLOAD bytes -- NOT of the signed bytes.
+    #: The signed input is the statement domain prepended to these bytes, and the domain is
+    #: prepended again at verification, never stored here. Storing the signed bytes would
+    #: double-prefix the domain and fail EVERY verification -- with a symptom that points at
+    #: the key material or the algorithm, nowhere near the cause.
+    statement_bytes_b64: str | None = None
+    statement_signature: str | None = None
+    certificate: EntitlementCertificate | None = None
+    certificate_bytes_b64: str | None = None
+    certificate_signature: str | None = None
+    root_key_id: str | None = None
+    # --- always present --------------------------------------------------------------------- #
+    #: Echoed back, and covered by the exchange signature: this is the only place a nonce lives.
+    #: It proves this exchange was fresh, and is then discarded — it is not inside the statement
+    #: and is never re-checked, or the statement could not verify from local storage offline.
+    exchange_nonce: str
+    observed_at: datetime
+    exchange_signature: str
+    # --- present only when issued is False -------------------------------------------------- #
+    refusal_code: EntitlementRefusalCode | None = None
+    refusal_detail: str | None = None
+
+
+class EntitlementAuthorityStatus(BaseModel):
+    """Operator diagnostic: is this deployment set up to license offline installations?
+
+    Public material only — never the issuing seed, in any field. This route is also where a
+    provisioning cause is delivered: a 5xx body cannot carry one, because the shared error
+    handler replaces both its prose and its machine code with fixed constants.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    provisioned: bool
+    root_key_id: str | None = None
+    issuing_key_id: str | None = None
+    certificate: EntitlementCertificate | None = None
+    certificate_bytes_b64: str | None = None
+    certificate_signature: str | None = None
+    offline_period_days: int | None = None
+    statement_validity_hours: int | None = None
+    unavailable_code: EntitlementUnavailableCode | None = None
+    unavailable_detail: str | None = None
 
 
 class TenantEntitlementCreate(BaseModel):
