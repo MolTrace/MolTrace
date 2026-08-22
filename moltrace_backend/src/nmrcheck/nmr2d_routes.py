@@ -38,7 +38,7 @@ def require_nmr2d_enabled(request: Request) -> None:
         raise HTTPException(status_code=404, detail="2D NMR evidence engine is disabled by feature flag.")
 
 
-def _feature_off(setting_name: str) -> "HTTPException":
+def _feature_off(setting_name: str) -> HTTPException:
     """A refusal that tells the client the situation and the operator the switch.
 
     The flag's name is an environment-variable name — deployment configuration, and backend
