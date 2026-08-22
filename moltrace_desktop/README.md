@@ -90,6 +90,21 @@ operator ought to see.
 The renderer receives verdicts, never inputs. A page that can see the entitlement or the service
 versions can reason about them; availability is decided once, in one place.
 
+## The four upgrade states
+
+`src/capabilities.js` decides *whether* something is available; `src/capability-view.js` decides what
+a person is **told**. They are separate concerns because the failure modes differ: a readout can
+distinguish four causes perfectly and still be useless if the interface renders all four as one grey
+"unavailable".
+
+§4.2 is explicit that the four causes *"imply four different next actions"*, so each state carries an
+**action**, not just a status — "unavailable" tells someone nothing the disabled control did not.
+Tests assert the four actions are distinct, that they are visually distinguishable, and that a state
+this version has not been taught about renders **loudly rather than blankly**: an empty cell reads
+like "fine", and a vocabulary mismatch between desktop and deployment is not fine.
+
+The machine code is carried on the element for a client to branch on, and never rendered as copy.
+
 ## The confinement test
 
 `test/confinement-runner.js` asserts §8.3 of the desktop specification in three layers, because no
