@@ -20,6 +20,7 @@ from pydantic import (
 # consumers that import them from here (spectral_similarity, unified_confidence,
 # and the week25 evidence-engine tests). ``NMR2DExperimentType`` is also used
 # directly below; the rest are pure re-export shims (F401 suppressed per name).
+from . import error_codes
 from .nmr2d_models import (
     NMR2DAnalyzeRequest,  # noqa: F401
     NMR2DAnalyzeResult,  # noqa: F401
@@ -54,6 +55,29 @@ FIDPresetId = Literal[
     "higher_resolution",
     "custom",
 ]
+
+class ErrorResponse(BaseModel):
+    """The body of every sanitized 401 and 403. Two fields, and never a third.
+
+    Clients branch on ``code``. ``detail`` is one of two fixed sentences and is **not** an
+    API — it exists so an un-migrated client rendering ``String(data.detail)`` still shows a
+    person something readable. Nothing route-specific ever reaches either field: on these two
+    statuses the cause of the refusal is the thing being protected, so it goes to the operator
+    log with the correlation id instead of to the caller who was refused.
+
+    ``code`` is a plain ``str`` carrying an enumeration rather than a Python ``Enum``: an
+    ``Enum`` would be a fourth hand-maintained copy of a vocabulary that already exists in
+    ``error_codes``, which is the duplication that module was written to remove. The
+    ``json_schema_extra`` form derives the list from the registry at import time and still
+    generates a string-literal union in the frontend's generated types.
+    """
+
+    code: str = Field(
+        description="Stable machine-readable code. Branch on this, never on `detail`.",
+        json_schema_extra={"enum": sorted(error_codes.SANITIZED_AUTH_CODES)},
+    )
+    detail: str = Field(description="Generic copy for display. Not a stable interface.")
+
 
 _PLAIN_TEXT_TAG_RE = re.compile(r"<\s*/?\s*[A-Za-z][^>]*>")
 

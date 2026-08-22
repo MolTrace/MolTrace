@@ -381,6 +381,7 @@ from .models import (
     EnvironmentCheckResponse,
     ErrorAnalysisSlice,
     ErrorAnalysisSliceCreate,
+    ErrorResponse,
     ESignatureManifestation,
     ESignatureVerification,
     EvidenceCommentCreate,
@@ -2884,15 +2885,6 @@ def _sanitize_public_error_detail(value: Any) -> Any:
     return _redact_public_error_text(str(value))
 
 
-#: 403 details that survive sanitization because a client must branch on them. Keep this tiny and
-#: keep every member a fixed machine code — never an explanation of *why* a permission failed.
-#: Derived from the code registry rather than maintained by hand — a code declared public
-#: there is, by construction, one a client may branch on here. This was a second list of the
-#: same idea; the frontend proxy's 401/403 allowlist is a third, and should be regenerated
-#: from `error_codes.PUBLIC_CODES` rather than edited independently.
-PUBLIC_MACHINE_READABLE_403_DETAILS: frozenset[str] = error_codes.PUBLIC_CODES
-
-
 class CodedHTTPException(HTTPException):
     """An HTTPException that states its own machine-readable ``code``.
 
@@ -2901,31 +2893,137 @@ class CodedHTTPException(HTTPException):
     put it *in* ``detail``, which costs the prose — and the frontend renders
     ``String(data.detail)``, so a structured detail is not an option either.
     This carries the code beside the sentence instead.
+
+    ``log_context`` is the seam for a cause the caller may **not** be told. On a 401/403 the
+    reason a check failed is the thing being protected, so it goes to the operator log with
+    the correlation id; it is never serialised, and there is deliberately no way to put it on
+    the wire. That is how this squares the house rule that a rejection names its cause — a
+    rule about scientific bounds, where the caller is entitled to the reason their data was
+    refused — with authorization, where the reason is exactly what is being withheld.
     """
 
-    def __init__(self, status_code: int, detail: Any, *, code: str) -> None:
+    def __init__(
+        self,
+        status_code: int,
+        detail: Any,
+        *,
+        code: str,
+        log_context: dict[str, str] | None = None,
+    ) -> None:
         super().__init__(status_code=status_code, detail=detail)
         self.error_code = code
+        self.log_context = dict(log_context or {})
 
 
 def _safe_http_exception_detail(status_code: int, detail: Any) -> Any:
+    """The public ``detail`` for a response.
+
+    A 401 and a 403 each get exactly one fixed sentence, for every input, with no exception —
+    no environment switch, no debug bypass, no discrimination by caller. There is deliberately
+    no "verbose mode": the party this control protects information *from* is the party issuing
+    the request, so any discriminator the caller could set is one the caller could omit, and a
+    control an adversary can switch off is not a control.
+
+    Two carve-outs used to live here and both are gone. A "feature flag" detail put an
+    environment-variable name on the wire (and onto a page, via ``web.py``, which renders a
+    403 detail straight into the DOM); the flag name now goes to the operator log and clients
+    branch on ``feature_not_enabled``. A detail that *was* a registered public code was echoed
+    verbatim so a client could branch on the prose; ``code`` carries that signal properly now,
+    and keeping the passthrough meant every newly registered public code silently widened what
+    a 403 ``detail`` may say, as a side effect of registration.
+    """
+
     if status_code == status.HTTP_401_UNAUTHORIZED:
         return PUBLIC_AUTH_REQUIRED_DETAIL
     if status_code == status.HTTP_403_FORBIDDEN:
-        # Genuine access denials stay generic so they reveal nothing about why
-        # access failed. Feature-flag denials are the deliberate exception: the
-        # flag name is not a secret and the caller needs it to know which flag
-        # to enable, so that detail is preserved (still sanitized for safety).
-        if isinstance(detail, str) and "feature flag" in detail.lower():
-            return _sanitize_public_error_detail(detail)
-        # Machine-readable codes a client must be able to act on. "This plan does not include
-        # that product" is a different situation from "you may not do that", and the caller needs
-        # to tell them apart to show the right thing. The code names no user, resource or reason
-        # for a permission failure, so preserving it leaks nothing.
-        if isinstance(detail, str) and detail in PUBLIC_MACHINE_READABLE_403_DETAILS:
-            return detail
         return PUBLIC_ACCESS_DENIED_DETAIL
     return _sanitize_public_error_detail(detail)
+
+
+def _sanitized_auth_body(
+    status_code: int, detail: Any, *, stated_code: str | None = None
+) -> dict[str, Any]:
+    """The complete body of a sanitized 401/403: two fields, and never a third.
+
+    The single place the shape is built, so all four exception handlers agree by construction
+    rather than by three of them being edited together correctly.
+
+    Fail-closed: a code outside ``SANITIZED_AUTH_CODES`` becomes the status fallback. That
+    covers a raise site inventing a code that names a resource, and a code that is registered
+    but not public — registration alone must not publish anything. The field is never absent
+    and never carries a value outside the registry, because a client that must handle
+    "sometimes there is a code" has gained nothing over parsing prose.
+    """
+
+    code = error_codes.code_for(status_code, detail, stated_code=stated_code)
+    if code not in error_codes.SANITIZED_AUTH_CODES:
+        code = (
+            error_codes.UNAUTHENTICATED
+            if status_code == status.HTTP_401_UNAUTHORIZED
+            else error_codes.FORBIDDEN
+        )
+    return {"detail": _safe_http_exception_detail(status_code, detail), "code": code}
+
+
+#: The 401/403 body declared on every route that can emit one, so the generated frontend
+#: types carry the shape instead of every client hand-rolling it. ``scim_router`` is
+#: deliberately excluded: its errors are the SCIM ``Error`` envelope with the
+#: ``application/scim+json`` media type Okta/Entra parse, so declaring this shape on it
+#: would document something it does not emit.
+_AUTH_ERROR_RESPONSES: dict[int | str, dict[str, Any]] = {
+    401: {
+        "model": ErrorResponse,
+        "description": "Authentication is required or must be repeated.",
+    },
+    403: {
+        "model": ErrorResponse,
+        "description": "The action is not available to this caller.",
+    },
+}
+
+
+def _log_refusal(request: Request, exc: BaseException) -> None:
+    """Send the cause of a 401/403 to the operator, since it may not go to the caller.
+
+    This is the other half of the generic copy, and the reason the generic copy is not a loss
+    of information — it is a change of audience. Anything a raise site attaches as
+    ``log_context`` (a feature-flag name, say) lands here with the correlation id and nowhere
+    else, which is what makes "the flag name never reaches the wire" a property of the design
+    rather than a discipline someone has to remember.
+    """
+
+    log_context = getattr(exc, "log_context", None)
+    if not log_context:
+        return
+    logger.info(
+        "Request refused; cause withheld from the caller",
+        extra={
+            "correlation_id": _request_correlation_id(request),
+            "path": request.url.path,
+            "status_code": getattr(exc, "status_code", None) or getattr(exc, "status", None),
+            "refusal_context": log_context,
+        },
+    )
+
+
+def _auth_or_passthrough_body(
+    request: Request, status_code: int, detail: Any, *, stated_code: str | None = None
+) -> dict[str, Any]:
+    """Sanitize a 401/403; leave every other status exactly as it was.
+
+    ``MFAError`` is also raised at 400/409/500 (a spent challenge, a duplicate passkey, an
+    enrolment that has not started). Those are out of scope on purpose: the proxy does not
+    sanitize those statuses either, so a browser and a direct client already see the same
+    thing there, and rewriting them is a separate question about MFA copy rather than about
+    confidentiality.
+    """
+
+    if status_code in (status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN):
+        return _sanitized_auth_body(status_code, detail, stated_code=stated_code)
+    return {
+        "detail": _safe_http_exception_detail(status_code, detail),
+        "code": error_codes.code_for(status_code, detail, stated_code=stated_code),
+    }
 
 
 def _safe_validation_errors(exc: RequestValidationError) -> list[dict[str, Any]]:
@@ -31969,9 +32067,16 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             content = _stable_unavailable_payload(request)
             content["code"] = error_codes.UNAVAILABLE
             status_code = exc.status_code
+        elif exc.status_code in (
+            status.HTTP_401_UNAUTHORIZED,
+            status.HTTP_403_FORBIDDEN,
+        ):
+            _log_refusal(request, exc)
+            content = _sanitized_auth_body(
+                exc.status_code, exc.detail, stated_code=getattr(exc, "error_code", None)
+            )
+            status_code = exc.status_code
         else:
-            # `detail` is untouched: clients branch on it today and must keep working.
-            # `code` is added beside it so they can stop.
             content = {
                 "detail": _safe_http_exception_detail(exc.status_code, exc.detail),
                 "code": error_codes.code_for(
@@ -31992,31 +32097,35 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     # would hit first. Same function, both classes.
     app.add_exception_handler(StarletteHTTPException, safe_http_exception_handler)  # type: ignore[arg-type]
 
+    # These two handlers used to return `exc.detail` verbatim, because the machine code had
+    # nowhere else to travel: it rode inside `detail` and the sanitizer would have replaced
+    # it. The stated precondition for undoing that was "until every client has moved", and
+    # every client has: the SPA branches on `code`, and so does the proxy. So they now take
+    # the same path as every other 401/403 and the bypass is closed. What that removed from
+    # the wire was MFA prose ("Invalid authentication code.", "Incorrect password.") and, in
+    # the worst single case, "Passkey clone/replay detected (sign count did not advance)" —
+    # an internal detector telling the holder of a cloned credential that the clone was
+    # caught, and how.
     @app.exception_handler(mfa_webauthn.MFAError)
     async def mfa_error_handler(
         request: Request, exc: mfa_webauthn.MFAError
     ) -> JSONResponse:
         return JSONResponse(
             status_code=exc.status,
-            content={
-                "detail": exc.detail,
-                "code": error_codes.code_for(exc.status, exc.detail),
-            },
+            content=_auth_or_passthrough_body(
+                request, exc.status, exc.detail, stated_code=getattr(exc, "error_code", None)
+            ),
         )
 
     @app.exception_handler(session_store.SessionError)
     async def session_error_handler(
         request: Request, exc: session_store.SessionError
     ) -> JSONResponse:
-        # These handlers exist because the machine code had nowhere else to travel: it rode
-        # inside `detail` and the sanitizer would have replaced it. `code` now carries it
-        # properly; `detail` stays as-is until every client has moved.
         return JSONResponse(
             status_code=exc.status,
-            content={
-                "detail": exc.detail,
-                "code": error_codes.code_for(exc.status, exc.detail),
-            },
+            content=_auth_or_passthrough_body(
+                request, exc.status, exc.detail, stated_code=getattr(exc, "error_code", None)
+            ),
         )
 
     @app.exception_handler(scim_store.SCIMError)
@@ -32025,6 +32134,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     ) -> JSONResponse:
         # Render every SCIM failure (auth, validation, conflict, not-found) as the SCIM Error
         # envelope with the application/scim+json media type Okta/Entra expect.
+        #
+        # DELIBERATE CARVE-OUT — do not route this through _sanitized_auth_body. Every other
+        # 401/403 in this app is sanitized into {code, detail}; this one is not, because its
+        # callers are identity providers that parse the SCIM envelope, and reshaping it breaks
+        # provisioning for every customer on enterprise SSO. Pinned by
+        # tests/test_direct_client_error_codes.py::test_scim_error_envelope_is_preserved,
+        # which exists because "sanitize every handler" is the natural reading of the rule the
+        # other three now follow.
         headers = {"WWW-Authenticate": "Bearer"} if exc.status == 401 else None
         return JSONResponse(
             status_code=exc.status,
@@ -32061,6 +32178,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(
         router,
         dependencies=[Depends(_baseline_access_gate), Depends(_module_licence_gate)],
+        responses=_AUTH_ERROR_RESPONSES,
     )
     # scim_router / nmr2d_router keep their own auth schemes but still need abuse throttling
     # (Prompt 16) — they don't run _baseline_access_gate, so attach the rate-limit-only gate.
@@ -32074,6 +32192,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(
         nmr2d_router,
         dependencies=[Depends(_abuse_rate_limit_gate), Depends(_module_licence_gate)],
+        responses=_AUTH_ERROR_RESPONSES,
     )
     app.state.session_factory = session_factory
     app.state.settings = settings
