@@ -94,10 +94,11 @@ Turns regulatory action items into reaction-optimization constraints: Bayesian, 
 
 ## Architecture
 
-MolTrace is a two-app monorepo:
+MolTrace is a three-app monorepo:
 
 - **Backend** (`moltrace_backend/`) — a single FastAPI service (package `nmrcheck`, app title "NMRCheck API"). The HTTP layer (`src/nmrcheck/`) carries routes, Pydantic models, SQLAlchemy ORM, Alembic migrations, auth, and RQ/Redis background jobs; `api.py` is a large monolithic module. Two modular science packages sit under `src/moltrace/`: `moltrace.spectroscopy` (NMR/MS science + AI model lifecycle) and `moltrace.regulatory` (the ICH/FDA impurity engine).
 - **Frontend** (`moltrace_frontend/`) — a single Next.js 16 / React 19 App Router app serving both the public marketing site and the signed-in product from one codebase, with an installable PWA shell.
+- **Desktop** (`moltrace_desktop/`) — an Electron shell, in early development. Its source is here for the same reason the rest is: shipping an Electron application publishes its client regardless, since ASAR is an archive rather than encryption, so what protects the product is the licence, the backend and the signature — not secrecy. `src/product.json` is checked in and **inert** — every operational value is `null`, so a build from this repository reaches no workspace, no update feed and no licensing authority, and refuses to start rather than falling back to a default. Real configuration is a private overlay applied at package time. Signing identities, notarization credentials and every entitlement key are absent by design: the client verifies signed entitlement statements against a pinned public key and never mints one.
 
 **The science layer** (`moltrace.spectroscopy`) is deterministic and verifier-centered: `verify_structure` runs four independent tests (PredictionBounds, Assignments, HSQC2DRanges, MSMoleculeMatch) and combines them via a Bayesian log-odds update into an auditable posterior. This deterministic verifier is the **sole arbiter** of correctness across the whole stack.
 
@@ -151,7 +152,7 @@ The FE↔BE contract pipeline: FastAPI `/openapi.json` → `pnpm generate:openap
 
 **Backend**
 - Python ≥3.11 (deployed on 3.13.5); FastAPI ≥0.115,<1.0, Pydantic v2
-- SQLAlchemy 2.x + Alembic (PostgreSQL via psycopg v3 in prod, SQLite in tests; 30 migrations)
+- SQLAlchemy 2.x + Alembic (PostgreSQL via psycopg v3 in prod, SQLite in tests; 48 migrations)
 - uv package manager + hatchling build backend; ruff + mypy (strict)
 - RQ ≥2.0 + Redis for queued background jobs
 - `pyjwt[crypto]` (RS256/ES256 OIDC id_token verification) + `cryptography` (AES-256-GCM secret encryption) for enterprise SSO; `pyotp` (RFC 6238 TOTP) + `webauthn` (py_webauthn, FIDO2 passkeys) for MFA
@@ -184,9 +185,9 @@ MolTrace/
 │   │   └── regulatory/        #   deterministic-first ICH/FDA/EMA/WHO engine: impurities/ specifications/
 │   │                          #   stability/ ctd/ quality/ (OOS + SPC) + data/ (versioned licence-aware
 │   │                          #   corpus) + intelligence/ (grounded RAG search) + ai/ compliance/ eval/ infra/
-│   ├── alembic/               #   14 migrations (0001–0014)
-│   ├── tests/                 #   ~187 test_*.py files
-│   ├── docs/                  #   48 design/handoff docs
+│   ├── alembic/               #   48 migrations (0001–0048)
+│   ├── tests/                 #   ~323 test_*.py files
+│   ├── docs/                  #   94 design/handoff docs
 │   ├── pyproject.toml · uv.lock · CHANGELOG.md · NOTICE
 ├── moltrace_frontend/         # Next.js 16 / React 19 app (pnpm)
 │   ├── app/                   #   active App Router tree (marketing + signed-in routes)
@@ -197,7 +198,7 @@ MolTrace/
 │   ├── next.config.mjs · vercel.json
 ├── whitepaper-build/          # six white-paper .md sources + Pandoc/Typst PDF build (Makefile)
 ├── moltrace_docs/             # empty Astro/Starlight build mirror (real site: docs.moltrace.co)
-├── scripts/                   # CI watch, release guardrails, playbook generator
+├── scripts/                   # CI watch, release guardrails, playbook generator, disk sweep
 ├── tests/contracts/           # cross-cutting release-health contract fixtures
 ├── moltrace_backend/deploy/   # GCP runbook + docker-compose dev stack (Dockerfile, cloudbuild.yaml one level up)
 ├── .github/workflows/ci-cd.yml
@@ -262,7 +263,7 @@ pnpm generate:openapi
 # openapi-typescript http://localhost:8000/openapi.json -o src/lib/api/schema.d.ts
 ```
 
-For local development, run both apps: the backend on `:8000` and the frontend on `:3000`.
+For local development, run the backend on `:8000` and the frontend on `:3000`. The desktop shell is driven from `moltrace_desktop/` with `npm test` and `npm start`; an unconfigured build refuses to start and names what it is missing.
 
 ## Configuration
 
@@ -316,7 +317,7 @@ Correctness is enforced, not assumed:
 ## Documentation
 
 - **Product docs:** [docs.moltrace.co](https://docs.moltrace.co) (a separate Astro/Starlight site; the in-repo `moltrace_docs/` is an empty build mirror).
-- **Engineering docs:** `moltrace_backend/docs/` (48 design/handoff documents) and `moltrace_backend/CHANGELOG.md` — the authoritative per-release record of what shipped.
+- **Engineering docs:** `moltrace_backend/docs/` (94 design/handoff documents) and `moltrace_backend/CHANGELOG.md` — the authoritative per-release record of what shipped.
 - **White papers:** six markdown sources in `whitepaper-build/` (White Paper, Sales, Technical, Executive One-Pager, ROI Methodology, Company Credentials) with a Pandoc + XeLaTeX / Typst PDF build (`make -C whitepaper-build all`).
 
 ## Compliance & disclaimers

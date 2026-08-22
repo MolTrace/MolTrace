@@ -1,0 +1,9 @@
+{
+  "_comment": "INERT BY DESIGN. This checked-in default configures nothing. A build from public source cannot phone home, cannot reach a licensing authority, and refuses to start — see product.js. The shipping build overlays a private product.json at package time (the VS Code pattern). Do NOT add a fallback value to this file: a fallback makes an unconfigured build silently become a configured one.",
+  "productName": "MolTrace",
+  "workspaceUrl": null,
+  "updateFeedUrl": null,
+  "telemetryDsn": null,
+  "entitlementRootPublicKey": null,
+  "entitlementRootKeyId": null
+}
