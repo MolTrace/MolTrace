@@ -476,15 +476,11 @@ jobs:
           cache: npm
           cache-dependency-path: moltrace_desktop/package-lock.json
 
-      # Electron's binary is ~100 MB and does not change between runs while the
-      # version is pinned, so cache it on the pinned version rather than the lock
-      # hash — the lock changes for reasons the binary does not.
-      - name: Cache the Electron binary
-        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4
-        with:
-          path: ~/.cache/electron
-          key: electron-${{ runner.os }}-43.4.1
-
+      # No cache for the Electron binary. One was added on the theory that ~100 MB
+      # per run is worth avoiding; it was removed when the first cached run failed
+      # to find node_modules/electron/dist at all, while the uncached run before it
+      # found it fine. A download is cheaper than a build that fails for a reason
+      # unrelated to the change under test.
       - name: Install
         run: npm ci
 
@@ -516,10 +512,25 @@ jobs:
       # only fix that works.
       - name: Configure the Chromium SUID sandbox (Linux)
         if: runner.os == 'Linux'
+        # SEARCHED, not derived from a layout assumption. A hard-coded
+        # node_modules/electron/dist/chrome-sandbox failed with "No such file"
+        # while saying nothing about what was actually there; and dirname() on
+        # require('electron') is layout-dependent — on macOS it lands inside the
+        # .app bundle, so it is the wrong idiom to reach for even though this step
+        # is Linux-only. `find` does not care about layout.
         run: |
-          sudo chown root:root node_modules/electron/dist/chrome-sandbox
-          sudo chmod 4755 node_modules/electron/dist/chrome-sandbox
-          ls -l node_modules/electron/dist/chrome-sandbox
+          sandbox=$(find node_modules/electron -name chrome-sandbox -type f | head -1)
+          if [ -z "$sandbox" ]; then
+            echo "::error::chrome-sandbox not found under node_modules/electron"
+            echo "--- what is actually there: ---"
+            ls -la node_modules/electron 2>/dev/null || echo "(no node_modules/electron)"
+            ls -la node_modules/electron/dist 2>/dev/null || echo "(no dist/ — the postinstall did not extract)"
+            exit 1
+          fi
+          echo "found: $sandbox"
+          sudo chown root:root "$sandbox"
+          sudo chmod 4755 "$sandbox"
+          ls -l "$sandbox"
 
       # The renderer confinement test drives a real Electron window, so Linux
       # needs a virtual display. macOS runners provide one.
