@@ -357,6 +357,58 @@ def _admin_headers(app, client: TestClient) -> dict[str, str]:
     return _signup(client, email)
 
 
+def test_each_provisioning_fault_names_its_own_cause(app, client) -> None:
+    """The operator diagnostic is the ONLY channel that can carry a cause.
+
+    The 503 is generic in both its prose and its machine code, and the log line carries whatever
+    code this function chose — so a code reused across two unrelated conditions sends the
+    operator to check something that is already correct, with nothing left to consult.
+
+    Every case below reported the wrong cause at one point, and all four are the same shape: a
+    branch whose correctness depended on a fact the branch did not name.
+    """
+    from nmrcheck.settings import Settings
+    from nmrcheck import entitlement_store as store
+
+    def cause(**over) -> str:
+        authority = valid_authority(**over.pop("auth", {}))
+        settings = Settings(
+            database_url="sqlite:///:memory:",
+            api_key="k",
+            **{**settings_overrides(authority), **over},
+        )
+        try:
+            store.resolve_authority(settings)
+        except store.AuthorityUnavailable as unavailable:
+            return unavailable.code
+        return "provisioned"
+
+    # The two commercial terms are separate decisions and neither has a default, so EVERY
+    # operator passes through "one set, one not". Naming the wrong one misdirects on the
+    # happy path, not on an edge case.
+    assert cause(entitlement_offline_period_days=None) == "offline_period_not_published"
+    assert cause(entitlement_statement_validity_hours=None) == "statement_validity_not_published"
+
+    # A certificate that verified against the root IS genuine. Saying otherwise sends an
+    # operator to re-request an authorisation, or to suspect tampering, over a setting.
+    assert (
+        cause(auth={"permitted_licence_classes": ["commercial"]}, entitlement_licence_class="perpetual")
+        == "licence_class_not_permitted"
+    )
+
+    # ...and the same for a signing key that is unreadable or simply the wrong one. Neither
+    # says anything about whether the authorisation is genuine.
+    assert cause(entitlement_issuing_private_key="nothex") == "issuing_key_unreadable"
+    assert (
+        cause(entitlement_issuing_private_key=bytes(range(64, 96)).hex()) == "issuing_key_mismatch"
+    )
+
+    # The certificate codes still mean what they say — a real forgery is still reported as one.
+    assert cause(entitlement_certificate_signature="ed25519:" + "00" * 64) == (
+        "authority_certificate_invalid"
+    )
+
+
 def test_the_authority_route_never_returns_private_material(app, client) -> None:
     authority = _provision(app)
     admin = _admin_headers(app, client)
