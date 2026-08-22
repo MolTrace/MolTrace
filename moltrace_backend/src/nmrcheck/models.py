@@ -15430,6 +15430,7 @@ EntitlementRefusalCode = Literal[
     "device_identity_key_mismatch",
     "device_revoked",
     "device_expired",
+    "device_not_in_good_standing",
     "no_licensed_modules",
 ]
 
@@ -15465,6 +15466,14 @@ ENTITLEMENT_REFUSAL_DETAILS: dict[str, str] = {
     "device_expired": (
         "The enrolment for this installation has lapsed. Your existing records remain available "
         "to read, export and verify."
+    ),
+    # Deliberately its OWN code rather than a borrowed one. "Withdrawn" and "never enrolled"
+    # are both specific claims about what happened, and both are false for an installation
+    # whose standing simply cannot be established — telling a customer either is the support
+    # call that goes nowhere. What is true is only that we cannot vouch for it.
+    "device_not_in_good_standing": (
+        "This installation is not currently in good standing for offline use. Your existing "
+        "records remain available to read, export and verify."
     ),
     "no_licensed_modules": (
         "This workspace does not currently license any product for offline use."

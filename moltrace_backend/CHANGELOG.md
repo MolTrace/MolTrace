@@ -98,6 +98,16 @@ entitlement to hardware of your choosing. The audit row records a withdrawal mad
 scope, and does not record one when the owner is themselves an administrator, because they
 crossed nothing.
 
+Refusal is decided by an **allowlist** over the device status, not a denylist. `MobileSessionStatus`
+constrains what the patch route accepts; the column behind it is a plain `String(32)` with no enum
+and no check constraint, so it constrains nothing about what is stored — and the vocabulary can
+grow. Naming the two bad values and granting everything else would make every status added later a
+grant by default, and what is granted here is a signed credential good for the whole offline period
+that nothing can retract, since withdrawal is expressed by declining to reissue. An unrecognised
+status gets its own refusal rather than a borrowed one: "withdrawn" and "never enrolled" are both
+specific claims about what happened and both are false for an installation whose standing merely
+cannot be established.
+
 Migration 0050 adds the device identity key, nullable and **not** backfilled: a device enrolled
 before the column existed has no provable identity, and inventing one would assert something that
 never happened. NULL is refused, never implicitly granted.

@@ -231,6 +231,38 @@ def test_a_mismatched_identity_key_is_refused(client, enrolled) -> None:
     assert body["refusal_code"] == "device_identity_key_mismatch"
 
 
+@pytest.mark.parametrize("unknown_status", ["suspended", "quarantined", "pending", ""])
+def test_a_status_this_code_does_not_recognise_is_refused_not_granted(
+    app, client, enrolled, unknown_status
+) -> None:
+    """Fail closed on the status column, because it is not the enum it looks like.
+
+    ``MobileSessionStatus`` constrains what the patch route ACCEPTS. The column is a plain
+    ``String(32)`` with no enum and no check constraint, so it constrains nothing about what is
+    stored — and the vocabulary can grow. Listing the two bad values and granting everything
+    else makes every status anyone adds later a grant by default, and the person adding one to a
+    mobile-session vocabulary has no reason to read the entitlement issuer.
+
+    This is the worst place in the delta to fail open: what gets minted is a signed credential
+    good for the whole offline period, and withdrawal here is expressed by declining to
+    reissue — so once it is out, nothing retracts it.
+    """
+    headers, device_id = enrolled
+    with app.state.session_factory() as session:
+        session.get(orm.MobileDeviceSessionORM, device_id).status = unknown_status
+        session.commit()
+
+    body = _issue(client, headers, device_id).json()
+    assert body["issued"] is False, (
+        f"an installation whose status this code does not recognise ({unknown_status!r}) was "
+        "issued a signed offline licence — and nothing can retract one"
+    )
+    assert body["statement"] is None and body["statement_signature"] is None
+    # ...and it is not told something that did not happen. It was not withdrawn, and it was
+    # not un-enrolled; what is true is that its standing cannot be established.
+    assert body["refusal_code"] == "device_not_in_good_standing"
+
+
 def test_a_deployment_serving_no_products_refuses_rather_than_issuing_an_empty_grant(
     app, client, enrolled
 ) -> None:

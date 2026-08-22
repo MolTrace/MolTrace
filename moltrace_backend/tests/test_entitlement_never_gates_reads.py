@@ -346,7 +346,11 @@ def test_an_empty_entitlement_is_a_working_installation() -> None:
 # below — the guarantee answers a fear that only arises on a *loss* of access, and reassurance
 # that appears everywhere stops being read anywhere.
 # --------------------------------------------------------------------------- #
-REFUSALS_THAT_CARRY_THE_GUARANTEE = ("device_revoked", "device_expired")
+REFUSALS_THAT_CARRY_THE_GUARANTEE = (
+    "device_revoked",
+    "device_expired",
+    "device_not_in_good_standing",
+)
 REFUSALS_THAT_DELIBERATELY_DO_NOT = (
     "device_not_enrolled",
     "device_identity_key_missing",
@@ -364,11 +368,11 @@ def test_every_customer_facing_refusal_restates_the_records_guarantee() -> None:
     # two issuance refusals plus NINE verifier codes. The verifier table reads as eight rows
     # because ``certificate_not_genuine`` and ``not_genuine`` share one row and one message —
     # they are two codes, and a count taken off the rendered table misses that.
-    assert len(customer_visible) == 11, (
-        f"expected eleven customer-visible refusal codes, counted {len(customer_visible)} — a "
+    assert len(customer_visible) == 12, (
+        f"expected twelve customer-visible refusal codes, counted {len(customer_visible)} — a "
         "test that pins the wrong number makes the wrong answer look deliberate"
     )
-    assert len(set(customer_visible.values())) == 10, (
+    assert len(set(customer_visible.values())) == 11, (
         "the eleven codes should render as ten distinct sentences; two of them deliberately "
         "share one, because a customer cannot act on the difference"
     )
