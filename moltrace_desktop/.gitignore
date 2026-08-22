@@ -1,0 +1,31 @@
+# Build + dependency output
+node_modules/
+dist/
+out/
+release/
+*.asar
+
+# THE PRIVATE PRODUCT CONFIG.
+# src/product.json is the INERT default and IS tracked — it configures nothing,
+# so a build from this repository fails closed. The real configuration is a
+# private overlay laid down at package time (the VS Code product.json pattern),
+# and it must never be committed.
+src/product.private.json
+product.private.json
+*.product.json
+!src/product.json
+
+# Signing and notarization material. None of this belongs in any repository,
+# public or private — a signing identity is compromised the moment it escapes.
+*.p12
+*.pfx
+*.pem
+*.key
+*.cer
+*.mobileprovision
+.env
+.env.*
+!.env.example
+
+# Local overlays a developer points MOLTRACE_PRODUCT_CONFIG at
+product.local.json

@@ -4,10 +4,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository shape
 
-Two-app monorepo. There is no root-level build — each app is driven from its own directory.
+Three-app monorepo. There is no root-level build — each app is driven from its own directory.
 
 - `moltrace_backend/` — FastAPI service, Python package name `nmrcheck` (app title "NMRCheck API"), managed with **uv**.
 - `moltrace_frontend/` — Next.js 16 / React 19 App Router app serving both the public marketing site and the signed-in product, managed with **pnpm**.
+- `moltrace_desktop/` — Electron shell, managed with **npm**, Electron pinned to an exact version (not a caret — a major line is not a version). `src/product.json` is checked in and **inert**: every operational value is `null`, so a build from this repository cannot reach a workspace or update feed and refuses to start. The real configuration is a private overlay applied at package time. Never commit a configured `product.json`, signing material, or any key — the client verifies entitlement statements against a pinned public key and never mints one.
 
 ## Commands
 

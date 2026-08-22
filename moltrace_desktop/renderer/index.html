@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<!-- §7.1: default-src 'self'; no unsafe-inline / unsafe-eval in script-src;
+     frame-ancestors 'none'. This page carries ZERO inline script, which is why
+     the esbuild entry meets the requirement where a Next static export cannot. -->
+<meta http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'">
+<title>MolTrace</title>
+<link rel="stylesheet" href="./app.css">
+</head>
+<body>
+<main id="root"><h1>MolTrace Desktop</h1><p id="status">starting…</p></main>
+<script src="./app.js"></script>
+</body>
+</html>

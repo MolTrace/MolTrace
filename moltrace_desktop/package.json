@@ -1,0 +1,17 @@
+{
+  "name": "moltrace-desktop-shell",
+  "version": "0.0.1",
+  "private": true,
+  "description": "MolTrace desktop shell (Electron). Source-available under BUSL 1.1, like the rest of this repository.",
+  "main": "src/main.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "electron .",
+    "test": "node test/product-config.js && MOLTRACE_PRODUCT_CONFIG=$PWD/test/fixtures-product.json electron test/confinement-runner.js",
+    "test:product": "node test/product-config.js",
+    "test:confinement": "MOLTRACE_PRODUCT_CONFIG=$PWD/test/fixtures-product.json electron test/confinement-runner.js"
+  },
+  "dependencies": {
+    "electron": "43.4.1"
+  }
+}
