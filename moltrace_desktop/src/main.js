@@ -1,11 +1,12 @@
 'use strict'
 const path = require('node:path')
-const { app, session, ipcMain } = require('electron')
+const { app, session, ipcMain, safeStorage } = require('electron')
 const { createWindow } = require('./window-factory')
 const product = require('./product')
 const serviceCredential = require('./service-credential')
 const capabilities = require('./capabilities')
 const capabilityView = require('./capability-view')
+const keyHierarchy = require('./key-hierarchy')
 
 // Generated once per launch and held in this closure. It is NOT put on
 // app.state, not exported, and never crosses the contextBridge — a renderer that
@@ -79,6 +80,22 @@ app.whenReady().then(() => {
     console.error('MolTrace cannot start — ' + product.unconfiguredMessage(cfg.missing))
     return app.exit(78)
   }
+
+  // §8.2: assess the secret store BEFORE anything relies on it, and record what
+  // it actually provides. `isEncryptionAvailable()` alone is not the answer — on
+  // Linux it returns true while the backend is 'basic_text', which keeps its
+  // password in memory rather than in a keyring. Measured, not assumed.
+  const storeAssessment = keyHierarchy.assessStore({
+    available: safeStorage.isEncryptionAvailable(),
+    backend: typeof safeStorage.getSelectedStorageBackend === 'function'
+      ? safeStorage.getSelectedStorageBackend()
+      : 'n/a',
+    platform: process.platform,
+  })
+  // Stated, never implied. This line is what a customer's IT reviewer is entitled
+  // to see, and it says the same thing on every platform because none of the
+  // three binds the entry to the signed application.
+  console.log(`[key store] usable=${storeAssessment.usable} os-backed=${storeAssessment.osBacked} — ${storeAssessment.limitation}`)
 
   // §7.1: a fresh 256-bit credential every launch, over an inherited handle when
   // the service is spawned. Created here so its lifetime is exactly the app's.
