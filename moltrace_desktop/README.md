@@ -26,6 +26,18 @@ private key** (offline, air-gapped, never on a build runner), any deployment iss
 backend credential. The client **verifies** entitlement statements against a pinned public key; it
 never mints one.
 
+## Naming and marks
+
+BUSL 1.1 already withholds trademark rights — *"This License does not grant you any right in any
+trademark or logo of Licensor or its affiliates"* — so the licence side needs no addition. But a
+licence clause does not stop a rebuilt binary from *looking* official to whoever runs it.
+
+The control that works is the one VS Code uses: the checked-in default carries a **visibly
+unofficial name**, and the brand arrives only with the private overlay at package time. VS Code's
+public `product.json` names itself `Code - OSS`, not `Visual Studio Code`, for exactly this reason.
+Here the inert default is `MolTrace Desktop (unconfigured build)`, and a test rejects any attempt to
+put the official name on an unconfigured build.
+
 ## Running it
 
 ```bash

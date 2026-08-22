@@ -1,6 +1,6 @@
 {
-  "_comment": "INERT BY DESIGN. This checked-in default configures nothing. A build from public source cannot phone home, cannot reach a licensing authority, and refuses to start — see product.js. The shipping build overlays a private product.json at package time (the VS Code pattern). Do NOT add a fallback value to this file: a fallback makes an unconfigured build silently become a configured one.",
-  "productName": "MolTrace",
+  "_comment": "INERT BY DESIGN. This checked-in default configures nothing. A build from public source cannot phone home, cannot reach a licensing authority, and refuses to start \u2014 see product.js. It also does NOT carry the product name: an unconfigured build must not present itself as MolTrace, the same way VS Code's public product.json names itself 'Code - OSS' rather than 'Visual Studio Code'. The shipping build overlays a private product.json at package time. Do NOT add a value to this file: a value here makes an unconfigured build silently look like a configured, official one.",
+  "productName": "MolTrace Desktop (unconfigured build)",
   "workspaceUrl": null,
   "updateFeedUrl": null,
   "telemetryDsn": null,

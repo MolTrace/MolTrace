@@ -50,6 +50,14 @@ const ALLOWED_KEYS = [
   'entitlementRootKeyId',
 ]
 
+// The name a build presents to a user. BUSL 1.1 already withholds trademark
+// rights ("This License does not grant you any right in any trademark or logo of
+// Licensor"), so the licence side is covered — but a licence clause does not stop
+// a rebuilt binary from *looking* official to the person running it. The
+// protection that works is the same one VS Code uses: the public default carries
+// a visibly unofficial name, and the brand arrives only with the private overlay.
+const OFFICIAL_PRODUCT_NAME = 'MolTrace'
+
 // Keys without which the product cannot honestly operate. `telemetryDsn` is
 // deliberately NOT required — a build with no telemetry is a legitimate build.
 const REQUIRED_FOR_LAUNCH = ['workspaceUrl', 'entitlementRootPublicKey', 'entitlementRootKeyId']
@@ -65,6 +73,12 @@ function validate(cfg = raw) {
       problems.push(`product config carries private key material in ${k}`)
     }
   }
+  // An unconfigured build must not claim the brand.
+  const configuredNow = REQUIRED_FOR_LAUNCH.every((k) => cfg[k])
+  if (!configuredNow && cfg.productName === OFFICIAL_PRODUCT_NAME) {
+    problems.push('an unconfigured build carries the official product name — it would present itself as MolTrace')
+  }
+
   const missing = REQUIRED_FOR_LAUNCH.filter((k) => !cfg[k])
   return { problems, missing, configured: missing.length === 0 }
 }
@@ -79,4 +93,4 @@ function unconfiguredMessage(missing) {
   )
 }
 
-module.exports = { raw, baked, loadRaw, ALLOWED_KEYS, REQUIRED_FOR_LAUNCH, validate, unconfiguredMessage }
+module.exports = { raw, baked, loadRaw, OFFICIAL_PRODUCT_NAME, ALLOWED_KEYS, REQUIRED_FOR_LAUNCH, validate, unconfiguredMessage }
