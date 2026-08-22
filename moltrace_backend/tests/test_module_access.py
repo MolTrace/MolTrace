@@ -131,7 +131,7 @@ def test_a_spectracheck_only_deployment_refuses_the_other_products(
             assert res.status_code == 403, f"{path} -> {res.status_code} {res.text}"
             # The code survives sanitization, so the client can tell "not in this plan" from
             # "not allowed" and show the right thing.
-            assert res.json()["detail"] == ma.MODULE_NOT_LICENSED_DETAIL, res.text
+            assert res.json()["code"] == ma.MODULE_NOT_LICENSED_DETAIL, res.text
             assert res.headers.get(ma.MODULE_HEADER) in {
                 "regulatory_hub",
                 "reaction_optimization",
