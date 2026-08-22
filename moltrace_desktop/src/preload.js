@@ -40,14 +40,11 @@ try { ipcRenderer.send('moltrace:confinement-self-report', measureConfinement())
 // allowlist" §7.1 asks for, rather than a scatter of top-level globals.
 contextBridge.exposeInMainWorld('moltrace', {
   capabilities: {
-    read: async () => ({
-      shell: 'moltrace-desktop',
-      // Deliberately no version string yet: §7.1 requires the pinned Electron AND
-      // Chromium versions be stated in the release manifest and the IQ/OQ docs.
-      // Inventing one here would put an unpinned value on a qualification surface.
-      modules: null,
-      packs: null,
-      service: null,
-    }),
+    // The assembled readout, requested from the main process. The renderer gets
+    // the VERDICTS, never the inputs: a page that can see the entitlement or the
+    // service versions can reason about them, and §7.1's rule is that the desktop
+    // decides availability once, in one place, rather than each surface deciding
+    // for itself and disagreeing.
+    read: async () => ipcRenderer.invoke('moltrace:capability-readout'),
   },
 })

@@ -4,6 +4,7 @@ const { app, session, ipcMain } = require('electron')
 const { createWindow } = require('./window-factory')
 const product = require('./product')
 const serviceCredential = require('./service-credential')
+const capabilities = require('./capabilities')
 
 // Generated once per launch and held in this closure. It is NOT put on
 // app.state, not exported, and never crosses the contextBridge — a renderer that
@@ -18,6 +19,34 @@ ipcMain.on('moltrace:confinement-self-report', (e, report) => {
   confinementReports.set(e.sender.id, report)
 })
 module.exports = { confinementReports }
+
+// §7.1's declared capability set. Adding one here is the visible diff a reviewer
+// sees; a capability that is not declared is not reported, and the readout test
+// asserts nothing is silently omitted.
+const DECLARED_CAPABILITIES = [
+  {
+    key: 'fid.process',
+    displayName: 'Process a raw acquisition',
+    requiresModule: 'spectracheck',
+    requiresPack: 'rules-ich',
+    requiresService: 'fid',
+  },
+]
+
+ipcMain.handle('moltrace:capability-readout', () => {
+  // The world is assembled here from the four sources §7.1 names. Each is null
+  // until its subsystem exists, and null fails CLOSED — so today the honest
+  // answer is that nothing is available, and the readout says so with a cause
+  // rather than reporting an empty list.
+  const world = {
+    modules: null,      // from the deployment's module set
+    entitlement: null,  // from the signed entitlement statement
+    packs: null,        // from the local pack inventory
+    service: null,      // from the reachable local service
+    role: null,
+  }
+  return capabilities.readout(DECLARED_CAPABILITIES, world)
+})
 
 function applyCsp() {
   // Belt and braces with the page's meta CSP: a header the page cannot weaken.
