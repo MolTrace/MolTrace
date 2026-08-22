@@ -3421,9 +3421,17 @@ def system_active_versions_route(request: Request) -> SystemActiveVersions:
     the same answer and no owner scope applies. Clients must cache it against the API base URL
     and never against the signed-in user: a per-user cache would let one person's stale catalogue
     decide whether another person's result is current.
+
+    The catalogue is signed by this workspace's issuing key when it has one, so an installation
+    can keep verifying it offline. The certificate needed to check that signature is **not**
+    repeated here — an installation already holds it from its entitlement exchange, and
+    publishing the same public material on a second route widens the surface without answering
+    anything new.
     """
-    coordinates = active_versions.active_version_coordinates(_state(request).session_factory)
+    state = _state(request)
+    coordinates = active_versions.active_version_coordinates(state.session_factory)
     return SystemActiveVersions(
+        assertion_signature=active_versions.sign_version_assertion(state.settings, coordinates),
         versions=[
             ActiveVersionEntry(
                 kind=coordinate.kind,  # type: ignore[arg-type]

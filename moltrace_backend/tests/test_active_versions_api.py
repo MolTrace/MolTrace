@@ -156,15 +156,33 @@ def test_no_currency_state_ever_blocks_read_export_or_verify(client, state: str)
     Asserted structurally: no read path consults this module at all, so no currency state can
     reach one.
     """
+    import ast
+    import pathlib as _pathlib
+
     import nmrcheck.api as api_module
 
-    source = (
-        __import__("pathlib").Path(api_module.__file__).read_text()
-    )
-    # The catalogue is READ by its own route and nothing else; it gates nothing.
-    assert source.count("active_versions.") == 1, (
-        "active_versions is consulted somewhere other than its own route — if that is a gate, "
-        "a currency state can now block a read"
+    # Structural, not a count: the earlier version asserted "exactly one call site", which said
+    # nothing about WHERE and broke the moment this route legitimately made a second call. What
+    # actually matters is that no OTHER function consults the catalogue — a call anywhere else
+    # is a place a currency state could reach a read path.
+    tree = ast.parse(_pathlib.Path(api_module.__file__).read_text())
+    offenders: list[str] = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef):
+            continue
+        if node.name == "system_active_versions_route":
+            continue
+        for inner in ast.walk(node):
+            if (
+                isinstance(inner, ast.Attribute)
+                and isinstance(inner.value, ast.Name)
+                and inner.value.id == "active_versions"
+            ):
+                offenders.append(f"{node.name}:{inner.lineno}")
+    assert not offenders, (
+        "the version catalogue is consulted outside its own route "
+        f"({', '.join(offenders)}) — if any of those is a gate, a currency state can now block "
+        "reading, exporting or verifying existing records"
     )
     for path in ("/system/capabilities", "/system/version"):
         assert client.get(path, headers=_headers(client, f"{state}@example.com")).status_code in (200, 401)

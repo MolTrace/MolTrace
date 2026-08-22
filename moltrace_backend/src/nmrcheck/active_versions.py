@@ -20,12 +20,20 @@ turns into *unknown* and refuses on. Absence is never reported as agreement.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import Any
 
 from . import ai_engine_adapter
 from .version_currency import VersionCoordinate
 
-__all__ = ["METHOD_DEFAULTS_LINEAGE", "active_version_coordinates", "method_defaults_payload"]
+__all__ = [
+    "METHOD_DEFAULTS_LINEAGE",
+    "active_version_coordinates",
+    "assertion_payload",
+    "method_defaults_payload",
+    "sign_version_assertion",
+    "verify_version_assertion",
+]
 
 #: One lineage for the whole compiled-in constant set. There is no laboratory-supersedable
 #: method profile in this platform — the constants below are module-level literals in the
@@ -163,3 +171,94 @@ def active_version_coordinates(session_factory: Any) -> list[VersionCoordinate]:
         _method_defaults_coordinate(),
     ]
     return sorted(coordinates, key=lambda c: c.lineage)
+
+
+# --------------------------------------------------------------------------------------------
+# The signed assertion (§4)
+# --------------------------------------------------------------------------------------------
+#: The catalogue must be authenticated for an installation that is offline: an unsigned version
+#: list is forgeable by anything that can write to the local data plane, and the whole point is
+#: to refuse a stale REGULATED result.
+#:
+#: It is a SEPARATE document from the entitlement statement, signed by the same deployment
+#: sub-key and verified through the same certificate chain to the same pinned root. Separate
+#: because the two have opposite lifetimes: an entitlement statement is commercial state with a
+#: hard expiry, and rule packs ship on a content cadence. Binding versions into the statement
+#: would make every pack release either invalidate outstanding entitlements or force a reissue
+#: storm — and worse, it would let a content release expire something, which inverts the rule
+#: that expiry never blocks reading existing records.
+#:
+#: **Delivered on this route rather than with the entitlement exchange.** §4 leaves that open.
+#: Bundling it into the exchange would re-couple the two round trips even though the documents
+#: stayed separate, which gives back the independence the separation was for. A client already
+#: has to call this route to compare, so riding here costs no extra request.
+#:
+#: No commercial expiry, deliberately. Freshness is judged by comparing coordinates, never by a
+#: deadline — which is what keeps a content release from ever touching a licence.
+_ASSERTION_SCHEMA = "moltrace.deployment.version-assertion/1"
+
+
+def assertion_payload(coordinates: list[VersionCoordinate]) -> dict[str, Any]:
+    """The exact mapping that gets canonically serialized and signed.
+
+    Field order is irrelevant (the canonical serializer sorts), but coordinate order is not —
+    it comes from ``active_version_coordinates``, which sorts by lineage so the bytes are stable
+    for a given deployment state.
+    """
+
+    return {
+        "assertion_schema": _ASSERTION_SCHEMA,
+        "versions": [
+            {
+                "kind": coordinate.kind,
+                "lineage": coordinate.lineage,
+                "identity": coordinate.identity,
+                "revision": coordinate.revision,
+            }
+            for coordinate in coordinates
+        ],
+    }
+
+
+def sign_version_assertion(settings: Any, coordinates: list[VersionCoordinate]) -> str | None:
+    """Sign the catalogue with this deployment's issuing key, or ``None`` if it has none.
+
+    ``None`` rather than an error: a deployment that licenses no offline installations still
+    serves this route to its browser clients, and a missing signature is not a fault there. A
+    desktop that requires an authenticated catalogue treats the absence as *cannot establish
+    currency* and refuses, which is the correct answer for it and the wrong one for a browser.
+    """
+
+    from . import entitlement_statement as es
+
+    seed = getattr(settings, "entitlement_issuing_private_key", None)
+    if not seed:
+        return None
+    try:
+        return es.sign_payload(es.VERSION_ASSERTION_DOMAIN, assertion_payload(coordinates), seed)
+    except Exception:  # noqa: BLE001 - an unsigned catalogue is degraded, never a failed read
+        return None
+
+
+def verify_version_assertion(
+    *, payload: Mapping[str, Any], signature: str, issuing_public_key: str | None
+) -> bool:
+    """Verify an assertion against the deployment's issuing public key.
+
+    Offline by construction: everything needed is the stored payload, its signature and the
+    certificate the installation already holds. No nonce, no clock, no round trip — a nonce
+    could not work here, because the assertion has to keep verifying from local storage across
+    restarts with no server to ask.
+
+    The domain prefix is what stops an entitlement statement being presented here, or this being
+    presented as one. It is prepended at signing and again at verification, never stored.
+    """
+
+    from . import entitlement_statement as es
+
+    return es.verify_payload(
+        es.VERSION_ASSERTION_DOMAIN,
+        es.canonical_bytes(payload),
+        signature,
+        issuing_public_key,
+    )

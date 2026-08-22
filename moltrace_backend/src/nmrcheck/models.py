@@ -6311,6 +6311,14 @@ class SystemActiveVersions(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     versions: list[ActiveVersionEntry] = Field(default_factory=list)
+    assertion_signature: str | None = Field(
+        default=None,
+        description=(
+            "Signature over the canonical catalogue, by this workspace's issuing key. Null when "
+            "the workspace does not license offline installations. Verify against the "
+            "certificate you already hold; do not trust an unsigned catalogue offline."
+        ),
+    )
 
 
 ProductProgramStatus = Literal["active", "hidden", "deprecated"]
