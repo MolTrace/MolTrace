@@ -394,9 +394,16 @@ def test_an_administrator_can_revoke_a_device_they_do_not_own(app, client) -> No
 
 
 def test_an_administrator_gains_no_other_reach_over_someone_elses_device(app, client) -> None:
-    """The capability is scoped to the transition, not to the resource. Widening the visibility
-    predicate instead would have silently granted every admin read access to every user's
-    devices — a privacy expansion shipped inside a bug fix."""
+    """The capability is scoped to the transition, not to the resource.
+
+    Relaxing the write's visibility predicate instead would have handed an administrator every
+    WRITE on any installation — relabelling it, re-pointing whose it is, rewriting its metadata,
+    putting a withdrawn one back into service. It would have leaked no reads: that predicate
+    guards this one write and gates no read at all.
+
+    The listing assertion below holds for its own reason — that query scopes itself, and always
+    did — so it pins that nothing widened there rather than crediting this fix for it.
+    """
     _provision(app)
     owner = _signup(client, "reach-owner@example.com")
     device_id = _device(client, owner, "private bench")
@@ -422,6 +429,52 @@ def test_an_administrator_gains_no_other_reach_over_someone_elses_device(app, cl
     assert all(row["id"] != device_id for row in listed.json()), (
         "an admin's device listing now includes another user's devices — that query scopes "
         "itself, so something widened it"
+    )
+
+
+def test_an_administrator_cannot_smuggle_another_write_alongside_the_revocation(
+    app, client
+) -> None:
+    """The capability is the transition, not the field.
+
+    A patch that revokes AND does something else is not the transition the policy engine
+    permitted, so owner scope applies to the whole of it. The identity key is why this is not
+    pedantry: an offline licence binds to that key, so writing one onto an installation the
+    caller does not own hands them that installation's entitlement on hardware of their choosing.
+
+    The exact-set reading is what makes this safe. A membership reading ("status is among the
+    fields") admits the whole patch, and the neighbouring reach and stranger tests both stay
+    green under it — so nothing else in this file would have caught it.
+    """
+    _provision(app)
+    owner = _signup(client, "smuggle-owner@example.com")
+    device_id = _device(client, owner, "the owner's bench")
+    admin = _admin_headers(app, client)
+
+    smuggled = client.patch(
+        f"/mobile/device-sessions/{device_id}",
+        headers=admin,
+        json={"status": "revoked", "identity_public_key": OTHER_DEVICE_KEY},
+    )
+    assert smuggled.status_code == 404, (
+        "an administrator revoked AND wrote an identity key onto an installation they do not "
+        "own — that key is what an offline licence binds to, so this hands them the "
+        f"installation's entitlement: {smuggled.status_code} {smuggled.text[:200]}"
+    )
+
+    with app.state.session_factory() as session:
+        row = session.get(orm.MobileDeviceSessionORM, device_id)
+        assert row.identity_public_key is None, (
+            "an identity key was written by a caller who does not own the installation"
+        )
+        assert row.status == "active", "the smuggled patch also revoked"
+
+    # The bare transition, from the same caller, still works — the extra field is the guard.
+    assert (
+        client.patch(
+            f"/mobile/device-sessions/{device_id}", headers=admin, json={"status": "revoked"}
+        ).status_code
+        == 200
     )
 
 
