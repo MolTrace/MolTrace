@@ -14,6 +14,63 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.69.11 — Two clustered signals were reported to chemists as a doublet with an impossible J (2026-08-22)
+
+`multiplicity_from_lines` reports a first-order label only when every adjacent-line
+spacing falls inside a plausible J window. That window's upper edge was **60.0 Hz**,
+which is not a statement about 1H-1H coupling — no proton-proton scalar coupling comes
+close. So when the peak detector clustered two unrelated signals together, the pair was
+handed back as a **doublet** carrying a J that cannot exist.
+
+It shipped on two of the nineteen golden fixtures, in both guidance configurations:
+
+* **40256149 (piperine) peak 9 @ 1.773 ppm** — `d`, J = 45.6 Hz. Two methylene
+  multiplets inside the piperidine envelope.
+* **60000023 (cocaine) peak 2 @ 3.578 ppm** — `d`, J = 43.5 Hz. Two overlapping
+  bicyclic-ring signals.
+
+Neither compound contains fluorine or phosphorus, so there is no heteronuclear route to
+a splitting that large either. Both now read `m`, which is what they are.
+
+**The edge was measured, not guessed.** Dumping every adjacent-line spacing the
+deconvolution produces across the whole corpus — 773 spacings from 126 multiplets —
+splits into two regimes with **nothing between them**: spacings actually reported as a
+coupling top out at 18.06 Hz (a geminal 2J), and the next-largest values are the 43.52
+and 45.62 Hz pairs above. The midpoint of that empty interval is 30.79 Hz, and the
+independently tuned 1H multiplet window in `moltrace.spectroscopy.peaks.gsd` answers the
+same physical question against the same corpus at 30.0. The new edge is **30.0 Hz**, so
+those two constants now agree instead of differing by a factor of two.
+
+Any edge in [19, 43] Hz classifies all 177 golden peaks identically, and that is the
+point rather than a caveat: a threshold on a fitted quantity belongs where the density is
+zero. The old 60.0 sat past both spurious pairs; a threshold with data sitting near it
+makes a discrete label a function of the last bits of the input. The prompting case was
+40256149 peak 9, whose two-line separation moves across 44.37 / 45.62 / 58.29 / 58.80 Hz
+under a relative 1e-12 nudge of the region trace — closing to 1.71 Hz of the old edge.
+It is now 14 Hz clear of the new one across that entire range, so the label no longer
+turns on where inside its own spread the fit lands. It needed no boundary-register entry,
+and the register stays at four.
+
+**A second, latent defect surfaced while narrowing the window.** The `dd` hypothesis in
+`moltrace.spectroscopy.multiplet.analysis` tested `outer_sep` and `inner_sep` against the
+same window — but those are `J1 + J2` and `J1 - J2`, not couplings. An ordinary dd of
+13.7 and 11.4 Hz spans 25.1 Hz outer, wider than any single 1H-1H coupling. Testing a sum
+against a coupling ceiling was invisible only while the ceiling was loose enough to admit
+sums; it rejects real dd patterns the moment the ceiling means what it says. The bound now
+applies to `j1` and `j2` themselves.
+
+Guards: `tests/test_gsd.py::TestTheCouplingWindowIsAChemicalBound` pins the two regimes in
+terms of chemistry — real couplings from 0.9 to 18.06 Hz stay doublets, the two measured
+spurious separations do not — and deliberately asserts nothing about the empty gap, since
+the corpus says nothing about it. `tests/test_fid_pipeline_invariants.py` gains a
+corpus-level backstop at 35 Hz, stated independently of the constant it protects, so a
+future widening fails a test that never referenced it.
+
+Goldens re-baselined: four labels `d` -> `m`, across the four files above. Every other
+label, and every shift and integration in all nineteen fixtures, is unchanged.
+
+---
+
 ## v0.69.10 — Every regulated result in production recorded its code revision as "unknown" (2026-08-21)
 
 `RegistryEntry.code_sha` answers the question an auditor asks first: which code produced
