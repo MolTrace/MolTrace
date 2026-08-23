@@ -2,6 +2,8 @@
 
 import random
 
+import pytest
+
 from nmrcheck.gsd import deconvolve_region, multiplicity_from_lines
 
 
@@ -198,3 +200,98 @@ class TestFitConvergesToThePrecisionThatIsRead:
         for _centre, height, hwhm, area in lines:
             assert height > 0.0 and hwhm > 0.0
             assert area > 0.0, "an analytic pseudo-Voigt area cannot be non-positive"
+
+
+class TestTheCouplingWindowIsAChemicalBound:
+    """``_MAX_J_HZ`` is a statement about chemistry, so it is tested as one.
+
+    ``multiplicity_from_lines`` reports a first-order label only when every
+    adjacent-line spacing falls inside the plausible J window. The upper edge is
+    therefore an assertion that a spacing that large CAN be a 1H-1H scalar
+    coupling — and when it is set too high, two unrelated signals that the peak
+    detector happened to cluster together are handed to a chemist as a doublet
+    with an impossible J.
+
+    These tests pin the CHEMISTRY, not the constant. They assert that real
+    couplings up to the geminal / trans-vinyl ceiling survive, and that the two
+    separations measured in the fixture corpus which cannot be couplings are
+    rejected. They deliberately say nothing about the interval between those two
+    regimes: the corpus has no data there (see the class docstring below), so
+    pinning a value inside it would be inventing a bound rather than measuring
+    one. Any ``_MAX_J_HZ`` in that empty interval passes.
+    """
+
+    MHZ = 399.953799784  # the nmrshiftdb2 40256149 spectrometer frequency
+
+    def _pair(self, separation_hz: float) -> tuple[str, tuple[float, ...]]:
+        """Label a two-line set separated by ``separation_hz``."""
+        return multiplicity_from_lines(
+            [2.0, 2.0 + separation_hz / self.MHZ], frequency_mhz=self.MHZ
+        )
+
+    @pytest.mark.parametrize(
+        ("j_hz", "what"),
+        [
+            (0.9, "long-range 4J, at the resolution limit"),
+            (2.5, "meta aromatic 4J"),
+            (7.2, "vicinal 3J, the most common coupling in a 1H spectrum"),
+            (8.5, "ortho aromatic 3J"),
+            (12.4, "geminal 2J in an sp3 methylene"),
+            (16.8, "trans-vinyl 3J"),
+            (18.06, "the largest genuine coupling in the fixture corpus"),
+        ],
+    )
+    def test_a_real_coupling_is_still_read_as_a_doublet(
+        self, j_hz: float, what: str
+    ) -> None:
+        multiplicity, j_values = self._pair(j_hz)
+        assert multiplicity == "d", (
+            f"{j_hz} Hz ({what}) must read as a doublet, got {multiplicity!r} — "
+            "the coupling window has been narrowed past real chemistry."
+        )
+        assert j_values and abs(j_values[0] - j_hz) <= 0.1
+
+    @pytest.mark.parametrize(
+        ("separation_hz", "source"),
+        [
+            (
+                43.52,
+                "60000023 (cocaine) peak 2 at 3.578 ppm — two overlapping "
+                "bicyclic-ring signals, not one doublet",
+            ),
+            (
+                45.62,
+                "40256149 (piperine) peak 9 at 1.773 ppm — two methylene "
+                "multiplets inside the piperidine envelope",
+            ),
+        ],
+    )
+    def test_a_separation_no_1h_coupling_can_produce_is_not_a_doublet(
+        self, separation_hz: float, source: str
+    ) -> None:
+        # Neither compound contains fluorine or phosphorus, so there is no
+        # heteronuclear route to a splitting this large either. The honest label
+        # for two clustered signals is the generic multiplet.
+        multiplicity, _j = self._pair(separation_hz)
+        assert multiplicity == "m", (
+            f"{separation_hz} Hz was reported as {multiplicity!r}. No 1H-1H "
+            f"scalar coupling reaches that value. Source: {source}."
+        )
+
+    def test_the_piperine_label_holds_across_the_whole_range_the_fit_explores(
+        self,
+    ) -> None:
+        """The label must not turn on where inside its own spread the fit lands.
+
+        40256149 peak 9 is one strong line and one weak line at 1.96x the
+        inclusion cut, whose fitted centre the data does not constrain. Nudging
+        the region trace by a relative 1e-12 — seven orders below one ADC count —
+        moves their separation across 44.37 / 45.62 / 58.29 / 58.80 Hz. A
+        classifier boundary anywhere in that range makes the reported
+        multiplicity a function of the last bits of the input.
+        """
+        labels = {sep: self._pair(sep)[0] for sep in (44.37, 45.62, 58.29, 58.80)}
+        assert set(labels.values()) == {"m"}, (
+            "the label changes across the range this peak's fit explores: "
+            f"{labels}. The band edge sits inside the fit's own spread."
+        )
