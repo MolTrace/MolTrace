@@ -131,6 +131,51 @@ def test_a_refused_request_still_writes_a_journal_entry(client: TestClient) -> N
     assert JOURNAL[0].payload["refused"] is True
 
 
+def test_an_unauthenticated_caller_cannot_grow_the_journal_without_bound(client: TestClient) -> None:
+    """Measured before the cap: 200 unauthenticated requests produced 200 entries.
+
+    Two harms and the second is worse — unbounded growth, and DILUTION: a genuine
+    refusal worth investigating buried under thousands of manufactured ones.
+    """
+    from nmrcheck.local_service_app import JOURNAL, REFUSAL_ENTRY_CAP
+
+    JOURNAL.clear()
+    for _ in range(REFUSAL_ENTRY_CAP * 5):
+        client.get("/health")
+    assert len(JOURNAL) == REFUSAL_ENTRY_CAP, (
+        f"{REFUSAL_ENTRY_CAP * 5} unauthenticated requests produced {len(JOURNAL)} entries"
+    )
+
+
+def test_the_cap_is_RECORDED_not_silent(client: TestClient) -> None:
+    """Dropping entries silently would leave a journal that looks complete."""
+    from nmrcheck.local_service_app import JOURNAL, REFUSAL_ENTRY_CAP
+
+    JOURNAL.clear()
+    for _ in range(REFUSAL_ENTRY_CAP * 2):
+        client.get("/health")
+    assert JOURNAL[-1].payload["operation"] == "journal.refusals-capped"
+    assert "not being written" in JOURNAL[-1].payload["cause"]
+
+
+def test_capping_refusals_never_suppresses_a_SUCCESS(client: TestClient) -> None:
+    """Successes require the credential, so their volume is not attacker-controlled.
+
+    A cap that silenced them would let an attacker erase the record of real work
+    by flooding refusals first — turning a denial-of-service into an evidence
+    problem, which is the worse of the two.
+    """
+    from nmrcheck.local_service_app import JOURNAL, REFUSAL_ENTRY_CAP
+
+    JOURNAL.clear()
+    for _ in range(REFUSAL_ENTRY_CAP * 3):
+        client.get("/health")
+    for _ in range(5):
+        client.get("/health", headers=auth())
+    successes = [e for e in JOURNAL if not e.payload["refused"]]
+    assert len(successes) == 5, "authenticated work was suppressed by a refusal flood"
+
+
 def test_the_journal_never_records_the_credential(client: TestClient) -> None:
     from nmrcheck.local_service_app import JOURNAL
 

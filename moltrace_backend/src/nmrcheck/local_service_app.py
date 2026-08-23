@@ -39,6 +39,19 @@ SERVED_OPERATIONS: tuple[str, ...] = ("system.health",)
 #: chain logic does not change when it does.
 JOURNAL: list[JournalEntry] = []
 
+#: How many REFUSAL entries an unauthenticated caller may add before the journal
+#: stops accepting more from that path.
+#:
+#: Measured: 200 unauthenticated requests produced 200 journal entries, so a local
+#: process with no credential controlled the journal's size. Two harms, and the
+#: second is worse: it grows without bound, and it DILUTES — a genuine refusal
+#: worth investigating is buried under thousands of manufactured ones.
+#:
+#: Successes are never suppressed: they require the credential, so their volume is
+#: not attacker-controlled. Only refusals are capped, and the cap is recorded once
+#: rather than silently discarding.
+REFUSAL_ENTRY_CAP = 64
+
 #: Test observability: which handlers actually ran. A refused request must leave
 #: this empty, and asserting on it is how "never reaches the handler" is checked
 #: rather than assumed.
@@ -61,6 +74,29 @@ def _clock() -> ClockState:
 def _journal(operation: str, *, refused: bool, cause: str | None = None) -> None:
     # `cause` is the guard's own message, which never contains the credential --
     # desktop_transport is tested for that. Nothing from the request is copied in.
+    if refused:
+        refusals = sum(1 for e in JOURNAL if e.payload.get("refused"))
+        if refusals >= REFUSAL_ENTRY_CAP:
+            # Already capped, and the cap entry is already written. Dropped
+            # silently HERE but not silently overall: the entry written at the
+            # boundary said it was happening and how many were kept.
+            return
+        if refusals == REFUSAL_ENTRY_CAP - 1:
+            JOURNAL.append(
+                append(
+                    JOURNAL,
+                    payload={
+                        "operation": "journal.refusals-capped",
+                        "refused": True,
+                        "cause": (
+                            f"{REFUSAL_ENTRY_CAP} refusals recorded; further refusals are not being "
+                            f"written, so an unauthenticated caller cannot dilute this journal"
+                        ),
+                    },
+                    clock=_clock(),
+                )
+            )
+            return
     JOURNAL.append(
         append(
             JOURNAL,
