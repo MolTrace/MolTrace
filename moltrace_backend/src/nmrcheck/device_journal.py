@@ -51,6 +51,12 @@ class ClockState:
 
 @dataclass(frozen=True)
 class JournalEntry:
+    # Position in the chain. NOT a tamper control -- the prev_hash chain already
+    # catches reordering and middle-deletion, and weakening probes confirmed the
+    # sequence check is masked by it in both cases. It is a RECONCILIATION
+    # COORDINATE: it gives the server something to name when it says "I have seen
+    # up to here", which is the only place end-truncation is detectable at all.
+    sequence: int
     occurred_at: datetime           # the device's clock. NOT a record time.
     observed_at: datetime | None    # the server's clock, at reconciliation.
     time_source: str
@@ -76,7 +82,7 @@ class JournalEntry:
 
 
 def _hashed_body(
-    *, occurred_at, time_source, clock_synchronized, offset_seconds,
+    *, sequence, occurred_at, time_source, clock_synchronized, offset_seconds,
     last_sync_age_seconds, clock_went_backwards, payload, prev_hash,
 ) -> dict:
     """Exactly what the entry hash covers. ONE definition.
@@ -88,6 +94,7 @@ def _hashed_body(
     hash input is the same defect as two canonicalizers, one level down.
     """
     return {
+        "sequence": sequence,
         "occurred_at": occurred_at.isoformat(),
         "time_source": time_source,
         "clock_synchronized": clock_synchronized,
@@ -110,9 +117,11 @@ def append(chain: list[JournalEntry], *, payload: dict, clock: ClockState) -> Jo
     """Build the next entry. Pure — storage is the caller's problem."""
     prev = chain[-1] if chain else None
     prev_hash = prev.entry_hash if prev else GENESIS
+    sequence = (prev.sequence + 1) if prev else 0
     went_backwards = bool(prev and clock.device_now < prev.occurred_at)
 
     body = _hashed_body(
+        sequence=sequence,
         occurred_at=clock.device_now,
         time_source=clock.source,
         clock_synchronized=clock.synchronized,
@@ -123,6 +132,7 @@ def append(chain: list[JournalEntry], *, payload: dict, clock: ClockState) -> Jo
         prev_hash=prev_hash,
     )
     return JournalEntry(
+        sequence=sequence,
         occurred_at=clock.device_now,
         observed_at=None,
         time_source=clock.source,
@@ -136,13 +146,43 @@ def append(chain: list[JournalEntry], *, payload: dict, clock: ClockState) -> Jo
     )
 
 
-def verify_chain(chain: list[JournalEntry]) -> None:
-    """Raise if the chain has been edited, truncated in the middle, or reordered."""
+def verify_chain(chain: list[JournalEntry], *, expect_at_least: int | None = None) -> None:
+    """Raise if the chain has been edited, reordered, or cut anywhere but the end.
+
+    **Truncation at the END cannot be detected from the chain alone, and no
+    arrangement of local data changes that.** A chain of entries 0..k is
+    indistinguishable from a chain of 0..k+5 with the last five deleted — the
+    remaining entries are internally consistent, because they were. An attacker
+    who can edit the local store deletes the entries recording their own most
+    recent activity and everything still verifies.
+
+    Reordering and deletion in the middle were ALREADY caught, by the hash link
+    alone — a weakening probe confirmed the sequence check is masked by it in both
+    cases and adds no detection. The sequence is kept for the message it produces
+    and for reconciliation, not as a second control, and this docstring says so
+    rather than letting a redundant field read as defence in depth.
+
+    ``expect_at_least`` is where end-truncation is actually caught, and it comes
+    from OUTSIDE this device: the server holds the last sequence it reconciled,
+    so at the next reconciliation a chain shorter than that is missing entries the
+    server has already seen. Locally it is undetectable, and a local high-water
+    mark would not help — see the entitlement work for the same conclusion: a key
+    that verifies on hardware the attacker controls is a key that forges.
+    """
     expected_prev = GENESIS
     for i, e in enumerate(chain):
+        # Redundant against the hash link below for every case tested, and kept
+        # anyway: it makes a corrupted store fail with a message that says WHICH
+        # entry is out of place, where the hash link only says the chain broke.
+        # Recorded as redundancy rather than presented as a second control.
+        if e.sequence != i:
+            raise ValueError(
+                f"journal entry {i} carries sequence {e.sequence}; entries are missing or reordered"
+            )
         if e.prev_hash != expected_prev:
             raise ValueError(f"journal entry {i} does not follow the previous entry")
         body = _hashed_body(
+            sequence=e.sequence,
             occurred_at=e.occurred_at,
             time_source=e.time_source,
             clock_synchronized=e.clock_synchronized,
@@ -155,6 +195,12 @@ def verify_chain(chain: list[JournalEntry]) -> None:
         if _hash_entry(body) != e.entry_hash:
             raise ValueError(f"journal entry {i} has been altered since it was written")
         expected_prev = e.entry_hash
+
+    if expect_at_least is not None and len(chain) < expect_at_least:
+        raise ValueError(
+            f"the journal holds {len(chain)} entries but the server has already "
+            f"reconciled {expect_at_least}; entries have been removed from the end"
+        )
 
 
 def authoritative_record_time(entry: JournalEntry) -> datetime | None:
