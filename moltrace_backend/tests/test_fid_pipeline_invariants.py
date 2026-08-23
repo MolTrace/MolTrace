@@ -149,6 +149,29 @@ def _case_id(case: dict[str, Any]) -> str:
     return f"{case['spectrum_id']}_{case['nucleus'].lower()}_{case['config']}"
 
 
+# No 1H-1H scalar coupling reaches this. The window the classifier actually
+# applies (nmrcheck.gsd._MAX_J_HZ, 30.0) is tighter and carries its own corpus
+# measurement; this is the looser backstop, stated independently here -- above
+# that window, below the smallest spurious separation the corpus contains
+# (43.52 Hz) -- so a future widening has to fail a test that never referenced
+# the constant it widened. A J above this means two unrelated signals were
+# clustered and reported as one first-order multiplet, which is what shipped
+# while the window sat at 60 Hz.
+IMPOSSIBLE_J_HZ = 35.0
+
+
+def _assert_reported_couplings_are_physical(case_id: str, report: Any) -> None:
+    """No peak may report a J that no proton-proton coupling can produce."""
+    for index, peak in enumerate(report.inferred_peaks):
+        for j_hz in peak.j_values_hz or ():
+            assert float(j_hz) <= IMPOSSIBLE_J_HZ, (
+                f"{case_id} peak {index} at {peak.shift_ppm:.3f} ppm reports "
+                f"J = {float(j_hz):.2f} Hz as a {peak.multiplicity!r}. No 1H-1H "
+                "coupling is that large, so those lines are separate signals "
+                "that were clustered together, not one multiplet."
+            )
+
+
 def _run_pipeline(case: dict[str, Any]) -> dict[str, Any]:
     from nmrcheck.fid import process_bruker_1d_zip
 
@@ -169,6 +192,7 @@ def _run_pipeline(case: dict[str, Any]) -> dict[str, Any]:
         expected_total_h=expected_total_h,
         expected_non_labile_h=expected_non_labile_h,
     )
+    _assert_reported_couplings_are_physical(_case_id(case), report)
     metadata = report.metadata or {}
     phase = metadata.get("phase") or {}
     baseline = metadata.get("baseline") or {}
