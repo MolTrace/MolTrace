@@ -83,14 +83,18 @@ class DesktopTransportGuard:
         if self.bound_host is not None:
             expected = {f"{self.bound_host}:{self.bound_port}", self.bound_host}
             if headers.get("host", "") not in expected:
-                raise TransportRefusal("refused: the request was addressed to another name")
+                raise TransportRefusal(
+                    "refused: the request was addressed to another name"
+                )
 
         # Credential position. Checked before the value, so a credential in the
         # wrong place is refused even when it is the RIGHT credential — otherwise
         # the position rule is advisory.
         for name in _FORBIDDEN_CREDENTIAL_HEADERS:
             if name in headers:
-                raise TransportRefusal(f"refused: a credential may not be presented in the {name} header")
+                raise TransportRefusal(
+                    f"refused: a credential may not be presented in the {name} header"
+                )
         query = scope.get("query_string", b"") or b""
         for key in _FORBIDDEN_QUERY_KEYS:
             if key + b"=" in b"&" + query:
