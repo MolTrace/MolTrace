@@ -23,6 +23,12 @@ function createWindow(opts = {}) {
   const win = new BrowserWindow({
     width: 1280,
     height: 860,
+    // Created hidden and shown on 'ready-to-show', which is Electron's own
+    // guidance: showing before the first paint gives a white flash. The window
+    // MUST still be shown -- an earlier version set this and never called
+    // show(), so a configured build launched and displayed nothing. The
+    // confinement test could not see it, because a webContents exists whether or
+    // not anyone can look at it.
     show: false,
     ...opts,
     webPreferences: {
@@ -34,6 +40,8 @@ function createWindow(opts = {}) {
   // §7.1: "Remote origins receive no native capability by default." A window that
   // is never allowed to navigate away cannot become a remote page holding local
   // authority, which is the hazard contextIsolation exists to bound.
+  win.once('ready-to-show', () => win.show())
+
   win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
   win.webContents.on('will-navigate', (e) => e.preventDefault())
 

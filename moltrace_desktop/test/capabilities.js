@@ -51,6 +51,28 @@ check('available:true is never returned with an unmet gate', () => {
   }
 })
 
+check('the ENTITLEMENT statement\'s own module list is enforced', () => {
+  // This branch had no test at all. Every world in this file drove the
+  // entitlement gate through `valid: false` or absence, both of which the
+  // EARLIER check refuses — so the statement's own module list was never
+  // exercised, and deleting it left the whole suite green. The masking shape.
+  const withModules = (modules) => ({ ...OK, entitlement: { valid: true, modules } })
+  assert.strictEqual(caps.assess(CAP, withModules(['spectracheck'])).available, true)
+  assert.strictEqual(caps.assess(CAP, withModules(['repho'])).available, false,
+    'a statement covering a different product granted this one')
+})
+
+check('an entitlement with NO module list grants nothing', () => {
+  // The worse half, and it is a fail-OPEN: `Array.isArray(...) &&` made the
+  // check skip itself when the list was absent or malformed, so a truncated or
+  // older-schema signed statement granted every module.
+  for (const ent of [{ valid: true }, { valid: true, modules: 'not-an-array' }, { valid: true, modules: null }]) {
+    const r = caps.assess(CAP, { ...OK, entitlement: ent })
+    assert.strictEqual(r.available, false,
+      `an entitlement with modules=${JSON.stringify(ent.modules)} granted the capability`)
+  }
+})
+
 check('an ABSENT input fails closed rather than assuming yes', () => {
   for (const k of ['modules', 'entitlement', 'packs', 'service', 'role']) {
     const world = { ...OK }

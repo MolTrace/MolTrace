@@ -113,6 +113,30 @@ def test_the_credential_shape_is_still_caught_in_a_path() -> None:
         guard().check(scope(path=f"/health/{CRED}"))
 
 
+@pytest.mark.parametrize(
+    "raw",
+    [
+        bytes([0xFF, 0xFE]) + b"a" * 41,   # non-ASCII bytes
+        "é".encode() + b"a" * 41,          # valid UTF-8, still non-ASCII
+        b"",                               # empty
+        b"a" * 5000,                       # absurdly long
+    ],
+    ids=["non-ascii", "utf8", "empty", "long"],
+)
+def test_a_hostile_credential_header_is_REFUSED_not_raised(raw: bytes) -> None:
+    """The guard must refuse, never raise.
+
+    hmac.compare_digest raises TypeError on str arguments containing non-ASCII,
+    and headers were decoded latin-1 before comparison — so a single 0xFF byte
+    made the guard raise instead of refuse. The middleware does not catch it, so
+    the request became a 500 with no journal entry: an unauthenticated caller
+    could reach an error path and leave no trace. The comparison is now on bytes.
+    """
+    s = scope(hdrs=[(CREDENTIAL_HEADER.encode(), raw)])
+    with pytest.raises(TransportRefusal):
+        guard().check(s)
+
+
 def test_comparison_is_constant_time() -> None:
     """§7.1: "comparing it in constant time before any request body is read"."""
     import inspect
@@ -122,6 +146,9 @@ def test_comparison_is_constant_time() -> None:
     src = inspect.getsource(desktop_transport)
     assert "compare_digest" in src, "the credential is not compared in constant time"
     assert "== self.credential" not in src, "a short-circuiting comparison leaks the credential"
+    # And on BYTES. compare_digest on str raises for non-ASCII, which turns the
+    # last gate into an unhandled exception rather than a refusal.
+    assert "encode(" in src, "the credential is compared as text, which raises on non-ASCII"
 
 
 # --- the rebinding refusals -------------------------------------------------

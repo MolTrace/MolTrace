@@ -83,9 +83,14 @@ class DesktopTransportGuard:
 
     def check(self, scope: dict) -> None:
         """Admit the request, or raise. Called before the body is read."""
+        # Two views of the same headers. The decoded map is for the checks that
+        # reason about text; the raw map is for the credential, which must never
+        # be decoded before comparison — see below.
+        raw_pairs = scope.get("headers", [])
+        raw_headers = {k.lower(): v for k, v in raw_pairs}
         headers = {
             k.decode("latin-1").lower(): v.decode("latin-1")
-            for k, v in scope.get("headers", [])
+            for k, v in raw_pairs
         }
 
         # Rebinding refusals first: they are cheap, and a request carrying an
@@ -117,12 +122,21 @@ class DesktopTransportGuard:
         if _looks_like_a_credential_segment(scope.get("path", "")):
             raise TransportRefusal("refused: a credential may not be presented in the address")
 
-        presented = headers.get(CREDENTIAL_HEADER)
-        if presented is None:
+        # Compared as BYTES, from the raw header rather than the decoded map.
+        #
+        # hmac.compare_digest raises TypeError on str arguments containing
+        # non-ASCII — and headers are decoded latin-1, so any byte above 0x7f
+        # becomes exactly such a character. A single 0xFF byte in this header
+        # therefore made the guard raise instead of refuse, the middleware did not
+        # catch it, and the request became a 500 with no journal entry. The
+        # position and rebinding checks above had already passed; this was the
+        # last gate, and it failed open into an error path.
+        presented_raw = raw_headers.get(CREDENTIAL_HEADER.encode("ascii"))
+        if presented_raw is None:
             raise TransportRefusal("refused: no local-service credential was presented")
         # Constant time. A short-circuiting comparison leaks the credential a byte
         # at a time to anything that can time a loopback request.
-        if not hmac.compare_digest(presented, self.credential):
+        if not hmac.compare_digest(presented_raw, self.credential.encode("utf-8")):
             raise TransportRefusal("refused: the local-service credential did not match")
 
 
