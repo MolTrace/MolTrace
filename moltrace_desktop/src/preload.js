@@ -47,4 +47,12 @@ contextBridge.exposeInMainWorld('moltrace', {
     // for itself and disagreeing.
     read: async () => ipcRenderer.invoke('moltrace:capability-readout'),
   },
+  service: {
+    read: async () => ipcRenderer.invoke('moltrace:service-report'),
+  },
+  // A callback, not an event emitter: the renderer is told THAT something
+  // changed and asks again, so nothing crosses the bridge except the invitation.
+  onChanged: (fn) => {
+    ipcRenderer.on('moltrace:readout-changed', () => fn())
+  },
 })
