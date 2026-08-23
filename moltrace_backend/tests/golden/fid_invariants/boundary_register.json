@@ -98,13 +98,21 @@
       },
       "reason": "One dominant line in a wide region - 33 seed maxima across 0.469 ppm (188 Hz) over a single 2.8e7-count peak. macOS fits it with one narrow line and reads 's'; Linux resolves a broad shoulder beside it and reads 'd'. The fit does not settle that shoulder: where it appears, its separation from the main line is close to the distance at which two lines are collapsed into one, and the main line's own fitted amplitude varies by 1.8x between runs differing only in the last bits of the input.",
       "evidence": {
-        "measurement": "Region 3.43406-3.90280 ppm, 2301 points, 33 seed maxima. The region height is 2.82e7 counts against a measured noise sigma of only 1.43e3, so the noise floor max(sigma, 0.005 x height) resolves to the height term at 1.41e5 and the 3x inclusion cut sits at 4.24e5 - 1.500% of the tallest line, 99x above the actual noise. macOS keeps exactly one line, amplitude 1.51e7 at 3.879382 ppm (hwhm 0.00067), and the accepted fit still misses the region by 1.69x the 5-sigma acceptance tolerance. Perturbing the trace by a relative 1e-12 in either sign direction yields two lines and 'd': a broad shoulder at 3.8772-3.8775 ppm (hwhm 0.0028, 4.2x wider) carrying 2.70-3.10x the inclusion cut - a real line by amplitude - separated from the main line by only 1.36-1.40x the merge distance, while the main line itself refits anywhere between 1.60e7 and 2.71e7. Corroborated on macOS alone by the committed goldens: the structure-guided run of this spectrum settles on a different detection sensitivity (0.12 against 0.06), fits this multiplet from a different cluster, and labels it (40256175_1h_guided peak 5, 3.878 ppm) 'd'. Two legitimate detections of one multiplet, on one platform, already disagree on the label.",
+        "measurement": "Region 3.43406-3.90280 ppm, 2301 points, 33 seed maxima. The region height is 2.82e7 counts against a measured noise sigma of only 1.43e3, so the noise floor max(sigma, 0.005 x height) resolves to the height term at 1.41e5 and the 3x inclusion cut sits at 4.24e5 - 1.500% of the tallest line, 99x above the actual noise. macOS keeps exactly one line, amplitude 1.51e7 at 3.879382 ppm (hwhm 0.00067), and the accepted fit still misses the region by 1.69x the 5-sigma acceptance tolerance. Perturbing the trace by a relative 1e-12 in either sign direction yields two lines and 'd': a broad shoulder at 3.8772-3.8775 ppm (hwhm 0.0028, 4.2x wider) carrying 2.70-3.10x the inclusion cut - a real line by amplitude - separated from the main line by only 1.36-1.40x the merge distance, while the main line itself refits anywhere between 1.60e7 and 2.71e7. Corroborated on macOS alone by the committed goldens: the structure-guided run of this spectrum settles on a different detection sensitivity (0.12 against 0.06), fits this multiplet from a different cluster, and labels it (40256175_1h_guided peak 5, 3.878 ppm) 'd'. Two legitimate detections of one multiplet, on one platform, already disagree on the label. THRESHOLD AUDIT (added 2026-08-22): the constant that actually decides this peak is the merge distance min_hwhm * 3.0, not the inclusion cut. It was checked the way a threshold should be — against the measured distribution. Across 1317 adjacent line gaps from 318 regions in all 19 fixtures the gaps split with an empty interval at 2.746 to 3.189 times min_hwhm, and 3.0 sits 57% across it, so ANY threshold in that range classifies all 1317 gaps identically. The label here is therefore not an artifact of where the constant sits; it is where the fit puts the line, which is what this register documents. This peak's deciding gap is 2.690 (0.897x the threshold), the 4th closest to it in the corpus. TWO LIMITS ON THAT AUDIT: the void is a factor of 1.16 wide against the 2.4 of the J-window audit that moved _MAX_J_HZ, so 3.0 is defensible rather than comfortable; and the void is defined by these 19 fixtures, so it establishes 3.0 as safe for this corpus, not generally. Unresolved and tracked separately: min_hwhm = max(step*0.75, span*1e-3) is set by the region SPAN in 91 of 318 regions, so the merge distance scales with region width rather than line width — a semantics question this audit does not answer.",
         "flip_perturbation_relative": 1e-12,
         "resolved_line_count": {
           "s": 1,
           "d": 2
         },
-        "fit_residual_over_acceptance_tolerance": 1.69
+        "fit_residual_over_acceptance_tolerance": 1.69,
+        "merge_threshold_void": {
+          "lo": 2.746,
+          "hi": 3.189,
+          "constant": 3.0,
+          "this_peak_gap": 2.69,
+          "gaps_measured": 1317,
+          "regions": 318
+        }
       },
       "added": "2026-08-21",
       "added_by": "sirmcdoe"
