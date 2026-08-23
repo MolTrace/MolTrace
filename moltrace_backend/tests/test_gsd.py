@@ -295,3 +295,89 @@ class TestTheCouplingWindowIsAChemicalBound:
             "the label changes across the range this peak's fit explores: "
             f"{labels}. The band edge sits inside the fit's own spread."
         )
+
+
+class TestLinesTooCloseToBeCouplingPartnersAreOneLine:
+    """Two lines closer than the smallest possible coupling are one line.
+
+    ``_MIN_J_HZ`` states that no resolvable 1H-1H scalar coupling is smaller than
+    0.5 Hz. Read as a lower bound on a SPACING that is a rejection rule -- a
+    multiplet containing one is not first-order, so it is reported "m". Read as
+    what it actually says about the two lines either side of that spacing, it is
+    a statement of identity: they are too close to be coupling partners, so for
+    the purpose of reading a coupling pattern they contribute one line, not two.
+
+    Measured across the 19 nmrshiftdb2 raw-FID fixtures: 18 of 126 deconvolved
+    multiplets (14%) were reported "m" solely because at least one adjacent
+    spacing fell below 0.5 Hz. Those gaps run 0.21-0.49 Hz -- at 250-400 MHz,
+    5e-4 ppm, orders of magnitude below any resolvable linewidth.
+    """
+
+    FREQ_MHZ = 250.0
+
+    # 40254842 (1,2-epoxybutane, 250 MHz), the ethyl CH3 at 0.984 ppm -- three
+    # bonds from the CH2, a textbook triplet. The deconvolution resolves seven
+    # lines: the two real ~7 Hz couplings, and a five-piece tiling of the centre
+    # transition with gaps of 0.32 / 0.29 / 0.24 / 0.21 Hz.
+    EPOXYBUTANE_CH3_LINES = [
+        0.9526317246464563,
+        0.9805969181335495,
+        0.9818813403739153,
+        0.9830529968996266,
+        0.9839967110563363,
+        0.9848433861175666,
+        1.0126292417638614,
+    ]
+
+    def test_the_epoxybutane_methyl_reads_as_the_triplet_it_is(self) -> None:
+        multiplicity, j_values = multiplicity_from_lines(
+            self.EPOXYBUTANE_CH3_LINES, frequency_mhz=self.FREQ_MHZ
+        )
+        assert multiplicity == "t", (
+            f"reported {multiplicity!r}. Adjacent spacings are 6.99 / 0.32 / "
+            f"0.29 / 0.24 / 0.21 / 6.95 Hz; the four sub-resolution gaps are not "
+            f"couplings, and what is left is two equal ones."
+        )
+        assert j_values and abs(j_values[0] - 7.5) <= 0.6, (
+            f"J = {j_values} Hz; an ethyl CH3 couples to its CH2 at ~7.5 Hz."
+        )
+
+    def test_two_lines_closer_than_any_coupling_are_a_singlet(self) -> None:
+        """40256149 peak 7 at 5.965 ppm: two lines 0.49 Hz apart, reported "m"."""
+        pair = [5.965, 5.965 + 0.4948 / self.FREQ_MHZ]
+        assert multiplicity_from_lines(pair, frequency_mhz=self.FREQ_MHZ) == ("s", ())
+
+    def test_a_coupling_just_above_the_floor_is_still_a_doublet(self) -> None:
+        """The other edge: a real coupling must survive the collapse.
+
+        Deliberately 0.6 Hz and not 0.5. A pair constructed AT the bound does not
+        test the rule -- ``(5.965 + 0.5 / 250.0 - 5.965) * 250.0`` is
+        0.49999999999994 Hz, so which side of the bound it lands on is decided by
+        the last bits of a subtraction, not by the data. The collapse and the
+        rejection rule read the same ``_MIN_J_HZ`` with the same comparison, so
+        they agree on that boundary by construction whichever way it rounds;
+        what needs pinning is that a coupling clear of it survives.
+        """
+        pair = [5.965, 5.965 + 0.6 / self.FREQ_MHZ]
+        multiplicity, j_values = multiplicity_from_lines(pair, frequency_mhz=self.FREQ_MHZ)
+        assert multiplicity == "d"
+        assert j_values and abs(j_values[0] - 0.6) <= 0.05
+
+    def test_a_clean_multiplet_is_untouched(self) -> None:
+        """Nothing with all spacings above the floor may move at all."""
+        j_ppm = 7.0 / 400.0
+        quartet = [2.40 + k * j_ppm for k in (-1.5, -0.5, 0.5, 1.5)]
+        assert multiplicity_from_lines(quartet, frequency_mhz=400.0)[0] == "q"
+
+    def test_a_collapsed_run_reports_the_envelope_centre(self) -> None:
+        """The survivor is the run's centroid, not an arbitrary member.
+
+        Picking an end member would shift the reported coupling by the width of
+        the run -- here 1.06 Hz, which is 14% of a 7.5 Hz coupling.
+        """
+        _multiplicity, j_values = multiplicity_from_lines(
+            self.EPOXYBUTANE_CH3_LINES, frequency_mhz=self.FREQ_MHZ
+        )
+        centre = sum(self.EPOXYBUTANE_CH3_LINES[1:6]) / 5
+        expected = (centre - self.EPOXYBUTANE_CH3_LINES[0]) * self.FREQ_MHZ
+        assert j_values and abs(j_values[0] - expected) <= 0.3

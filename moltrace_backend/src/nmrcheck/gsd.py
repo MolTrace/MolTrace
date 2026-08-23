@@ -408,6 +408,54 @@ def _distinct_spacings(spacings: list[float], tolerance: float) -> list[float]:
     return [round(sum(group) / len(group), 1) for group in groups]
 
 
+def _collapse_sub_coupling_runs(
+    ascending: list[float], *, frequency: float
+) -> list[float]:
+    """Collapse runs of lines too close together to be coupling partners.
+
+    ``_MIN_J_HZ`` is the smallest resolvable 1H-1H scalar coupling. Two lines
+    closer together than that are therefore not two coupling partners, and the
+    pattern reader must not count them as two lines -- whatever they are, one
+    transition whose lineshape the fit tiled with several components, or two
+    genuinely degenerate transitions, they contribute a single line to a
+    first-order pattern.
+
+    This is not a loosening of the J window: the same ``_MIN_J_HZ`` still rejects
+    a multiplet whose spacings fall outside it, and a spacing AT the bound is
+    still a coupling. It is the other reading of the same bound, applied one step
+    earlier -- to the lines rather than to the spacings between them.
+
+    Without it a single sub-resolution gap discards the whole multiplet. Measured
+    across the 19 nmrshiftdb2 raw-FID fixtures, that cost 18 of 126 deconvolved
+    multiplets (14%) their label: every one was forced to a generic "m" by gaps of
+    0.21-0.49 Hz, which at 250-400 MHz is 5e-4 ppm -- far below any resolvable
+    linewidth. nmrshiftdb2 40254842 (1,2-epoxybutane) at 0.984 ppm is the clearest
+    case: seven lines spaced 6.99 / 0.32 / 0.29 / 0.24 / 0.21 / 6.95 Hz, which is
+    the ethyl CH3 triplet with its centre transition tiled five ways.
+
+    The survivor of a run is its CENTROID, not one of its members: the run has
+    width, and taking an end member would bias the reported coupling by that
+    width -- 1.06 Hz on the epoxybutane methyl, 14% of its 7.5 Hz coupling.
+
+    Note the collapsed positions are used only to read the pattern. The resolved
+    line list ``deconvolve_region`` returns is deliberately NOT changed: those
+    extra components are not free, they measurably improve the fit (collapsing
+    the epoxybutane pair and refitting raises the region's max residual to 1.9x
+    the acceptance tolerance), so removing them would misreport how the region
+    was actually modelled.
+    """
+    collapsed: list[float] = []
+    run: list[float] = [ascending[0]]
+    for center in ascending[1:]:
+        if (center - run[-1]) * frequency < _MIN_J_HZ:
+            run.append(center)
+            continue
+        collapsed.append(sum(run) / len(run))
+        run = [center]
+    collapsed.append(sum(run) / len(run))
+    return collapsed
+
+
 def multiplicity_from_lines(
     line_centers: list[float],
     *,
@@ -421,15 +469,21 @@ def multiplicity_from_lines(
     note its adjacent spacings are *not* the couplings: the J pair is recovered
     from line-pair separations by first-order rules. Anything else is reported
     honestly as a generic multiplet "m" with the resolved J set.
+
+    Lines closer together than ``_MIN_J_HZ`` are first collapsed into one -- see
+    :func:`_collapse_sub_coupling_runs` for why that is a statement about the
+    lines and not a loosening of the J window.
     """
     finite = [float(center) for center in line_centers if math.isfinite(center)]
-    line_count = len(finite)
-    if line_count <= 1:
+    if len(finite) <= 1:
         return ("s", ())
     if frequency_mhz is None or frequency_mhz <= 0:
         return ("m", ())
     frequency = float(frequency_mhz)
-    ascending = sorted(finite)
+    ascending = _collapse_sub_coupling_runs(sorted(finite), frequency=frequency)
+    line_count = len(ascending)
+    if line_count <= 1:
+        return ("s", ())
     spacings = [
         (ascending[index + 1] - ascending[index]) * frequency
         for index in range(line_count - 1)
@@ -451,6 +505,12 @@ def multiplicity_from_lines(
         j_large = (
             (ascending[2] - ascending[0]) + (ascending[3] - ascending[1])
         ) / 2.0 * frequency
-        return ("dd", (round(j_large, 1), round(j_small, 1)))
+        # Bound the COUPLINGS, matching ``multiplet.analysis``. The window above
+        # is applied to adjacent SPACINGS, and on a dd no adjacent spacing is a
+        # coupling -- J_large is the sum of two of them. So J_large reached this
+        # return unchecked, and a dd could report a coupling of up to twice
+        # _MAX_J_HZ while every spacing it was read from sat inside the window.
+        if _MIN_J_HZ <= j_small <= j_large <= _MAX_J_HZ:
+            return ("dd", (round(j_large, 1), round(j_small, 1)))
     distinct = _distinct_spacings(spacings, tolerance)
     return ("m", tuple(sorted(distinct, reverse=True))[:3])

@@ -14,6 +14,105 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.69.12 — A triplet was reported as "m" because the fit split its centre line five ways (2026-08-22)
+
+`multiplicity_from_lines` rejects a multiplet outright when any adjacent-line spacing
+falls below `_MIN_J_HZ` = 0.5 Hz. That bound is right — no resolvable 1H-1H scalar
+coupling is smaller — but the conclusion drawn from it was wrong. A spacing that small
+does not mean "these lines are not a first-order multiplet". It means **those two lines
+are not two coupling partners**, and a pattern reader must count them once.
+
+Across the same nineteen golden fixtures, **18 of 126 deconvolved multiplets (14%)** lost
+their label to this. Every one was forced to a generic `m` by gaps of **0.21-0.49 Hz** —
+at 250-400 MHz, 5e-4 ppm, orders of magnitude below any resolvable linewidth.
+
+The clearest case is **40254842 (1,2-epoxybutane) at 0.984 ppm**, the ethyl CH3 three
+bonds from the CH2 — a textbook triplet. The deconvolution resolves seven lines spaced
+6.99 / 0.32 / 0.29 / 0.24 / 0.21 / 6.95 Hz: two real couplings, and the centre transition
+tiled five ways. Dropping the four sub-resolution gaps leaves two equal couplings. It now
+reads `t`, J = 7.5 Hz.
+
+**The suspect was the deconvolution's merge step, and it was measurably the wrong lever.**
+`deconvolve_region` ends by collapsing lines "that converged onto the same position",
+against a threshold of `min_hwhm * 3` — three times the LOWER BOUND the fit may reach,
+not three times any width a line reached. That much is a real units defect: the fitted
+half-width runs a median **10.8x** that bound across the corpus and up to **326x**, so the
+threshold is for the median line 0.28x the line's own half-width. But repairing the units
+does not repair the label, and three independent measurements say the merge step cannot:
+
+* **Fixing the units alone does not reach the case.** The artefact pairs sit at 0.43-0.84
+  of the broader line's FWHM, while `test_deconvolution_resolves_an_overlapped_quartet`
+  — the guard on this module's entire purpose, resolving transitions that overlap — sits
+  at 0.97. Only a threshold inside that 15% window separates them, which is a tuned
+  constant, not a measurement.
+* **A region-wide linewidth scale destroys real couplings.** Collapsing anything closer
+  than the region's broadest half-width turns a clean 7.93 Hz doublet (60000016 @ 1.110)
+  into a singlet and a uniform ~5.7 Hz sextet (60000023 @ 9.309) into a doublet.
+* **The extra lines are not free, so no model-selection test removes them.** Proposing
+  each too-close pair for collapse and refitting the region rejected all eleven attempts
+  on 40254842, by 1.4x to 18x the acceptance tolerance — 1.9x on the methyl itself. The
+  fit splits that line because the real lineshape is not a pseudo-Voigt, and the pieces
+  measurably improve the residual. The backward elimination pass had already run to
+  completion on that region (0.72x tolerance) and pruned none of it: it only ever tests
+  the region's globally weakest line and stops at the first load-bearing one, so a strong
+  transition tiled several ways is never offered up.
+
+So the fix is where the lines are read as a coupling pattern, not where they are fitted.
+`_collapse_sub_coupling_runs` collapses a run of lines closer together than `_MIN_J_HZ`
+into its centroid before the pattern is read. The centroid and not a member: the run has
+width, and an end member would bias the reported coupling by it — 1.06 Hz on the
+epoxybutane methyl, 14% of its 7.5 Hz coupling. **`_MIN_J_HZ` is unchanged at 0.5 Hz**,
+and the same constant still rejects a multiplet whose spacings fall outside the window;
+this is the other reading of the same bound, applied one step earlier.
+
+The resolved line list `deconvolve_region` returns is **deliberately not changed**. Those
+components are what the region was actually modelled with, and removing them would
+misreport the fit.
+
+Because the collapse only ever touches lines closer than 0.5 Hz, the change is surgical:
+**five labels move, and not one shift, integration, phase, baseline or preview value in
+any of the nineteen fixtures.**
+
+* **40254842 peak 3 @ 0.984 ppm** (both configs) — `m` -> `t`, J = 7.5 Hz. The ethyl CH3
+  triplet above. Correct against structure.
+* **40256149 peak 7 @ 5.965 ppm** (both configs) — `m` -> `s`. Two lines 0.49 Hz apart at
+  400 MHz are one line.
+* **40255339 (indole) peak 2 @ 7.611 ppm** (structure-guided only) — `m` -> `dd`,
+  J = 20.0 / 7.9 Hz. **This one is reported as a false positive, not as a correction.**
+  Indole has no 1H-1H coupling near 20 Hz (ortho ~8, meta ~1.4). The four surviving lines
+  are two aromatic doublets of ~8 Hz whose centres are 12.0 Hz apart, and two
+  equal-intensity doublets are exactly degenerate with a dd in both line positions and
+  line intensities — nothing in the data distinguishes them. The old `m` was right by
+  accident, for a reason that had nothing to do with the coupling. The unguided detection
+  of the same spectrum still reads `m`, so the two configurations now disagree, which is
+  itself the evidence that the label is not determined. Left visible rather than papered
+  over; discriminating a dd from two coincident doublets needs information this reader
+  does not receive.
+
+**A latent defect closed in passing.** v0.69.11 bounded the derived `dd` couplings in
+`moltrace.spectroscopy.multiplet.analysis` but not in `nmrcheck.gsd`, which recovers the
+same couplings by the same first-order rule. The J window there is applied to adjacent
+SPACINGS, and on a dd no adjacent spacing is a coupling — `J_large` is the sum of two of
+them — so `J_large` reached the caller unchecked and a dd could report a coupling of up
+to twice `_MAX_J_HZ` while every spacing it was read from sat inside the window. The two
+analysers now agree. It moves no golden.
+
+Guards: `tests/test_gsd.py::TestLinesTooCloseToBeCouplingPartnersAreOneLine` pins the
+epoxybutane methyl as a triplet from its real fitted line centres, pins the collapsed
+survivor at the run centroid, and pins both edges — two lines 0.49 Hz apart are one line,
+a 0.6 Hz coupling is still a doublet. It deliberately does not assert on a pair
+constructed AT 0.5 Hz: `(5.965 + 0.5 / 250.0 - 5.965) * 250.0` is 0.49999999999994 Hz, so
+which side it lands on is decided by the last bits of a subtraction rather than by the
+data.
+
+The boundary register stays at **four**. No entry is stale: the collapse cannot reach any
+of them. 40256175 peak 6 is the only entry whose divergence is a line COUNT that a
+stronger collapse could have erased, and the second line its Linux fit resolves sits
+0.77-0.79 Hz from the first at 400 MHz — above the floor. The other three entries carry no
+adjacent spacing below 1.16 Hz.
+
+---
+
 ## v0.69.11 — Two clustered signals were reported to chemists as a doublet with an impossible J (2026-08-22)
 
 `multiplicity_from_lines` reports a first-order label only when every adjacent-line
