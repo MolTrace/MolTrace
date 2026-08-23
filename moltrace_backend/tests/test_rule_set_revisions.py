@@ -46,6 +46,13 @@ ENGINES = {
     "cpca": cpca_classifier,
 }
 
+#: The compiled-in method constants are versioned the same way and enforced by the same test.
+#: They are NOT a rule set — they are the qNMR / multiplet / GSD literals an engine computes
+#: with — but they have the identical failure mode: the constants live in three modules, nothing
+#: at the edit site prompts a bump, and a forgotten one makes an installation believe its
+#: constants match a deployment's when they do not.
+METHOD_DEFAULTS_KEY = "supplier_defaults"
+
 MANIFEST_PATH = Path(__file__).parent / "data" / "rule_set_revisions.json"
 
 
@@ -59,9 +66,9 @@ def test_the_manifest_covers_every_engine_that_versions_itself() -> None:
     The failure this prevents is silent: an engine absent from the manifest is an engine whose
     content can move freely, and the loop below would simply not look at it.
     """
-    assert set(_manifest()) == set(ENGINES), (
-        "the revision manifest and the engine set disagree — an engine was added or renamed "
-        "without pinning its revision"
+    assert set(_manifest()) == set(ENGINES) | {METHOD_DEFAULTS_KEY}, (
+        "the revision manifest and the versioned-artifact set disagree — something was added or "
+        "renamed without pinning its revision"
     )
 
 
@@ -102,3 +109,32 @@ def test_every_engine_carries_an_ordered_version_beside_its_identity() -> None:
         assert artifact.semver, f"{lineage} declares no ordered version"
         # The legacy name still resolves to the same address, so existing callers are unmoved.
         assert module._RULE_SET_VERSION == artifact.identity_hash, lineage
+
+
+def test_a_moved_method_constant_forces_a_moved_semver() -> None:
+    """The method constants get the same enforcement as a rule set, and need it more.
+
+    A rule set is edited in the file that declares its version. These constants are spread over
+    three modules and their version is declared in a fourth, so nothing at the edit site prompts
+    a bump — which makes this the likeliest forgotten one in the codebase.
+
+    The consequence of forgetting is specific: two installations with different qNMR uncertainty
+    defaults would compare as *current*, and each would emit a purity figure the other's
+    deployment would not reproduce.
+    """
+    from moltrace.regulatory.infra.versioning import content_hash
+    from nmrcheck.active_versions import METHOD_DEFAULTS_SEMVER, method_defaults_payload
+
+    pinned = _manifest()[METHOD_DEFAULTS_KEY]
+    identity = content_hash(method_defaults_payload())
+
+    if identity != pinned["identity_hash"]:
+        assert METHOD_DEFAULTS_SEMVER != pinned["semver"], (
+            "a built-in method constant changed and METHOD_DEFAULTS_SEMVER did not. Bump it in "
+            "the same change, then regenerate the manifest."
+        )
+    else:
+        assert METHOD_DEFAULTS_SEMVER == pinned["semver"], (
+            "METHOD_DEFAULTS_SEMVER moved but no constant did — every later comparison would "
+            "report identical constants as stale."
+        )

@@ -168,12 +168,12 @@ def compare(
     Evaluated in exactly this order; the order is load-bearing and the notes say why.
     """
 
-    name = (canonical or local).display_name if (canonical or local) else "this artifact"
+    name = (canonical or local).display_name if (canonical or local) else "artifact"
 
     # 1-2. One side asserted nothing. Absence is never treated as agreement.
     if canonical is None:
         return _decide(
-            CurrencyState.UNKNOWN, f"the workspace asserted no version for {name}"
+            CurrencyState.UNKNOWN, f"this workspace has published no version of the {name}"
         )
     if local is None:
         return _decide(CurrencyState.UNKNOWN, f"this installation carries no {name}")
@@ -187,14 +187,14 @@ def compare(
             # catalogues is wrong, and there is no way to tell which — so neither is trusted.
             return _decide(
                 CurrencyState.UNKNOWN,
-                f"{name} is identical on both sides but is declared at two different versions",
+                f"the {name} is identical on both sides but is declared at two different versions",
             )
-        return _decide(CurrencyState.CURRENT, f"{name} matches the workspace")
+        return _decide(CurrencyState.CURRENT, f"the {name} matches this workspace")
 
     # 4. Different lines are not rankable against each other at all.
     if local.lineage != canonical.lineage:
         return _decide(
-            CurrencyState.UNKNOWN, f"the two versions of {name} are not on a common line"
+            CurrencyState.UNKNOWN, f"the two versions of the {name} are not on a common line"
         )
 
     # 5. No ordering input on one side.
@@ -203,22 +203,22 @@ def compare(
     if local_revision is None or canonical_revision is None:
         return _decide(
             CurrencyState.UNKNOWN,
-            f"one of the two versions of {name} declares no ordered revision",
+            f"one of the two versions of the {name} declares no ordered revision",
         )
 
     # 6-7. The orderable cases.
     if local_revision < canonical_revision:
         return _decide(
             CurrencyState.BEHIND,
-            f"this installation's {name} is older than the version this workspace has adopted",
+            f"this workspace has adopted a newer {name} than this installation carries",
         )
     if local_revision > canonical_revision:
         return _decide(
             CurrencyState.AHEAD,
             f"this installation carries a newer {name} than this workspace has adopted",
             gap=(
-                f"computed with {name} {local.revision}, which this workspace has not adopted "
-                f"(it uses {canonical.revision})"
+                f"computed with the {name} at {local.revision}, which this workspace has "
+                f"not adopted (it uses {canonical.revision})"
             ),
         )
 
@@ -227,5 +227,5 @@ def compare(
     #    was reviewed, and nothing here can tell which.
     return _decide(
         CurrencyState.UNKNOWN,
-        f"one version of {name} is declared over two different contents",
+        f"one version of the {name} is declared over two different contents",
     )
