@@ -42,8 +42,40 @@ from scipy.optimize import least_squares
 
 # Plausible homonuclear 1H-1H coupling window (Hz). Spacings outside this are
 # not treated as real J couplings.
+#
+# The upper edge is a claim about CHEMISTRY, and it decides a discrete label, so
+# it was measured rather than guessed. Dumping every adjacent-line spacing the
+# deconvolution produces across the 19-fixture golden corpus (773 spacings from
+# 126 multiplets) splits cleanly into two regimes with nothing in between:
+#
+#   * spacings actually reported as a coupling (d / t / q / dd ...) top out at
+#     18.06 Hz -- a geminal 2J, the largest genuine 1H-1H coupling in the corpus;
+#   * the next-largest values are 43.52 and 45.62 Hz, and neither is a coupling.
+#     43.52 Hz is 60000023 (cocaine) peak 2, two overlapping bicyclic-ring
+#     signals; 45.62 Hz is 40256149 (piperine) peak 9, two methylene multiplets
+#     inside the piperidine envelope. Neither compound contains fluorine or
+#     phosphorus, so no heteronuclear route reaches those values either.
+#
+# So the interval (18.06, 43.52) Hz is EMPTY, and the previous 60.0 sat on the
+# far side of it -- past both spurious pairs, which were therefore shipped to
+# chemists as doublets with impossible J values. Its midpoint, the edge furthest
+# from both regimes, is 30.79 Hz; the independently tuned 1H multiplet window in
+# moltrace.spectroscopy.peaks.gsd (_DEFAULT_CLUSTER_J_HZ_BY_NUCLEUS) answers the
+# same physical question -- how far apart two lines of one 1H multiplet can sit --
+# and was tuned against the same corpus to 30.0. Those two agree to 0.8 Hz, so
+# 30.0 it is, and the two constants now say the same thing instead of differing
+# by a factor of two.
+#
+# The exact value inside that empty interval is not load-bearing for this corpus:
+# any edge in [19, 43] Hz classifies all 177 golden peaks identically. That is the
+# point. A threshold on a fitted quantity belongs where the density is zero, not
+# where a round number happens to fall -- the fit's own spread on the weakest
+# lines is several Hz, so an edge with data near it makes the reported
+# multiplicity a function of the last bits of the input. tests/test_gsd.py
+# TestTheCouplingWindowIsAChemicalBound pins the two regimes and deliberately
+# asserts nothing about the gap between them.
 _MIN_J_HZ = 0.5
-_MAX_J_HZ = 60.0
+_MAX_J_HZ = 30.0
 
 # A fit is accepted (and a line is deemed redundant) when the region is
 # reproduced to within this many noise-sigma everywhere.
@@ -249,26 +281,53 @@ def deconvolve_region(
                 bounds=(lower, upper),
                 method="trf",
                 max_nfev=6000,
-                # 1e-5, not scipy's 1e-8 default: each trust-region iteration costs
-                # an SVD, and profiling a 65k-point 1H run found 41,714 SVDs (11.3 s
-                # of 24 s) across 178 fits averaging 234 iterations. 1e-5 keeps three
-                # orders of margin over the reported precision (centres to 3-4 ppm
-                # decimals, J to ~0.1 Hz) and measured 6.95x faster with the peak
-                # list identical on that spectrum.
+                # scipy's default 1e-8, restored. A previous change loosened these
+                # to 1e-5 for speed on the premise that the fit "stops changing"
+                # long before 1e-8 — measured true on one 65k-point spectrum (same
+                # 40 peaks, 0.0000 Hz drift, identical multiplicities, 6.95x faster).
                 #
-                # BEWARE, and do NOT chase this with the tolerance: a few ambiguous
-                # multiplets have a DISCRETE label (read off the resolved line count)
-                # that is not robust. nmrshiftdb2 40256149 peak 2 is "m" at 1e-8 and
-                # "t" at 1e-5 on macOS, and 40256175 peak 6 is "s" on macOS but "d"
-                # on Linux at BOTH tolerances — the fit lands in a different local
-                # minimum per platform's LAPACK, and no ftol reconciles it (verified:
-                # tightening to 1e-8 still failed on Linux CI). Because the choice is
-                # platform-inherent, the fit tolerance is a pure latency lever again;
-                # the output-invariance goldens are minted on Linux (production) to
-                # match — see .github/workflows/remint-fid-goldens.yml.
-                ftol=1e-5,
-                xtol=1e-5,
-                gtol=1e-5,
+                # It is NOT true across the fixture corpus. Multiplicity is a
+                # DISCRETE label read off the resolved line COUNT, and for real
+                # spectra the count is still moving between 1e-5 and 1e-8: measured,
+                # nmrshiftdb2 40256149 peak 2 reads a generic "m" at 1e-8 and flips
+                # to "t" at 1e-5 / 1e-6 / 1e-7 alike — i.e. 1e-5 reports an
+                # UNDER-converged fit, not a faster-but-equal one. No tolerance
+                # between 1e-5 and 1e-7 reproduces the goldens; only 1e-8 does. The
+                # output-invariance goldens (test_fid_pipeline_invariants.py) caught
+                # exactly this, which is their job.
+                #
+                # Re-measured over the whole corpus on ONE machine, so no platform
+                # variable is in play: 3 of 177 labels differ between the two — that
+                # peak in both guidance configs, plus 40256175 guided peak 8
+                # ("dd" -> "m"). At 1e-8 all 177 reproduce the committed goldens
+                # exactly; at 1e-5 those three do not. Note the direction, because
+                # it is the opposite of the intuition and makes 1e-5 look good in a
+                # spot check: 1e-5 is MORE repeatable under a perturbed input and
+                # LESS correct, since a looser stop halts nearer the initial guess —
+                # so the label is then set partly by that guess, not by the data.
+                #
+                # This was loosened a second time (aad2174) on the premise that the
+                # goldens would be re-minted on Linux to match. That re-mint is a
+                # manual workflow and never ran, so main shipped a fit whose labels
+                # disagreed with its own committed goldens on the very platform they
+                # were minted on. Restored here; if you loosen it again, re-mint in
+                # the SAME commit or the corpus tier is red the moment it runs.
+                #
+                # A discrete classifier has to sit on a converged fit. If the SVD
+                # cost matters, the lever is fewer/cheaper fits or better initial
+                # guesses (output-preserving), not a looser stop that changes which
+                # multiplet the chemist is shown.
+                #
+                # Convergence is necessary but not sufficient: a few genuinely-
+                # ambiguous multiplets still land in a different local minimum under
+                # Linux/x86 LAPACK than under macOS/ARM at 1e-8, because their label
+                # turns on a resolved line count or a spacing-symmetry test that the
+                # data does not settle. Those are named with their measured evidence
+                # in tests/golden/fid_invariants/boundary_register.json — do not
+                # reach for the tolerance again to chase them.
+                ftol=1e-8,
+                xtol=1e-8,
+                gtol=1e-8,
             )
         except (ValueError, RuntimeError):
             return (None, math.inf)
