@@ -71,7 +71,10 @@ class DesktopTransportGuard:
 
     def check(self, scope: dict) -> None:
         """Admit the request, or raise. Called before the body is read."""
-        headers = {k.decode("latin-1").lower(): v.decode("latin-1") for k, v in scope.get("headers", [])}
+        headers = {
+            k.decode("latin-1").lower(): v.decode("latin-1")
+            for k, v in scope.get("headers", [])
+        }
 
         # Rebinding refusals first: they are cheap, and a request carrying an
         # Origin is a browser request that has no business here whatever
