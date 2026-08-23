@@ -30,10 +30,21 @@ from .desktop_transport import DesktopTransportGuard, TransportRefusal
 from .device_journal import ClockState, JournalEntry, append
 from .offline_policy import is_served_locally
 
-#: Operations this app serves. Every one is checked against the policy table at
-#: construction, so adding a line here that the table withholds fails loudly
-#: rather than quietly widening the local surface.
-SERVED_OPERATIONS: tuple[str, ...] = ("system.health",)
+#: Operations this app serves, and the route each one is reached by. Routes are
+#: DERIVED from this map rather than declared separately with @app.get.
+#:
+#: They were separate, and nothing tied them: the construction check validated the
+#: LIST while the routes were registered independently, so a route could be
+#: mounted for an operation the list did not contain and the check would pass.
+#: One definition, so they cannot diverge -- the same fix as the hashed body
+#: written out twice, and the same reason.
+ROUTES: dict[str, tuple[str, str]] = {
+    # operation -> (method, path)
+    "system.health": ("GET", "/health"),
+}
+
+#: Kept as a name because tests and callers read it, derived so it cannot drift.
+SERVED_OPERATIONS: tuple[str, ...] = tuple(ROUTES)
 
 #: Process-local for now. The durable store lands with §7.8's storage work; the
 #: chain logic does not change when it does.
@@ -107,6 +118,12 @@ def _journal(operation: str, *, refused: bool, cause: str | None = None) -> None
     )
 
 
+async def _health() -> dict[str, Any]:
+    HANDLER_CALLS.append("system.health")
+    _journal("system.health", refused=False)
+    return {"status": "ok"}
+
+
 class TransportGuardMiddleware:
     """Runs before routing, before the body, before any handler."""
 
@@ -147,7 +164,12 @@ class TransportGuardMiddleware:
 
 
 def _operation_for(path: str) -> str:
-    return {"/health": "system.health"}.get(path, "unknown")
+    # Also derived from ROUTES. A third hand-maintained copy of the path->operation
+    # mapping is a third thing to drift.
+    for operation, (_method, route_path) in ROUTES.items():
+        if route_path == path:
+            return operation
+    return "unknown"
 
 
 def create_local_app(
@@ -165,11 +187,14 @@ def create_local_app(
 
     app = FastAPI(title="MolTrace local science service", docs_url=None, redoc_url=None)
 
-    @app.get("/health")
-    async def health() -> dict[str, Any]:
-        HANDLER_CALLS.append("system.health")
-        _journal("system.health", refused=False)
-        return {"status": "ok"}
+    # One handler per declared route, registered from the map. Adding a route
+    # means adding a line to ROUTES, which is the line the policy check reads.
+    handlers = {"system.health": _health}
+    for operation, (method, path) in ROUTES.items():
+        handler = handlers.get(operation)
+        if handler is None:
+            raise ValueError(f"{operation!r} is declared in ROUTES with no handler")
+        app.add_api_route(path, handler, methods=[method])
 
     app.add_middleware(
         TransportGuardMiddleware,
