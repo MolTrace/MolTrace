@@ -78,8 +78,23 @@ class TransportGuardMiddleware:
         self.guard = guard
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        if scope["type"] != "http":
+        # Every scope type that is NOT http is REFUSED, not waved through.
+        #
+        # A first version passed them to the app unguarded on the reasoning that
+        # the app has no websocket routes. That is true today and is exactly the
+        # kind of premise that stops being true quietly: the first websocket route
+        # anyone adds would be unauthenticated, and nothing here would say so.
+        # `lifespan` is the one legitimate non-http scope and it is startup
+        # signalling, not a request, so it passes.
+        if scope["type"] == "lifespan":
             await self.app(scope, receive, send)
+            return
+        if scope["type"] != "http":
+            _journal(
+                "unsupported-scope",
+                refused=True,
+                cause=f"scope type {scope['type']!r} is not served",
+            )
             return
         try:
             self.guard.check(scope)

@@ -115,9 +115,14 @@ class DesktopTransportGuard:
                 raise TransportRefusal(
                     f"refused: a credential may not be presented in the {name} header"
                 )
-        query = scope.get("query_string", b"") or b""
+        # Lowercased before matching. A first version compared raw bytes against
+        # lowercase keys, so `?Token=<credential>` and `?ACCESS_TOKEN=<credential>`
+        # were both admitted while `?access_token=` was refused — the rule is about
+        # the position, and a position does not change with capitalisation.
+        query = (scope.get("query_string", b"") or b"").lower()
         for key in _FORBIDDEN_QUERY_KEYS:
-            if key + b"=" in b"&" + query:
+            # Both separators: some clients still emit ';' between parameters.
+            if key + b"=" in b"&" + query.replace(b";", b"&"):
                 raise TransportRefusal("refused: a credential may not be presented in the address")
         if _looks_like_a_credential_segment(scope.get("path", "")):
             raise TransportRefusal("refused: a credential may not be presented in the address")

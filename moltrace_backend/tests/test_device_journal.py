@@ -121,6 +121,44 @@ def test_a_forward_clock_is_not_flagged_as_rollback() -> None:
     assert second.clock_went_backwards is False
 
 
+def test_reordering_is_caught_by_the_sequence() -> None:
+    chain: list[JournalEntry] = []
+    for i in range(3):
+        chain.append(append(chain, payload={"action": f"a{i}"}, clock=synced(T0 + timedelta(seconds=i))))
+    with pytest.raises(ValueError):
+        verify_chain([chain[1], chain[0], chain[2]])
+
+
+def test_truncation_at_the_END_is_NOT_detectable_locally() -> None:
+    """Stated as a test so nobody later assumes it is covered.
+
+    A chain of 0..k is indistinguishable from 0..k+5 with the last five deleted:
+    the survivors are internally consistent because they were. No arrangement of
+    local data fixes this, and a local high-water mark would not either — a key
+    that verifies on hardware the attacker controls is a key that forges.
+    """
+    chain: list[JournalEntry] = []
+    for i in range(5):
+        chain.append(append(chain, payload={"action": f"a{i}"}, clock=synced(T0 + timedelta(seconds=i))))
+    assert verify_chain(chain[:2]) is None, (
+        "if this now raises, the local-only claim has changed and the docstring is stale"
+    )
+
+
+def test_the_SERVER_catches_end_truncation_at_reconciliation() -> None:
+    """Where the detection actually lives: outside this device.
+
+    The server holds the last sequence it reconciled, so a chain shorter than
+    that is missing entries it has already seen.
+    """
+    chain: list[JournalEntry] = []
+    for i in range(5):
+        chain.append(append(chain, payload={"action": f"a{i}"}, clock=synced(T0 + timedelta(seconds=i))))
+    assert verify_chain(chain, expect_at_least=5) is None
+    with pytest.raises(ValueError, match="removed from the end"):
+        verify_chain(chain[:2], expect_at_least=5)
+
+
 # --- the honesty half -------------------------------------------------------
 
 
@@ -166,6 +204,14 @@ def test_every_field_the_entry_carries_is_covered_by_the_hash() -> None:
                                                       source="network")),
         "offset_seconds": append([], payload={"action": "a"}, clock=synced(offset=99.0)),
         "last_sync_age_seconds": append([], payload={"action": "a"}, clock=synced(age=99.0)),
+        # clock_went_backwards was in the hashed body and in NO variant, so
+        # dropping it would have gone unnoticed — and it is the field an attacker
+        # most wants to edit, since it turns a recorded rollback into a clean
+        # record. It needs a prior entry to be true, so this variant is a chain.
+        "clock_went_backwards": append(
+            [append([], payload={"action": "a"}, clock=synced(at=T0 + timedelta(hours=1)))],
+            payload={"action": "a"}, clock=synced(),
+        ),
     }
     for field_name, variant in variants.items():
         assert variant.entry_hash != reference.entry_hash, (
