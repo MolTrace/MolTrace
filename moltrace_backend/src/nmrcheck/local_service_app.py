@@ -89,8 +89,9 @@ def _journal(operation: str, *, refused: bool, cause: str | None = None) -> None
                         "operation": "journal.refusals-capped",
                         "refused": True,
                         "cause": (
-                            f"{REFUSAL_ENTRY_CAP} refusals recorded; further refusals are not being "
-                            f"written, so an unauthenticated caller cannot dilute this journal"
+                            f"{REFUSAL_ENTRY_CAP} refusals recorded; further refusals are "
+                            f"not being written, so an unauthenticated caller cannot "
+                            f"dilute this journal"
                         ),
                     },
                     clock=_clock(),
