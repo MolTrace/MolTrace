@@ -26,11 +26,24 @@ const PROBE = `(() => {
     // The local-service credential must be unreachable from the page. A renderer
     // that can read it can talk to the scientific service directly, which defeats
     // the peer check, the header discipline and the rebinding refusals at once.
+    // Hunts VALUES, not just key names. A first version tested only whether a
+    // KEY matched /credential|token|secret/, so exposing the credential under an
+    // innocuous name — moltrace.config.value — sailed straight through. A guard
+    // that can be evaded by renaming the variable is not a guard.
+    //
+    // The shape is the credential's own: 43 characters of base64url, which is
+    // what the shell emits. Reported as a boolean; the value itself is never
+    // returned, so the probe cannot become the leak it is looking for.
     credentialReachable: (() => {
+      const looksLikeCredential = (v) =>
+        typeof v === 'string' && v.length === 43 && /^[A-Za-z0-9_-]+$/.test(v)
       const hunt = (o, d) => {
-        if (d > 3 || !o || typeof o !== 'object') return false
-        return Object.keys(o).some((k) =>
-          /credential|token|secret/i.test(k) || hunt(o[k], d + 1))
+        if (d > 3 || o === null || o === undefined) return false
+        if (looksLikeCredential(o)) return true
+        if (typeof o !== 'object') return false
+        return Object.keys(o).some(
+          (k) => /credential|token|secret/i.test(k) || hunt(o[k], d + 1)
+        )
       }
       return hunt(globalThis.moltrace, 0)
     })(),

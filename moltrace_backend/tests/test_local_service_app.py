@@ -70,6 +70,40 @@ def test_an_operation_the_policy_table_withholds_is_not_served(client: TestClien
     assert r.status_code == 404
 
 
+def test_every_mounted_route_corresponds_to_a_declared_operation() -> None:
+    """Routes and the served list were separate, and nothing tied them.
+
+    The construction check validated the LIST while @app.get registered routes
+    independently — so a route could be mounted for an operation the list did not
+    contain, and the check would pass. Routes are now derived from ROUTES, and
+    this asserts the app's actual route table matches it.
+    """
+    from nmrcheck.local_service_app import ROUTES, create_local_app
+
+    app = create_local_app(credential=CRED)
+    mounted = {
+        (next(iter(r.methods - {"HEAD"})), r.path)
+        for r in app.routes
+        if getattr(r, "methods", None) and not r.path.startswith("/openapi")
+    }
+    declared = set(ROUTES.values())
+    assert declared <= mounted, f"declared but not mounted: {declared - mounted}"
+    extra = {m for m in mounted if m not in declared and not m[1].startswith("/docs")}
+    assert not extra, f"mounted but not declared in ROUTES: {extra}"
+
+
+def test_a_route_declared_with_no_handler_fails_at_construction(monkeypatch) -> None:
+    from nmrcheck import local_service_app
+
+    monkeypatch.setattr(
+        local_service_app,
+        "ROUTES",
+        {**local_service_app.ROUTES, "analysis.draft": ("POST", "/draft")},
+    )
+    with pytest.raises(ValueError, match="no handler"):
+        local_service_app.create_local_app(credential=CRED)
+
+
 def test_the_app_serves_only_operations_the_table_permits() -> None:
     from nmrcheck.local_service_app import SERVED_OPERATIONS
     from nmrcheck.offline_policy import is_served_locally
