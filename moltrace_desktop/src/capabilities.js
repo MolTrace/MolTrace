@@ -38,8 +38,20 @@ function assess(capability, world = {}) {
   if (!ent || ent.valid !== true) {
     return locked('product_not_enabled', `${name} is switched off for this installation, or its licence could not be confirmed.`)
   }
-  if (capability.requiresModule && Array.isArray(ent.modules) && !ent.modules.includes(capability.requiresModule)) {
-    return locked('product_not_enabled', `${name} is not switched on for this installation.`)
+  // The statement's OWN module list. `Array.isArray(...) &&` was here and made
+  // the check permissive: an entitlement with `valid: true` and no `modules`
+  // field — truncated, malformed, or an older schema — granted every module.
+  // That is the exact inversion of this file's doctrine ten lines up, and of the
+  // gate one step earlier, where a non-array `world.modules` is coerced to null
+  // and immediately locked. An absent list is not an empty constraint; it is no
+  // answer, and no answer is not available.
+  if (capability.requiresModule) {
+    if (!Array.isArray(ent.modules)) {
+      return locked('product_not_enabled', `${name} is unavailable because this installation could not read which products its licence covers.`)
+    }
+    if (!ent.modules.includes(capability.requiresModule)) {
+      return locked('product_not_enabled', `${name} is not switched on for this installation.`)
+    }
   }
 
   // 3. Is the local side actually set up — packs present, service reachable and

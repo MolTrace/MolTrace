@@ -40,6 +40,19 @@ async function run() {
 
   const problems = []
 
+  // A window nobody can see is not a shipped product. `show: false` with no
+  // show() call launched a configured build that displayed nothing, and every
+  // other layer here passed — a webContents exists whether or not anyone can
+  // look at it. Asserted here because this is the only test that drives a real
+  // window.
+  const { BrowserWindow } = require('electron')
+  const windows = BrowserWindow.getAllWindows()
+  if (windows.length === 0) {
+    problems.push('[window] no window was created')
+  } else if (!windows.some((w) => w.isVisible())) {
+    problems.push('[window] a window was created but none is visible — the build launches to nothing')
+  }
+
   // Layer 0: the OS-level sandbox. Checked first because if it is off, every
   // layer below is reporting on a weaker process than the one that ships.
   problems.push(...assertOsSandboxNotDisabled(require('electron').app.commandLine))
