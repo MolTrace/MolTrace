@@ -91,6 +91,33 @@ check('a scan of the temp dir after creation finds no credential file', () => {
   assert.deepStrictEqual(hits, [], `credential-named file left in ${dir}`)
 })
 
+check('the header name matches the one the ENGINE verifies', () => {
+  // The two halves are in different languages and were written hours apart. They
+  // agree today, and nothing made them agree — a rename on either side would be
+  // silent, and every request would fail authentication with a correct
+  // credential. Read the Python constant rather than restating it.
+  const py = fs.readFileSync(
+    path.join(__dirname, '..', '..', 'moltrace_backend', 'src', 'nmrcheck', 'desktop_transport.py'),
+    'utf8',
+  )
+  const m = py.match(/^CREDENTIAL_HEADER\s*=\s*"([^"]+)"/m)
+  assert.ok(m, 'could not find CREDENTIAL_HEADER in desktop_transport.py')
+  assert.strictEqual(cred.HEADER_NAME, m[1],
+    `the shell sends ${cred.HEADER_NAME} and the engine reads ${m[1]}`)
+})
+
+check('the emitted length clears the ENGINE\'s minimum', () => {
+  const py = fs.readFileSync(
+    path.join(__dirname, '..', '..', 'moltrace_backend', 'src', 'nmrcheck', 'local_service_entry.py'),
+    'utf8',
+  )
+  const m = py.match(/_MIN_CREDENTIAL_CHARS\s*=\s*(\d+)/)
+  assert.ok(m, 'could not find _MIN_CREDENTIAL_CHARS in local_service_entry.py')
+  const emitted = cred.create().valueForHandle().length
+  assert.ok(emitted >= Number(m[1]),
+    `the shell emits ${emitted} characters and the engine requires ${m[1]}`)
+})
+
 for (const [s, n] of results) console.log(`  ${s === 'PASS' ? '✓' : '✗'} ${n}`)
 const failed = results.filter(([s]) => s === 'FAIL').length
 console.log(failed ? `\nSERVICE CREDENTIAL FAILED (${failed})` : `\nSERVICE CREDENTIAL OK — ${results.length} assertions`)
