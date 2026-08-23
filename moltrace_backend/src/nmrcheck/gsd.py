@@ -42,8 +42,40 @@ from scipy.optimize import least_squares
 
 # Plausible homonuclear 1H-1H coupling window (Hz). Spacings outside this are
 # not treated as real J couplings.
+#
+# The upper edge is a claim about CHEMISTRY, and it decides a discrete label, so
+# it was measured rather than guessed. Dumping every adjacent-line spacing the
+# deconvolution produces across the 19-fixture golden corpus (773 spacings from
+# 126 multiplets) splits cleanly into two regimes with nothing in between:
+#
+#   * spacings actually reported as a coupling (d / t / q / dd ...) top out at
+#     18.06 Hz -- a geminal 2J, the largest genuine 1H-1H coupling in the corpus;
+#   * the next-largest values are 43.52 and 45.62 Hz, and neither is a coupling.
+#     43.52 Hz is 60000023 (cocaine) peak 2, two overlapping bicyclic-ring
+#     signals; 45.62 Hz is 40256149 (piperine) peak 9, two methylene multiplets
+#     inside the piperidine envelope. Neither compound contains fluorine or
+#     phosphorus, so no heteronuclear route reaches those values either.
+#
+# So the interval (18.06, 43.52) Hz is EMPTY, and the previous 60.0 sat on the
+# far side of it -- past both spurious pairs, which were therefore shipped to
+# chemists as doublets with impossible J values. Its midpoint, the edge furthest
+# from both regimes, is 30.79 Hz; the independently tuned 1H multiplet window in
+# moltrace.spectroscopy.peaks.gsd (_DEFAULT_CLUSTER_J_HZ_BY_NUCLEUS) answers the
+# same physical question -- how far apart two lines of one 1H multiplet can sit --
+# and was tuned against the same corpus to 30.0. Those two agree to 0.8 Hz, so
+# 30.0 it is, and the two constants now say the same thing instead of differing
+# by a factor of two.
+#
+# The exact value inside that empty interval is not load-bearing for this corpus:
+# any edge in [19, 43] Hz classifies all 177 golden peaks identically. That is the
+# point. A threshold on a fitted quantity belongs where the density is zero, not
+# where a round number happens to fall -- the fit's own spread on the weakest
+# lines is several Hz, so an edge with data near it makes the reported
+# multiplicity a function of the last bits of the input. tests/test_gsd.py
+# TestTheCouplingWindowIsAChemicalBound pins the two regimes and deliberately
+# asserts nothing about the gap between them.
 _MIN_J_HZ = 0.5
-_MAX_J_HZ = 60.0
+_MAX_J_HZ = 30.0
 
 # A fit is accepted (and a line is deemed redundant) when the region is
 # reproduced to within this many noise-sigma everywhere.
