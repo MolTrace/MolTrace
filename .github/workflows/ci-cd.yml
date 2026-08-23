@@ -696,8 +696,23 @@ jobs:
           uv sync --frozen --extra fid --extra dev
           uv run moltrace-eval-gate --informational \
             --persist-out "$RUNNER_TEMP/nmr_eval_gate/candidate_metric_vector.json"
+      # The sentinel above is deliberately informational (`--informational`), and
+      # this upload only preserves its metric vector as release evidence. Losing
+      # that evidence must not stop a deploy: on 2026-08-23 GitHub's own artifact
+      # service timed out five times over
+      # (/twirp/github.actions.results.api.v1.ArtifactService/CreateArtifact), the
+      # step failed, and Build + push, Apply DB migrations and Deploy new revision
+      # were all skipped -- a non-blocking diagnostic hard-blocked production over
+      # a transient outage in someone else's service. `if-no-files-found: ignore`
+      # already says the artifact is optional; this says the same about the upload.
+      # The step still reports red, so a persistent failure stays visible.
+      #
+      # Deliberately NOT applied to the SBOM uploads in sbom-backend/sbom-frontend:
+      # those feed verify-provenance, which is a documented blocking release gate,
+      # and their evidence is required rather than informational.
       - name: Upload accuracy sentinel vector
         if: always()
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: nmr-eval-gate-candidate-vector
