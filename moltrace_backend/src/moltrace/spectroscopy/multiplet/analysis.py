@@ -66,9 +66,10 @@ _NAME_ALPHABET = [chr(ord("A") + i) for i in range(26)]
 # Outside this window, a peak-position spacing is not considered a real
 # scalar coupling.  Matches ``nmrcheck.gsd._MIN_J_HZ`` / ``_MAX_J_HZ`` so
 # the multiplet analyser agrees with the legacy simple-multiplicity helper
-# on overlap cases.
+# on overlap cases -- these two must move together, and the measurement that
+# sets the upper edge is recorded beside the constants in ``nmrcheck.gsd``.
 _MIN_J_HZ = 0.5
-_MAX_J_HZ = 60.0
+_MAX_J_HZ = 30.0
 
 # -- Pascal-triangle intensity ratios for first-order multiplets -------------
 # Used in ``generate_synthetic_multiplet`` to weight the predicted peak
@@ -542,15 +543,22 @@ def _try_complex_multiplet(
     if n == 4:
         outer_sep = centres_hz[3] - centres_hz[0]
         inner_sep = centres_hz[2] - centres_hz[1]
+        j1 = 0.5 * (outer_sep + inner_sep)
+        j2 = 0.5 * (outer_sep - inner_sep)
+        # Bound the COUPLINGS, not the separations they are read from.
+        # ``outer_sep`` is J1 + J2 and ``inner_sep`` is J1 - J2, so neither is
+        # itself a coupling and neither belongs inside the J window: a perfectly
+        # ordinary dd of 13.7 and 11.4 Hz spans 25.1 Hz outer, which is wider
+        # than any single 1H-1H coupling can be. Testing the sum against the
+        # coupling ceiling was harmless only while that ceiling was loose enough
+        # (60 Hz) to admit sums as well; it rejects real dd patterns as soon as
+        # the ceiling is set to what a coupling can actually reach.
         if (
-            _MIN_J_HZ <= outer_sep <= _MAX_J_HZ
-            and _MIN_J_HZ <= inner_sep <= _MAX_J_HZ
-            and outer_sep >= inner_sep
+            outer_sep >= inner_sep
+            and inner_sep >= _MIN_J_HZ
+            and _MIN_J_HZ <= j2 <= j1 <= _MAX_J_HZ
         ):
-            j1 = 0.5 * (outer_sep + inner_sep)
-            j2 = 0.5 * (outer_sep - inner_sep)
-            if j2 >= _MIN_J_HZ:
-                _consider("dd", [j1, j2])
+            _consider("dd", [j1, j2])
 
     # --- dt / td (n=6) ---
     if n == 6:
