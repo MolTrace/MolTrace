@@ -28,6 +28,7 @@ from .version_currency import VersionCoordinate
 
 __all__ = [
     "METHOD_DEFAULTS_LINEAGE",
+    "METHOD_DEFAULTS_SEMVER",
     "active_version_coordinates",
     "assertion_payload",
     "method_defaults_payload",
@@ -43,13 +44,28 @@ __all__ = [
 #: declares them individually.
 METHOD_DEFAULTS_LINEAGE = "supplier_defaults"
 
+#: The ORDERED version of the constant set below. Bump it in the same change that alters any
+#: constant `method_defaults_payload` reads.
+#:
+#: Without this the method axis had an identity and no ordering, so any constant change compared
+#: as *unknown* — "cannot establish currency" — and refused. That is safe but blunt and, worse,
+#: uninformative: an installation was taken out of service with no way to say whether it was
+#: ahead or behind, and a scientist could not be told to update. With a declared version the same
+#: change reports *behind*, which is true, actionable, and lets the AHEAD policy apply here as it
+#: does to the rule sets.
+#:
+#: The constants themselves live in three other modules, so nothing at the edit site prompts this
+#: bump. `tests/test_rule_set_revisions.py` is the enforcement, exactly as it is for the five
+#: rule sets: it fails when the payload's content hash moves and this does not.
+METHOD_DEFAULTS_SEMVER = "1.0.0"
+
 #: lineage -> (display name, import path of the engine module).
 _RULE_ENGINES: tuple[tuple[str, str, str], ...] = (
-    ("ich_q3ab", "the ICH Q3A/Q3B impurity rule set", "q3ab_calculator"),
-    ("ich_q3c", "the ICH Q3C residual-solvent rule set", "q3c_solvents"),
-    ("ich_q3d", "the ICH Q3D elemental-impurity rule set", "q3d_elements"),
-    ("ich_m7", "the ICH M7 mutagenic-impurity rule set", "m7_classifier"),
-    ("cpca", "the CPCA nitrosamine rule set", "cpca_classifier"),
+    ("ich_q3ab", "ICH Q3A/Q3B impurity rule set", "q3ab_calculator"),
+    ("ich_q3c", "ICH Q3C residual-solvent rule set", "q3c_solvents"),
+    ("ich_q3d", "ICH Q3D elemental-impurity rule set", "q3d_elements"),
+    ("ich_m7", "ICH M7 mutagenic-impurity rule set", "m7_classifier"),
+    ("cpca", "CPCA nitrosamine rule set", "cpca_classifier"),
 )
 
 
@@ -115,7 +131,7 @@ def _model_coordinates(session_factory: Any) -> list[VersionCoordinate]:
         coordinates.append(
             VersionCoordinate(
                 lineage=f"model:{artifact.role}{suffix}",
-                display_name=f"the {artifact.role.replace('_', ' ')} model{nucleus_copy}",
+                display_name=f"{artifact.role.replace('_', ' ')} model{nucleus_copy}",
                 identity=f"sha256:{artifact.artifact_sha256}",
                 revision=artifact.semantic_version,
                 kind="model_artifact",
@@ -137,7 +153,7 @@ def _reference_pack_coordinate() -> VersionCoordinate:
 
     return VersionCoordinate(
         lineage="reference_pack:hose",
-        display_name="the reference shift knowledge base",
+        display_name="reference shift knowledge base",
         identity=knowledge_base_identity(),
         revision=None,
         kind="reference_pack",
@@ -149,9 +165,9 @@ def _method_defaults_coordinate() -> VersionCoordinate:
 
     return VersionCoordinate(
         lineage=METHOD_DEFAULTS_LINEAGE,
-        display_name="the built-in method constants",
+        display_name="built-in method-constant set",
         identity=content_hash(method_defaults_payload()),
-        revision=None,
+        revision=METHOD_DEFAULTS_SEMVER,
         kind="method_defaults",
     )
 
