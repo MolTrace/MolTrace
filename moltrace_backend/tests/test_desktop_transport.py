@@ -90,6 +90,29 @@ def test_a_credential_in_the_path_is_refused() -> None:
         guard().check(scope(path=f"/health/{CRED}", hdrs=headers(**{CREDENTIAL_HEADER: CRED})))
 
 
+def test_a_content_addressed_path_is_NOT_refused() -> None:
+    """The false-positive half, and it would have broken real routes.
+
+    A first version refused any path segment of >= 32 alphanumeric characters.
+    A SHA-256 digest is 64 hex characters, and this platform puts
+    content-addressed identifiers in paths routinely — so the local service
+    would have refused its own artifact reads. The rule now matches the
+    credential's exact shape rather than "long and opaque".
+    """
+    sha = "a" * 64  # a hex digest, as it appears in a content-addressed path
+    assert guard().check(scope(path=f"/artifacts/{sha}/download")) is None
+
+
+def test_a_uuid_in_a_path_is_NOT_refused() -> None:
+    assert guard().check(scope(path="/records/8f14e45fceea167a5a36dedd4bea2543")) is None
+
+
+def test_the_credential_shape_is_still_caught_in_a_path() -> None:
+    """The true-positive half. Narrowing the rule must not blunt it."""
+    with pytest.raises(TransportRefusal):
+        guard().check(scope(path=f"/health/{CRED}"))
+
+
 def test_comparison_is_constant_time() -> None:
     """§7.1: "comparing it in constant time before any request body is read"."""
     import inspect
