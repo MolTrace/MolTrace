@@ -34,6 +34,12 @@ class CredentialHandleError(RuntimeError):
 def read_credential_from_handle(fd: int = CREDENTIAL_FD) -> str:
     """Read the credential the host wrote, or raise.
 
+    **CONSUMES the descriptor.** It is closed on the way out, success or failure,
+    which is deliberate: the handle exists to carry one secret once, and leaving
+    it open leaves the credential re-readable by anything that later inherits the
+    descriptor. A caller that needs to keep its own copy of the fd must pass a
+    ``dup``.
+
     Never echoes what it read: a refusal that quotes the value publishes it into
     whatever collects the startup log.
     """
