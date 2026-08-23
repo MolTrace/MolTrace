@@ -26,6 +26,7 @@ put it. Both are required.
 from __future__ import annotations
 
 import hmac
+import re
 from dataclasses import dataclass
 
 #: The one position a credential may occupy.
@@ -41,7 +42,18 @@ _FORBIDDEN_CREDENTIAL_HEADERS = ("cookie", "authorization", "proxy-authorization
 #: logs, referrers and crash reports.
 _FORBIDDEN_QUERY_KEYS = (b"access_token", b"token", b"credential", b"api_key")
 
+#: Shortest credential this service will start with. A separate concept from the
+#: path-shape constant below, and they were briefly the same name serving both —
+#: which meant raising the minimum would have silently stopped the path check
+#: catching a real credential. One constant, two policies, is how that happens.
 _MIN_CREDENTIAL_LEN = 32
+
+#: The exact length the shell emits: base64url of 32 random bytes. Used ONLY to
+#: recognise a credential sitting in a path.
+_CREDENTIAL_CHARS = 43
+
+#: base64url's alphabet, and nothing else.
+_BASE64URL_ONLY = re.compile(r"[A-Za-z0-9_-]+")
 
 
 class TransportRefusal(Exception):
@@ -115,13 +127,21 @@ class DesktopTransportGuard:
 
 
 def _looks_like_a_credential_segment(path: str) -> bool:
-    """A long opaque path segment is a credential in the address.
+    """A credential-shaped path segment is a credential in the address.
 
-    Deliberately shape-based rather than value-based: comparing against the real
-    credential here would mean a *wrong* long token in the path sails through,
-    and the rule is about the position, not the value.
+    Shape-based rather than value-based on purpose: comparing against the real
+    credential would let a *wrong* long token in the path sail through, and the
+    rule is about the position, not the value.
+
+    But the shape must be the CREDENTIAL's shape, not "long and opaque". A first
+    version refused any segment of >= 32 alphanumeric characters, which is also
+    what a SHA-256 digest looks like — and this platform puts content-addressed
+    identifiers in paths routinely. That version would have refused legitimate
+    routes, and the local service's own artifact reads first.
+
+    So: exactly the length the shell emits, and exactly the base64url alphabet.
     """
     return any(
-        len(seg) >= _MIN_CREDENTIAL_LEN and seg.replace("-", "").replace("_", "").isalnum()
+        len(seg) == _CREDENTIAL_CHARS and _BASE64URL_ONLY.fullmatch(seg) is not None
         for seg in path.split("/")
     )
