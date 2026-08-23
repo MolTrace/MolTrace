@@ -22,12 +22,13 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Any
 
-from fastapi import FastAPI
+from fastapi import Body, FastAPI, HTTPException
 from starlette.responses import JSONResponse
 from starlette.types import ASGIApp, Receive, Scope, Send
 
 from .desktop_transport import DesktopTransportGuard, TransportRefusal
 from .device_journal import ClockState, JournalEntry, append
+from .local_science import process_spectrum
 from .offline_policy import is_served_locally
 
 #: Operations this app serves, and the route each one is reached by. Routes are
@@ -41,6 +42,7 @@ from .offline_policy import is_served_locally
 ROUTES: dict[str, tuple[str, str]] = {
     # operation -> (method, path)
     "system.health": ("GET", "/health"),
+    "fid.process": ("POST", "/fid/process"),
 }
 
 #: Kept as a name because tests and callers read it, derived so it cannot drift.
@@ -124,6 +126,37 @@ async def _health() -> dict[str, Any]:
     return {"status": "ok"}
 
 
+#: Module-level singleton, because ruff's B008 is right: a call in a default
+#: argument is evaluated once at import and shared, which is fine here and
+#: surprising everywhere else.
+_BODY = Body(...)
+
+
+async def _fid_process(payload: dict = _BODY) -> dict[str, Any]:
+    HANDLER_CALLS.append("fid.process")
+    try:
+        peaks = process_spectrum(
+            ppm_axis=payload.get("ppm_axis", []),
+            intensity=payload.get("intensity", []),
+            nucleus=str(payload.get("nucleus", "unknown")),
+            field_mhz=float(payload.get("field_mhz", 0.0)),
+        )
+    except ValueError as bad_input:
+        # Journalled as a refusal: an analysis that could not run is an event
+        # worth keeping, and the cause is the engine's own message about the
+        # SHAPE of the input -- it carries no spectral data.
+        _journal("fid.process", refused=True, cause=str(bad_input))
+        raise HTTPException(status_code=400, detail=str(bad_input)) from None
+
+    # The count, not the peaks. A journal that carried the results would become a
+    # second copy of the science, and the record of what was DONE is the thing
+    # this journal is for.
+    _journal("fid.process", refused=False, cause=f"{len(peaks)} peaks")
+    # No timestamp in the response. §8.4: a device clock is not a record time, and
+    # a result that carries one starts being read as a record.
+    return {"peaks": [p.to_dict() for p in peaks]}
+
+
 class TransportGuardMiddleware:
     """Runs before routing, before the body, before any handler."""
 
@@ -189,7 +222,7 @@ def create_local_app(
 
     # One handler per declared route, registered from the map. Adding a route
     # means adding a line to ROUTES, which is the line the policy check reads.
-    handlers = {"system.health": _health}
+    handlers = {"system.health": _health, "fid.process": _fid_process}
     for operation, (method, path) in ROUTES.items():
         handler = handlers.get(operation)
         if handler is None:
