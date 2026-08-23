@@ -1,0 +1,30 @@
+{
+  "_comment": [
+    "Pairs each versioned rule-set engine's content hash with its declared revision.",
+    "T11 (desktop DELTA 4 \u00a79.3) fails when a hash moves and its semver does not.",
+    "Bumping a semver here without changing the rule set is harmless; changing the rule",
+    "set without bumping the semver is the thing this file exists to catch."
+  ],
+  "engines": {
+    "cpca": {
+      "identity_hash": "sha256:e8f9db5214942b48b8572090444ce7c16d6dce8ab6a4f25174d036a5e4e36be4",
+      "semver": "1.0.0"
+    },
+    "m7": {
+      "identity_hash": "sha256:922f78e48fb90431c89c06755784c4fa59e1c5c2d03ba4a6e54d45d17147331d",
+      "semver": "1.0.0"
+    },
+    "q3ab": {
+      "identity_hash": "sha256:ed6c58c23c1d15a935f93f58c9fd92de01f1682123cd65aff276fa755a486ff7",
+      "semver": "1.0.0"
+    },
+    "q3c": {
+      "identity_hash": "sha256:2e3b58d7a01c229835d35686fe90d65ff2c636f743a96685c3fb6777f9242b63",
+      "semver": "1.0.0"
+    },
+    "q3d": {
+      "identity_hash": "sha256:0ca79670bc792d8ce3cce8aec2ad706b97346008da706cc3913c8e4074a51ed9",
+      "semver": "1.0.0"
+    }
+  }
+}
