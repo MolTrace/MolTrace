@@ -56,7 +56,7 @@ const PROBE = `(() => {
 
 // The contextBridge allowlist. §7.1: "least-privilege capabilities per window,
 // enumerated in one reviewable allowlist." Growing this list is a security review.
-const ALLOWED_BRIDGE_KEYS = ['capabilities']
+const ALLOWED_BRIDGE_KEYS = ['capabilities', 'onChanged', 'service']
 
 // The preload's self-report (§ main.js IPC). A main-world probe is structurally
 // blind to nodeIntegration and sandbox while contextIsolation holds — MEASURED,

@@ -15,6 +15,17 @@ const path = require('node:path')
 const seen = new Set()
 app.on('web-contents-created', (_e, wc) => seen.add(wc))
 
+async function waitFor(condition, timeoutMs, what) {
+  const deadline = Date.now() + timeoutMs
+  while (Date.now() < deadline) {
+    if (condition()) return
+    await new Promise((r) => setTimeout(r, 100))
+  }
+  // Not a throw: the assertions below should still run and report what they can,
+  // and "never became visible" is itself one of the things worth asserting.
+  console.error(`  (timed out after ${timeoutMs}ms waiting for ${what})`)
+}
+
 function fail(lines) {
   console.error('\nCONFINEMENT FAILED:')
   for (const l of lines) console.error('  ✗ ' + l)

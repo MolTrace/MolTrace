@@ -11,3 +11,8 @@ body { margin: 0; padding: 2rem; }
 .cap--setup      { border-left: 4px solid #ef6c00; }
 .cap--permission { border-left: 4px solid #546e7a; }
 .cap--unknown    { border-left: 4px solid #c62828; }
+.service { border: 1px solid currentColor; border-left-width: 4px; border-radius: .5rem;
+           padding: .75rem 1rem; max-width: 34rem; margin-bottom: 1rem; }
+.service--running { border-left-color: #2e7d32; }
+.service--stopped { border-left-color: #c62828; }
+.service__detail { margin: .25rem 0 0; font-size: .875rem; opacity: .85; }
