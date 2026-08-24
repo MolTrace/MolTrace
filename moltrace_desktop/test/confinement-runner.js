@@ -15,6 +15,24 @@ const path = require('node:path')
 const seen = new Set()
 app.on('web-contents-created', (_e, wc) => seen.add(wc))
 
+// WATCHDOG. Two CI runners sat in this script for five hours and twenty minutes
+// each before a human noticed, and the log's last line was from before the
+// assertions started — so it said nothing about where it stopped. A security
+// test that hangs is worse than one that fails: a failure is a red mark someone
+// acts on, a hang is a spinner someone waits out. This bounds the run and names
+// the stage it died in.
+//
+// The job also carries a `timeout-minutes` in CI. Both are wanted: this one
+// reports the stage, that one survives this file being wrong.
+let stage = 'starting'
+const WATCHDOG_MS = Number(process.env.MOLTRACE_CONFINEMENT_TIMEOUT_MS || 120000)
+const watchdog = setTimeout(() => {
+  console.error(`\nCONFINEMENT TIMED OUT after ${WATCHDOG_MS}ms during: ${stage}`)
+  try { require('../src/main.js').shutdown() } catch {}
+  app.exit(1)
+}, WATCHDOG_MS)
+watchdog.unref()
+
 async function waitFor(condition, timeoutMs, what) {
   const deadline = Date.now() + timeoutMs
   while (Date.now() < deadline) {
@@ -26,18 +44,41 @@ async function waitFor(condition, timeoutMs, what) {
   console.error(`  (timed out after ${timeoutMs}ms waiting for ${what})`)
 }
 
+// app.exit() does NOT emit `will-quit`, so the app's own cleanup never runs on
+// this path. Measured: after app.exit(0) the `uv` and `python` processes were
+// still alive and reparented to init. Every exit here goes through this.
+function leave(code) {
+  try { require('../src/main.js').shutdown() } catch {}
+  clearTimeout(watchdog)
+  app.exit(code)
+}
+
 function fail(lines) {
   console.error('\nCONFINEMENT FAILED:')
   for (const l of lines) console.error('  ✗ ' + l)
-  app.exit(1)
+  leave(1)
 }
 
 async function run() {
   // Boot the real main process. It must not be a test-only window factory —
   // the point is to assert what the SHIPPING main process produces.
+  stage = 'booting the main process'
   const main = require('../src/main.js')
-  await new Promise((r) => setTimeout(r, 2500))
 
+  // Waits for the CONDITION rather than sleeping a fixed 2500ms. The fixed sleep
+  // was a flake: starting the local service competes for the event loop, a cold
+  // subprocess makes that competition slower, and `ready-to-show` slipped past
+  // the deadline -- reporting "the build launches to nothing" for a scheduling
+  // reason. A security test that passes two runs in three is worse than one that
+  // fails, because the third result gets explained away.
+  //
+  // `waitFor` existed for this and was never called. The helper was written, the
+  // call site was not changed, and the flake survived a fix that looked applied.
+  const { BrowserWindow: BW } = require('electron')
+  stage = 'waiting for a visible window'
+  await waitFor(() => BW.getAllWindows().some((w) => w.isVisible()), 20000, 'a visible window')
+
+  stage = 'collecting renderers'
   const { webContents } = require('electron')
   const all = webContents.getAllWebContents()
   if (all.length === 0) return fail(['no renderers were created — nothing was asserted'])
@@ -56,8 +97,7 @@ async function run() {
   // other layer here passed — a webContents exists whether or not anyone can
   // look at it. Asserted here because this is the only test that drives a real
   // window.
-  const { BrowserWindow } = require('electron')
-  const windows = BrowserWindow.getAllWindows()
+  const windows = BW.getAllWindows()
   if (windows.length === 0) {
     problems.push('[window] no window was created')
   } else if (!windows.some((w) => w.isVisible())) {
@@ -95,6 +135,7 @@ async function run() {
     }
   }
 
+  stage = 'probing renderers'
   for (const wc of all) {
     if (wc.isDestroyed()) continue
     const url = wc.getURL() || '(no url)'
@@ -111,7 +152,7 @@ async function run() {
 
   if (problems.length) return fail(problems)
   console.log(`\nCONFINEMENT OK — ${all.length} renderer(s) asserted, all confined.`)
-  app.exit(0)
+  leave(0)
 }
 
 app.whenReady().then(run).catch((e) => fail([String(e && e.stack || e)]))

@@ -40,6 +40,48 @@ for (const m of html.matchAll(/(?:src|href)="\.\/([^"]+)"/g)) {
   }
 }
 
+// Every test suite must actually be RUN. A suite that exists and is wired into
+// nothing is worse than no suite: it reads as coverage in the tree and in review,
+// and it asserts nothing. That is not hypothetical -- test/local-service.js was
+// written, committed, and never referenced by any npm script, so six assertions
+// sat inert while CI reported the desktop green.
+//
+// A file in test/ is a suite unless it is a helper another test requires, or is
+// prefixed with `_`. Anything else must appear in the `test` script chain.
+const testDir = __dirname
+const pkgScripts = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8')).scripts
+
+// Reachable FROM `test`, following `npm run` transitively -- not "mentioned in
+// some script anywhere". A first version scanned every script value, so a suite
+// kept alive only by its own convenience alias (`test:service`) counted as
+// wired. Measured: unwiring local-service from the `test` chain left the guard
+// green. It was checking that the file was spelled somewhere, which is not the
+// property. The suite must be reachable from the command CI runs.
+const reachable = new Set()
+const expand = (name) => {
+  if (reachable.has(name) || !pkgScripts[name]) return ''
+  reachable.add(name)
+  const body = pkgScripts[name]
+  let text = body
+  for (const m of body.matchAll(/npm run ([A-Za-z0-9:_-]+)/g)) text += ' ' + expand(m[1])
+  return text
+}
+const scriptText = expand('test')
+const testFiles = fs.readdirSync(testDir).filter((n) => n.endsWith('.js') && !n.startsWith('_'))
+const requiredByAnother = new Set()
+for (const f of testFiles) {
+  for (const m of fs.readFileSync(path.join(testDir, f), 'utf8').matchAll(/require\(\s*['"]\.\/([^'"]+)['"]\s*\)/g)) {
+    requiredByAnother.add(m[1].endsWith('.js') ? m[1] : m[1] + '.js')
+  }
+}
+for (const f of testFiles) {
+  if (requiredByAnother.has(f)) continue
+  checked++
+  if (!scriptText.includes('test/' + f)) {
+    problems.push(`test/${f} is a suite that no npm script runs — it asserts nothing`)
+  }
+}
+
 for (const p of problems) console.log('  ✗ ' + p)
 if (problems.length) {
   console.log(`\nMODULES FAILED (${problems.length} of ${checked} references unresolved)`)
