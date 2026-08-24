@@ -76,7 +76,93 @@ check('an unreachable service still yields a usable capability world', () => {
   assert.ok(r.code, 'no cause given for an unreachable service')
 })
 
-for (const [s, n] of results) console.log(`  ${s === 'PASS' ? '✓' : '✗'} ${n}`)
-const failed = results.filter(([s]) => s === 'FAIL').length
-console.log(failed ? `\nLOCAL SERVICE FAILED (${failed})` : `\nLOCAL SERVICE OK — ${results.length} assertions`)
-process.exit(failed ? 1 : 0)
+// --- the two invariants that cost a build ----------------------------------
+
+const net = require('node:net')
+
+/** Connect and report which of the three things happened. */
+function probe(socketPath, timeoutMs = 1500) {
+  return new Promise((resolve) => {
+    const c = net.connect(socketPath)
+    const t = setTimeout(() => { c.destroy(); resolve('accepted-and-ignored') }, timeoutMs)
+    c.on('connect', () => { /* wait: an accepting-but-silent peer holds it open */ })
+    c.on('error', (e) => { clearTimeout(t); resolve(e.code) })
+    c.on('close', () => { clearTimeout(t); resolve('closed') })
+  })
+}
+
+const asyncChecks = [
+  ['the host SWALLOWS connections while it is still accepting', async () => {
+    // Documents the hazard the fix exists for, so that removing the fix fails
+    // here rather than in a five-hour CI hang. With no child in the picture at
+    // all, a request to this socket is accepted by the host's own server and
+    // then never answered -- the caller waits forever and never gets an error.
+    const h = svc.createListener()
+    try {
+      assert.strictEqual(await probe(h.socketPath), 'accepted-and-ignored',
+        'the host no longer swallows -- if this changed, the staging-rename dance may be unnecessary')
+    } finally { h.close() }
+  }],
+
+  ['once the host stops accepting, a connection is REFUSED, not swallowed', async () => {
+    // The invariant. A refused connection is a retry; a swallowed one is a hang.
+    const h = svc.createListener()
+    try {
+      h.stopAccepting()
+      const r = await probe(h.socketPath)
+      assert.strictEqual(r, 'ECONNREFUSED', `expected ECONNREFUSED, got ${r}`)
+    } finally { h.close() }
+  }],
+
+  ['the socket path SURVIVES the host closing its server', async () => {
+    // libuv unlinks the path it BOUND. That is why the socket is bound under a
+    // staging name and renamed before the host closes -- libuv then unlinks a
+    // name that is already gone. Delete the rename and this goes red, which is
+    // the point: without it the host's close destroys the service's socket and
+    // nothing can connect at all.
+    const h = svc.createListener()
+    try {
+      h.stopAccepting()
+      assert.ok(fs.existsSync(h.socketPath),
+        'the host closing its server unlinked the socket -- the service is unreachable')
+    } finally { h.close() }
+  }],
+
+  ['a service that cannot be spawned is REPORTED, never thrown', async () => {
+    // The five-hour hang. `spawn` reports ENOENT as an ASYNCHRONOUS 'error'
+    // event, which no try/catch around spawn() can see, and an unhandled 'error'
+    // on an EventEmitter throws. In Electron's main process that becomes an
+    // uncaught exception, whose default handling is a MODAL dialog -- and on a
+    // machine with nobody to dismiss it, the app hangs instead of failing.
+    //
+    // A non-existent working directory makes spawn fail exactly that way.
+    let uncaught = null
+    const onUncaught = (e) => { uncaught = e }
+    process.on('uncaughtException', onUncaught)
+    const started = svc.start({
+      credential: require('../src/service-credential.js').create(),
+      backendDir: path.join(os.tmpdir(), 'moltrace-no-such-dir-' + process.pid),
+    })
+    try {
+      await new Promise((r) => setTimeout(r, 1200))
+      assert.strictEqual(uncaught, null, `spawn failure escaped as an uncaught exception: ${uncaught && uncaught.message}`)
+      const f = started.failure()
+      assert.ok(f, 'the spawn failed and nothing recorded why')
+      assert.ok(svc.describeFailure(f).reason.length > 10, 'the failure has no readable cause')
+    } finally {
+      process.removeListener('uncaughtException', onUncaught)
+      started.close()
+    }
+  }],
+]
+
+;(async () => {
+  for (const [name, fn] of asyncChecks) {
+    try { await fn(); results.push(['PASS', name]) }
+    catch (e) { results.push(['FAIL', name + ' — ' + e.message]) }
+  }
+  for (const [s, n] of results) console.log(`  ${s === 'PASS' ? '✓' : '✗'} ${n}`)
+  const failed = results.filter(([s]) => s === 'FAIL').length
+  console.log(failed ? `\nLOCAL SERVICE FAILED (${failed})` : `\nLOCAL SERVICE OK — ${results.length} assertions`)
+  process.exit(failed ? 1 : 0)
+})()

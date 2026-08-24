@@ -20,8 +20,7 @@ let localServiceCredential = null
 // The running service, or a description of why it is not running. Never null:
 // the capability readout needs an answer, and "we did not look" is not one.
 let serviceState = { reachable: false, versions: {}, reason: 'The local science service has not been started yet.' }
-let serviceHandle = null
-let serviceChild = null
+let service = null
 
 // Collected per webContents id so the confinement test can assert on the
 // environment each preload actually got, not on what was declared.
@@ -51,46 +50,46 @@ async function startLocalService() {
   // reachable, and the capability readout already renders an unreachable service
   // as not-provisioned with a cause.
   try {
-    serviceHandle = localService.createListener()
-    const plan = localService.buildSpawn({
+    service = localService.start({
       credential: localServiceCredential,
-      socketFd: serviceHandle.fd,
       backendDir: pathMod.join(__dirname, '..', '..', 'moltrace_backend'),
     })
-    serviceChild = localService.spawn(plan.command, plan.args, plan.options)
-    plan.writeCredential(serviceChild)
-    serviceChild.on('exit', (code) => {
-      serviceState = localService.describeFailure(new Error(`the service stopped (code ${code})`))
-    })
-    serviceState = await waitForService(serviceHandle.socketPath)
+    serviceState = await waitForService(service.socketPath, () => service.failure())
   } catch (err) {
     serviceState = localService.describeFailure(err)
   }
 }
 
-// KNOWN LIMITATION, stated rather than hidden.
+// Polls the health route rather than sleeping a fixed time. A fixed sleep is
+// either too short on a cold start or wasted on a warm one, and it turns a slow
+// machine into a "service unavailable" that is not true.
 //
-// The transport itself is proven: driven from plain `node`, this exact sequence
-// -- owner-only socket, credential on fd 3, bound descriptor on fd 4 -- starts
-// the packaged service and returns real peaks over the socket.
-//
-// Started from the ELECTRON main process it does not become ready, and the cause
-// is not yet isolated. Ruled out by measurement: fd 4 IS inherited as a socket
-// under Electron exactly as under node; `uv` resolves on Electron's PATH; the
-// child spawns, stays alive and writes nothing to stderr for 25 seconds.
-//
-// The app is built so this is survivable rather than fatal -- the window opens,
-// the service reports itself not running, and the reason below is what an
-// operator sees. That is the correct behaviour for a service that genuinely is
-// not running; it is not a substitute for finding out why.
-function waitForService(socketPath, attempts = 60) {
-  // Polls the health route rather than sleeping a fixed time. A fixed sleep is
-  // either too short on a cold start or wasted on a warm one, and it turns a
-  // slow machine into a "service unavailable" that is not true.
+// EVERY REQUEST CARRIES A TIMEOUT, and that is load-bearing rather than tidy. A
+// request to this socket can be accepted by something that never answers it, in
+// which case the response callback never fires AND the error callback never
+// fires — so a poll without a timeout does not retry, it stops. That is not
+// hypothetical: the host's own listener used to do exactly this, and a single
+// swallowed probe left the promise below permanently unsettled, the app reporting
+// a service that had in fact started, and no error anywhere to explain it. The
+// host no longer competes for the socket (see local-service.js), but the timeout
+// stays: it is what makes a swallowed connection a retry instead of a hang, for
+// whatever swallows one next.
+function waitForService(socketPath, failure, attempts = 60) {
   return new Promise((resolve) => {
     const attempt = (n) => {
+      // A child that failed to launch will never answer. Say so with its cause
+      // rather than spending fifteen seconds discovering it.
+      const err = failure && failure()
+      if (err) return resolve(localService.describeFailure(err))
+
       const req = http.request(
-        { socketPath, path: '/health', method: 'GET', headers: localServiceCredential.headers() },
+        {
+          socketPath,
+          path: '/health',
+          method: 'GET',
+          headers: localServiceCredential.headers(),
+          timeout: 2000,
+        },
         (res) => {
           res.resume()
           if (res.statusCode === 200) resolve({ reachable: true, versions: { fid: '1' }, reason: null })
@@ -98,23 +97,33 @@ function waitForService(socketPath, attempts = 60) {
           else resolve(localService.describeFailure(new Error(`it answered ${res.statusCode} rather than starting`)))
         },
       )
-      req.on('error', () => {
+      const retry = () => {
         if (n > 0) setTimeout(() => attempt(n - 1), 250)
         else resolve(localService.describeFailure(
           new Error(`it did not answer within ${Math.round((attempts * 250) / 1000)} seconds of starting`)))
-      })
+      }
+      req.on('timeout', () => { req.destroy(); retry() })
+      req.on('error', retry)
       req.end()
     }
     attempt(attempts)
   })
 }
 
-app.on('will-quit', () => {
-  // No orphans. A service left running holds the socket and its credential is
-  // already gone, so nothing could talk to it anyway -- it would just sit there.
-  if (serviceChild) { try { serviceChild.kill() } catch {} }
-  if (serviceHandle) { try { serviceHandle.close() } catch {} }
-})
+// No orphans. A service left running holds the socket and its credential is
+// already gone, so nothing could talk to it anyway -- it would just sit there.
+//
+// EXPORTED because app.exit() does not emit this, and app.exit() is how the
+// confinement test ends. Measured: after app.exit(0) the `uv` and `python`
+// processes were still alive, reparented to init (PPID 1). Anything that exits
+// the app by that route must call shutdown() itself.
+function shutdown() {
+  if (service) { try { service.close() } catch {} }
+  service = null
+}
+module.exports.shutdown = shutdown
+
+app.on('will-quit', shutdown)
 
 // §7.1 asks the readout to report "module, local-pack, network, and SERVICE
 // capabilities". The service is not only a gate input -- an operator needs to see

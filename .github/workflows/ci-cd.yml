@@ -462,6 +462,13 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest]
     runs-on: ${{ matrix.os }}
+    # GitHub's default is 360 MINUTES. Two runners sat in a hung Electron test
+    # for 5h20m each before anyone noticed, because a hang looks like slow work
+    # and nothing bounded it. The whole job takes about three minutes; fifteen is
+    # generous and still fails fast enough to be read as a failure. The test also
+    # carries its own watchdog, which reports WHERE it stopped -- this one only
+    # has to survive that watchdog being wrong.
+    timeout-minutes: 15
     defaults:
       run:
         working-directory: moltrace_desktop
@@ -507,11 +514,14 @@ jobs:
           echo "electron: $actual"
           [ "$actual" = "43.4.1" ] || { echo "::error::expected 43.4.1, got $actual"; exit 1; }
 
-      - name: Product config — inert, unbranded, no key material
-        run: npm run test:product
-
-      - name: Transport credential
-        run: npm run test:credential
+      # `npm run test:node` rather than a hand-listed pair of suites. CI named
+      # test:product and test:credential and nothing else, so key-hierarchy,
+      # capabilities, upgrade-states and local-service never ran here at all —
+      # ten assertions about the service transport among them. Naming the chain
+      # instead of its members means a new suite is covered the moment it is
+      # added to the chain, and test:modules now asserts that it was.
+      - name: Desktop suites — config, credential, keys, capabilities, service
+        run: npm run test:node
 
       # Electron's SUID sandbox helper ships non-setuid from npm, and Chromium
       # REFUSES TO START rather than run unsandboxed — which is the correct
@@ -557,12 +567,6 @@ jobs:
         if: runner.os == 'macOS'
         run: npm run test:confinement
 
-      # Cheap, and it is the failure this repository has actually had: a commit
-      # that references a module it did not add. Static resolution rather than
-      # require-and-see, because running main.js outside Electron throws for
-      # unrelated reasons and a grep on the runtime error would lie.
-      - name: Every local reference is committed
-        run: npm run test:modules
 
   deployment-gate:
     name: Deployment gate · fail-closed release control
