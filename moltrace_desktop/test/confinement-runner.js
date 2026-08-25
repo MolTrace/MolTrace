@@ -25,7 +25,23 @@ app.on('web-contents-created', (_e, wc) => seen.add(wc))
 // The job also carries a `timeout-minutes` in CI. Both are wanted: this one
 // reports the stage, that one survives this file being wrong.
 let stage = 'starting'
-const WATCHDOG_MS = Number(process.env.MOLTRACE_CONFINEMENT_TIMEOUT_MS || 120000)
+
+// Validated, not just parsed. `Number('abc')` is NaN and setTimeout treats NaN,
+// 0 and negatives all as ZERO -- so a mistyped override fires the watchdog
+// immediately and the run reports a confinement failure that is really a typo.
+// A guard whose knob can silently disable it is not a guard. Falling back is
+// announced, because a silent fallback is how a knob gets believed.
+const DEFAULT_WATCHDOG_MS = 120000
+const WATCHDOG_MS = (() => {
+  const raw = process.env.MOLTRACE_CONFINEMENT_TIMEOUT_MS
+  if (raw === undefined || raw === '') return DEFAULT_WATCHDOG_MS
+  const ms = Number(raw)
+  if (!Number.isFinite(ms) || ms <= 0) {
+    console.error(`  (ignoring MOLTRACE_CONFINEMENT_TIMEOUT_MS=${JSON.stringify(raw)} — not a positive number of milliseconds; using ${DEFAULT_WATCHDOG_MS})`)
+    return DEFAULT_WATCHDOG_MS
+  }
+  return ms
+})()
 const watchdog = setTimeout(() => {
   console.error(`\nCONFINEMENT TIMED OUT after ${WATCHDOG_MS}ms during: ${stage}`)
   try { require('../src/main.js').shutdown() } catch {}
