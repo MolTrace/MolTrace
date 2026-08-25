@@ -44,6 +44,7 @@ const net = require('node:net')
 const os = require('node:os')
 const path = require('node:path')
 const { spawn } = require('node:child_process')
+const http = require('node:http')
 
 function createSocketDirectory() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'moltrace-svc-'))
@@ -59,11 +60,30 @@ function createListener() {
   // chmod immediately after are safe without waiting for the 'listening' event.
   const bindPath = path.join(dir, 'bind')
   const server = net.createServer()
-  server.listen(bindPath)
-  fs.renameSync(bindPath, socketPath)
 
-  // Node makes it 0755. §7.1 wants owner-only on the socket AND its parent.
-  fs.chmodSync(socketPath, 0o600)
+  // THE THIRD ASYNCHRONOUS ERROR CHANNEL. The commit that added this staging
+  // dance handled 'error' on the ChildProcess and on the credential pipe and
+  // left this one live -- which is the exact half-applied shape it was written
+  // to avoid. A failed bind (descriptor exhaustion, a TMPDIR long enough to
+  // overflow macOS's 104-byte sun_path, a sandboxed runtime refusing) emits
+  // 'error' on the server, and an unhandled 'error' throws.
+  //
+  // Recorded rather than swallowed: when the synchronous path below then fails
+  // with a confusing secondary error (a rename of a socket that was never
+  // created), the listen error is the one worth reporting.
+  let listenError = null
+  server.on('error', (err) => { listenError = err })
+
+  try {
+    server.listen(bindPath)
+    fs.renameSync(bindPath, socketPath)
+    // Node makes it 0755. §7.1 wants owner-only on the socket AND its parent.
+    fs.chmodSync(socketPath, 0o600)
+  } catch (err) {
+    try { server.close() } catch {}
+    cleanup()
+    throw listenError || err
+  }
 
   const handle = server._handle
   const fd = handle && typeof handle.fd === 'number' ? handle.fd : -1
@@ -114,7 +134,7 @@ function buildSpawn({ credential, socketFd, backendDir }) {
  * readiness probes. A caller holding the pieces separately has to remember. A
  * caller calling this does not.
  */
-function start({ credential, backendDir }) {
+function start({ credential, backendDir, onExit }) {
   const listener = createListener()
   const plan = buildSpawn({ credential, socketFd: listener.fd, backendDir })
   const child = spawn(plan.command, plan.args, plan.options)
@@ -140,13 +160,37 @@ function start({ credential, backendDir }) {
     credentialPipe.on('error', (err) => { failure = failure || err })
   }
 
+  // DRAIN stdout AND stderr. They are 'pipe', and nothing read them -- two harms.
+  // A pipe nobody reads fills at the kernel buffer and the child then BLOCKS
+  // FOREVER on its next write, which presents as a service that started and went
+  // silent. And the service's own explanation of why it refused to start went
+  // into that pipe and was discarded, so an operator saw a bare exit code while
+  // the sentence naming the cause was thrown away. Keeping the tail bounded: this
+  // is diagnostic text, not a log, and an unbounded string is its own leak.
+  let output = ''
+  for (const stream of [child.stdout, child.stderr]) {
+    if (!stream || typeof stream.on !== 'function') continue
+    stream.setEncoding('utf8')
+    stream.on('data', (chunk) => { output = (output + chunk).slice(-4000) })
+    stream.on('error', () => { /* a dead pipe is the exit we already report */ })
+  }
+
   try {
     plan.writeCredential(child)
   } catch (err) {
     failure = failure || err
   }
-  child.on('exit', (code) => {
-    failure = failure || new Error(`the service stopped (code ${code})`)
+
+  // (code, signal) -- Node passes code=null when a signal killed the child, so
+  // binding only the first argument printed the literal "code null" and dropped
+  // the one field that said what happened.
+  child.on('exit', (code, signal) => {
+    failure = failure || new Error(_exitReason(code, signal))
+    // A death AFTER startup has to reach the readout. Without this the app keeps
+    // reporting a service that is gone: serviceState is written once, by the
+    // startup poll, and this handler was its only other writer before the
+    // lifecycle moved in here.
+    if (typeof onExit === 'function') { try { onExit(failure, output) } catch {} }
   })
 
   // Only now, with the child holding its own descriptor.
@@ -156,6 +200,8 @@ function start({ credential, backendDir }) {
     socketPath: listener.socketPath,
     child,
     failure: () => failure,
+    /** The child's own words. For a cause line and for logs -- never rendered raw. */
+    diagnostic: () => output,
     close: () => {
       try { child.kill() } catch {}
       listener.close()
@@ -163,13 +209,160 @@ function start({ credential, backendDir }) {
   }
 }
 
-function describeFailure(err) {
+//: Text that must never reach a person's screen: absolute paths, Python
+//: tracebacks, errno codes, and the names of the programs this app happens to
+//: run. The house rule is that display copy is humanised while wire values are
+//: not renamed -- so the raw text is still carried, just not rendered.
+//: NOT case-insensitive, deliberately. With an /i flag the errno alternative
+//: `\bE[A-Z]{3,}\b` matches any ordinary four-letter word beginning with "e" --
+//: it flagged the word "engine" in this module's own copy. An errno code is
+//: uppercase by nature, so the case IS the signal; the alternatives that can
+//: legitimately vary spell both forms out.
+const _NOT_FOR_A_PERSON = new RegExp([
+  '(?:/[\\w.-]+){2,}',        // two or more path segments
+  'Traceback', 'File "',       // a Python stack
+  '\\bE[A-Z]{3,}\\b', 'errno',  // errno codes, uppercase by nature
+  '\\b[Uu][Vv]\\b', '\\b[Pp]ython\\d*\\b', '[Uu]vicorn',   // the programs this app happens to run
+  '\\bfd \\d',                 // file descriptor numbers
+].join('|'))
+
+/**
+ * The service's own last words, when they are a sentence rather than a stack.
+ *
+ * The service writes a deliberate refusal sentence when it will not start, and
+ * that sentence is the most useful thing an operator can be told. A traceback is
+ * not, and neither is a path into a temporary directory.
+ */
+function _serviceSentence(diagnostic) {
+  const lines = String(diagnostic || '').split('\n').map((l) => l.trim()).filter(Boolean)
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const line = lines[i]
+    if (line.length >= 20 && line.length <= 200 && !_NOT_FOR_A_PERSON.test(line)) return line
+  }
+  return null
+}
+
+/** Why it is not running, in words a scientist reads, with the cause named. */
+function _humanCause(err, diagnostic) {
+  const sentence = _serviceSentence(diagnostic)
+  if (sentence) return sentence
+
+  const code = err && err.code
+  const message = (err && err.message) || ''
+  if (code === 'ENOENT' || /\bENOENT\b/.test(message)) {
+    return 'The analysis engine that runs on this computer could not be found in this installation.'
+  }
+  if (code === 'EACCES' || /\bEACCES\b/.test(message)) {
+    return 'This computer did not permit the analysis engine to start.'
+  }
+  if (code === 'EPIPE' || /\bEPIPE\b/.test(message)) {
+    return 'It closed before it had finished starting up.'
+  }
+  // Messages this module wrote itself are already written for a person.
+  if (message && !_NOT_FOR_A_PERSON.test(message)) return message.charAt(0).toUpperCase() + message.slice(1) + '.'
+  return 'It could not be started, and did not say why.'
+}
+
+/**
+ * `reason` is rendered. `diagnostic` is NOT -- it is for a log or a support
+ * bundle, and putting it on screen is what this function exists to prevent.
+ */
+// Polls the health route rather than sleeping a fixed time. A fixed sleep is
+// either too short on a cold start or wasted on a warm one, and it turns a slow
+// machine into a "service unavailable" that is not true.
+//
+// EVERY REQUEST CARRIES A TIMEOUT, and that is load-bearing rather than tidy. A
+// request to this socket can be accepted by something that never answers it, in
+// which case the response callback never fires AND the error callback never
+// fires -- so a poll without a timeout does not retry, it stops. That is not
+// hypothetical: the host's own listener used to do exactly this, and a single
+// swallowed probe left the promise below permanently unsettled.
+//
+// AND A TIMED-OUT REQUEST FIRES TWICE. Measured on Electron 43.4.1's Node and on
+// Node 25: `req.destroy()` inside the 'timeout' handler makes the request emit
+// 'error' with ECONNRESET, so a handler on each event ran the retry TWICE for one
+// attempt and the poll forked as 2^k. Measured with attempts=6 against an
+// accepting-but-silent socket: 127 requests issued and 64 concurrent, where one
+// chain issues 7. At the shipped attempts=60 that is not a number worth writing
+// down. The `retried` latch is the fix, and it must stay even if one of the two
+// handlers is ever removed -- dropping the timeout handler instead would restore
+// the original hang, because 'error' does not fire for a swallowed connection.
+function waitUntilReady({ started, headers, cancelled, attempts = 60 }) {
+  const socketPath = started.socketPath
+  const startedAt = Date.now()
+  return new Promise((resolve) => {
+    const attempt = (n) => {
+      // Cancelled means cancelled: after shutdown there is nothing to be ready.
+      if (cancelled && cancelled()) {
+        return resolve(describeFailure(new Error('it was stopped before it finished starting')))
+      }
+      // A child that failed to launch will never answer. Say so with its cause
+      // rather than spending the whole budget discovering it.
+      const err = started.failure()
+      if (err) return resolve(describeFailure(err, started.diagnostic()))
+
+      let retried = false
+      const req = http.request(
+        {
+          socketPath,
+          path: '/health',
+          method: 'GET',
+          headers: headers(),
+          timeout: 2000,
+        },
+        (res) => {
+          res.resume()
+          if (res.statusCode === 200) resolve({ reachable: true, versions: { fid: '1' }, reason: null })
+          else if (n > 0) setTimeout(() => attempt(n - 1), 250)
+          else resolve(describeFailure(new Error('it did not start up correctly'), started.diagnostic()))
+        },
+      )
+      const retry = () => {
+        if (retried) return
+        retried = true
+        if (n > 0) setTimeout(() => attempt(n - 1), 250)
+        else {
+          // The ELAPSED time, not the arithmetic of the backoff. That arithmetic
+          // counted only the 250ms delay and so claimed 15 seconds for a wait
+          // that, once every probe could burn a 2s timeout, ran to over two
+          // minutes. A number a user can time with a wristwatch has to be true.
+          const seconds = Math.round((Date.now() - startedAt) / 1000)
+          resolve(describeFailure(
+            new Error(`it did not answer within ${seconds} seconds of starting`), started.diagnostic()))
+        }
+      }
+      req.on('timeout', () => { req.destroy(); retry() })
+      req.on('error', retry)
+      req.end()
+    }
+    attempt(attempts)
+  })
+}
+
+
+/**
+ * Why the child ended, in one sentence.
+ *
+ * Node passes `code = null` when a SIGNAL killed the child, so a handler binding
+ * only the first argument printed the literal "code null" and dropped the one
+ * field that said what happened. Separated from the handler so it can be tested
+ * without a live child -- CI has no `uv`, so a test that needs one to die is a
+ * test that only runs on a developer's machine.
+ */
+function _exitReason(code, signal) {
+  if (signal) return `the service was stopped by ${signal}`
+  if (code === 0) return 'the service exited on its own'
+  return `the service stopped while starting (code ${code})`
+}
+
+function describeFailure(err, diagnostic) {
   return {
     reachable: false,
     versions: {},
     reason:
       'The local science service is not running, so analysis on this computer is unavailable. ' +
-      (err && err.message ? `(${err.message})` : ''),
+      _humanCause(err, diagnostic),
+    diagnostic: (err && err.message ? err.message + '\n' : '') + String(diagnostic || ''),
   }
 }
 
@@ -187,5 +380,7 @@ function capabilityWorld(service) {
 }
 
 module.exports = {
-  createSocketDirectory, createListener, buildSpawn, start, describeFailure, capabilityWorld, spawn,
+  createSocketDirectory, createListener, buildSpawn, start, waitUntilReady, describeFailure,
+  capabilityWorld, spawn, _exitReason,
+  _NOT_FOR_A_PERSON,
 }
