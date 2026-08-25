@@ -50,6 +50,18 @@ contextBridge.exposeInMainWorld('moltrace', {
   service: {
     read: async () => ipcRenderer.invoke('moltrace:service-report'),
   },
+  analysis: {
+    // Takes NO arguments and returns a summary. The renderer never names a file
+    // and never sees the credential: the main process runs the picker, holds the
+    // per-launch credential in a closure, and talks to the service itself. A
+    // renderer that could name a path would be a renderer that could ask this
+    // service to read anything the user can read.
+    //
+    // It also never sees the gate's INPUTS -- only its verdict -- for the same
+    // reason capabilities.read() returns verdicts: a page that can reason about
+    // entitlement is a page that can disagree with the desktop about it.
+    openSpectrum: async () => ipcRenderer.invoke('moltrace:open-spectrum'),
+  },
   // A callback, not an event emitter: the renderer is told THAT something
   // changed and asks again, so nothing crosses the bridge except the invitation.
   onChanged: (fn) => {

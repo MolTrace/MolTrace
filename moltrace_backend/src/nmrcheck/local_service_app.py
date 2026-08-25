@@ -28,7 +28,7 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 
 from .desktop_transport import DesktopTransportGuard, TransportRefusal
 from .device_journal import ClockState, JournalEntry, append
-from .local_science import process_spectrum
+from .local_science import SpectrumUnreadable, open_spectrum, process_spectrum
 from .offline_policy import is_served_locally
 
 #: Operations this app serves, and the route each one is reached by. Routes are
@@ -43,6 +43,7 @@ ROUTES: dict[str, tuple[str, str]] = {
     # operation -> (method, path)
     "system.health": ("GET", "/health"),
     "fid.process": ("POST", "/fid/process"),
+    "fid.open": ("POST", "/fid/open"),
 }
 
 #: Kept as a name because tests and callers read it, derived so it cannot drift.
@@ -157,6 +158,41 @@ async def _fid_process(payload: dict = _BODY) -> dict[str, Any]:
     return {"peaks": [p.to_dict() for p in peaks]}
 
 
+async def _fid_open(payload: dict = _BODY) -> dict[str, Any]:
+    """Read an acquisition already on this computer, and say what is in it.
+
+    Takes a path, not the spectrum. Measured: a processed 1H acquisition is
+    131,072 points and 3.6 MB of JSON, and the caller is on the same machine
+    under the same user -- so the arrays never need to cross the socket at all.
+
+    Reading is bounded by the caller's own authority: this service runs as that
+    user and can open nothing they could not already open. What the transport
+    credential buys is that nothing ELSE on the machine can ask.
+    """
+    HANDLER_CALLS.append("fid.open")
+    path = str(payload.get("path") or "")
+    if not path:
+        _journal("fid.open", refused=True, cause="no file was named")
+        raise HTTPException(status_code=400, detail="no file was named")
+    try:
+        summary = open_spectrum(path)
+    except SpectrumUnreadable as unreadable:
+        # The cause describes the FORMAT, never the path -- a filename can carry
+        # a compound name, and this string is written to the device journal.
+        _journal("fid.open", refused=True, cause=str(unreadable))
+        raise HTTPException(status_code=400, detail=str(unreadable)) from None
+
+    # The count and the shape of the answer, not the answer. Same rule as
+    # fid.process: the journal records what was DONE, and a journal carrying the
+    # results would be a second copy of the science.
+    _journal(
+        "fid.open",
+        refused=False,
+        cause=f"{summary['peak_count']} peaks in {len(summary['multiplets'])} multiplets",
+    )
+    return summary
+
+
 class TransportGuardMiddleware:
     """Runs before routing, before the body, before any handler."""
 
@@ -222,7 +258,11 @@ def create_local_app(
 
     # One handler per declared route, registered from the map. Adding a route
     # means adding a line to ROUTES, which is the line the policy check reads.
-    handlers = {"system.health": _health, "fid.process": _fid_process}
+    handlers = {
+        "system.health": _health,
+        "fid.process": _fid_process,
+        "fid.open": _fid_open,
+    }
     for operation, (method, path) in ROUTES.items():
         handler = handlers.get(operation)
         if handler is None:

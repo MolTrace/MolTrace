@@ -218,3 +218,55 @@ def test_the_journal_never_records_the_credential(client: TestClient) -> None:
     client.get("/health", headers={"x-moltrace-local-service": "d" * 43})
     assert CRED not in str([e.payload for e in JOURNAL])
     assert "d" * 43 not in str([e.payload for e in JOURNAL])
+
+
+# --- reading a spectrum off this computer -----------------------------------
+
+
+def test_reading_a_spectrum_refuses_when_no_file_is_named(client: TestClient) -> None:
+    """A rejection names its cause. An empty path is a caller mistake, not a 500."""
+    for body in ({}, {"path": ""}, {"path": None}):
+        r = client.post("/fid/open", json=body, headers=auth())
+        assert r.status_code == 400, body
+        assert "no file was named" in r.json()["detail"]
+
+
+def test_a_file_that_is_not_there_is_refused_without_echoing_its_path(
+    client: TestClient,
+) -> None:
+    """The refusal is written to the device journal, so it must not carry a path.
+
+    A filename can carry a compound name — which is exactly the class of thing
+    this platform does not put into durable records without being asked.
+    """
+    secret_ish = "/tmp/AcmeCorp-CANDIDATE-7731/acquisition"
+    r = client.post("/fid/open", json={"path": secret_ish}, headers=auth())
+    assert r.status_code == 400
+    detail = r.json()["detail"]
+    assert secret_ish not in detail, "the refusal echoed the path back"
+    assert "AcmeCorp" not in detail and "CANDIDATE" not in detail
+    assert len(detail) > 10, "the refusal names no cause"
+
+
+def test_a_file_that_is_not_a_spectrum_is_refused_not_guessed(
+    client: TestClient, tmp_path
+) -> None:
+    """Refusing beats returning zero peaks: they are different answers.
+
+    Zero peaks from a file that was never a spectrum is a true statement about a
+    question nobody asked, and a caller cannot tell it apart from "the analysis
+    found nothing" — which is a real and meaningful result.
+    """
+    junk = tmp_path / "notes.txt"
+    junk.write_text("this is not an acquisition")
+    r = client.post("/fid/open", json={"path": str(junk)}, headers=auth())
+    assert r.status_code == 400
+    assert r.json()["detail"], "refused with no cause"
+
+
+def test_reading_a_spectrum_needs_the_credential_like_everything_else(
+    client: TestClient,
+) -> None:
+    r = client.post("/fid/open", json={"path": "/anything"})
+    assert r.status_code == 401
+    assert "fid.open" not in HANDLER_CALLS, "the handler was reached without a credential"

@@ -53,6 +53,10 @@ POLICY: dict[str, str] = {
     "analysis.draft": "offline-draft",
     # The reason the desktop exists: deterministic science on local bytes.
     "fid.process": "offline-compute",
+    # Reading an acquisition off this computer and summarising it. Same class as
+    # fid.process and for the same reason: the bytes are already here, the
+    # computation is deterministic, and nothing about it needs a server.
+    "fid.open": "offline-compute",
     # Signing is server-authoritative — identity, step-up and record binding all
     # live there, and §6.5 refuses offline signing in every profile.
     "signature.create": "online-only",

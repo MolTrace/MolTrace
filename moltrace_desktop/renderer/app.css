@@ -16,3 +16,24 @@ body { margin: 0; padding: 2rem; }
 .service--running { border-left-color: #2e7d32; }
 .service--stopped { border-left-color: #c62828; }
 .service__detail { margin: .25rem 0 0; font-size: .875rem; opacity: .85; }
+
+/* The analysis surface. */
+.analysis { margin-top: 1.5rem; max-width: 46rem; }
+.analysis__open { font: inherit; padding: .55rem 1.1rem; border-radius: .5rem;
+                  border: 1px solid currentColor; background: transparent; cursor: pointer; }
+.analysis__open[disabled] { opacity: .6; cursor: progress; }
+.analysis__hint  { margin: .5rem 0 0; font-size: .875rem; opacity: .8; }
+.analysis__error { margin: .75rem 0 0; font-size: .9rem; border-left: 4px solid #c62828;
+                   padding: .5rem .75rem; }
+.result { margin-top: 1.25rem; }
+.result__head   { font-weight: 600; margin: 0; }
+.result__counts { margin: .25rem 0 .75rem; font-size: .875rem; opacity: .85; }
+/* A wide table must scroll inside itself rather than push the window sideways. */
+.peaks { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+.peaks th, .peaks td { text-align: right; padding: .35rem .6rem; border-bottom: 1px solid rgba(128,128,128,.35); }
+.peaks th:first-child, .peaks td:first-child,
+.peaks th:nth-child(3), .peaks td:nth-child(3) { text-align: left; }
+.peaks th { font-size: .8rem; text-transform: uppercase; letter-spacing: .04em; opacity: .75; }
+/* The limits are not fine print: same weight as the numbers they qualify. */
+.result__limits { margin: 1rem 0 0; padding-left: 1.1rem; font-size: .875rem; }
+.result__limits li { margin: .35rem 0; }

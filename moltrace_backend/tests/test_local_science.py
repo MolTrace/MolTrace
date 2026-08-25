@@ -87,3 +87,73 @@ def test_the_response_carries_no_device_timestamp_as_a_record_time(client: TestC
     body = client.post("/fid/process", headers=auth(), json=two_peaks()).json()
     assert "record_time" not in body
     assert "timestamp" not in body
+
+
+# --- open_spectrum: what a chemist actually reads ----------------------------
+
+
+def _one_public_1h_acquisition() -> str | None:
+    """A public reference acquisition, by ROLE. Never named in an assertion."""
+    import glob
+
+    roots = sorted(
+        {p.split("/pdata")[0] for p in glob.glob("tests/fixtures/nmrshiftdb2/raw/extracted/*1h*/*/pdata")}
+    )
+    return roots[0] if roots else None
+
+
+def test_open_spectrum_groups_lines_into_signals() -> None:
+    """The peak detector over-picks, so a raw line list misstates how many
+    signals a spectrum contains. Measured on a public 1H reference acquisition:
+    30 fitted lines resolve to 8 multiplets, five of those lines belonging to one
+    of them. Grouping is correctness, not presentation."""
+    import pytest
+
+    from nmrcheck.local_science import open_spectrum
+
+    source = _one_public_1h_acquisition()
+    if source is None:
+        pytest.skip("no public reference acquisition in this checkout")
+
+    out = open_spectrum(source)
+    assert out["multiplets"], "no signals were resolved at all"
+    assert len(out["multiplets"]) < out["peak_count"], (
+        "every fitted line became its own signal — the lines were not grouped"
+    )
+    for m in out["multiplets"]:
+        assert m["line_count"] >= 1
+        assert 0.0 <= m["relative_area"] <= 1.0
+    total = sum(m["relative_area"] for m in out["multiplets"])
+    assert abs(total - 1.0) < 1e-6, f"the shares do not sum to the whole spectrum ({total})"
+
+
+def test_a_result_carries_its_own_limits() -> None:
+    """The caveats travel WITH the numbers, from the engine.
+
+    A caller that receives bare numbers can render them bare. This platform's
+    rule is that a figure never appears without its uncertainty, and the only way
+    to make that structural is for the engine to emit both together."""
+    import pytest
+
+    from nmrcheck.local_science import open_spectrum
+
+    source = _one_public_1h_acquisition()
+    if source is None:
+        pytest.skip("no public reference acquisition in this checkout")
+
+    out = open_spectrum(source)
+    limits = " ".join(out["limits"]).lower()
+    assert out["limits"], "the numbers travel with no limits at all"
+    assert "ratio" in limits or "not proton counts" in limits, (
+        "nothing says the areas are ratios rather than proton counts"
+    )
+    assert "structure" in limits, "nothing says this was not checked against a structure"
+
+
+def test_an_unreadable_file_raises_rather_than_returning_nothing() -> None:
+    import pytest
+
+    from nmrcheck.local_science import SpectrumUnreadable, open_spectrum
+
+    with pytest.raises(SpectrumUnreadable):
+        open_spectrum("/no/such/acquisition/anywhere")
