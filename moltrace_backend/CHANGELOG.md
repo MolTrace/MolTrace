@@ -14,6 +14,42 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.70.0 — The local science service can read a spectrum off the machine it runs on (2026-08-24)
+
+The desktop's local service served `system.health` and `fid.process`, and
+`fid.process` takes the ppm axis and intensities as arrays. Measured on a public
+1H reference acquisition that is 131,072 points: **3.6 MB of JSON per spectrum**,
+serialised, copied and parsed, to analyse a file already sitting on the same
+machine as the caller.
+
+`fid.open` takes a path instead — 132 bytes on the wire for the same acquisition,
+200 in 1.9 s. Reading is bounded by the caller's own authority: the service runs
+as that user and can open nothing they could not already open. What the transport
+credential buys is that nothing *else* on the machine can ask.
+
+**It returns multiplets, not peaks, and that is correctness rather than
+presentation.** This platform's peak detector over-picks; on that same
+acquisition, 30 fitted lines resolve to 8 multiplets, five of the lines belonging
+to a single one of them. A raw line list shown to a chemist misstates how many
+signals the spectrum contains, and a chemist reading five "peaks" at one shift
+will say so.
+
+Every result carries its own limits, emitted by the engine rather than added by
+an interface: that nothing has been checked against a proposed structure, that
+areas are **ratios and not proton counts** (assigning protons needs a structure
+this analysis was not given), and that a crowded region can be grouped more than
+one way. A caller that receives bare numbers can render them bare, so the numbers
+and their qualifications travel together.
+
+`fid.open` is classified `offline-compute` in the offline policy table — the
+table raises on an unclassified operation, so the route could not have been
+mounted without the classification being made deliberately.
+
+Refusals name the format, never the path. The cause is written to the device
+journal, and a filename can carry a compound name.
+
+---
+
 ## v0.69.11 — Two clustered signals were reported to chemists as a doublet with an impossible J (2026-08-22)
 
 `multiplicity_from_lines` reports a first-order label only when every adjacent-line

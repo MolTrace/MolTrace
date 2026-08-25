@@ -1,6 +1,6 @@
 'use strict'
 const path = require('node:path')
-const { app, session, ipcMain, safeStorage } = require('electron')
+const { app, dialog, session, ipcMain, safeStorage } = require('electron')
 const { createWindow } = require('./window-factory')
 const product = require('./product')
 const serviceCredential = require('./service-credential')
@@ -9,6 +9,7 @@ const capabilityView = require('./capability-view')
 const keyHierarchy = require('./key-hierarchy')
 const localService = require('./local-service')
 const pathMod = require('node:path')
+const http = require('node:http')
 
 // Generated once per launch and held in this closure. It is NOT put on
 // app.state, not exported, and never crosses the contextBridge — a renderer that
@@ -40,6 +41,23 @@ module.exports = { confinementReports }
 // asserts nothing is silently omitted.
 const DECLARED_CAPABILITIES = [
   {
+    // Reading an acquisition already on this computer and saying what is in it.
+    // Its only real requirement is the local service: the offline policy table
+    // classifies this operation `offline-compute`, meaning the bytes are here,
+    // the computation is deterministic, and nothing about it needs a server.
+    //
+    // It is NOT gated on a module or a pack, and that is a deliberate, narrow
+    // claim rather than an oversight: an ICH rule pack is what regulated impurity
+    // work needs, and it has nothing to do with picking lines out of a spectrum.
+    // Whether reading a spectrum should also require a licence is a commercial
+    // decision, not a technical one, and it belongs to whoever sets pricing.
+    key: 'spectrum.open',
+    displayName: 'Read a spectrum on this computer',
+    requiresService: 'fid',
+  },
+  {
+    // The regulated path, left gated exactly as declared. It is the half of this
+    // readout that proves the gate still works.
     key: 'fid.process',
     displayName: 'Process a raw acquisition',
     requiresModule: 'spectracheck',
@@ -133,6 +151,80 @@ ipcMain.handle('moltrace:capability-readout', () => {
     .readout(DECLARED_CAPABILITIES, localService.capabilityWorld(serviceState))
     .map(capabilityView.present)
 })
+
+// Reading a spectrum, end to end.
+//
+// THE GATE IS CHECKED HERE, in the main process, and not by hiding a button. A
+// renderer that decides its own availability is a renderer that can be persuaded
+// otherwise; §7.1's rule is that the desktop decides once, in one place. So this
+// handler re-assesses the capability on every call rather than trusting that the
+// readout which drew the button is still true.
+ipcMain.handle('moltrace:open-spectrum', async () => {
+  const declared = DECLARED_CAPABILITIES.find((c) => c.key === 'spectrum.open')
+  const verdict = capabilities.assess(declared, localService.capabilityWorld(serviceState))
+  if (!verdict.available) {
+    return { ok: false, reason: capabilityView.present(verdict).reason }
+  }
+
+  // A Bruker acquisition is a DIRECTORY -- the processed data sits in
+  // <acquisition>/pdata/<n> -- while JCAMP-DX is a single file. Offering only
+  // one of those makes half the instruments in a lab unopenable.
+  const picked = await dialog.showOpenDialog({
+    title: 'Choose a spectrum',
+    properties: ['openFile', 'openDirectory'],
+    buttonLabel: 'Read spectrum',
+  })
+  if (picked.canceled || !picked.filePaths.length) return { ok: false, cancelled: true }
+
+  try {
+    const summary = await requestFromService('/fid/open', { path: picked.filePaths[0] })
+    return { ok: true, summary }
+  } catch (err) {
+    return { ok: false, reason: localService.describeFailure(err).reason }
+  }
+})
+
+/** A request to the local service, carrying the credential the renderer cannot see. */
+function requestFromService(path, body) {
+  return new Promise((resolve, reject) => {
+    if (!service) return reject(new Error('the local science service is not running'))
+    const payload = Buffer.from(JSON.stringify(body))
+    const req = http.request(
+      {
+        socketPath: service.socketPath,
+        path,
+        method: 'POST',
+        headers: {
+          ...localServiceCredential.headers(),
+          'content-type': 'application/json',
+          'content-length': payload.length,
+        },
+        // Bounded, like every other wait here. Reading a large acquisition is
+        // seconds of real work, so this is generous -- but it is not unbounded,
+        // because an unbounded one turns a stuck read into a frozen window.
+        timeout: 120000,
+      },
+      (res) => {
+        let out = ''
+        res.setEncoding('utf8')
+        res.on('data', (d) => { out += d })
+        res.on('end', () => {
+          let parsed = null
+          try { parsed = JSON.parse(out) } catch { /* handled below */ }
+          if (res.statusCode === 200 && parsed) return resolve(parsed)
+          // The service's own refusal sentence describes the FORMAT, never the
+          // path, and is written for a person to read.
+          reject(new Error((parsed && parsed.detail) || 'the spectrum could not be read'))
+        })
+      },
+    )
+    let settled = false
+    const fail = (err) => { if (!settled) { settled = true; reject(err) } }
+    req.on('timeout', () => { req.destroy(); fail(new Error('reading the spectrum took too long')) })
+    req.on('error', fail)
+    req.end(payload)
+  })
+}
 
 function applyCsp() {
   // Belt and braces with the page's meta CSP: a header the page cannot weaken.
