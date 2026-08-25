@@ -8,7 +8,6 @@ const capabilities = require('./capabilities')
 const capabilityView = require('./capability-view')
 const keyHierarchy = require('./key-hierarchy')
 const localService = require('./local-service')
-const http = require('node:http')
 const pathMod = require('node:path')
 
 // Generated once per launch and held in this closure. It is NOT put on
@@ -21,6 +20,12 @@ let localServiceCredential = null
 // the capability readout needs an answer, and "we did not look" is not one.
 let serviceState = { reachable: false, versions: {}, reason: 'The local science service has not been started yet.' }
 let service = null
+// Set by shutdown(). A readiness poll in flight must not report a service the
+// app has already stopped, and must not dereference the binding shutdown cleared.
+let stopped = false
+// The window the readout is pushed to, so a service death reaches the screen
+// without waiting for the user to do something.
+let mainWindow = null
 
 // Collected per webContents id so the confinement test can assert on the
 // environment each preload actually got, not on what was declared.
@@ -50,64 +55,32 @@ async function startLocalService() {
   // reachable, and the capability readout already renders an unreachable service
   // as not-provisioned with a cause.
   try {
-    service = localService.start({
+    // Held in a LOCAL const as well as the module binding. The readiness poll
+    // closes over this one: shutdown() sets the module binding to null, and a
+    // poll still in flight would then dereference null from a timer callback --
+    // an uncaught exception in the main process, which is the failure class this
+    // whole area keeps producing. Closing over the local means a late probe sees
+    // the service it was started for.
+    const started = localService.start({
       credential: localServiceCredential,
       backendDir: pathMod.join(__dirname, '..', '..', 'moltrace_backend'),
+      onExit: (err, output) => {
+        // A service that dies AFTER startup has to reach the screen. serviceState
+        // is otherwise written once, by the poll below, so a dead service went on
+        // being reported as running for the life of the window.
+        serviceState = localService.describeFailure(err, output)
+        pushReadout(mainWindow)
+      },
     })
-    serviceState = await waitForService(service.socketPath, () => service.failure())
+    service = started
+    serviceState = await localService.waitUntilReady({
+      started,
+      headers: () => localServiceCredential.headers(),
+      cancelled: () => stopped,
+    })
   } catch (err) {
     serviceState = localService.describeFailure(err)
   }
-}
-
-// Polls the health route rather than sleeping a fixed time. A fixed sleep is
-// either too short on a cold start or wasted on a warm one, and it turns a slow
-// machine into a "service unavailable" that is not true.
-//
-// EVERY REQUEST CARRIES A TIMEOUT, and that is load-bearing rather than tidy. A
-// request to this socket can be accepted by something that never answers it, in
-// which case the response callback never fires AND the error callback never
-// fires — so a poll without a timeout does not retry, it stops. That is not
-// hypothetical: the host's own listener used to do exactly this, and a single
-// swallowed probe left the promise below permanently unsettled, the app reporting
-// a service that had in fact started, and no error anywhere to explain it. The
-// host no longer competes for the socket (see local-service.js), but the timeout
-// stays: it is what makes a swallowed connection a retry instead of a hang, for
-// whatever swallows one next.
-function waitForService(socketPath, failure, attempts = 60) {
-  return new Promise((resolve) => {
-    const attempt = (n) => {
-      // A child that failed to launch will never answer. Say so with its cause
-      // rather than spending fifteen seconds discovering it.
-      const err = failure && failure()
-      if (err) return resolve(localService.describeFailure(err))
-
-      const req = http.request(
-        {
-          socketPath,
-          path: '/health',
-          method: 'GET',
-          headers: localServiceCredential.headers(),
-          timeout: 2000,
-        },
-        (res) => {
-          res.resume()
-          if (res.statusCode === 200) resolve({ reachable: true, versions: { fid: '1' }, reason: null })
-          else if (n > 0) setTimeout(() => attempt(n - 1), 250)
-          else resolve(localService.describeFailure(new Error(`it answered ${res.statusCode} rather than starting`)))
-        },
-      )
-      const retry = () => {
-        if (n > 0) setTimeout(() => attempt(n - 1), 250)
-        else resolve(localService.describeFailure(
-          new Error(`it did not answer within ${Math.round((attempts * 250) / 1000)} seconds of starting`)))
-      }
-      req.on('timeout', () => { req.destroy(); retry() })
-      req.on('error', retry)
-      req.end()
-    }
-    attempt(attempts)
-  })
 }
 
 // No orphans. A service left running holds the socket and its credential is
@@ -118,6 +91,7 @@ function waitForService(socketPath, failure, attempts = 60) {
 // processes were still alive, reparented to init (PPID 1). Anything that exits
 // the app by that route must call shutdown() itself.
 function shutdown() {
+  stopped = true
   if (service) { try { service.close() } catch {} }
   service = null
 }
@@ -213,6 +187,7 @@ app.whenReady().then(() => {
 
   applyCsp()
   const win = createWindow()
+  mainWindow = win
   // Started alongside the window, not before it: the window must open whatever
   // the service does.
   startLocalService().then(() => pushReadout(win))
