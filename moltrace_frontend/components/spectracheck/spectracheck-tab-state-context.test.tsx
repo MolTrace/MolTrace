@@ -216,6 +216,62 @@ describe("SpectraCheck tab state context", () => {
     expect(proc!.state.analyzeLoading).toBe(false)
   })
 
+  /* A session persisted before the vendor union was corrected holds "agilent",
+     which the routes reject outright — so rehydrating it verbatim would keep that
+     session failing every upload with no in-product way back. Same for the
+     retired "imported_parameters" preset, which is refused with
+     UNKNOWN_PROCESSING_PRESET. Both must migrate on read, not survive. */
+  it("migrates retired raw-fid vendor and preset ids out of persisted state", () => {
+    window.sessionStorage.setItem(
+      SPECTRACHECK_TAB_STATE_STORAGE_KEY,
+      JSON.stringify({
+        version: 1,
+        rawFid: {
+          vendor: "agilent",
+          preset: "imported_parameters",
+          selectedFileName: "keep-me.zip",
+        },
+        processed: {},
+      }),
+    )
+
+    let raw: ReturnType<typeof useRawFidTabState> | null = null
+    function Reader() {
+      raw = useRawFidTabState()
+      return null
+    }
+    render(
+      <SpectraCheckTabStateProvider>
+        <Reader />
+      </SpectraCheckTabStateProvider>,
+    )
+
+    expect(raw!.state.vendor).toBe("agilent_varian")
+    expect(raw!.state.preset).toBe("safe_automatic")
+    // The migration must not discard the rest of the persisted slice.
+    expect(raw!.state.selectedFileName).toBe("keep-me.zip")
+  })
+
+  it("drops an unrecognised persisted vendor rather than sending it", () => {
+    window.sessionStorage.setItem(
+      SPECTRACHECK_TAB_STATE_STORAGE_KEY,
+      JSON.stringify({ version: 1, rawFid: { vendor: "varian" }, processed: {} }),
+    )
+
+    let raw: ReturnType<typeof useRawFidTabState> | null = null
+    function Reader() {
+      raw = useRawFidTabState()
+      return null
+    }
+    render(
+      <SpectraCheckTabStateProvider>
+        <Reader />
+      </SpectraCheckTabStateProvider>,
+    )
+
+    expect(raw!.state.vendor).toBe("auto")
+  })
+
   it("isolates raw-fid and processed slices under the same provider", () => {
     let raw: ReturnType<typeof useRawFidTabState> | null = null
     let proc: ReturnType<typeof useProcessedTabState> | null = null

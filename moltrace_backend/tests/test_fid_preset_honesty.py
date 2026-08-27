@@ -9,6 +9,16 @@ silently fell back to "balanced", and produced byte-identical settings — so
 These tests pin the fix at all three layers: id resolution, the settings a
 preset yields (including surviving the 1H advised-processing constraints),
 and the pipeline metadata a processed archive reports.
+
+Update 2026-08-27: only THREE of those ids are product-facing now. The picker
+went on offering ``imported_parameters`` long after this module started using it
+as its example of an id the engine refuses, so choosing "Imported parameters"
+returned 422 and no spectrum. The frontend dropped the option rather than
+aliasing it: the only preset it could have mapped to is ``custom``, an empty
+recipe, which is indistinguishable from ``safe_automatic`` unless the caller
+also sends explicit processing controls — and that client sends none. Aliasing
+it would have re-created exactly the silent-fallback dishonesty this module
+exists to prevent.
 """
 
 from __future__ import annotations
@@ -21,6 +31,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from nmrcheck.fid import (
+    _FID_PRESET_SETTINGS,
     UnknownFIDPresetError,
     fid_settings_from_preset,
     normalize_fid_preset_id,
@@ -61,6 +72,27 @@ def _bruker_zip(*, title: str, points: int = 2048) -> bytes:
         archive.writestr("sample/acqus", acqus)
         archive.writestr("sample/pulseprogram", "zg30\n")
     return buffer.getvalue()
+
+
+"""Every id the SpectraCheck picker can send, mirroring the ``RawFidPreset``
+union in ``components/spectracheck/spectracheck-tab-state-context.tsx``.
+
+The wire field is a plain string, not an enum, so the contract cannot type-check
+this the way it does ``vendor`` — an id in the picker with no alias behind it is
+a runtime 422 and no spectrum. Adding to the picker means adding here.
+"""
+SPECTRACHECK_PRESET_IDS = (
+    "safe_automatic",
+    "no_baseline_correction",
+    "no_phase_correction",
+)
+
+
+@pytest.mark.parametrize("preset_id", SPECTRACHECK_PRESET_IDS)
+def test_every_picker_preset_id_resolves(preset_id: str) -> None:
+    # Parametrized so a dropped alias names the exact id that broke, rather
+    # than failing on whichever assertion happened to come first.
+    assert resolve_fid_preset_id_strict(preset_id) in _FID_PRESET_SETTINGS
 
 
 def test_product_preset_ids_resolve_to_real_presets() -> None:
