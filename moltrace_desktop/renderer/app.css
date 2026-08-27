@@ -43,3 +43,8 @@ body { margin: 0; padding: 2rem; }
 .preview-banner { border: 1px solid currentColor; border-left: 4px solid #6a1b9a;
                   border-radius: .5rem; padding: .6rem .9rem; margin: 0 0 1rem;
                   max-width: 46rem; font-size: .9rem; }
+
+/* A saturated detector is a warning about the numbers beside it, not a footnote. */
+.result__warning { margin: .5rem 0 .75rem; padding: .55rem .8rem; font-size: .9rem;
+                   border: 1px solid currentColor; border-left: 4px solid #ef6c00;
+                   border-radius: .5rem; }

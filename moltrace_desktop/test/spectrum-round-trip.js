@@ -153,6 +153,18 @@ app.whenReady().then(async () => {
     if (/\bH\b/.test(heads)) throw new Error(`a proton-count column was rendered: ${heads}`)
     if (!/share/i.test(heads)) throw new Error(`no share-of-signal column: ${heads}`)
   })
+  check('the screen says WHERE the numbers came from', () => {
+    // An acquisition may carry a spectrum the instrument processed, or only the
+    // raw measurement this application then processed with its own phasing and
+    // baseline settings. Those are different numbers, and a chemist comparing
+    // them to their spectrometer's printout needs to know which they are looking
+    // at before they call a difference a defect.
+    const said = dom.counts || ''
+    if (!/instrument|computed here/i.test(said)) {
+      throw new Error(`nothing says which processing produced these numbers: ${said}`)
+    }
+  })
+
   check('the limits are rendered with the numbers, every time', () => {
     if (dom.limits.length < 3) throw new Error(`only ${dom.limits.length} limits rendered`)
     const joined = dom.limits.join(' ').toLowerCase()

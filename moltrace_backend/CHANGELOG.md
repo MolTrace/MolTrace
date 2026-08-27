@@ -14,6 +14,42 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.70.1 — The desktop refused two thirds of real acquisitions (2026-08-27)
+
+`open_spectrum` called `read_processed_spectrum` and nothing else, so an
+acquisition that carried only raw time-domain data was refused — with the
+reader's own developer-facing sentence, *"Use read_fid() for that"*, shown to a
+chemist.
+
+Measured across every acquisition in this repository: **7 carry a processed
+spectrum and 16 carry only the FID.** What comes off an instrument is usually the
+FID, so the app opened 7 of 23 real datasets, and every 400-600 MHz acquisition
+here was among the refused. It now falls through to `read_fid` and opens 23 of
+23.
+
+**Which reader produced the numbers is reported, because it changes what they
+mean.** A spectrum computed here uses this application's own phasing and baseline
+settings rather than the spectrometer's, so shifts and integrals can differ from
+the printout the chemist is holding. `processing` is `instrument` or `moltrace`,
+and the second carries a limit saying so — otherwise a difference from their own
+output looks like a defect in one of the two.
+
+**A saturated detector now says so.** `gsd_peak_pick` keeps at most
+`_MAX_PEAKS_BY_LEVEL[level]` candidates and discards the rest by prominence, so a
+spectrum that reaches the ceiling has been truncated. Four instrument-processed
+13C acquisitions came back at exactly the level-2 ceiling of 220 lines and were
+reported as **68 to 188 distinct signals**. No 13C spectrum of a real compound
+has 188 carbons. `saturated` is now on the result, with a limit stating the count
+is a floor rather than a finding. The underlying over-picking is unchanged and
+still wants a fix in `gsd.py`; this only stops the app presenting a truncated
+result as a complete one.
+
+Refusals no longer carry function names or the caller's path. The path matters
+because the cause is written to the device journal and a filename can carry a
+compound name.
+
+---
+
 ## v0.70.0 — The local science service can read a spectrum off the machine it runs on (2026-08-24)
 
 The desktop's local service served `system.health` and `fid.process`, and
