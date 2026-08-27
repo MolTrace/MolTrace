@@ -484,14 +484,28 @@ export function SpectraCheckRawFidSection({
   // ── GSD-Prompt-3 (experimental, opt-in) — additive only. Default must
   // stay `legacy` so tenants who never touch the selector keep the
   // existing /nmr/raw-fid/process pipeline unchanged.
-  const [analysisBackend, setAnalysisBackend] = useState<AnalysisBackendChoice>("legacy")
-  const [gsdLevel, setGsdLevel] = useState<GSDLevel>(2)
-  const [gsdResult, setGsdResult] = useState<SpectrumGSDAnalyzeResult | null>(null)
+  /* GSD output, its settings and the instrument readout live in tab state, not
+     here: a tab switch unmounts this component while the spectrum survives in
+     the provider, so local state left the user looking at their chart with the
+     analysis under it gone. */
+  const analysisBackend = state.analysisBackend as AnalysisBackendChoice
+  const setAnalysisBackend = useCallback(
+    (v: AnalysisBackendChoice) => update({ analysisBackend: v }),
+    [update],
+  )
+  const gsdLevel = state.gsdLevel as GSDLevel
+  const setGsdLevel = useCallback((v: GSDLevel) => update({ gsdLevel: v }), [update])
+  const gsdResult = state.gsdResult as SpectrumGSDAnalyzeResult | null
+  const setGsdResult = useCallback(
+    (v: SpectrumGSDAnalyzeResult | null) => update({ gsdResult: v }),
+    [update],
+  )
   const [gsdError, setGsdError] = useState("")
   const [gsdLoading, setGsdLoading] = useState(false)
   // GSD-scoped solvent override, initialized from the session-level
   // solvent prop. Canonicalized against the catalog when it arrives.
-  const [gsdSolvent, setGsdSolvent] = useState(solvent)
+  const gsdSolvent = state.gsdSolvent || solvent
+  const setGsdSolvent = useCallback((v: string) => update({ gsdSolvent: v }), [update])
 
   /**
    * A GSD analysis belongs to the dataset it was run on.
@@ -560,7 +574,11 @@ export function SpectraCheckRawFidSection({
    * What the instrument recorded, read out of the dropped dataset's own acqus/procpar before
    * anything is uploaded. Null until something readable lands.
    */
-  const [acquisition, setAcquisition] = useState<AcquisitionSummary | null>(null)
+  const acquisition = state.acquisition
+  const setAcquisition = useCallback(
+    (v: AcquisitionSummary | null) => update({ acquisition: v }),
+    [update],
+  )
 
   /**
    * Reflect a drop's own acquisition parameters into the setup form.

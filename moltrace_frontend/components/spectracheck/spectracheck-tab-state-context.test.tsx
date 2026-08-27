@@ -272,6 +272,49 @@ describe("SpectraCheck tab state context", () => {
     expect(raw!.state.vendor).toBe("auto")
   })
 
+  /* GSD output, its settings and the instrument readout used to live in the
+     section's own useState. Radix unmounts an inactive tab, so switching away
+     and back left the user looking at their spectrum — which the provider does
+     keep — with the analysis under it gone, which reads as the run having
+     failed rather than as state having been dropped. */
+  it("keeps GSD output and the instrument readout across a consumer remount", () => {
+    let raw: ReturnType<typeof useRawFidTabState> | null = null
+    function Reader() {
+      raw = useRawFidTabState()
+      return null
+    }
+
+    const harness = render(
+      <SpectraCheckTabStateProvider>
+        <Reader />
+      </SpectraCheckTabStateProvider>,
+    )
+
+    act(() => {
+      raw!.update({
+        gsdResult: { peaks: [{ ppm: 7.26 }] } as never,
+        gsdLevel: 4,
+        gsdSolvent: "CDCl3",
+        analysisBackend: "gsd_prompt3",
+        acquisition: { vendor: "bruker" } as never,
+      })
+    })
+
+    // Unmount the consumer the way a tab switch does, then bring it back.
+    harness.unmount()
+    render(
+      <SpectraCheckTabStateProvider>
+        <Reader />
+      </SpectraCheckTabStateProvider>,
+    )
+
+    expect(raw!.state.gsdResult).toEqual({ peaks: [{ ppm: 7.26 }] })
+    expect(raw!.state.gsdLevel).toBe(4)
+    expect(raw!.state.gsdSolvent).toBe("CDCl3")
+    expect(raw!.state.analysisBackend).toBe("gsd_prompt3")
+    expect(raw!.state.acquisition).toEqual({ vendor: "bruker" })
+  })
+
   it("isolates raw-fid and processed slices under the same provider", () => {
     let raw: ReturnType<typeof useRawFidTabState> | null = null
     let proc: ReturnType<typeof useProcessedTabState> | null = null
