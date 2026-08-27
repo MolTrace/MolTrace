@@ -44,6 +44,19 @@ class UnifiedConfidenceError(ValueError):
     pass
 
 
+# Every layer below is CANDIDATE-SPECIFIC, checked 2026-08-27. This was flagged as
+# unverified when candidate.py was fixed for the opposite problem: two of its terms
+# (the 2D and DEPT/APT scores) were computed once per request and injected into every
+# candidate, so 22-31 % of the ranking weight could not discriminate and merely diluted
+# the terms that could. Nothing here has that shape --
+#   predicted_nmr      nmr_item (per candidate)
+#   hrms_exact_mass    hrms_item.ppm_score
+#   adduct_isotope     the candidate's own formula against the inferred adduct's hits
+#   msms_annotation    msms_item.candidate_score
+#   fragmentation_tree tree_item.tree_score
+#   lcms_feature_family lcms_item.score
+# -- so a layer added here must be per-candidate too, or it will quietly buy weight
+# without earning any ordering.
 DEFAULT_LAYER_WEIGHTS = {
     "predicted_nmr": 0.36,
     "hrms_exact_mass": 0.20,
