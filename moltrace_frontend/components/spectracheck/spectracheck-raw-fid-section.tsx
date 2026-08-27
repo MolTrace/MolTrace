@@ -5,7 +5,9 @@ import { useOptionalSpectraCheckWorkspaceSession } from "@/components/spectrache
 import {
   useRawFidTabState,
   useSpectraCheckTabLink,
+  type RawFidPreset,
   type RawFidTabState,
+  type RawFidVendor,
 } from "@/components/spectracheck/spectracheck-tab-state-context"
 import { apiFetch, isModuleNotIncludedError } from "@/lib/api/client"
 import { AnalysisJobTimeline } from "@/src/components/spectracheck/AnalysisJobTimeline"
@@ -155,12 +157,15 @@ type Props = {
   registerDev?: (key: string, value: unknown) => void
 }
 
+/* Every id here must exist in the backend's preset alias table, or the run is
+   refused and the user gets no spectrum. "Imported parameters" used to sit in
+   this list with no alias behind it — see RawFidPreset for why it is not simply
+   aliased to `custom`. */
 const PRESETS = [
   { value: "safe_automatic", label: "Safe automatic" },
-  { value: "imported_parameters", label: "Imported parameters" },
   { value: "no_baseline_correction", label: "No baseline correction" },
   { value: "no_phase_correction", label: "No phase correction" },
-] as const
+] as const satisfies ReadonlyArray<{ value: RawFidPreset; label: string }>
 
 const EMPTY_SPECTRUM_PEAKS: never[] = []
 
@@ -864,12 +869,15 @@ export function SpectraCheckRawFidSection({
    * props and tab state, so a control nudged while twenty datasets are still to go would
    * otherwise apply to some of them and not others, with nothing on screen saying so.
    */
+  /* vendor/preset are the wire unions, not bare strings: every raw FID request
+     is built here, so widening them back to `string` is what would let a value
+     the routes reject reach the wire again. */
   type RawFidRequestSettings = {
     sampleId: string
     solvent: string
     nucleus: "1H" | "13C"
-    vendor: string
-    preset: string
+    vendor: RawFidVendor
+    preset: RawFidPreset
     compoundClass: CompoundClassValue
     candidatesText: string
     protonText: string
@@ -1572,11 +1580,13 @@ export function SpectraCheckRawFidSection({
             <div className="space-y-1.5">
               <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Vendor</Label>
               <div className="inline-flex flex-wrap rounded-lg border border-input bg-background p-0.5">
-                {[
+                {([
                   { value: "auto", label: "Auto" },
                   { value: "bruker", label: "Bruker" },
-                  { value: "agilent", label: "Agilent" },
-                ].map((option) => (
+                  // Wire value, not a display choice: the routes accept
+                  // "agilent_varian" and reject "agilent" outright.
+                  { value: "agilent_varian", label: "Agilent / Varian" },
+                ] as const satisfies ReadonlyArray<{ value: RawFidVendor; label: string }>).map((option) => (
                   <button
                     key={option.value}
                     type="button"
@@ -1684,9 +1694,9 @@ export function SpectraCheckRawFidSection({
 
                 {acquisition.vendor &&
                 vendor !== "auto" &&
-                vendor !== (acquisition.vendor === "bruker" ? "bruker" : "agilent") ? (
+                vendor !== (acquisition.vendor === "bruker" ? "bruker" : "agilent_varian") ? (
                   <p>
-                    Vendor is set to {vendor === "bruker" ? "Bruker" : "Agilent"}, but these files
+                    Vendor is set to {vendor === "bruker" ? "Bruker" : "Agilent / Varian"}, but these files
                     are{" "}
                     {acquisition.vendor === "bruker" ? "Bruker" : "Varian/Agilent"}. Switch to Auto
                     unless you meant to override it.

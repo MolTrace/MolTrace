@@ -22,6 +22,7 @@ import {
   useState,
   type ReactNode,
 } from "react"
+import type { components } from "@/src/lib/api/schema"
 import { registerSpectraCheckRuntimeReset } from "@/src/lib/spectracheck/spectracheck-runtime-reset"
 import {
   abortRawFidBatchRun,
@@ -30,10 +31,36 @@ import {
 } from "@/src/lib/spectracheck/raw-fid-batch"
 
 export type RawFidNucleus = "1H" | "13C"
-export type RawFidVendor = "auto" | "bruker" | "agilent"
+
+/**
+ * Vendor is DERIVED FROM THE GENERATED CONTRACT, never restated by hand.
+ *
+ * This used to be a hand-written `"auto" | "bruker" | "agilent"`. The routes
+ * declare `Literal["auto", "bruker", "agilent_varian"]`, so every raw FID
+ * upload where the user picked Agilent was rejected 422 before any processing
+ * ran — a whole vendor's datasets, failing on a value the picker itself
+ * offered. Sourcing the union from `schema.d.ts` makes the next such drift a
+ * typecheck failure instead of a runtime rejection.
+ */
+export type RawFidVendor =
+  components["schemas"]["Body_nmr_raw_fid_preview_route_nmr_raw_fid_preview_post"]["vendor"]
+
+/**
+ * Processing preset ids the picker may send.
+ *
+ * These are product-facing ids the backend resolves through its alias table;
+ * they are deliberately NOT the engine's canonical ids. The request field is a
+ * plain string on the wire, so nothing here is type-checked against the
+ * contract — an id the alias table does not carry is refused at runtime with
+ * `UNKNOWN_PROCESSING_PRESET` and the user gets no spectrum. `imported_parameters`
+ * was exactly that: offered by the picker, absent from the alias table. It is
+ * gone rather than aliased, because the only preset it could have mapped to
+ * (`custom`, an empty recipe) is indistinguishable from `safe_automatic` unless
+ * the caller also sends explicit processing controls, which this client does not.
+ * Adding an id here without a matching alias re-breaks the tab.
+ */
 export type RawFidPreset =
   | "safe_automatic"
-  | "imported_parameters"
   | "no_baseline_correction"
   | "no_phase_correction"
 export type RawFidResultMode = "preview" | "process"
@@ -353,11 +380,37 @@ function writePersistedTabState(rawFid: RawFidTabState, processed: ProcessedTabS
   }
 }
 
+/** Accepted wire values, and the retired id each superseded value maps to.
+ *
+ * A session persisted before the vendor union was corrected still holds
+ * "agilent", which the routes reject. Rehydrating it unchanged would keep that
+ * session failing every upload with no way back other than clearing storage,
+ * so it is migrated on read rather than trusted.
+ */
+const RETIRED_RAW_FID_VENDORS: Record<string, RawFidVendor> = { agilent: "agilent_varian" }
+
+function migrateRawFidVendor(value: unknown): RawFidVendor | undefined {
+  if (typeof value !== "string") return undefined
+  if (value in RETIRED_RAW_FID_VENDORS) return RETIRED_RAW_FID_VENDORS[value]
+  return value === "auto" || value === "bruker" || value === "agilent_varian" ? value : undefined
+}
+
+/** Same problem, same shape: "imported_parameters" is no longer offered. */
+function migrateRawFidPreset(value: unknown): RawFidPreset | undefined {
+  return value === "safe_automatic" ||
+    value === "no_baseline_correction" ||
+    value === "no_phase_correction"
+    ? value
+    : undefined
+}
+
 function hydrateRawFidState(state: unknown): RawFidTabState {
   const patch = isRecord(state) ? (state as Partial<RawFidTabState>) : {}
   return {
     ...defaultRawFid,
     ...patch,
+    vendor: migrateRawFidVendor(patch.vendor) ?? defaultRawFid.vendor,
+    preset: migrateRawFidPreset(patch.preset) ?? defaultRawFid.preset,
     selectedFile: null,
     // Never rehydrated from storage — a persisted blob written before these were excluded could
     // otherwise restore item shells whose File handles are long gone.
