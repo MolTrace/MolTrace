@@ -93,6 +93,78 @@ def test_cohort_of_concern_impurity_uses_cpca_ai_limit() -> None:
     assert "Cohort of Concern" in row.justification and "CPCA" in row.justification
 
 
+def test_the_specification_records_the_rule_sets_its_numbers_came_from() -> None:
+    """Every limit on this table is an upstream engine's number; none of their versions survived.
+
+    The impurity limits are Q3A/B qualification thresholds, ICH M7 staged TTCs and FDA CPCA
+    acceptable intakes. Each of those engines returns a content-addressed rule_set_version, and
+    the builder read the numbers off the results and dropped the versions. So editing a Q3A/B,
+    M7 or CPCA table changed every impurity limit on an already-filed specification with nothing
+    in the specification moving -- the one field that says which rules produced a regulated
+    number was simply absent.
+    """
+
+    profile = SubstanceProfile(
+        name="API",
+        substance_type="drug_substance",
+        max_daily_dose_g=1.0,
+        impurities=(
+            ImpurityObservation("Impurity A"),
+            ImpurityObservation("EMS", structural_assignment="CCOS(=O)(=O)C"),
+            ImpurityObservation("NDMA", structural_assignment="CN(C)N=O"),
+        ),
+    )
+    spec = _spec(profile)
+
+    versions = spec.source_rule_set_versions
+    # Exactly the engines this profile actually exercised: an ordinary impurity (Q3A/B), a
+    # mutagenic one (M7), and a Cohort-of-Concern nitrosamine (CPCA).
+    assert set(versions) == {"q3ab", "m7", "cpca"}, versions
+
+    assert versions["q3ab"] == calculate_q3ab_thresholds(
+        1.0, "drug_substance", "oral"
+    ).rule_set_version
+    assert versions["m7"] == classify_m7("CCOS(=O)(=O)C").rule_set_version
+    assert versions["cpca"] == classify_cpca("CN(C)N=O").rule_set_version
+    assert all(v.startswith("sha256:") for v in versions.values()), versions
+
+    # And it survives serialisation -- a version that as_dict() drops is not provenance.
+    assert spec.as_dict()["source_rule_set_versions"] == versions
+
+
+def test_only_the_engines_actually_consulted_are_recorded() -> None:
+    """A version claimed for an engine that never ran would be provenance for a number nobody used."""
+
+    spec = _spec(
+        SubstanceProfile(
+            name="API",
+            substance_type="drug_substance",
+            max_daily_dose_g=1.0,
+            impurities=(ImpurityObservation("Impurity A"),),
+        )
+    )
+    # No structural assignment, so neither M7 nor CPCA was consulted.
+    assert set(spec.source_rule_set_versions) == {"q3ab"}
+
+
+def test_q3ab_is_recorded_even_with_no_named_impurities() -> None:
+    """Q3A/B is consulted for every specification, named impurities or not.
+
+    A table with no named impurity still carries an "Any unspecified impurity" limit (the Q3A/B
+    identification threshold) and a "Total impurities" limit. Both are Q3A/B numbers, so the
+    version belongs on the record. Written after an earlier version of this test asserted the
+    opposite and an early return was added to satisfy it -- which silently deleted both rows
+    while every existing test stayed green, because none of them build a specification without
+    impurities.
+    """
+
+    spec = _spec(SubstanceProfile(name="API", substance_type="drug_substance"))
+
+    assert spec.parameter("Any unspecified impurity") is not None
+    assert spec.parameter("Total impurities") is not None
+    assert set(spec.source_rule_set_versions) == {"q3ab"}
+
+
 def test_process_capability_tightens_the_limit() -> None:
     # Tight, well-centred batch data (Cpk > 1.33) -> limit tightened below the Q3A/B ceiling.
     profile = SubstanceProfile(

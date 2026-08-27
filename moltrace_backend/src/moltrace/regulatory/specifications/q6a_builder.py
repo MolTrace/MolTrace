@@ -16,7 +16,7 @@ rapidly-dissolving high-solubility products), and #7 water content.
 from __future__ import annotations
 
 import statistics
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -120,6 +120,13 @@ class Specification:
     dosage_form: str
     parameters: tuple[SpecificationParameter, ...]
     metadata: dict[str, Any] = field(default_factory=dict)
+    #: Content-addressed versions of the rule-sets whose numbers appear on this table, keyed by
+    #: engine ("q3ab", "m7", "cpca"). Q6A itself encodes decision trees rather than a limit
+    #: table -- every regulated NUMBER here is produced upstream, so this is the provenance that
+    #: ties a filed specification to the rules that generated it. Only engines actually consulted
+    #: for this substance appear; claiming a version for an engine that never ran would be
+    #: provenance for a number nobody used.
+    source_rule_set_versions: Mapping[str, str] = field(default_factory=dict)
 
     def parameter(self, name: str) -> SpecificationParameter | None:
         return next((p for p in self.parameters if p.parameter == name), None)
@@ -130,6 +137,7 @@ class Specification:
             "dosage_form": self.dosage_form,
             "parameters": [p.as_dict() for p in self.parameters],
             "metadata": self.metadata,
+            "source_rule_set_versions": dict(self.source_rule_set_versions),
         }
 
 
@@ -230,7 +238,10 @@ def _assay(
 
 
 def _genotoxic_parameter(
-    imp: ImpurityObservation, m7: Any, profile: SubstanceProfile
+    imp: ImpurityObservation,
+    m7: Any,
+    profile: SubstanceProfile,
+    rule_set_versions: dict[str, str],
 ) -> SpecificationParameter:
     """Safety-based limit for a genotoxic impurity (ICH M7).
 
@@ -241,6 +252,7 @@ def _genotoxic_parameter(
 
     if m7.coc_flag:
         cpca = classify_cpca(imp.structural_assignment)
+        rule_set_versions["cpca"] = cpca.rule_set_version
         ppm = cpca.ai_limit_ng_per_day / profile.max_daily_dose_g / 1000.0
         return SpecificationParameter(
             parameter=f"Impurity: {imp.name} (Cohort of Concern)",
@@ -272,21 +284,26 @@ def _genotoxic_parameter(
 
 
 def _impurity_parameters(
-    profile: SubstanceProfile, batches: Sequence[BatchResult]
+    profile: SubstanceProfile,
+    batches: Sequence[BatchResult],
+    rule_set_versions: dict[str, str],
 ) -> list[SpecificationParameter]:
     """Per-impurity limits: M7 safety limit if genotoxic, else Q3A/B threshold, Cpk-tightened."""
 
     thresholds = calculate_q3ab_thresholds(
         profile.max_daily_dose_g, profile.substance_type, profile.route
     )
+    rule_set_versions["q3ab"] = thresholds.rule_set_version
     qual_pct = thresholds.qualification_threshold.effective_percent
     ident_pct = thresholds.identification_threshold.effective_percent
     params: list[SpecificationParameter] = []
 
     for imp in profile.impurities:
         m7 = classify_m7(imp.structural_assignment) if imp.structural_assignment else None
+        if m7 is not None:
+            rule_set_versions["m7"] = m7.rule_set_version
         if m7 is not None and m7.m7_class in _GENOTOXIC_CLASSES:
-            params.append(_genotoxic_parameter(imp, m7, profile))
+            params.append(_genotoxic_parameter(imp, m7, profile, rule_set_versions))
             continue
 
         # Ordinary impurity: Q3A/B qualification threshold, tightened by process capability.
@@ -422,11 +439,12 @@ def build_specification(
 ) -> Specification:
     """Run all applicable ICH Q6A decision trees; return the complete draft specification table."""
 
+    rule_set_versions: dict[str, str] = {}
     params: list[SpecificationParameter] = [
         _appearance(substance_profile),
         _identification(substance_profile, method_validation),
         _assay(substance_profile, batch_analysis_data, method_validation),
-        *_impurity_parameters(substance_profile, batch_analysis_data),
+        *_impurity_parameters(substance_profile, batch_analysis_data, rule_set_versions),
     ]
     for optional in (
         _dissolution(substance_profile, method_validation),
@@ -447,4 +465,5 @@ def build_specification(
             "guideline": "ICH Q6A",
             "n_batches": len(batch_analysis_data),
         },
+        source_rule_set_versions=rule_set_versions,
     )
