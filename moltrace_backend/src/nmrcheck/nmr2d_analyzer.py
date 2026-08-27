@@ -452,6 +452,23 @@ def analyze_nmr2d_preview(
     # +/- 7.7 ppm on 13C -- wide enough to match almost any proton to almost any
     # expectation. Matching therefore stays against the OBSERVED 1D shifts, which
     # are measured; only the denominator is structural.
+    #
+    # Re-tested 2026-08-27 with a TIGHTER window than that argument assumed, because
+    # the conformal calibration now deployed measures 90 % half-widths of 0.397 ppm
+    # (1H) and 4.722 ppm (13C) -- 1.9x and 1.6x tighter than the pooled figures above.
+    # The conclusion survives, and the window turns out not to be the binding
+    # constraint at all. Counting, for each predicted correlation, how many OTHER
+    # predictions fall inside its window across six molecules / 57 expectations:
+    #
+    #   pooled 90 %      (+/-0.75  / +/-7.70 )  84.2 % ambiguous, 4.11 rivals
+    #   conformal 90 %   (+/-0.397 / +/-4.722)  80.7 % ambiguous, 3.96 rivals
+    #   HSQC test window (+/-0.15  / +/-2.00 )  77.2 % ambiguous, 3.93 rivals
+    #
+    # Tightening 5x on 1H and 3.85x on 13C moves ambiguity by seven points. Expected
+    # correlations cluster because the chemistry clusters -- aliphatic envelopes put
+    # many protons in one ppm of each other with carbons within ten -- so no window
+    # makes predicted-shift matching unambiguous. Recorded here so the next reader
+    # holding better numbers does not re-open a decision those numbers do not change.
     # One-bond only: HMBC's expected set is 2-3 bonds (sometimes 4 through
     # conjugation) and 2-bond correlations are frequently absent, so a structural
     # denominator there would punish correct structures. See playbook C5.
