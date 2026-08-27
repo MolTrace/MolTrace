@@ -278,6 +278,32 @@ def test_a_dossier_without_a_daily_dose_says_the_limit_is_the_reference_one(clie
     assert "source_needed" not in warning
 
 
+def test_the_elemental_dose_warning_names_no_wire_keys(client, api_headers):
+    """The warning a reviewer reads must not be written in field names.
+
+    It said "dossier max_daily_dose_g required for the permitted concentration of Pb". That is
+    a database column quoted at a pharmacist. The gap it describes is real and the warning must
+    stay -- only its wording changes; the stored keys are untouched.
+    """
+
+    headers = api_headers
+    with client:
+        juris = _jurisdiction(client, headers, "Q3D nodose US", "US")
+        dossier = _dossier(client, headers, juris["id"])
+        res = client.post(
+            f"/regulatory/dossiers/{dossier['id']}/elemental-impurity-assessment",
+            headers=headers,
+            json={"elements_json": [{"element": "Pb", "observed_ppm": 0.1}]},
+        )
+        assert res.status_code == 201, res.text
+        body = res.json()
+
+    warning = next((w for w in body["warnings"] if "Pb" in w), None)
+    assert warning is not None, body["warnings"]
+    assert "max_daily_dose_g" not in warning
+    assert "maximum daily dose" in warning.lower()
+
+
 def test_a_class_1_dossier_limit_is_not_labelled_option_1(client, api_headers):
     """Class 1 has no PDE to scale, so neither Option applies -- the limit is a fixed value."""
 
