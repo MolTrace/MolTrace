@@ -175,9 +175,23 @@ export function extractWarnings(payload: unknown): string[] {
   return []
 }
 
+/**
+ * `notes` is `list[str]` on every backend model that carries it, and `string[]`
+ * in the generated schema — never a bare string. Accepting only the string
+ * shape meant this returned null for every real payload and the Details card's
+ * Notes block could not render at all. `extractWarnings` above already read
+ * both shapes; this one had simply not been updated to match the contract.
+ *
+ * Both call sites render the result into a single `<p>`, so a list is joined
+ * rather than returned as an array — keeping the shape the consumers expect.
+ */
 export function extractNotes(payload: unknown): string | null {
   if (!isRecord(payload)) return null
   const n = payload.notes ?? payload.note ?? payload.message
+  if (Array.isArray(n)) {
+    const parts = n.map((x) => String(x).trim()).filter((x) => x.length > 0)
+    return parts.length > 0 ? parts.join(" ") : null
+  }
   if (typeof n === "string" && n.trim()) return n
   return null
 }

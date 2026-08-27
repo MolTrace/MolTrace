@@ -164,7 +164,6 @@ export type RawFidTabState = {
 
   // UI helpers
   advancedOpen: boolean
-  sessionRawFileIdChoice: string
   jobActionError: string
 }
 
@@ -218,7 +217,6 @@ const defaultRawFid: RawFidTabState = {
   batchActiveId: null,
   batchRunning: false,
   advancedOpen: false,
-  sessionRawFileIdChoice: "",
   jobActionError: "",
 }
 
@@ -298,7 +296,6 @@ function serializeRawFid(state: RawFidTabState): Partial<RawFidTabState> {
     previewSpectrumError: state.previewSpectrumError,
     activeResultMode: state.activeResultMode,
     advancedOpen: state.advancedOpen,
-    sessionRawFileIdChoice: state.sessionRawFileIdChoice,
     jobActionError: state.jobActionError,
   }
 }
@@ -336,7 +333,6 @@ function hasPersistableRawFidState(state: RawFidTabState): boolean {
     state.previewSpectrumError !== defaultRawFid.previewSpectrumError ||
     state.activeResultMode !== defaultRawFid.activeResultMode ||
     state.advancedOpen !== defaultRawFid.advancedOpen ||
-    state.sessionRawFileIdChoice !== defaultRawFid.sessionRawFileIdChoice ||
     state.jobActionError !== defaultRawFid.jobActionError
   )
 }

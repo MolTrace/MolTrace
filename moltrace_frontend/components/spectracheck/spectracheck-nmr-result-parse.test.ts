@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest"
 import {
   extractPeaksFromPayload,
   extractSpectrumXY,
+  extractNotes,
 } from "@/components/spectracheck/spectracheck-nmr-result-parse"
 
 describe("extractSpectrumXY", () => {
@@ -172,5 +173,35 @@ describe("extractPeaksFromPayload", () => {
       peaks: [{ ppm: 3.65, intensity: 1, category: "" }],
     })
     expect(peaks[0].category).toBeUndefined()
+  })
+})
+
+describe("extractNotes", () => {
+  /**
+   * `notes` is `list[str]` on every backend model that carries it, and
+   * `string[]` in the generated schema — it is never a bare string. The reader
+   * accepted only `typeof n === "string"`, so it returned null for every real
+   * payload and the Details card's Notes block could not render at all.
+   * `extractWarnings`, immediately above it in the same module, already handled
+   * both shapes.
+   */
+  it("reads the list shape the contract actually returns", () => {
+    expect(extractNotes({ notes: ["Referenced to residual solvent."] })).toBe(
+      "Referenced to residual solvent.",
+    )
+  })
+
+  it("joins multiple notes into the single line the card renders", () => {
+    const value = extractNotes({ notes: ["First note.", "Second note."] })
+    expect(value).toContain("First note.")
+    expect(value).toContain("Second note.")
+  })
+
+  it("still accepts a bare string, and ignores empty or absent values", () => {
+    expect(extractNotes({ note: "Single string note." })).toBe("Single string note.")
+    expect(extractNotes({ notes: [] })).toBeNull()
+    expect(extractNotes({ notes: ["", "   "] })).toBeNull()
+    expect(extractNotes({})).toBeNull()
+    expect(extractNotes(null)).toBeNull()
   })
 })

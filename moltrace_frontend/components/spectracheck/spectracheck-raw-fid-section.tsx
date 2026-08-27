@@ -1,7 +1,6 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { useOptionalSpectraCheckWorkspaceSession } from "@/components/spectracheck/spectracheck-workspace-session-context"
 import {
   useRawFidTabState,
   useSpectraCheckTabLink,
@@ -10,13 +9,11 @@ import {
   type RawFidVendor,
 } from "@/components/spectracheck/spectracheck-tab-state-context"
 import { apiFetch, isModuleNotIncludedError } from "@/lib/api/client"
-import { AnalysisJobTimeline } from "@/src/components/spectracheck/AnalysisJobTimeline"
 import {
   COMPOUND_CLASS_UNSPECIFIED,
   compoundClassForRequest,
   type CompoundClassValue,
 } from "@/src/lib/spectracheck/compound-classes"
-import type { SessionFileRecord } from "@/src/lib/spectracheck/session-file-record"
 import { SPECTRACHECK_RAW_FID_ACCEPT, isRawFidArchiveFilename } from "@/src/lib/spectracheck/spectrum-file-formats"
 import { registerSpectraCheckRuntimeReset } from "@/src/lib/spectracheck/spectracheck-runtime-reset"
 import {
@@ -56,7 +53,6 @@ import {
   type RawFidBatchItem,
   type RawFidBatchMode,
 } from "@/src/lib/spectracheck/raw-fid-batch"
-import { useAnalysisJob } from "@/src/lib/spectracheck/useAnalysisJob"
 import { SpectrumViewer } from "@/components/science/SpectrumViewer"
 import { DeveloperJsonPanel } from "@/components/spectracheck/spectracheck-result-panels"
 import {
@@ -437,8 +433,6 @@ export function SpectraCheckRawFidSection({
     previewSpectrumLoading,
     previewSpectrumError,
     activeResultMode,
-    sessionRawFileIdChoice,
-    jobActionError,
     selectedFile,
     selectedFileName,
     advancedOpen,
@@ -484,10 +478,6 @@ export function SpectraCheckRawFidSection({
     return () => clearInterval(id)
   }, [rawFidBusy])
   const elapsedLabel = elapsedMs >= 1000 ? ` ${Math.floor(elapsedMs / 1000)}s` : ""
-  const setSessionRawFileIdChoice = useCallback(
-    (v: string) => update({ sessionRawFileIdChoice: v }),
-    [update],
-  )
   const setSelectedFile = useCallback((v: File | null) => update({ selectedFile: v }), [update])
   const setSelectedFileName = useCallback(
     (v: string | null) => update({ selectedFileName: v }),
@@ -560,8 +550,6 @@ export function SpectraCheckRawFidSection({
     setGsdError("")
   }, [batchActiveId])
 
-  const ws = useOptionalSpectraCheckWorkspaceSession()
-  const analysisJob = useAnalysisJob()
   const sendTabLink = useSpectraCheckTabLink()
 
   // dragOver is purely ephemeral visual state — fine to reset on remount.
@@ -851,10 +839,6 @@ export function SpectraCheckRawFidSection({
     [registerDev]
   )
 
-  const rawSessionFileOptions = (ws?.sessionFiles ?? []).filter(
-    (f: SessionFileRecord) =>
-      (f.file_kind === "raw_fid" || f.file_kind === "spectrum_archive") && isRawFidArchiveFilename(f.filename),
-  )
 
   // NOTE: raw-FID BACKGROUND JOBS were removed here. The server registers the
   // nmr_raw_fid_preview/process job types but has no execution adapter for them, so every
@@ -1554,11 +1538,15 @@ export function SpectraCheckRawFidSection({
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-1.5">
               <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Nucleus</Label>
-              <div className="inline-flex rounded-lg border border-input bg-background p-0.5">
+              {/* Selection was conveyed by background colour alone — no ARIA
+                  state at all, so a screen-reader user could not tell which
+                  nucleus was active. */}
+              <div role="group" aria-label="Nucleus" className="inline-flex rounded-lg border border-input bg-background p-0.5">
                 {(["1H", "13C"] as const).map((option) => (
                   <button
                     key={option}
                     type="button"
+                    aria-pressed={nucleus === option}
                     onClick={() => setNucleus(option)}
                     className={cn(
                       "rounded-md px-4 py-1.5 font-mono text-sm font-bold transition-colors",
@@ -1579,7 +1567,7 @@ export function SpectraCheckRawFidSection({
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Vendor</Label>
-              <div className="inline-flex flex-wrap rounded-lg border border-input bg-background p-0.5">
+              <div role="group" aria-label="Vendor" className="inline-flex flex-wrap rounded-lg border border-input bg-background p-0.5">
                 {([
                   { value: "auto", label: "Auto" },
                   { value: "bruker", label: "Bruker" },
@@ -1590,6 +1578,7 @@ export function SpectraCheckRawFidSection({
                   <button
                     key={option.value}
                     type="button"
+                    aria-pressed={vendor === option.value}
                     onClick={() => setVendor(option.value)}
                     className={cn(
                       "rounded-md px-3 py-1.5 font-mono text-xs font-bold uppercase tracking-wide transition-colors",
@@ -1977,27 +1966,13 @@ export function SpectraCheckRawFidSection({
               </button>
             </CollapsibleTrigger>
             <CollapsibleContent className="space-y-4 pt-4">
-              <div className="space-y-1.5">
-                <Label htmlFor="raw-session-file" className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                  Reuse session raw FID
-                </Label>
-                <select
-                  id="raw-session-file"
-                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 font-mono text-sm shadow-xs outline-none"
-                  value={sessionRawFileIdChoice}
-                  onChange={(e) => setSessionRawFileIdChoice(e.target.value)}
-                >
-                  <option value="">— none — use archive above</option>
-                  {rawSessionFileOptions.map((f) => (
-                    <option key={f.file_id} value={f.file_id}>
-                      {f.filename} ({f.file_kind})
-                    </option>
-                  ))}
-                </select>
-                <p className="text-[11px] text-muted-foreground">
-                  Reuse a raw FID archive already attached to this session.
-                </p>
-              </div>
+              {/* "Reuse session raw FID" removed. The select wrote
+                  sessionRawFileIdChoice, which no request builder ever read, so
+                  choosing an archive here changed nothing while telling the user
+                  it would reuse it. Wiring it means resolving a session file id
+                  to an archive id and threading it through all five request
+                  paths — a feature, and its own change. A control that lies is
+                  worse than one that is absent. */}
 
               <div className="space-y-1.5">
                 <Label htmlFor="raw-preset" className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
@@ -2143,9 +2118,6 @@ export function SpectraCheckRawFidSection({
               >
                 Process
               </Button>
-              <span className="text-[10px] text-muted-foreground">
-                not available yet — the buttons above run it directly
-              </span>
             </div>
             <Button
               type="button"
@@ -2159,18 +2131,10 @@ export function SpectraCheckRawFidSection({
             </Button>
           </div>
 
-          {jobActionError ? (
-            <AlertCard variant="warning" title="Job error" description={jobActionError} />
-          ) : null}
-
-          {analysisJob.jobId ? (
-            <AnalysisJobTimeline
-              job={analysisJob}
-              variant="compact"
-              evidenceLayer={nucleus === "1H" ? "raw_fid_1h" : "raw_fid_13c"}
-              sourceTab="Raw FID upload"
-            />
-          ) : null}
+          {/* No job-error alert and no job timeline here. Nothing in this file
+              calls setJobActionError, startJob or pollJob — background jobs are
+              disabled for raw FID (see the row above) — so both surfaces were
+              provably unreachable rather than merely unused. */}
 
           {showHeavy13CWarning && (
             <AlertCard
