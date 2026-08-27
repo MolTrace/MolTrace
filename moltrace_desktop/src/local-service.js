@@ -287,7 +287,14 @@ function _humanCause(err, diagnostic) {
 // down. The `retried` latch is the fix, and it must stay even if one of the two
 // handlers is ever removed -- dropping the timeout handler instead would restore
 // the original hang, because 'error' does not fire for a swallowed connection.
-function waitUntilReady({ started, headers, cancelled, attempts = 60 }) {
+function waitUntilReady({
+  started, headers, cancelled, attempts = 60,
+  // The probe budget, injectable so a test can assert the POLL'S SHAPE without
+  // paying its production wall-clock. The defaults are the shipped values and
+  // no caller in the app passes anything else; the two tests that count probes
+  // were spending 13 of this suite's 18 seconds watching real timeouts elapse.
+  probeTimeoutMs = 2000, backoffMs = 250,
+}) {
   const socketPath = started.socketPath
   const startedAt = Date.now()
   return new Promise((resolve) => {
@@ -308,19 +315,19 @@ function waitUntilReady({ started, headers, cancelled, attempts = 60 }) {
           path: '/health',
           method: 'GET',
           headers: headers(),
-          timeout: 2000,
+          timeout: probeTimeoutMs,
         },
         (res) => {
           res.resume()
           if (res.statusCode === 200) resolve({ reachable: true, versions: { fid: '1' }, reason: null })
-          else if (n > 0) setTimeout(() => attempt(n - 1), 250)
+          else if (n > 0) setTimeout(() => attempt(n - 1), backoffMs)
           else resolve(describeFailure(new Error('it did not start up correctly'), started.diagnostic()))
         },
       )
       const retry = () => {
         if (retried) return
         retried = true
-        if (n > 0) setTimeout(() => attempt(n - 1), 250)
+        if (n > 0) setTimeout(() => attempt(n - 1), backoffMs)
         else {
           // The ELAPSED time, not the arithmetic of the backoff. That arithmetic
           // counted only the 250ms delay and so claimed 15 seconds for a wait
