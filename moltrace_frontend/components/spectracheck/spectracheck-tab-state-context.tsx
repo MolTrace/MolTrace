@@ -24,6 +24,7 @@ import {
 } from "react"
 import type { components } from "@/src/lib/api/schema"
 import { registerSpectraCheckRuntimeReset } from "@/src/lib/spectracheck/spectracheck-runtime-reset"
+import type { AcquisitionSummary } from "@/src/lib/spectracheck/vendor-acquisition"
 import {
   abortRawFidBatchRun,
   type RawFidBatchItem,
@@ -64,6 +65,9 @@ export type RawFidPreset =
   | "no_baseline_correction"
   | "no_phase_correction"
 export type RawFidResultMode = "preview" | "process"
+
+/** Derived from the contract rather than restated, same as RawFidVendor. */
+export type RawFidGsdResult = components["schemas"]["SpectrumGSDAnalyzeResult"]
 
 export type RawFidPreviewSpectrum = {
   x: number[]
@@ -162,6 +166,21 @@ export type RawFidTabState = {
    */
   batchRunning: boolean
 
+  /**
+   * GSD analysis output and the settings that produced it.
+   *
+   * These lived in the section's own useState, so a tab switch unmounted them
+   * while the spectrum — held here — survived. The user came back to their
+   * chart with the analysis under it gone, which reads as the run having
+   * failed rather than as state having been dropped. The instrument readout
+   * had the same problem.
+   */
+  gsdResult: RawFidGsdResult | null
+  gsdLevel: number
+  gsdSolvent: string
+  analysisBackend: string
+  acquisition: AcquisitionSummary | null
+
   // UI helpers
   advancedOpen: boolean
   jobActionError: string
@@ -216,6 +235,11 @@ const defaultRawFid: RawFidTabState = {
   batchMode: "process",
   batchActiveId: null,
   batchRunning: false,
+  gsdResult: null,
+  gsdLevel: 2,
+  gsdSolvent: "",
+  analysisBackend: "legacy",
+  acquisition: null,
   advancedOpen: false,
   jobActionError: "",
 }
