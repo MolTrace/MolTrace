@@ -17,6 +17,25 @@ Promotion criteria (from the Prompt 3 spec):
 
 The module mirrors the structure of ``raw_fid_prompt_validation`` so the
 two sidecars share an idiomatic harness shape.
+
+Which detector these numbers describe
+-------------------------------------
+``moltrace.spectroscopy.peaks.gsd.gsd_peak_pick``, and only that one. It matters,
+because two peak detectors are live in this codebase and they are not the two the
+audit named:
+
+* ``moltrace.spectroscopy.peaks.gsd.gsd_peak_pick`` -- whole spectrum to peak list.
+  Measured here.
+* ``nmrcheck.spectrum`` -- its own local-maximum scan over a Savitzky-Golay-smoothed
+  trace with an SNR cut (around ``_PeakComponent`` construction). This is what the
+  processed-spectrum upload path uses, and this harness does **not** measure it: it
+  consumes processed spectra rather than Bruker FIDs, so the fixture corpus cannot
+  drive it without a separate input set.
+
+``nmrcheck.gsd`` is neither. ``spectrum.py`` imports ``deconvolve_region`` from it, but
+that function is a within-cluster *line resolver* -- handed an already-detected cluster
+and a component list, bounded by ``max_lines`` -- so it cannot over-pick a spectrum it
+never sees. Any over-pick figure quoted against "nmrcheck.gsd" is misattributed.
 """
 
 from __future__ import annotations
@@ -32,6 +51,7 @@ from typing import Any
 
 from moltrace.spectroscopy.io.fid_reader import NMRSpectrum, read_fid
 from moltrace.spectroscopy.peaks.gsd import (
+    _MAX_PEAKS_BY_LEVEL,
     Environment,
     Peak,
     auto_classify,
@@ -43,7 +63,10 @@ from moltrace.spectroscopy.peaks.gsd import (
 # not provide one; mirrors moltrace.spectroscopy.peaks.gsd._DEFAULT_FIELD_MHZ.
 _DEFAULT_FIELD_MHZ = 500.0
 
-REPORT_VERSION = "gsd_prompt3_validation_report_v1"
+# v2 adds signed-direction and picked/expected ratio aggregates. v1 published only
+# absolute-value medians, so it could not tell over-picking from under-picking and a
+# change that traded one for the other scored as an improvement.
+REPORT_VERSION = "gsd_prompt3_validation_report_v2"
 DEFAULT_OUTPUT_DIRNAME = "gsd_prompt3_validation"
 DEFAULT_LEVEL = 2
 DEFAULT_BUNDLE_FILENAME = "nmrshiftdb2_bruker_20.json"
@@ -95,6 +118,10 @@ CSV_COLUMNS = [
     "solvent",
     "row_status",
     "reference_peak_count",
+    "field_mhz",
+    "field_mhz_source",
+    "peak_cap",
+    "peak_cap_saturated",
     "prompt_peak_count",
     "prompt_compound_peak_count",
     "prompt_environment_count",
@@ -200,7 +227,7 @@ def run_fixture(
         )
     except Exception as exc:  # pragma: no cover - defensive against vendor edge cases
         return _row_error(spec, f"{type(exc).__name__}: {exc}")
-    return _row_success(spec, spectrum, classified, environments)
+    return _row_success(spec, spectrum, classified, environments, level=level)
 
 
 def run_all(
@@ -237,6 +264,82 @@ def build_report(rows: list[dict[str, Any]], *, level: int) -> dict[str, Any]:
             abs(row[field]) for row in ok_rows if row.get(field) is not None
         )
         return float(values[len(values) // 2]) if values else None
+
+    def _median(values: list[float]) -> float | None:
+        ordered = sorted(values)
+        return float(ordered[len(ordered) // 2]) if ordered else None
+
+    def _p90(values: list[float]) -> float | None:
+        ordered = sorted(values)
+        if not ordered:
+            return None
+        return float(ordered[min(len(ordered) - 1, int(round(0.9 * (len(ordered) - 1))))])
+
+    def _direction(field: str) -> dict[str, Any]:
+        """Signed aggregates. ``_median_abs`` alone cannot tell over- from under-picking.
+
+        The per-row delta has always been signed (``picked - expected``); the summary threw
+        the sign away, so a change that traded over-picking for under-picking scored as an
+        improvement on every published metric and on every regression floor.
+        """
+
+        values = [row[field] for row in ok_rows if row.get(field) is not None]
+        return {
+            "median_signed": _median([float(v) for v in values]),
+            "over_count": sum(1 for v in values if v > 0),
+            "under_count": sum(1 for v in values if v < 0),
+            "exact_count": sum(1 for v in values if v == 0),
+        }
+
+    def _ratio(field: str, nucleus: str | None = None) -> dict[str, Any]:
+        """picked / expected. A ratio survives comparison across fixtures; a count does not.
+
+        A delta of +20 means something different on a 5-peak reference than on a 23-peak one,
+        which is why the over-pick factor has to be read here rather than off the delta.
+        """
+
+        values = [
+            float(row[field]) / float(row["reference_peak_count"])
+            for row in ok_rows
+            if row.get(field) is not None
+            and row.get("reference_peak_count")
+            and (nucleus is None or row.get("nucleus") == nucleus)
+        ]
+        return {
+            "n": len(values),
+            "median": _median(values),
+            "p90": _p90(values),
+            "max": max(values, default=None),
+        }
+
+    def _field_band(mhz: float | None) -> str:
+        """Coarse observe-frequency bands.
+
+        This is the OBSERVE frequency, not the instrument field, so a 13C band and a 1H
+        band of the same label are different instruments -- which is why banding is nested
+        inside nucleus rather than pooled across it.
+        """
+
+        if not mhz:
+            return "unknown"
+        if mhz < 100.0:
+            return "<100MHz"
+        if mhz < 200.0:
+            return "100-200MHz"
+        if mhz < 400.0:
+            return "200-400MHz"
+        return ">=400MHz"
+
+    def _ratios_by_stage(nucleus: str | None = None) -> dict[str, Any]:
+        return {
+            # Where the "3-7x over-pick" figure lives: the raw detector output, before
+            # classification removes solvent / artifact / satellite lines.
+            "raw_total": _ratio("prompt_peak_count", nucleus),
+            "after_classification": _ratio("prompt_compound_peak_count", nucleus),
+            "after_clustering": _ratio("prompt_compound_environment_count", nucleus),
+        }
+
+    field_values = sorted({row.get("field_mhz") for row in ok_rows if row.get("field_mhz")})
 
     summary = {
         "report_version": REPORT_VERSION,
@@ -278,6 +381,67 @@ def build_report(rows: list[dict[str, Any]], *, level: int) -> dict[str, Any]:
             within_manifest_total / len(ok_rows) if ok_rows else None
         ),
         "median_abs_peak_count_delta": _median_abs("peak_count_delta"),
+        # --- Direction and magnitude -------------------------------------- #
+        # Every metric above is an absolute value or a within-tolerance rate, so none of
+        # them can distinguish picking too many lines from picking too few. These can.
+        "direction": {
+            "peak_count": _direction("peak_count_delta"),
+            "compound_peak_count": _direction("compound_peak_count_delta"),
+            "compound_environment_count": _direction("compound_environment_count_delta"),
+        },
+        "over_pick_ratio": {
+            "all": _ratios_by_stage(),
+            "by_nucleus": {
+                nucleus: _ratios_by_stage(nucleus)
+                for nucleus in sorted(
+                    {str(row.get("nucleus")) for row in ok_rows if row.get("nucleus")}
+                )
+            },
+            # Nested inside nucleus deliberately: field_mhz is the observe frequency, so
+            # the same band label means a different instrument for 1H and 13C. Each entry
+            # carries its own n -- on a 19-fixture corpus most bands are too thin to
+            # conclude from, and that has to be visible rather than inferred.
+            "by_nucleus_and_field": {
+                nucleus: {
+                    band: {
+                        "n": sum(
+                            1
+                            for row in ok_rows
+                            if row.get("nucleus") == nucleus
+                            and _field_band(row.get("field_mhz")) == band
+                        ),
+                        "raw_total_median": _median(
+                            [
+                                float(row["prompt_peak_count"]) / float(row["reference_peak_count"])
+                                for row in ok_rows
+                                if row.get("nucleus") == nucleus
+                                and _field_band(row.get("field_mhz")) == band
+                                and row.get("prompt_peak_count") is not None
+                                and row.get("reference_peak_count")
+                            ]
+                        ),
+                    }
+                    for band in sorted(
+                        {
+                            _field_band(row.get("field_mhz"))
+                            for row in ok_rows
+                            if row.get("nucleus") == nucleus
+                        }
+                    )
+                }
+                for nucleus in sorted(
+                    {str(row.get("nucleus")) for row in ok_rows if row.get("nucleus")}
+                )
+            },
+        },
+        "field_mhz_observed": field_values,
+        "field_mhz_defaulted_count": sum(
+            1 for row in ok_rows if row.get("field_mhz_source") == "default"
+        ),
+        # A saturated pick is a floor, not a measurement, and every count downstream
+        # inherits that. Emitted even when zero so it is visibly zero.
+        "peak_cap": _MAX_PEAKS_BY_LEVEL.get(level),
+        "peak_cap_saturated_count": sum(1 for row in ok_rows if row.get("peak_cap_saturated")),
     }
     return {"summary": summary, "rows": rows}
 
@@ -341,6 +505,8 @@ def _row_success(
     spectrum: NMRSpectrum,
     peaks: list[Peak],
     environments: list[Environment],
+    *,
+    level: int,
 ) -> dict[str, Any]:
     prompt_count = len(peaks)
     compound_count = sum(1 for peak in peaks if peak.category == "compound")
@@ -419,6 +585,19 @@ def _row_success(
         "solvent": spectrum.solvent,
         "row_status": "ok",
         "reference_peak_count": spec.reference_peak_count,
+        # Recorded so over-pick can be stratified by field, and so a fixture whose FID
+        # carries no frequency is visibly running on the 500 MHz default rather than
+        # silently being pooled with measured ones.
+        "field_mhz": float(spectrum.field_mhz or _DEFAULT_FIELD_MHZ),
+        "field_mhz_source": "metadata" if spectrum.field_mhz else "default",
+        # The detector stops at a per-level ceiling. A run that hits it is reporting a
+        # truncated pick, and every count downstream of it is a floor, not a measurement.
+        "peak_cap": _MAX_PEAKS_BY_LEVEL.get(level),
+        "peak_cap_saturated": (
+            prompt_count >= _MAX_PEAKS_BY_LEVEL[level]
+            if level in _MAX_PEAKS_BY_LEVEL
+            else False
+        ),
         "prompt_peak_count": prompt_count,
         "prompt_compound_peak_count": compound_count,
         "prompt_environment_count": env_total_count,
