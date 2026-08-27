@@ -32,20 +32,26 @@ did; an atom with no usable σ (an element-prior abstention) gets no interval at
 from __future__ import annotations
 
 import json
+import logging
 import math
+import os
 import statistics
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 from moltrace.spectroscopy.infra.contract import content_hash
 
 __all__ = [
+    "CALIBRATION_PATH_ENV",
     "ConformalBin",
     "ConformalCalibration",
     "CoverageReport",
     "Interval",
+    "conformal_calibration_status",
     "fit_conformal",
+    "load_deployed_calibration",
     "measure_coverage",
     "min_calibration_size",
 ]
@@ -492,3 +498,93 @@ def measure_coverage(
         n_no_interval=no_interval,
         notes=tuple(notes),
     )
+
+
+# --------------------------------------------------------------------------- #
+# Deployment
+# --------------------------------------------------------------------------- #
+#: Path to the fitted calibration this process should score matches against.
+CALIBRATION_PATH_ENV = "MOLTRACE_CONFORMAL_CALIBRATION"
+
+_DEPLOYED: ConformalCalibration | None = None
+_DEPLOYED_LOADED = False
+
+
+def load_deployed_calibration() -> ConformalCalibration | None:
+    """The fitted calibration this process verifies against, or ``None``.
+
+    Unset is a legitimate configuration -- a dev checkout with no fitted artifact --
+    and the verifier falls back to the predictor's claimed sigma, saying so in each
+    result's ``significance_basis``. That fallback is weaker, not absent: held-out
+    measurement put the sigma basis at a half-width/sigma ratio running 8.66x down to
+    1.77x across bins, where a correctly scaled sigma would give a constant, and it is
+    worst exactly where the arbiter leans hardest.
+
+    **Set-and-unloadable is a misconfiguration**, and it is logged at ERROR rather
+    than absorbed, for the same reason the HOSE table is: it is what a deploy that
+    forgot to stage the artifact looks like, and silently substituting the basis that
+    was explicitly configured away is the failure this exists to prevent. A corrupt or
+    version-mismatched file is treated the same way -- ``from_json`` raises on both,
+    and neither is a reason to refuse service on the weaker basis.
+
+    Cached for the life of the process: the artifact is deployed state, not
+    configuration that changes under a running service.
+    """
+
+    global _DEPLOYED, _DEPLOYED_LOADED
+    if _DEPLOYED_LOADED:
+        return _DEPLOYED
+    _DEPLOYED_LOADED = True
+
+    raw_path = os.environ.get(CALIBRATION_PATH_ENV)
+    if not raw_path:
+        return None
+
+    log = logging.getLogger(__name__)
+    path = Path(raw_path)
+    if not path.exists():
+        log.error(
+            "%s is set to %r but no such file exists. Structure verification will fall "
+            "back to the predictor's claimed sigma, which held-out measurement showed is "
+            "differentially mis-scaled. Fit one with "
+            "scripts/measure_conformal_calibration.py.",
+            CALIBRATION_PATH_ENV,
+            raw_path,
+        )
+        return None
+
+    try:
+        _DEPLOYED = ConformalCalibration.from_json(path.read_text(encoding="utf-8"))
+    except Exception:
+        log.exception(
+            "%s at %r could not be loaded; falling back to the sigma basis. A version "
+            "mismatch means the calibration was fitted by a different procedure than "
+            "this build expects and its numbers are not comparable; a fingerprint "
+            "mismatch means the file's contents were edited after fitting.",
+            CALIBRATION_PATH_ENV,
+            raw_path,
+        )
+        return None
+
+    log.info(
+        "conformal calibration loaded: target_coverage=%s bins=%d fingerprint=%s",
+        _DEPLOYED.target_coverage,
+        len(_DEPLOYED.bins),
+        _DEPLOYED.fingerprint(),
+    )
+    return _DEPLOYED
+
+
+def conformal_calibration_status() -> dict[str, Any]:
+    """Which significance basis this process verifies on. Cheap enough for a probe."""
+
+    raw_path = os.environ.get(CALIBRATION_PATH_ENV)
+    return {
+        "configured": bool(raw_path),
+        "path_present": bool(raw_path) and Path(raw_path).exists(),
+        "loaded": _DEPLOYED is not None,
+        "basis": "conformal" if _DEPLOYED is not None else "predicted_sigma",
+        "target_coverage": None if _DEPLOYED is None else _DEPLOYED.target_coverage,
+        "fingerprint": None if _DEPLOYED is None else _DEPLOYED.fingerprint(),
+        "n_bins": None if _DEPLOYED is None else len(_DEPLOYED.bins),
+    }

@@ -354,7 +354,20 @@ model-derived number from the request body.** That last one is the test to write
 L1 = `structure_elucidation_program.md` **B0**, plus three additions that document does not cover.
 B0 items 1–4 stand as written and are not restated. The additions:
 
-### D1. Conformal prediction over the shift predictor — **fitted and measured 2026-08-08**
+### D1. Conformal prediction over the shift predictor — **fitted 2026-08-08, deployed 2026-08-27**
+
+> **Deployment note (2026-08-27).** Fitted was not the same as reached. `VerificationOptions.
+> shift_calibration` was consumed by the scorer but no production caller ever set it, so every
+> live verdict was still scored on `_significance_from_sigma` — the basis this section measures
+> as differentially mis-scaled. The 0.90 calibration is now a checked-in artifact
+> (`data/conformal/shift_calibration.json`, 4.7 KB of residual quantiles), loaded via
+> `MOLTRACE_CONFORMAL_CALIBRATION`, threaded through `/spectrum/reason` →
+> `propose_structures` → `verify_structure`, and reported by `/health` and
+> `/admin/deployment`. Re-fitting on the same export reproduced the table below to five
+> decimals (90.0255 % / 90.6140 %). The 0.95 fit was deliberately not deployed: it undershoots
+> on ¹³C (94.72 %, worst deficit 0.0028) and its wider intervals make the weighting less
+> discriminating while failing the rate it advertises.
+
 
 > **The guarantee holds on real data, and the defect is larger than B5 could see.**
 > `spectroscopy/eval/conformal.py` fits Mondrian split-conformal bands (nucleus × reported-σ
