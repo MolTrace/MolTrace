@@ -11,8 +11,21 @@ const os = require('node:os')
 const path = require('node:path')
 const svc = require('../src/local-service.js')
 
+// Printed AS EACH ONE FINISHES, not buffered to the end.
+//
+// This suite was killed mid-run on a CI macOS runner and printed literally
+// nothing, so the log said only that the step died -- it took a local reproduction
+// to find out which assertion it was sitting in. A test run that is interrupted
+// should already have told you where it was. The summary still comes at the end;
+// what changed is that the line is not held hostage to reaching it.
 const results = []
-const check = (n, f) => { try { f(); results.push(['PASS', n]) } catch (e) { results.push(['FAIL', n + ' — ' + e.message]) } }
+const record = (status, name) => {
+  results.push([status, name])
+  console.log(`  ${status === 'PASS' ? '✓' : '✗'} ${name}`)
+}
+const check = (n, f) => {
+  try { f(); record('PASS', n) } catch (e) { record('FAIL', n + ' — ' + e.message) }
+}
 
 check('the socket directory is owner-only', () => {
   const { dir, cleanup } = svc.createSocketDirectory()
@@ -325,10 +338,9 @@ const asyncChecks = [
 
 ;(async () => {
   for (const [name, fn] of asyncChecks) {
-    try { await fn(); results.push(['PASS', name]) }
-    catch (e) { results.push(['FAIL', name + ' — ' + e.message]) }
+    try { await fn(); record('PASS', name) }
+    catch (e) { record('FAIL', name + ' — ' + e.message) }
   }
-  for (const [s, n] of results) console.log(`  ${s === 'PASS' ? '✓' : '✗'} ${n}`)
   const failed = results.filter(([s]) => s === 'FAIL').length
   console.log(failed ? `\nLOCAL SERVICE FAILED (${failed})` : `\nLOCAL SERVICE OK — ${results.length} assertions`)
   process.exit(failed ? 1 : 0)
