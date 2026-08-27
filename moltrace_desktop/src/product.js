@@ -48,6 +48,10 @@ const ALLOWED_KEYS = [
   'telemetryDsn',
   'entitlementRootPublicKey',
   'entitlementRootKeyId',
+  // PREVIEW BUILDS ONLY. See previewWorld() -- it is ignored outright unless the
+  // BAKED config is unconfigured, so a shipped installation cannot be unlocked
+  // with it even if someone bakes it in.
+  'previewModules',
 ]
 
 // The name a build presents to a user. BUSL 1.1 already withholds trademark
@@ -83,6 +87,42 @@ function validate(cfg = raw) {
   return { problems, missing, configured: missing.length === 0 }
 }
 
+/**
+ * The capability inputs a PREVIEW build may use, or null.
+ *
+ * A prototype handed to evaluators has to be able to do something, and the real
+ * inputs come from a signed entitlement statement this build has no way to
+ * obtain. So a preview build may declare which products it is standing in for.
+ *
+ * THE CONDITION IS THE WHOLE SECURITY PROPERTY, and it is the same one the
+ * config overlay already rests on: this is honoured only when the BAKED config
+ * is unconfigured. A shipped installation always carries a baked configuration,
+ * so it can never take this path -- not through the environment, and not by
+ * someone baking `previewModules` into the packaged file, because the test is on
+ * the baked config's completeness rather than on where the key came from.
+ *
+ * It does NOT fabricate an entitlement statement. There is no statement here and
+ * the app says so: `preview: true` travels with every verdict this produces, and
+ * the window states that entitlement was not verified. Minting one would be the
+ * one thing this client must never do.
+ */
+function previewWorld(cfg = raw) {
+  const bakedConfigured = REQUIRED_FOR_LAUNCH.every((k) => baked[k])
+  if (bakedConfigured) return null
+  const modules = Array.isArray(cfg.previewModules) ? cfg.previewModules.filter((m) => typeof m === 'string') : []
+  if (!modules.length) return null
+  return {
+    preview: true,
+    modules,
+    // No reference data is installed in a preview build. An empty inventory is a
+    // true statement, and it keeps every pack-gated capability locked -- so the
+    // gate is still visibly doing its job rather than being switched off.
+    packs: [],
+    entitlement: null,
+    role: null,
+  }
+}
+
 // §7.1: a refusal names its cause, in words a person reads — no endpoint paths,
 // no env-var names, no status codes.
 function unconfiguredMessage(missing) {
@@ -93,4 +133,4 @@ function unconfiguredMessage(missing) {
   )
 }
 
-module.exports = { raw, baked, loadRaw, OFFICIAL_PRODUCT_NAME, ALLOWED_KEYS, REQUIRED_FOR_LAUNCH, validate, unconfiguredMessage }
+module.exports = { raw, baked, loadRaw, previewWorld, OFFICIAL_PRODUCT_NAME, ALLOWED_KEYS, REQUIRED_FOR_LAUNCH, validate, unconfiguredMessage }

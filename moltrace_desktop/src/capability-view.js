@@ -50,9 +50,13 @@ function present(verdict) {
       displayName: verdict.displayName,
       available: true,
       code: null,
-      headline: 'Available',
+      // A preview build says so HERE, next to the capability, and not only in a
+      // banner at the top of the window. A banner is read once and then stops
+      // being seen; the line beside the thing you are about to use is not.
+      headline: verdict.preview === true ? 'Available in this preview build' : 'Available',
       action: null,
       tone: 'available',
+      preview: verdict.preview === true,
     }
   }
   const p = PRESENTATION[verdict.code] || UNRECOGNISED
@@ -65,6 +69,7 @@ function present(verdict) {
     headline: p.headline,
     action: p.action,
     tone: p.tone,
+    preview: verdict.preview === true,
   }
 }
 

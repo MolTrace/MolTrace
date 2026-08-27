@@ -37,3 +37,9 @@ body { margin: 0; padding: 2rem; }
 /* The limits are not fine print: same weight as the numbers they qualify. */
 .result__limits { margin: 1rem 0 0; padding-left: 1.1rem; font-size: .875rem; }
 .result__limits li { margin: .35rem 0; }
+
+/* Not fine print, and not a dismissible toast: an evaluator has to see this
+   before the numbers, every time. */
+.preview-banner { border: 1px solid currentColor; border-left: 4px solid #6a1b9a;
+                  border-radius: .5rem; padding: .6rem .9rem; margin: 0 0 1rem;
+                  max-width: 46rem; font-size: .9rem; }
