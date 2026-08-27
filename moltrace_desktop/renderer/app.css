@@ -48,3 +48,13 @@ body { margin: 0; padding: 2rem; }
 .result__warning { margin: .5rem 0 .75rem; padding: .55rem .8rem; font-size: .9rem;
                    border: 1px solid currentColor; border-left: 4px solid #ef6c00;
                    border-radius: .5rem; }
+
+/* The spectrum. */
+.spectrum { margin: 0 0 1rem; }
+.spectrum__svg { width: 100%; height: auto; display: block; overflow: visible; }
+.spectrum__trace  { fill: currentColor; fill-opacity: .78; stroke: none; }
+.spectrum__zero   { stroke: currentColor; stroke-opacity: .35; stroke-width: 1; stroke-dasharray: 3 3; }
+.spectrum__tick   { stroke: currentColor; stroke-opacity: .5; stroke-width: 1; }
+.spectrum__tick-label { fill: currentColor; font-size: 11px; opacity: .75; }
+.spectrum__marker { stroke: #6a1b9a; stroke-width: 2; }
+.spectrum__caption { margin: .35rem 0 0; font-size: .8rem; opacity: .8; }

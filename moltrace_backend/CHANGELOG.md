@@ -14,6 +14,37 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.71.0 — The spectrum is drawn, not just tabulated (2026-08-27)
+
+A peak table with no trace beside it cannot be checked. Reading NMR is looking at
+the lines and the numbers together; a chemist handed only a table has to take
+every row on trust — and on the acquisitions where the detector saturates, the
+table is exactly what they should not be trusting.
+
+`fid.open` now returns a drawable reduction of the spectrum alongside the peak
+table, and the reduction is the part that had to be got right.
+
+**A min/max envelope, not every Nth point.** An NMR line is a handful of points
+wide, so a stride steps straight over it. Measured on a 524,288-point
+acquisition: taking every Nth point left the tallest peak at **19.9%** of its
+real height; keeping the minimum and maximum of each bucket reproduced it at
+**100%**. Both edges are kept rather than only the maxima, because negative
+excursions are how a chemist sees bad phasing. 1,200 columns, about 48 KB.
+
+**Highest ppm first.** An NMR spectrum is read right to left, and an axis the
+other way round is one a chemist has to translate every time.
+
+**The window follows the signal, and says what it left out.** A 1H acquisition
+may sweep -44 to 263 ppm while every signal sits between 0 and 10; drawn end to
+end that is a flat line with a spike. `sweep_ppm` carries the full acquisition,
+and the caption states the trim when a meaningful part is off screen — a trimmed
+axis that does not admit it is a claim that nothing lies outside.
+
+The reduction itself is stated on screen rather than implied: how many points,
+how many columns, and that each column spans the full range beneath it.
+
+---
+
 ## v0.70.1 — The desktop refused two thirds of real acquisitions (2026-08-27)
 
 `open_spectrum` called `read_processed_spectrum` and nothing else, so an
