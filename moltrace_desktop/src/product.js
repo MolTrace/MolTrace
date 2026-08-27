@@ -83,6 +83,15 @@ function validate(cfg = raw) {
     problems.push('an unconfigured build carries the official product name — it would present itself as MolTrace')
   }
 
+  // A preview build must not claim the brand either — and this REFUSES TO START
+  // rather than silently declining to unlock, because a build that carries
+  // previewModules was built to be a preview and a silent lock would read as a
+  // broken app rather than a misconfigured one.
+  if (Array.isArray(cfg.previewModules) && cfg.previewModules.length
+      && cfg.productName === OFFICIAL_PRODUCT_NAME) {
+    problems.push('a build declaring preview products carries the official product name — a preview is not a licensed installation and must not present itself as one')
+  }
+
   const missing = REQUIRED_FOR_LAUNCH.filter((k) => !cfg[k])
   return { problems, missing, configured: missing.length === 0 }
 }
@@ -107,8 +116,25 @@ function validate(cfg = raw) {
  * one thing this client must never do.
  */
 function previewWorld(cfg = raw) {
-  const bakedConfigured = REQUIRED_FOR_LAUNCH.every((k) => baked[k])
-  if (bakedConfigured) return null
+  // THE CONDITION IS THE BRAND, and it replaces an earlier one that could not
+  // survive packaging. That version required the BAKED config to be incomplete —
+  // safe, but self-defeating: a build refuses to start unless it is configured,
+  // so a packaged build for evaluators was configured and therefore never a
+  // preview. The rule could not both let the app launch and let it do anything.
+  //
+  // A build that declares preview products may not carry the official product
+  // name, exactly as an unconfigured one may not (`validate()` enforces both,
+  // and an offending config refuses to start rather than quietly locking). That
+  // is a STRONGER signal, not a weaker one: it is visible to whoever is running
+  // the thing, it survives packaging, and a genuine MolTrace installation can
+  // never be a preview build because a genuine one carries the brand.
+  //
+  // It does not pretend to stop someone editing their own client. ASAR is an
+  // archive rather than encryption and the README says so: what protects the
+  // product is the licence, the backend and the signature. What this rule buys
+  // is that an honest build cannot BECOME unlicensed by accident, and that a
+  // build which has cannot look official while doing it.
+  if (cfg.productName === OFFICIAL_PRODUCT_NAME) return null
   const modules = Array.isArray(cfg.previewModules) ? cfg.previewModules.filter((m) => typeof m === 'string') : []
   if (!modules.length) return null
   return {

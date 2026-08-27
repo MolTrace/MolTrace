@@ -17,9 +17,13 @@
     "test:keys": "node test/key-hierarchy.js",
     "test:node": "node test/modules-committed.js && node test/product-config.js && node test/service-credential.js && node test/key-hierarchy.js && node test/capabilities.js && node test/upgrade-states.js && node test/local-service.js",
     "test:service": "node test/local-service.js",
-    "test:roundtrip": "MOLTRACE_PRODUCT_CONFIG=$PWD/test/fixtures-product.json electron test/spectrum-round-trip.js"
+    "test:roundtrip": "MOLTRACE_PRODUCT_CONFIG=$PWD/test/fixtures-product.json electron test/spectrum-round-trip.js",
+    "package": "node scripts/package.js"
   },
   "dependencies": {
     "electron": "43.4.1"
+  },
+  "devDependencies": {
+    "@electron/packager": "20.3.0"
   }
 }

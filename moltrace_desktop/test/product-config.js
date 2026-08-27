@@ -113,17 +113,7 @@ check('a CONFIGURED build may carry the official name', () => {
 
 // --- the preview world, and the one condition that makes it safe -----------
 
-/** Run `fn` with the BAKED config temporarily looking like a shipped build. */
-function withConfiguredBakedBuild(fn) {
-  const saved = {}
-  for (const k of product.REQUIRED_FOR_LAUNCH) {
-    saved[k] = product.baked[k]
-    product.baked[k] = 'set-by-the-packager'
-  }
-  try { return fn() } finally {
-    for (const k of product.REQUIRED_FOR_LAUNCH) product.baked[k] = saved[k]
-  }
-}
+const CONFIGURED = { workspaceUrl: 'https://w.invalid', entitlementRootPublicKey: 'ed25519:0', entitlementRootKeyId: 'k' }
 
 check('a preview build with no declaration unlocks nothing', () => {
   assert.strictEqual(product.previewWorld({}), null)
@@ -132,31 +122,43 @@ check('a preview build with no declaration unlocks nothing', () => {
     'a string was accepted where a list is required')
 })
 
-check('an unconfigured build MAY declare the products it stands in for', () => {
-  const w = product.previewWorld({ previewModules: ['spectracheck'] })
-  assert.ok(w, 'the preview world was refused in an unconfigured build')
+check('a build that does NOT claim the brand may declare preview products', () => {
+  // And it may be fully configured, which is what makes a packaged evaluator
+  // build possible: it has to be configured to start at all.
+  const w = product.previewWorld({ ...CONFIGURED, productName: 'MolTrace Preview', previewModules: ['spectracheck'] })
+  assert.ok(w, 'a configured, unbranded preview build was refused')
   assert.strictEqual(w.preview, true, 'the world does not mark itself as a preview')
   assert.deepStrictEqual(w.modules, ['spectracheck'])
 })
 
-check('a CONFIGURED build ignores previewModules entirely — the security property', () => {
-  // This is the assertion the whole mechanism rests on. A shipped installation
-  // always carries a baked configuration, so it must never be able to take this
-  // path — not through the environment, and NOT by someone baking
-  // `previewModules` into the packaged file, because the test is on the baked
-  // config's completeness rather than on where the key came from.
-  withConfiguredBakedBuild(() => {
-    assert.strictEqual(product.previewWorld({ previewModules: ['spectracheck'] }), null,
-      'a configured build honoured previewModules — this is a licence bypass on every customer machine')
-    assert.strictEqual(product.previewWorld({ previewModules: ['spectracheck', 'regentry'] }), null)
-  })
+check('a build claiming the brand unlocks NOTHING — the security property', () => {
+  // This is the assertion the mechanism rests on. A genuine MolTrace
+  // installation carries the official name, so it can never be a preview build.
+  assert.strictEqual(
+    product.previewWorld({ ...CONFIGURED, productName: product.OFFICIAL_PRODUCT_NAME, previewModules: ['spectracheck'] }),
+    null,
+    'an officially-named build honoured previewModules — that is a licence bypass wearing the brand')
+})
+
+check('a brand-claiming preview build REFUSES TO START rather than locking quietly', () => {
+  // A silent lock reads as a broken app. A build carrying previewModules was
+  // built to be a preview, so the contradiction is a misconfiguration and must
+  // say so at launch.
+  const v = product.validate({ ...CONFIGURED, productName: product.OFFICIAL_PRODUCT_NAME, previewModules: ['spectracheck'] })
+  assert.ok(v.problems.length, 'the contradiction was accepted silently')
+  assert.match(v.problems.join(' '), /preview/i)
+})
+
+check('a real installation is unaffected by any of this', () => {
+  const cfg = { ...CONFIGURED, productName: product.OFFICIAL_PRODUCT_NAME }
+  assert.strictEqual(product.previewWorld(cfg), null)
+  assert.deepStrictEqual(product.validate(cfg).problems, [], 'a genuine installation was refused')
+  assert.strictEqual(product.validate(cfg).configured, true)
 })
 
 check('a preview build NEVER fabricates an entitlement statement', () => {
   // The client verifies statements against a pinned key and never mints one.
-  // Handing assess() an object shaped like a verified statement would be exactly
-  // that, dressed up as configuration.
-  const w = product.previewWorld({ previewModules: ['spectracheck'] })
+  const w = product.previewWorld({ ...CONFIGURED, productName: 'MolTrace Preview', previewModules: ['spectracheck'] })
   assert.strictEqual(w.entitlement, null, 'the preview world invented an entitlement statement')
   assert.deepStrictEqual(w.packs, [], 'a preview build claimed reference data it does not have')
 })

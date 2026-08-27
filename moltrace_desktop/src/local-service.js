@@ -106,17 +106,45 @@ function createListener() {
   }
 }
 
-/** How to spawn it. Separated so the shape is testable without spawning. */
-function buildSpawn({ credential, socketFd, backendDir }) {
-  const plan = credential.spawnPlan({
+/**
+ * Where the service actually is.
+ *
+ * A PACKAGED build ships a frozen copy of the service beside the app and runs
+ * that. A development checkout has no frozen copy and runs it from source
+ * through `uv`. Resolved by asking the filesystem rather than by a build-time
+ * flag, so a packaged build cannot be handed a development command and a
+ * developer cannot accidentally test the frozen one they have not rebuilt.
+ *
+ * The frozen binary is what a tester gets: it refuses to start without a passed
+ * socket exactly as the source does — verified against the built artifact, not
+ * assumed from the source it was built from.
+ */
+function resolveService({ resourcesPath, backendDir }) {
+  if (resourcesPath) {
+    const frozen = path.join(resourcesPath, 'moltrace-local-service', 'moltrace-local-service')
+    if (fs.existsSync(frozen)) {
+      // cwd is the bundle's own directory: a frozen build resolves its data
+      // files relative to itself, and inheriting the app's cwd has no meaning.
+      return { command: frozen, args: [], cwd: path.dirname(frozen), frozen: true }
+    }
+  }
+  return {
     command: 'uv',
     args: ['run', 'python', '-m', 'nmrcheck.local_service_main'],
-  })
+    cwd: backendDir,
+    frozen: false,
+  }
+}
+
+/** How to spawn it. Separated so the shape is testable without spawning. */
+function buildSpawn({ credential, socketFd, backendDir, resourcesPath, service }) {
+  const target = service || resolveService({ resourcesPath, backendDir })
+  const plan = credential.spawnPlan({ command: target.command, args: target.args })
   return {
     command: plan.command,
     args: plan.args,                        // never carries the credential
     options: {
-      cwd: backendDir,
+      cwd: target.cwd,
       env: { ...process.env },              // never carries the credential
       // 0,1,2 as usual; 3 is the credential pipe; 4 is the bound socket.
       stdio: ['ignore', 'pipe', 'pipe', 'pipe', socketFd],
@@ -134,9 +162,9 @@ function buildSpawn({ credential, socketFd, backendDir }) {
  * readiness probes. A caller holding the pieces separately has to remember. A
  * caller calling this does not.
  */
-function start({ credential, backendDir, onExit }) {
+function start({ credential, backendDir, resourcesPath, service, onExit }) {
   const listener = createListener()
-  const plan = buildSpawn({ credential, socketFd: listener.fd, backendDir })
+  const plan = buildSpawn({ credential, socketFd: listener.fd, backendDir, resourcesPath, service })
   const child = spawn(plan.command, plan.args, plan.options)
 
   // MEASURED: `spawn uv ENOENT` arrives as an ASYNCHRONOUS 'error' event, which
@@ -388,6 +416,6 @@ function capabilityWorld(service) {
 
 module.exports = {
   createSocketDirectory, createListener, buildSpawn, start, waitUntilReady, describeFailure,
-  capabilityWorld, spawn, _exitReason,
+  capabilityWorld, spawn, _exitReason, resolveService,
   _NOT_FOR_A_PERSON,
 }
