@@ -186,6 +186,19 @@ function BasisInfo({ basis }: { basis: string }) {
   return <InfoTooltip content={basis} label="Regulatory basis" />
 }
 
+/** One line of evidence behind a verdict. Rendered only when the engine supplied it -- an
+ *  empty row would read as "we checked and found nothing", which is a different claim. */
+function Evidence({ label, value }: { label: string; value: string | string[] | null | undefined }) {
+  const items = Array.isArray(value) ? value.filter(Boolean) : value ? [value] : []
+  if (!items.length) return null
+  return (
+    <p className="text-xs leading-relaxed">
+      <span className="text-muted-foreground">{label}: </span>
+      <span>{items.join("; ")}</span>
+    </p>
+  )
+}
+
 function num(value: number | null | undefined, digits = 2): string {
   if (value == null || !Number.isFinite(value)) return "—"
   return value.toLocaleString(undefined, { maximumFractionDigits: digits })
@@ -705,7 +718,7 @@ export function ImpurityAssessmentWorkspace() {
             eyebrow="Impurity Assessment · Report"
             title="Assessment report"
             icon={ShieldCheck}
-            description={`Dose ${num(result.daily_dose_g)} g/day · ${statusLabel(result.route)} · ${statusLabel(result.substance_type)} · ${result.duration_months} months`}
+            description={`Dose ${num(result.daily_dose_g)} g/day · ${statusLabel(result.route)} · ${statusLabel(result.substance_type)} · ${result.duration_months} months · ${result.authority} limits applied`}
           >
             <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
               <TabsList className="h-auto w-full flex-wrap justify-start">
@@ -843,6 +856,16 @@ export function ImpurityAssessmentWorkspace() {
                       {st.regulatory_action_required}
                     </p>
 
+                    <div className="space-y-1">
+                      <Evidence label="Class" value={st.class_definition} />
+                      <Evidence label="Structural alerts" value={st.structural_alerts} />
+                      <Evidence label="Cohort of concern" value={st.coc_categories} />
+                      <Evidence label="In-silico concordance" value={st.in_silico_concordance} />
+                      <Evidence label="Duration band" value={st.duration_band} />
+                      <Evidence label="Basis" value={st.data_basis} />
+                      <Evidence label="Reasoning" value={st.reasoning} />
+                    </div>
+
                     {st.cpca ? (
                       <div className="rounded-md border border-dashed bg-muted/20 p-3">
                         <p className="mb-1 font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">
@@ -851,7 +874,9 @@ export function ImpurityAssessmentWorkspace() {
                         <div className="flex flex-wrap items-center gap-2 text-sm">
                           <Badge variant="outline" className="font-normal">CPCA category {st.cpca.category}</Badge>
                           <span className="text-muted-foreground">AI limit</span>
-                          <span className="font-mono tabular-nums">{num(st.cpca.ai_limit_ng_per_day)} ng/day</span>
+                          <span className="font-mono tabular-nums">
+                            {num(st.cpca.ai_limit_ng_per_day)} ng/day ({result.authority})
+                          </span>
                           {st.cpca.measured_ng_per_day != null ? (
                             <>
                               <span className="text-muted-foreground">· measured</span>
@@ -866,6 +891,24 @@ export function ImpurityAssessmentWorkspace() {
                             <Badge variant="outline" className="border-destructive/50 font-normal text-destructive">exceeds AI limit</Badge>
                           )}
                           <span className="ml-auto"><BasisInfo basis={st.cpca.regulatory_basis} /></span>
+                        </div>
+
+                        <div className="mt-2 space-y-1">
+                          <Evidence label="Category" value={st.cpca.category_description} />
+                          <Evidence
+                            label="Alpha-hydrogen score"
+                            value={
+                              st.cpca.alpha_h_score == null
+                                ? null
+                                : [num(st.cpca.alpha_h_score), st.cpca.alpha_h_distribution]
+                                    .filter(Boolean)
+                                    .join(" · ")
+                            }
+                          />
+                          <Evidence label="Activating" value={st.cpca.activating_features} />
+                          <Evidence label="Deactivating" value={st.cpca.deactivating_features} />
+                          <Evidence label="Method" value={st.cpca.method_reference} />
+                          <Evidence label="Notes" value={st.cpca.notes} />
                         </div>
                       </div>
                     ) : null}

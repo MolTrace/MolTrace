@@ -1200,8 +1200,9 @@ def create_elemental_impurity_assessment(
                     match["control_threshold_ppm"] = limit.control_threshold_ppm
             elif dose is None:
                 warnings.append(
-                    f"dossier max_daily_dose_g required for the permitted concentration of "
-                    f"{pde.element}."
+                    f"No maximum daily dose is recorded for this dossier, so no permitted "
+                    f"concentration could be calculated for {pde.element}. Record the daily "
+                    "dose to obtain the ICH Q3D concentration limit."
                 )
             if observed_value is not None and permitted_ppm is not None:
                 match["threshold_triggered"] = observed_value >= permitted_ppm

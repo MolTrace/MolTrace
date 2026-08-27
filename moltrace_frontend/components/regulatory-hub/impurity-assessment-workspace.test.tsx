@@ -166,6 +166,69 @@ describe("ImpurityAssessmentWorkspace", () => {
     expect(screen.queryByText("option_2_dose_scaled")).not.toBeInTheDocument()
   })
 
+  it("shows which authority's limit was applied, next to the limit it changed", async () => {
+    const { default: userEvent } = await import("@testing-library/user-event")
+    const user = userEvent.setup()
+    // The server echoes the authority it resolved. FDA and EMA differ only on the Category-1
+    // acceptable intake -- 26.5 vs 18 ng/day -- so the number alone cannot tell a reviewer
+    // which rule produced it.
+    mockApiFetch.mockResolvedValue({
+      ...RESULT,
+      authority: "EMA",
+      structural_impurities: [
+        {
+          ...RESULT.structural_impurities[0],
+          cpca: { ...RESULT.structural_impurities[0].cpca, ai_limit_ng_per_day: 18.0 },
+        },
+      ],
+    })
+
+    render(<ImpurityAssessmentWorkspace />)
+    await user.click(screen.getByRole("button", { name: "Assess" }))
+    await waitFor(() => expect(screen.getByText("Assessment report")).toBeInTheDocument())
+
+    // Specific to the report header -- "EMA" on its own also matches the selector button above.
+    expect(screen.getByText(/EMA limits applied/i)).toBeInTheDocument()
+
+    await user.click(screen.getByRole("tab", { name: /Structural/ }))
+    // And beside the one number the choice actually changes.
+    expect(await screen.findByText(/18 ng\/day \(EMA\)/)).toBeInTheDocument()
+  })
+
+  it("shows the evidence behind a CPCA category rather than the category alone", async () => {
+    const { default: userEvent } = await import("@testing-library/user-event")
+    const user = userEvent.setup()
+    mockApiFetch.mockResolvedValue({
+      ...RESULT,
+      structural_impurities: [
+        {
+          ...RESULT.structural_impurities[0],
+          class_definition: "Class 2: known mutagen with unknown carcinogenic potential.",
+          structural_alerts: ["N-nitrosamine"],
+          reasoning: "N-nitroso centre flanked by unbranched alkyl chains.",
+          cpca: {
+            ...RESULT.structural_impurities[0].cpca,
+            category_description: "Category 1: most potent, AI 26.5 ng/day.",
+            alpha_h_score: 1,
+            activating_features: ["two alpha hydrogens"],
+            deactivating_features: ["tertiary carbon"],
+          },
+        },
+      ],
+    })
+
+    render(<ImpurityAssessmentWorkspace />)
+    await user.click(screen.getByRole("button", { name: "Assess" }))
+    await waitFor(() => expect(screen.getByText("Assessment report")).toBeInTheDocument())
+    await user.click(screen.getByRole("tab", { name: /Structural/ }))
+
+    // The reasoning a regulator would ask for, not just the verdict.
+    expect(await screen.findByText(/two alpha hydrogens/)).toBeInTheDocument()
+    expect(screen.getByText(/tertiary carbon/)).toBeInTheDocument()
+    expect(screen.getByText(/N-nitrosamine/)).toBeInTheDocument()
+    expect(screen.getByText(/N-nitroso centre flanked by unbranched alkyl chains/)).toBeInTheDocument()
+  })
+
   it("blocks a non-positive dose client-side without calling the API", async () => {
     const { default: userEvent } = await import("@testing-library/user-event")
     const user = userEvent.setup()
