@@ -2450,10 +2450,14 @@ export function SpectraCheckRawFidSection({
                 </div>
               ) : null}
               {xy ? (
-                // Raw FID needs a denser Plotly trace than processed uploads
-                // so dd/t/q/m fine structure is visible without zooming. The
-                // aromatic cleanup is display-only and peak-preserving; it
-                // does not touch the evidence trace or processed spectra.
+                // Trace density is derived from the chart's own pixel width
+                // (see spectrumPointBudgetForWidth). This surface used to
+                // override it to 12_000 points / 24 per pixel to make dd/t/q/m
+                // fine structure visible without zooming; measured, that took
+                // the sampler past its "source already fits" early return and
+                // handed Plotly ~10 vertices per pixel column, which is what
+                // rendered peaks as soft blobs on a fuzzy baseline. Fine
+                // structure comes from zooming, not from over-drawing.
                 <SpectrumViewer
                   x={xy.x}
                   y={xy.y}
@@ -2461,8 +2465,6 @@ export function SpectraCheckRawFidSection({
                   nucleus={resolvedNucleus}
                   renderMode="webgl"
                   rawFidAromaticBaseSmoothing
-                  maxObservedPoints={12_000}
-                  observedPointsPerPixel={24}
                 />
               ) : processLoading || previewLoading || previewSpectrumLoading ? (
                 <div
