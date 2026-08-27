@@ -299,3 +299,73 @@ def test_a_dominating_candidate_is_approved_and_the_gate_records_why(
         assert check["applied"] is True
         assert "top1_accuracy" in check["improvements"]
         assert "ece" in check["improvements"]
+
+
+def test_monitoring_splits_the_counts_by_confidence_scale(client, api_headers) -> None:
+    """The pooled review count mixes two scales the codebase itself calls not comparable.
+
+    Both engines write `confidence_score` into one column and are screened against one
+    threshold, so a platform-wide count of low-confidence runs counts two different things:
+    a verifier-quality figure that "is not a probability that the structure is correct", and
+    a closed-world DP4 share. The pooled figures stay -- they are a live contract -- but the
+    split has to sit beside them, and the warning has to say why.
+    """
+
+    with client:
+        ranking = _post_prediction(client, api_headers)
+        assert ranking.status_code == 201, ranking.text
+
+        summary = client.get("/ai/model-monitoring", headers=api_headers)
+        assert summary.status_code == 200, summary.text
+        body = summary.json()
+
+    by_scale = body["metadata_json"]["by_confidence_scale"]
+    # The ranking engine's runs are counted under its own scale, never merged into a
+    # platform total. (The shift engine is exercised by the unit test below rather than
+    # here: it is a long synchronous computation and running it inside a request to
+    # manufacture a second scale tests the predictor, not this split.)
+    assert "dp4_posterior" in by_scale, by_scale
+    assert by_scale["dp4_posterior"]["prediction_count"] >= 1
+
+    # The split must reconcile with the pooled figure it qualifies, or it is a third number
+    # rather than an explanation of the second.
+    assert sum(b["prediction_count"] for b in by_scale.values()) == body["prediction_count"]
+    assert (
+        sum(b["requires_review_count"] for b in by_scale.values())
+        == body["requires_review_count"]
+    )
+
+
+
+def test_a_single_scale_raises_no_comparability_warning(client, api_headers) -> None:
+    """The warning keys on scales actually being mixed, not on the split existing."""
+
+    with client:
+        assert _post_prediction(client, api_headers).status_code == 201
+        summary = client.get("/ai/model-monitoring", headers=api_headers)
+        assert summary.status_code == 200, summary.text
+        body = summary.json()
+
+    scales = [s for s in body["metadata_json"]["by_confidence_scale"] if s != "unregistered_service"]
+    if len(scales) == 1:
+        assert not [w for w in body["warnings"] if "not comparable" in w], body["warnings"]
+
+
+def test_the_comparability_warning_fires_only_when_scales_are_actually_mixed() -> None:
+    """The wording that tells a reader the pooled counts cannot be read as one number."""
+
+    from nmrcheck.ai_inference_store import scale_comparability_warnings
+
+    one = {"dp4_posterior": {"prediction_count": 3, "requires_review_count": 1}}
+    assert scale_comparability_warnings(one) == []
+
+    # An unregistered service is not a second *known* scale, so it raises nothing on its own.
+    with_unknown = {**one, "unregistered_service": {"prediction_count": 1, "requires_review_count": 0}}
+    assert scale_comparability_warnings(with_unknown) == []
+
+    mixed = {**one, "verifier_quality": {"prediction_count": 2, "requires_review_count": 2}}
+    warnings = scale_comparability_warnings(mixed)
+    assert len(warnings) == 1
+    assert "not comparable" in warnings[0]
+    # Both scales are named, so the reader knows which two were mixed.
+    assert "dp4_posterior" in warnings[0] and "verifier_quality" in warnings[0]
