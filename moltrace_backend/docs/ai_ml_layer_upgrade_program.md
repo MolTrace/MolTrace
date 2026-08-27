@@ -475,6 +475,38 @@ B0 items 1–4 stand as written and are not restated. The additions:
 > 2. **Family frontier.** Across **108** `(base, k)` settings for ¹³C and **99** for ¹H, **zero**
 >    weakly dominate `(4.0, 3.0)` / `(0.30, 3.0)`.
 >
+> **Re-verified 2026-08-27, and the one untested assumption now measured.** Re-running
+> `scripts/measure_match_tolerance.py` reproduces every figure in the table above exactly, so
+> the withdrawal stands on reproducible ground. Two things worth adding:
+>
+> The ¹³C base is not the operative window for most atoms. The current rule's *median* ¹³C
+> window is **7.195 ppm**, because `max(base, 3σ)` is dominated by the 3σ term — so changing the
+> "round number" 4.0 only moves atoms with σ < 1.333 ppm, and the framing of it as the thing
+> making the window permissive is wrong on its face.
+>
+> The exposure column was a reference-shift count — one line per atom — and the script described
+> it as a **lower** bound, reasoning that a picker over-picking 3-7× puts more candidate lines in
+> a real spectrum. That reasoning was never measured, and it is wrong in direction. Counting
+> rivals against what the matcher actually binds (¹³C: classified compound peaks; ¹H: clustered
+> environments) over the 19-fixture Bruker corpus:
+>
+> | nucleus | window (ppm) | reference rivals | detected rivals | ratio |
+> |---|---|---|---|---|
+> | ¹³C | 4.000 | 1.048 | 0.219 | 0.21× |
+> | ¹³C | 7.195 | 1.714 | 0.438 | 0.26× |
+> | ¹³C | 10.667 | 2.229 | 0.619 | 0.28× |
+> | ¹H | 0.300 | 0.605 | 0.163 | 0.27× |
+> | ¹H | 0.649 | 1.767 | 0.535 | 0.30× |
+> | ¹H | 1.164 | 2.558 | 1.047 | 0.41× |
+>
+> A reference list carries every distinct environment and a real spectrum does not resolve them
+> all — an unresolved pair contributes two reference rivals and one detected line — while
+> `auto_classify` removes the solvent, artifact and satellite picks the raw over-pick factor
+> counts. So measured exposure **overstates** the rival density a wide window faces. That cuts
+> against wide windows, not for them, which strengthens rather than weakens the decision to leave
+> `(4.0, 3.0)` / `(0.30, 3.0)` alone. Nineteen fixtures is a small corpus and a larger one could
+> move it.
+>
 > **The original claim was also inverted, not merely overstated.** Per-band realized retention
 > shows the flat floor **under**-covers confident atoms: ¹³C floor-bound bands realize
 > 96.80 / 95.96 / 94.41 / 93.74 % against a 96.30 % aggregate, while the widest bands reach
