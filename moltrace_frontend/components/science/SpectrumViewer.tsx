@@ -121,9 +121,59 @@ export type SpectrumViewerProps = {
 
 const DISPLAY_Y_CAP = 1e120
 const MIN_VIEWPORT_TRACE_POINTS = 1_000
-const MAX_VIEWPORT_TRACE_POINTS = 3_000
-const VIEWPORT_POINTS_PER_PIXEL = 2
+/**
+ * Ceiling only — a runaway guard, NOT the working control.
+ *
+ * The density term below is what governs. This used to be 3_000, which meant a
+ * chart wider than 1_500 px silently stopped getting denser; callers who wanted
+ * a sharper trace raised it, and raising it is what produced the blob (see
+ * `spectrumPointBudgetForWidth`).
+ */
+const MAX_VIEWPORT_TRACE_POINTS = 24_000
+/**
+ * Output slots the sampler can spend per bucket with no mask active: the
+ * bucket's min, its max, and the LTTB pick. Budget ÷ slots is the bucket count,
+ * so a budget of `slots × pixel columns` yields one bucket per column.
+ */
+const SPECTRUM_BUCKET_SLOTS = 3
+/**
+ * Vertices per CSS pixel column. At `SPECTRUM_BUCKET_SLOTS` this is exactly one
+ * min/max bucket per column — the single vertical segment per column that
+ * professional NMR display draws, and the density a spectrum should be drawn at.
+ * It was 2, i.e. 0.67 buckets per column, so an envelope bar landed only every
+ * 1.5 px.
+ */
+const VIEWPORT_POINTS_PER_PIXEL = SPECTRUM_BUCKET_SLOTS
 const MAX_OVERLAY_TRACE_POINTS = 1_800
+
+/**
+ * How many vertices Plotly should receive for a plot this wide.
+ *
+ * Exported because it is the whole "blob" fix and has to be assertable on its
+ * own: the defect was never in the sampler, which resamples correctly when
+ * asked to. It was here. The raw-FID surface asked for a 12_000-point budget
+ * against a ~9_173-point source, so the sampler took its "source already fits"
+ * early return and handed Plotly every point — 10.19 vertices per pixel column,
+ * each spanning its column's full local peak-to-peak. Ten overlapping diagonal
+ * strokes per column rasterise as a soft filled band: the blob over a peak, and
+ * the fuzzy baseline between peaks.
+ *
+ * So the budget is a DENSITY, derived from the pixels available to draw in, and
+ * never a fixed total. A caller wanting a sharper trace should widen the chart,
+ * not raise the ceiling.
+ */
+export function spectrumPointBudgetForWidth(
+  plotPixelWidth: number,
+  options: { maxPoints?: number; pointsPerPixel?: number } = {},
+): number {
+  const ceiling = Math.max(
+    MIN_VIEWPORT_TRACE_POINTS,
+    Math.min(24_000, Math.round(options.maxPoints ?? MAX_VIEWPORT_TRACE_POINTS)),
+  )
+  const density = Math.max(1, Math.min(24, options.pointsPerPixel ?? VIEWPORT_POINTS_PER_PIXEL))
+  const width = Number.isFinite(plotPixelWidth) ? Math.max(0, plotPixelWidth) : 0
+  return Math.max(MIN_VIEWPORT_TRACE_POINTS, Math.min(ceiling, Math.round(width * density)))
+}
 const AROMATIC_BASE_WINDOWS = [
   { min: 6.45, max: 8.65 },
   { min: 105, max: 165 },
@@ -1091,28 +1141,13 @@ function SpectrumViewerImpl({
   // axis relayout over a fixed trace and the line stops shimmering. The precise
   // viewport-density resample is restored the instant the drag ends.
   const sampleXRange = isPanning ? null : visibleXRange
-  const normalizedMaxObservedPoints = useMemo(
-    () =>
-      Math.max(
-        MIN_VIEWPORT_TRACE_POINTS,
-        Math.min(24_000, Math.round(maxObservedPoints)),
-      ),
-    [maxObservedPoints],
-  )
-  const normalizedObservedPointsPerPixel = useMemo(
-    () => Math.max(1, Math.min(24, observedPointsPerPixel)),
-    [observedPointsPerPixel],
-  )
   const observedPointBudget = useMemo(
     () =>
-      Math.max(
-        MIN_VIEWPORT_TRACE_POINTS,
-        Math.min(
-          normalizedMaxObservedPoints,
-          Math.round(plotPixelWidth * normalizedObservedPointsPerPixel),
-        ),
-      ),
-    [plotPixelWidth, normalizedMaxObservedPoints, normalizedObservedPointsPerPixel],
+      spectrumPointBudgetForWidth(plotPixelWidth, {
+        maxPoints: maxObservedPoints,
+        pointsPerPixel: observedPointsPerPixel,
+      }),
+    [plotPixelWidth, maxObservedPoints, observedPointsPerPixel],
   )
   const overlayPointBudget = useMemo(
     () =>

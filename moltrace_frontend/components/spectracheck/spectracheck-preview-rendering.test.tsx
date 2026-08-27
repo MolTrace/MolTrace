@@ -715,8 +715,14 @@ describe("SpectraCheck preview rendering", () => {
     expect(viewerProps?.defaultShowPeaks).toBeUndefined()
     expect(viewerProps?.defaultShowPeakGuides).toBeUndefined()
     expect(viewerProps?.rawFidAromaticBaseSmoothing).toBe(true)
-    expect(viewerProps?.maxObservedPoints).toBe(12_000)
-    expect(viewerProps?.observedPointsPerPixel).toBe(24)
+    // Re-baselined: these used to pin maxObservedPoints 12_000 / 24-per-pixel.
+    // Measured, that budget exceeded the ~9_173-point source, so the sampler
+    // took its "source already fits" early return and handed Plotly every
+    // point — ~10 vertices per pixel column, which is what drew peaks as soft
+    // blobs on a fuzzy baseline. The surface now inherits the density-derived
+    // default, so the assertion is that it sets NO override at all.
+    expect(viewerProps?.maxObservedPoints).toBeUndefined()
+    expect(viewerProps?.observedPointsPerPixel).toBeUndefined()
   })
 
   it("keeps raw FID preview and process on raw endpoints with distinct form contracts", async () => {
@@ -805,8 +811,14 @@ describe("SpectraCheck preview rendering", () => {
     const viewerProps = lastSpectrumViewerProps()
     expect(viewerProps?.renderMode).toBe("webgl")
     expect(viewerProps?.rawFidAromaticBaseSmoothing).toBe(true)
-    expect(viewerProps?.maxObservedPoints).toBe(12_000)
-    expect(viewerProps?.observedPointsPerPixel).toBe(24)
+    // Re-baselined: these used to pin maxObservedPoints 12_000 / 24-per-pixel.
+    // Measured, that budget exceeded the ~9_173-point source, so the sampler
+    // took its "source already fits" early return and handed Plotly every
+    // point — ~10 vertices per pixel column, which is what drew peaks as soft
+    // blobs on a fuzzy baseline. The surface now inherits the density-derived
+    // default, so the assertion is that it sets NO override at all.
+    expect(viewerProps?.maxObservedPoints).toBeUndefined()
+    expect(viewerProps?.observedPointsPerPixel).toBeUndefined()
   })
 
   it("shows the raw FID processing interface immediately while first process is pending", async () => {

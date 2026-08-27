@@ -195,8 +195,6 @@ export function SpectraCheckBench() {
                     nucleus={nucleus}
                     renderMode="webgl"
                     rawFidAromaticBaseSmoothing
-                    maxObservedPoints={12_000}
-                    observedPointsPerPixel={24}
                   />
                 ) : (
                   <p className="text-sm text-muted-foreground">
