@@ -75,10 +75,17 @@ describe("ProgramsInterfaceWorkspace (post-reorg: SpectraCheck only)", () => {
     // tick or two after render(). Wait for one of ITS OWN tabs before making
     // negative assertions — otherwise this guard passes against an empty
     // placeholder and would not notice Regentry/Repho tabs coming back.
+    // This one overrides the suite-wide 5510ms in src/test/setup.ts, because this
+    // mount is the slowest in the suite: next/dynamic plus a viewport gate, 1036-3185ms
+    // inside a full run against a test that swings 3.07x run to run. 3185 x 3.073
+    // = 9788ms. It previously carried 5000ms, which was worse than thin — it was
+    // exactly Vitest's per-test default, so it could never expire: Vitest killed the
+    // test first and reported "Test timed out", hiding WHICH element never came.
+    // Keep it under testTimeout for that reason.
     const spectraCheckTab = await screen.findByRole(
       "tab",
       { name: /^Session$/i },
-      { timeout: 5000 },
+      { timeout: 9788 },
     )
     expect(spectraCheckTab).toBeInTheDocument()
     // The cross-module switcher (SpectraCheck / Regentry / Repho) lives on the sidebar
