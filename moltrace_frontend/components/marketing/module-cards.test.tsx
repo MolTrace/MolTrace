@@ -36,7 +36,7 @@ describe("ModuleCards", () => {
 
     // The dynamically-imported overlay resolves and renders its content...
     expect(
-      await screen.findByText("Uncover the Ground Truth in Your Data.", undefined, { timeout: 4000 }),
+      await screen.findByText("Uncover the Ground Truth in Your Data."),
     ).toBeInTheDocument()
     // ...and the default capabilities panel is swapped out for it.
     expect(screen.queryByText("Capabilities")).not.toBeInTheDocument()
@@ -75,7 +75,7 @@ describe("ModuleCards", () => {
 
     // ...and present once the reader opens the preview.
     fireEvent.click(screen.getAllByRole("button", { name: /Explore Module/i })[0])
-    const link = await screen.findByRole("link", { name: new RegExp(label, "i") }, { timeout: 4000 })
+    const link = await screen.findByRole("link", { name: new RegExp(label, "i") })
     expect(link).toHaveAttribute("href", href)
   })
 })

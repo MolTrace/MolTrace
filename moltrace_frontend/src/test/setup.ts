@@ -1,5 +1,30 @@
 import { afterEach, beforeEach } from "vitest"
+import { configure } from "@testing-library/react"
 import "@testing-library/jest-dom/vitest"
+
+/**
+ * How long a `waitFor` / `findBy*` may wait for the DOM to catch up.
+ *
+ * Testing Library's 1000ms default is a second budget denominated in wall-clock,
+ * next to Vitest's `testTimeout`, and it fails the same way: `--run` forks
+ * `availableParallelism() - 1` workers, so a component that mounts in well under
+ * a second alone takes several inside a full suite. It is the constraint that
+ * survives once `testTimeout` is sized properly — `app/spectracheck/page.test.tsx`
+ * kept failing on "Unable to find role=button and name /Drop raw FID archive/i"
+ * with the per-test budget nowhere near spent.
+ *
+ * 5510ms = 923ms x 5.97. 923ms is the uncontended cost of the heaviest
+ * render-then-wait test in the suite (reaction-optimization-render's "Reaction
+ * Project Detail", measured running alone); 5.97 is the worst inflation measured
+ * between running alone and running in a full suite (785ms -> 4689.4ms). A single
+ * wait cannot outlast the test that contains it, so this bounds every wait here —
+ * it clears the longest whole test ever recorded (4689.4ms) — while staying well
+ * under `testTimeout`, so a real miss still reports WHICH element never arrived
+ * instead of an anonymous "Test timed out".
+ *
+ * A test needing longer than this says so at its own call site, and says why.
+ */
+configure({ asyncUtilTimeout: 5510 })
 
 class ResizeObserverStub {
   observe(): void {}

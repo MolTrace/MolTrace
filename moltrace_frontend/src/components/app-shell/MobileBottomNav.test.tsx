@@ -92,14 +92,11 @@ describe("MobileBottomNav", () => {
     }
     // ...and every tab is fully prefetched once the idle callback lands. The
     // `auto` default prefetches almost nothing for these dynamic segments.
-    await waitFor(
-      () => {
-        for (const anchor of anchors()) {
-          expect(anchor?.getAttribute("data-prefetch")).toBe("true")
-        }
-      },
-      { timeout: 4000 },
-    )
+    await waitFor(() => {
+      for (const anchor of anchors()) {
+        expect(anchor?.getAttribute("data-prefetch")).toBe("true")
+      }
+    })
   })
 
   it("opts every nav target out of the mobile double-tap-zoom delay", () => {
