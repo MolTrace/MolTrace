@@ -714,7 +714,12 @@ describe("SpectraCheck preview rendering", () => {
     const viewerProps = lastSpectrumViewerProps()
     expect(viewerProps?.defaultShowPeaks).toBeUndefined()
     expect(viewerProps?.defaultShowPeakGuides).toBeUndefined()
-    expect(viewerProps?.rawFidAromaticBaseSmoothing).toBe(true)
+    // Re-baselined: this pinned a raw-FID-only display transform that altered
+    // 100% of the values it drew inside 6.45-8.65 ppm, rectified samples below
+    // a floor onto one constant, and produced a 2.4x texture step at the window
+    // edge where the underlying data stepped by 0.99x. The surface now draws
+    // what it receives, so it sets no smoothing prop at all.
+    expect(viewerProps?.rawFidAromaticBaseSmoothing).toBeUndefined()
     // Re-baselined: these used to pin maxObservedPoints 12_000 / 24-per-pixel.
     // Measured, that budget exceeded the ~9_173-point source, so the sampler
     // took its "source already fits" early return and handed Plotly every
@@ -810,7 +815,12 @@ describe("SpectraCheck preview rendering", () => {
 
     const viewerProps = lastSpectrumViewerProps()
     expect(viewerProps?.renderMode).toBe("webgl")
-    expect(viewerProps?.rawFidAromaticBaseSmoothing).toBe(true)
+    // Re-baselined: this pinned a raw-FID-only display transform that altered
+    // 100% of the values it drew inside 6.45-8.65 ppm, rectified samples below
+    // a floor onto one constant, and produced a 2.4x texture step at the window
+    // edge where the underlying data stepped by 0.99x. The surface now draws
+    // what it receives, so it sets no smoothing prop at all.
+    expect(viewerProps?.rawFidAromaticBaseSmoothing).toBeUndefined()
     // Re-baselined: these used to pin maxObservedPoints 12_000 / 24-per-pixel.
     // Measured, that budget exceeded the ~9_173-point source, so the sampler
     // took its "source already fits" early return and handed Plotly every

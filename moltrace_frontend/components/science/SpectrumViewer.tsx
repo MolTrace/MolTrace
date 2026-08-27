@@ -99,13 +99,6 @@ export type SpectrumViewerProps = {
   reversedXAxis?: boolean
   renderMode?: "svg" | "webgl"
   /**
-   * Display-only raw FID cleanup for aromatic windows. It smooths the
-   * baseline/base samples around 6.45-8.65 ppm (1H) and 105-165 ppm (13C)
-   * while preserving detected peak apices, so the raw archive remains
-   * immutable and processed spectra are not touched.
-   */
-  rawFidAromaticBaseSmoothing?: boolean
-  /**
    * Optional observed-trace sampling budget. Processed spectra use the compact
    * defaults; raw FID can opt into a denser Plotly trace so fine multiplet
    * structure is visible without zooming.
@@ -174,13 +167,6 @@ export function spectrumPointBudgetForWidth(
   const width = Number.isFinite(plotPixelWidth) ? Math.max(0, plotPixelWidth) : 0
   return Math.max(MIN_VIEWPORT_TRACE_POINTS, Math.min(ceiling, Math.round(width * density)))
 }
-const AROMATIC_BASE_WINDOWS = [
-  { min: 6.45, max: 8.65 },
-  { min: 105, max: 165 },
-] as const
-const AROMATIC_BASE_PEAK_NOISE_MULTIPLIER = 3.5
-const AROMATIC_BASE_LOCAL_PEAK_NOISE_MULTIPLIER = 1.6
-const AROMATIC_BASE_FLOOR_NOISE_MULTIPLIER = 0.55
 
 /**
  * Plotly plot-area inset, in pixels. Shared by the layout (so Plotly draws the
@@ -342,27 +328,7 @@ function medianSorted(values: number[]): number {
   return values.length % 2 === 0 ? (values[mid - 1] + values[mid]) / 2 : values[mid]
 }
 
-function robustMedian(values: number[]): number {
-  if (values.length === 0) return 0
-  const sorted = values.slice().sort((a, b) => a - b)
-  return medianSorted(sorted)
-}
 
-function robustNoiseFromResiduals(values: number[], center: number): number {
-  if (values.length < 3) return 0
-  const residuals = values.map((v) => Math.abs(v - center)).sort((a, b) => a - b)
-  const madNoise = medianSorted(residuals) * 1.4826
-
-  const deltas: number[] = []
-  let previous: number | null = null
-  for (const value of values) {
-    if (previous != null) deltas.push(Math.abs(value - previous))
-    previous = value
-  }
-  deltas.sort((a, b) => a - b)
-  const deltaNoise = deltas.length > 0 ? medianSorted(deltas) * 0.7413 : 0
-  return Math.max(madNoise, deltaNoise, 1e-12)
-}
 
 /**
  * Whole-spectrum baseline noise σ estimator, robust to peaks and dispersion
@@ -373,6 +339,38 @@ function robustNoiseFromResiduals(values: number[], center: number): number {
  * Scaled by 1/Φ⁻¹(3/4) ≈ 0.7413 so the returned value is the σ of an
  * equivalent Gaussian noise process, matching the industry-standard
  * noise-factor peak threshold convention used by NMR-processing software.
+ *
+ * MEASURED, AND DELIBERATELY LEFT AS IT IS — do not "correct" the constant on
+ * its own. Two errors here partially cancel, and fixing either alone makes the
+ * display worse.
+ *
+ * 1. The constant is wrong for successive differences. For iid N(0,σ²) the
+ *    difference of adjacent samples has sd σ√2, so recovering σ needs
+ *    1.4826/√2 ≈ 1.0483, not 1.4826/2 = 0.7413.
+ * 2. The input on the raw-FID path is not a time series. The backend sends a
+ *    min/max envelope, which alternates local extrema and therefore maximises
+ *    |Δy| — the estimator's independence assumption is violated upstream.
+ *
+ * Measured on 200k samples of true σ = 1 (plain noise vs a 12-sample min/max
+ * envelope of the same noise):
+ *
+ *     estimator                     plain     envelope
+ *     × 0.7413 (this function)     0.7227       2.4270
+ *     × 1.4826/√2 ("the fix")      1.0220       3.4323
+ *     MAD of values × 1.4826       1.0202       2.4255
+ *
+ * So on enveloped input NO client-side estimator recovers σ — the envelope
+ * genuinely has ~2.4× the spread, and that information is destroyed before it
+ * reaches the browser. Correcting the constant alone would deepen the -4σ
+ * lower-bound clamp this feeds by 41% (2.43 → 3.43), pushing the frame bottom
+ * further from where it was designed to sit.
+ *
+ * The real fix is upstream: give the flat baseline buckets a single
+ * representative instead of a min/max pair in the backend sampler, then this
+ * estimator sees something close to plain noise and the constant can be
+ * corrected in the same change. That backend change also moves
+ * `baseline_flatness_qa`, a graded statistic, so it needs its own commit with a
+ * consumer audit and visible re-baselining.
  */
 function estimateBaselineNoiseSigma(values: ArrayLike<number>): number {
   if (values.length < 4) return 0
@@ -391,108 +389,6 @@ function estimateBaselineNoiseSigma(values: ArrayLike<number>): number {
   deltas.sort((a, b) => a - b)
   const sigma = medianSorted(deltas) * 0.7413
   return Number.isFinite(sigma) && sigma > 0 ? sigma : 0
-}
-
-/**
- * Local display cleanup for raw FID aromatic regions (industry-standard NMR display).
- *
- * Constraints:
- * - only acts inside aromatic windows (1H: 6.45-8.65 ppm; 13C: 105-165 ppm);
- * - preserves peak apices and local maxima above the measured noise floor;
- * - smooths only baseline/base samples using neighbouring non-peak points;
- * - lifts base-only negative excursions to the local noise floor.
- *
- * This is deliberately display-only. It never mutates uploaded FID data,
- * picked peaks, processed spectra, or non-aromatic ppm regions.
- */
-export function smoothRawFidAromaticBaseForDisplay(x: number[], y: number[]): number[] {
-  const n = Math.min(x.length, y.length)
-  if (n < 16) return y
-
-  let out: number[] | null = null
-
-  for (const window of AROMATIC_BASE_WINDOWS) {
-    const source = out ?? y
-    const regionIndices: number[] = []
-    const regionValues: number[] = []
-    for (let i = 0; i < n; i++) {
-      const ppm = x[i]
-      const value = source[i]
-      if (!Number.isFinite(ppm) || !Number.isFinite(value)) continue
-      if (ppm < window.min || ppm > window.max) continue
-      regionIndices.push(i)
-      regionValues.push(value)
-    }
-    if (regionIndices.length < 12) continue
-
-    const baseline = robustMedian(regionValues)
-    const noise = robustNoiseFromResiduals(regionValues, baseline)
-    if (!Number.isFinite(noise) || noise <= 0) continue
-
-    const strongPeakCutoff = baseline + AROMATIC_BASE_PEAK_NOISE_MULTIPLIER * noise
-    const localPeakCutoff = baseline + AROMATIC_BASE_LOCAL_PEAK_NOISE_MULTIPLIER * noise
-    const floor = baseline - AROMATIC_BASE_FLOOR_NOISE_MULTIPLIER * noise
-    const target: number[] = out ?? y.slice()
-    out = target
-
-    const isProtectedPeak = (index: number): boolean => {
-      const value = source[index]
-      if (!Number.isFinite(value)) return false
-      if (value >= strongPeakCutoff) return true
-      if (value < localPeakCutoff) return false
-
-      let left = value
-      for (let i = index - 1; i >= 0; i--) {
-        if (x[i] < window.min || x[i] > window.max) break
-        if (Number.isFinite(source[i])) {
-          left = source[i]
-          break
-        }
-      }
-      let right = value
-      for (let i = index + 1; i < n; i++) {
-        if (x[i] < window.min || x[i] > window.max) break
-        if (Number.isFinite(source[i])) {
-          right = source[i]
-          break
-        }
-      }
-      return value >= left && value >= right
-    }
-
-    const protectedPeaks = new Set<number>()
-    for (const index of regionIndices) {
-      if (isProtectedPeak(index)) protectedPeaks.add(index)
-    }
-
-    for (let pos = 0; pos < regionIndices.length; pos++) {
-      const index = regionIndices[pos]
-      const value = source[index]
-      if (!Number.isFinite(value) || protectedPeaks.has(index)) continue
-
-      let weighted = 0
-      let weightSum = 0
-      for (let offset = -3; offset <= 3; offset++) {
-        const neighbourPos = pos + offset
-        if (neighbourPos < 0 || neighbourPos >= regionIndices.length) continue
-        const neighbourIndex = regionIndices[neighbourPos]
-        if (protectedPeaks.has(neighbourIndex)) continue
-        const neighbour = source[neighbourIndex]
-        if (!Number.isFinite(neighbour)) continue
-        if (neighbour > strongPeakCutoff) continue
-        const weight = 4 - Math.abs(offset)
-        weighted += neighbour * weight
-        weightSum += weight
-      }
-      if (weightSum === 0) continue
-
-      const localBase = weighted / weightSum
-      const blended = value * 0.35 + localBase * 0.65
-      target[index] = Math.max(blended, floor)
-    }
-  }
-
-  return out ?? y
 }
 
 /**
@@ -953,7 +849,6 @@ function SpectrumViewerImpl({
   yLabel = "Intensity",
   reversedXAxis = true,
   renderMode = "svg",
-  rawFidAromaticBaseSmoothing = false,
   maxObservedPoints = MAX_VIEWPORT_TRACE_POINTS,
   observedPointsPerPixel = VIEWPORT_POINTS_PER_PIXEL,
   defaultShowPeaks = false,
@@ -987,10 +882,11 @@ function SpectrumViewerImpl({
   const chartPaneRef = useRef<HTMLDivElement | null>(null)
   const contextMenuRef = useRef<HTMLDivElement | null>(null)
   const [plotPixelWidth, setPlotPixelWidth] = useState(1_200)
-  const displaySourceY = useMemo(
-    () => (rawFidAromaticBaseSmoothing ? smoothRawFidAromaticBaseForDisplay(x, y) : y),
-    [rawFidAromaticBaseSmoothing, x, y],
-  )
+  /* No display transform: the trace drawn is the trace received. A raw-FID-only
+     aromatic "base cleanup" used to sit here — see the removal note above
+     AROMATIC display constants in git history (commit removing it explains the
+     measurement). */
+  const displaySourceY = y
   // Detect the runaway peak ONCE on the raw input (gain-independent). The
   // detector returns null when no peak is more than MASK_DOMINANCE_RATIO×P95.
   const dominantPeakRange = useMemo(
