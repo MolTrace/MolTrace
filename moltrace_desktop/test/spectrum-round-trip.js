@@ -111,6 +111,9 @@ app.whenReady().then(async () => {
     "  const all = (s) => [].slice.call(document.querySelectorAll(s)).map(function(e){return e.textContent})",
     '  return JSON.stringify({',
     '    error: err ? err.textContent : null,',
+    "    svgTicks: all('.spectrum__tick-label').map(parseFloat),",
+    "    svgMarkers: document.querySelectorAll('.spectrum__marker').length,",
+    "    svgCaption: g('.spectrum__caption'),",
     "    head: g('.result__head'), counts: g('.result__counts'),",
     "    heads: all('.peaks thead th'), limits: all('.result__limits li'),",
     "    rows: [].slice.call(document.querySelectorAll('.peaks tbody tr')).map(function(tr){",
@@ -153,6 +156,29 @@ app.whenReady().then(async () => {
     if (/\bH\b/.test(heads)) throw new Error(`a proton-count column was rendered: ${heads}`)
     if (!/share/i.test(heads)) throw new Error(`no share-of-signal column: ${heads}`)
   })
+  check('the spectrum itself is drawn, not just tabulated', () => {
+    // A peak table with no trace beside it cannot be checked. Reading NMR is
+    // looking at the lines and the numbers together; a chemist handed only a
+    // table has to take every row on trust.
+    if (!dom.svgTicks || dom.svgTicks.length < 2) throw new Error('no spectrum was drawn')
+    if (!dom.svgCaption) throw new Error('the trace carries no caption saying how it was reduced')
+  })
+
+  check('the ppm axis runs the way a chemist reads it', () => {
+    // Right to left, high ppm first. An axis the other way round is one they
+    // have to translate every single time.
+    const t = dom.svgTicks
+    for (let i = 1; i < t.length; i++) {
+      if (!(t[i - 1] >= t[i])) throw new Error(`ppm ascends left to right: ${t.join(', ')}`)
+    }
+  })
+
+  check('every reported signal is findable on the trace', () => {
+    if (dom.svgMarkers !== dom.rows.length) {
+      throw new Error(`${dom.rows.length} rows in the table but ${dom.svgMarkers} marked on the spectrum`)
+    }
+  })
+
   check('the screen says WHERE the numbers came from', () => {
     // An acquisition may carry a spectrum the instrument processed, or only the
     // raw measurement this application then processed with its own phasing and

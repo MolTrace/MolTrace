@@ -142,6 +142,98 @@
     }
   }
 
+  const SVG = 'http://www.w3.org/2000/svg'
+  const el = (name, attrs) => {
+    const n = document.createElementNS(SVG, name)
+    for (const [k, v] of Object.entries(attrs || {})) n.setAttribute(k, String(v))
+    return n
+  }
+
+  // The spectrum itself. A peak table with no trace beside it cannot be checked:
+  // reading NMR is looking at the lines and the numbers together, and a chemist
+  // handed only a table has to take every row on trust.
+  function spectrumView(s) {
+    const t = s.trace
+    const W = 1000, H = 240, PAD_L = 8, PAD_R = 8, PAD_B = 26, PAD_T = 10
+    const n = t.ppm.length
+    const lo = Math.min(...t.min), hi = Math.max(...t.max)
+    const span = (hi - lo) || 1
+    const xAt = (i) => PAD_L + (i / (n - 1)) * (W - PAD_L - PAD_R)
+    const yAt = (v) => PAD_T + (1 - (v - lo) / span) * (H - PAD_T - PAD_B)
+
+    const fig = document.createElement('figure')
+    fig.className = 'spectrum'
+    const svg = el('svg', { viewBox: `0 0 ${W} ${H}`, class: 'spectrum__svg', role: 'img' })
+    // Named for a screen reader, which otherwise gets an unlabelled graphic.
+    svg.setAttribute('aria-label',
+      `${s.nucleus} spectrum from ${t.ppm[0].toFixed(1)} to ${t.ppm[n - 1].toFixed(1)} ppm, ` +
+      `${s.multiplets.length} signals`)
+
+    // The envelope as one closed shape: the top edge left-to-right, the bottom
+    // edge back. Drawing only the maxima would hide negative excursions, which
+    // are how a chemist sees bad phasing.
+    let d = `M ${xAt(0)} ${yAt(t.max[0])}`
+    for (let i = 1; i < n; i++) d += ` L ${xAt(i)} ${yAt(t.max[i])}`
+    for (let i = n - 1; i >= 0; i--) d += ` L ${xAt(i)} ${yAt(t.min[i])}`
+    svg.append(el('path', { d: d + ' Z', class: 'spectrum__trace' }))
+
+    // Zero, so a baseline that is not flat is visible as such.
+    if (lo < 0 && hi > 0) {
+      svg.append(el('line', { x1: PAD_L, x2: W - PAD_R, y1: yAt(0), y2: yAt(0), class: 'spectrum__zero' }))
+    }
+
+    // ppm ticks. The axis runs high-to-low left-to-right, which is the direction
+    // an NMR spectrum is read; reversing it makes a chemist translate every time.
+    const first = t.ppm[0], last = t.ppm[n - 1]
+    for (let k = 0; k <= 6; k++) {
+      const i = Math.round((k / 6) * (n - 1))
+      const label = t.ppm[i]
+      svg.append(el('line', { x1: xAt(i), x2: xAt(i), y1: H - PAD_B, y2: H - PAD_B + 4, class: 'spectrum__tick' }))
+      const txt = el('text', { x: xAt(i), y: H - PAD_B + 16, class: 'spectrum__tick-label', 'text-anchor': 'middle' })
+      txt.textContent = Math.abs(first - last) > 40 ? label.toFixed(0) : label.toFixed(1)
+      svg.append(txt)
+    }
+
+    // Where each reported signal sits, so a row in the table can be found on the
+    // trace without counting.
+    for (const m of s.multiplets) {
+      const i = t.ppm.findIndex((p) => p <= m.center_ppm)
+      if (i < 0) continue
+      svg.append(el('line', { x1: xAt(i), x2: xAt(i), y1: PAD_T, y2: PAD_T + 8, class: 'spectrum__marker' }))
+    }
+    fig.append(svg)
+
+    const cap = document.createElement('figcaption')
+    cap.className = 'spectrum__caption'
+    const sweep = t.sweep_ppm
+    // Worth a sentence only when a MEANINGFUL part of the acquisition is off
+    // screen. A 0.7 ppm trim off an 8 ppm sweep told the reader the axis had been
+    // cut when what they were looking at was effectively the whole thing —
+    // a caveat that fires on nothing teaches people to ignore the ones that don't.
+    const hidden = Math.abs(sweep[0] - sweep[1]) - Math.abs(first - last)
+    const trimmed = hidden > Math.abs(sweep[0] - sweep[1]) * 0.1
+    // Rounding can MAKE a negative zero out of a real number: (-0.494).toFixed(0)
+    // is "-0". Guarding the literal -0 does not catch that, so the check has to
+    // be on the formatted string.
+    const ppm = (v, dp) => {
+      const text = v.toFixed(dp)
+      return /^-0(\.0*)?$/.test(text) ? text.slice(1) : text
+    }
+    cap.textContent =
+      `${s.nucleus}, ${ppm(first, 1)} to ${ppm(last, 1)} ppm. ` +
+      // The reduction is stated. A drawn line is 1200 columns and the spectrum is
+      // hundreds of thousands of points; each column spans the full height of the
+      // points beneath it, so nothing is dropped, but it is not point-for-point.
+      `Drawn from ${t.points_represented.toLocaleString()} points as ${n} columns, ` +
+      `each spanning the full range beneath it. ` +
+      // A trimmed axis that does not say so is a claim that nothing lies outside.
+      (trimmed
+        ? `The acquisition swept ${ppm(sweep[0], 0)} to ${ppm(sweep[1], 0)} ppm; this shows where the signals are.`
+        : '')
+    fig.append(cap)
+    return fig
+  }
+
   function resultView(s) {
     const wrap = document.createElement('div')
     wrap.className = 'result'
@@ -178,6 +270,8 @@
         + 'rows as real.'
       wrap.append(warn)
     }
+
+    if (s.trace && s.trace.ppm && s.trace.ppm.length > 1) wrap.append(spectrumView(s))
 
     const table = document.createElement('table')
     table.className = 'peaks'

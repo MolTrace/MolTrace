@@ -307,6 +307,77 @@ def test_the_refusal_humaniser_strips_what_a_chemist_must_not_be_shown() -> None
     )
 
 
+def test_the_display_trace_keeps_the_peaks_it_draws() -> None:
+    """A reduction that shortens peaks is worse than no picture at all.
+
+    An NMR line is a handful of points wide, so taking every Nth point steps
+    straight over it. Measured on a 524,288-point acquisition: a stride left the
+    tallest peak at 19.9% of its real height. Keeping the minimum AND maximum of
+    each bucket reproduced it exactly.
+
+    A chemist looking at a trace that silently shortened its own peaks would be
+    right to distrust every number beside it.
+    """
+    import numpy as np
+
+    from moltrace.spectroscopy.io.fid_reader import read_fid, read_processed_spectrum
+    from nmrcheck.local_science import open_spectrum
+
+    source = _one("instrument") or _one("moltrace")
+    if source is None:
+        pytest.skip("no acquisition in this checkout")
+
+    result = open_spectrum(source)
+    trace = result["trace"]
+    assert trace["ppm"], "no trace was produced at all"
+
+    from pathlib import Path
+
+    try:
+        spectrum = read_processed_spectrum(Path(source))
+    except Exception:  # noqa: BLE001
+        spectrum = read_fid(Path(source))
+    x = np.asarray(spectrum.ppm_axis, dtype=float)
+    y = np.asarray(spectrum.data, dtype=float)
+    window = (x <= trace["ppm"][0]) & (x >= trace["ppm"][-1])
+
+    # The envelope's ceiling must BE the window's ceiling, not an approximation.
+    assert max(trace["max"]) == pytest.approx(float(y[window].max()), rel=1e-9), (
+        "the drawn trace is shorter than the spectrum it claims to draw"
+    )
+    assert min(trace["min"]) == pytest.approx(float(y[window].min()), rel=1e-9), (
+        "the drawn trace does not reach the lowest point in its window — "
+        "negative excursions are how a chemist sees bad phasing"
+    )
+
+
+def test_the_trace_runs_the_way_a_chemist_reads_it() -> None:
+    """Highest ppm first. An NMR spectrum is read right to left."""
+    from nmrcheck.local_science import open_spectrum
+
+    source = _one("instrument") or _one("moltrace")
+    if source is None:
+        pytest.skip("no acquisition in this checkout")
+    trace = open_spectrum(source)["trace"]
+    assert trace["ppm"][0] > trace["ppm"][-1], "the axis ascends — it would be read backwards"
+    assert all(a >= b for a, b in zip(trace["ppm"], trace["ppm"][1:], strict=False)), "the axis is not monotonic"
+    assert len(trace["ppm"]) == len(trace["min"]) == len(trace["max"])
+
+
+def test_the_trace_reports_what_it_left_out() -> None:
+    """A trimmed axis that does not say so is a claim that nothing lies outside."""
+    from nmrcheck.local_science import open_spectrum
+
+    source = _one("instrument") or _one("moltrace")
+    if source is None:
+        pytest.skip("no acquisition in this checkout")
+    trace = open_spectrum(source)["trace"]
+    sweep_hi, sweep_lo = trace["sweep_ppm"]
+    assert sweep_hi >= trace["ppm"][0], "the window starts above the acquisition's own sweep"
+    assert sweep_lo <= trace["ppm"][-1], "the window ends below the acquisition's own sweep"
+    assert trace["points_represented"] > 0
+
+
 @pytest.mark.slow
 def test_every_acquisition_opens_end_to_end() -> None:
     """The exhaustive pass. ~4.4s each, so it is opt-in."""
