@@ -122,8 +122,27 @@ check('a packaged build with NO frozen service falls back rather than failing', 
 
 const net = require('node:net')
 
+/**
+ * Wait until `ready()` is true, giving up after `ceilingMs`.
+ *
+ * A fixed sleep pays its worst case on every run. These waits are for an ASYNC
+ * 'error' that arrives in milliseconds, so four of them cost ~5s per run and
+ * bought nothing -- and this suite's runtime is not free: it is what put the
+ * macOS leg on the wrong side of a CI kill. The ceiling keeps the old worst
+ * case, so a genuinely slow machine still gets the time it had.
+ */
+async function until(ready, ceilingMs = 1200, stepMs = 10) {
+  const deadline = Date.now() + ceilingMs
+  while (Date.now() < deadline) {
+    if (ready()) return
+    await new Promise((r) => setTimeout(r, stepMs))
+  }
+}
+
 /** Connect and report which of the three things happened. */
-function probe(socketPath, timeoutMs = 1500) {
+// 400ms, not 1500ms: this window only has to outlast an error that arrives in
+// microseconds. Nothing happening within it IS the swallow being demonstrated.
+function probe(socketPath, timeoutMs = 400) {
   return new Promise((resolve) => {
     const c = net.connect(socketPath)
     const t = setTimeout(() => { c.destroy(); resolve('accepted-and-ignored') }, timeoutMs)
@@ -186,7 +205,13 @@ const asyncChecks = [
       backendDir: path.join(os.tmpdir(), 'moltrace-no-such-dir-' + process.pid),
     })
     try {
-      await new Promise((r) => setTimeout(r, 1200))
+      await until(() => started.failure())
+      // The spawn 'error' and the credential pipe's EPIPE are DIFFERENT async
+      // channels, and this asserts that NEITHER escapes. Returning the instant
+      // the first lands can beat the second to the assertion -- measured, with
+      // the pipe handler deliberately removed: 1 run in 3 went green. The settle
+      // is what makes the guard reliable. It is 120ms, not the 1200 it replaced.
+      await new Promise((r) => setTimeout(r, 120))
       assert.strictEqual(uncaught, null, `spawn failure escaped as an uncaught exception: ${uncaught && uncaught.message}`)
       const f = started.failure()
       assert.ok(f, 'the spawn failed and nothing recorded why')
@@ -268,7 +293,7 @@ const asyncChecks = [
       onExit: (err) => { reported = err },
     })
     try {
-      await new Promise((r) => setTimeout(r, 1200))
+      await until(() => started.failure())
       assert.ok(started.failure(), 'the spawn failed and nothing recorded it')
       // ENOENT never reaches 'exit', so onExit may not fire here; the contract is
       // that SOMETHING observable records the death. Assert the channel exists.
@@ -359,7 +384,9 @@ const asyncChecks = [
         assert.ok(stream.listenerCount('data') > 0,
           `${name} is piped and nothing reads it — the child will block when the buffer fills`)
       }
-      await new Promise((r) => setTimeout(r, 1200))
+      // Either it could not launch, or it launched and said something. Either
+      // settles the question this asserts; waiting past it settles nothing.
+      await until(() => started.failure() || started.diagnostic().length > 0)
       assert.strictEqual(typeof started.diagnostic(), 'string', 'the child output is unreachable')
     } finally { started.close() }
   }]
