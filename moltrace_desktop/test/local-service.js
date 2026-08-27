@@ -89,6 +89,35 @@ check('an unreachable service still yields a usable capability world', () => {
   assert.ok(r.code, 'no cause given for an unreachable service')
 })
 
+check('a development checkout runs the service from source', () => {
+  const r = svc.resolveService({ backendDir: '/repo/moltrace_backend' })
+  assert.strictEqual(r.frozen, false)
+  assert.strictEqual(r.command, 'uv', 'a checkout should run it from source')
+  assert.strictEqual(r.cwd, '/repo/moltrace_backend')
+})
+
+check('a packaged build runs the FROZEN service beside it', () => {
+  // Resolved by asking the filesystem rather than by a build-time flag: a
+  // packaged build cannot then be handed a development command, and a developer
+  // cannot accidentally test a frozen build they have not rebuilt.
+  const res = fs.mkdtempSync(path.join(os.tmpdir(), 'moltrace-res-'))
+  const dir = path.join(res, 'moltrace-local-service')
+  fs.mkdirSync(dir, { recursive: true })
+  const bin = path.join(dir, 'moltrace-local-service')
+  fs.writeFileSync(bin, '#!/bin/sh\nexit 0\n')
+  try {
+    const r = svc.resolveService({ resourcesPath: res, backendDir: '/repo/moltrace_backend' })
+    assert.strictEqual(r.frozen, true, 'the frozen service beside the app was not found')
+    assert.strictEqual(r.command, bin)
+    assert.strictEqual(r.cwd, dir, 'a frozen build resolves its data files relative to itself')
+  } finally { fs.rmSync(res, { recursive: true, force: true }) }
+})
+
+check('a packaged build with NO frozen service falls back rather than failing', () => {
+  const r = svc.resolveService({ resourcesPath: '/no/such/resources', backendDir: '/repo/backend' })
+  assert.strictEqual(r.frozen, false)
+})
+
 // --- the two invariants that cost a build ----------------------------------
 
 const net = require('node:net')

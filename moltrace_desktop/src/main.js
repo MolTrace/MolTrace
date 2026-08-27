@@ -82,6 +82,9 @@ async function startLocalService() {
     const started = localService.start({
       credential: localServiceCredential,
       backendDir: pathMod.join(__dirname, '..', '..', 'moltrace_backend'),
+      // Present only in a packaged build; a development run has no frozen
+      // service beside it and falls back to running it from source.
+      resourcesPath: process.resourcesPath,
       onExit: (err, output) => {
         // A service that dies AFTER startup has to reach the screen. serviceState
         // is otherwise written once, by the poll below, so a dead service went on
