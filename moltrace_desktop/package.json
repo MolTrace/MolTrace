@@ -20,10 +20,8 @@
     "test:roundtrip": "MOLTRACE_PRODUCT_CONFIG=$PWD/test/fixtures-product.json electron test/spectrum-round-trip.js",
     "package": "node scripts/package.js"
   },
-  "dependencies": {
-    "electron": "43.4.1"
-  },
   "devDependencies": {
-    "@electron/packager": "20.3.0"
+    "@electron/packager": "20.3.0",
+    "electron": "43.4.1"
   }
 }

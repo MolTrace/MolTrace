@@ -14,8 +14,10 @@ From `moltrace_backend/`:
 ```
 uv run --with pyinstaller pyinstaller --noconfirm --onedir --name moltrace-local-service \
   --distpath dist --workpath build/pyi --specpath build/pyi \
-  --collect-submodules nmrcheck --collect-submodules moltrace \
+  --exclude-module mypy --exclude-module pytest --exclude-module IPython \
+  --exclude-module tkinter --exclude-module matplotlib \
   --hidden-import uvicorn.protocols.http.h11_impl \
+  --hidden-import uvicorn.protocols.websockets.wsproto_impl \
   --hidden-import uvicorn.lifespan.on --hidden-import uvicorn.loops.asyncio \
   --console packaging/moltrace_local_service.py
 ```
@@ -23,7 +25,14 @@ uv run --with pyinstaller pyinstaller --noconfirm --onedir --name moltrace-local
 PyInstaller is pulled in just-in-time with `uv run --with` and is deliberately
 absent from `pyproject.toml`, the same as `pytest-split` and `pytest-timeout`.
 
-Roughly 230 MB, and it takes a couple of minutes. Check it refuses correctly
+**Do NOT add `--collect-submodules nmrcheck --collect-submodules moltrace`.** It was there and it
+force-included every module in both packages rather than the ones actually reachable from the
+entry point — 280 of our modules instead of 58, among them the whole `moltrace.regulatory` rule
+engine and `nmrcheck.api`. An evaluator would have received the regulatory engine as bytecode in
+order to run a peak picker. Let PyInstaller follow the imports; add a `--hidden-import` for
+anything it provably misses.
+
+Roughly 170 MB, and it takes a couple of minutes. Check it refuses correctly
 before going further — started without a socket it must name the cause and exit
 78 rather than opening a port:
 
@@ -39,7 +48,7 @@ From `moltrace_desktop/`:
 npm run package
 ```
 
-The build lands in `out/`, is about 550 MB unzipped, and is **unsigned**.
+The build lands in `out/`, is about 470 MB unzipped (**181 MB zipped**), and is **unsigned**.
 
 Pass `--config=<path>` to supply a real configuration. With no argument it builds
 a **preview**: named "MolTrace Preview", declaring `previewModules`, carrying an
