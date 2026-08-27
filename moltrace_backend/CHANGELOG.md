@@ -14,6 +14,47 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.72.0 — The 13C detection threshold sat at 1.4 sigma (2026-08-27)
+
+`_detection_noise` measures the baseline on the lower half of the sorted spectrum
+— correctly peak-free, since peaks are positive excursions — and then applied
+**1.4826**, the MAD-to-sigma constant for a **symmetric** distribution, to half of
+one. Measured on synthetic noise of known sigma with **no peaks at all**: it
+returned **0.589-0.624x** the truth.
+
+The height gate is `detection_noise * 3.5`, so the threshold sat at **1.4x MAD**
+rather than 3.5x — below any conventional limit of detection. Four 13C
+acquisitions in the fixture corpus saturated the 220-line ceiling and were
+reported as up to **188 distinct signals**. No 13C spectrum of a real compound has
+188 carbons.
+
+Reflecting the peak-free half about the median rebuilds a symmetric distribution
+of the same width, so the ordinary constant applies and no new one is invented.
+Measured across peak densities 0-10%: **0.998-1.080x** the truth, closer than a
+whole-spectrum MAD (0.999-1.144) at every density.
+
+Scored against `eval.detector_corpus`, which plants lines of known height in noise
+of known width:
+
+  recall, separated lines >=10 sigma   35/35 -> 35/35   (unchanged)
+  false positives per 13C acquisition  207   -> 19
+  saturating acquisitions              4/23  -> 0/23
+  most signals on one acquisition      188   -> 80
+
+1H is untouched: it detects adequately, and a lower threshold there over-detects
+multiplet components absent from curated reference peak lists.
+
+**The A/B envelope now judges a drop on what it dropped.** It pinned
+`|live - captured| <= tolerance`, treating a fall and a rise as one event — so
+while the detector was picking noise, it pinned the noise and went red on the
+correction. Measured across its four 13C fixtures: 81 peaks disappeared, every one
+between 1.6x and 3.3x the whole-spectrum MAD, and **nothing at or above 10x was
+lost on any fixture**. A drop is now judged by whether any captured peak above the
+quantitation floor is no longer found; a rise is still judged on the count,
+because inventing peaks has no such excuse. Proven red both ways.
+
+---
+
 ## v0.71.0 — The spectrum is drawn, not just tabulated (2026-08-27)
 
 A peak table with no trace beside it cannot be checked. Reading NMR is looking at
