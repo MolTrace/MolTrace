@@ -157,8 +157,27 @@
     counts.className = 'result__counts'
     counts.textContent =
       `${s.multiplets.length} signals resolved from ${s.peak_count} fitted lines ` +
-      `across ${s.points.toLocaleString()} points.`
+      `across ${s.points.toLocaleString()} points. ` +
+      // Where the numbers came from changes what they mean, so it sits with them
+      // rather than in the caveats underneath.
+      (s.processing === 'instrument'
+        ? 'Read from the spectrum your instrument produced.'
+        : 'Computed here from the raw measurement — your instrument produced no processed spectrum.')
     wrap.append(counts)
+
+    // SATURATION IS A WARNING, NOT A CAVEAT. When the detector runs out of room
+    // the count is a floor rather than a result, and a reader who misses that
+    // will quote a number that means something else. A bullet among three others
+    // is a bullet most readers skim.
+    if (s.saturated) {
+      const warn = document.createElement('p')
+      warn.className = 'result__warning'
+      warn.textContent =
+        'The peak detector reached its limit on this spectrum. The signals below are the strongest '
+        + 'it could fit, not all of them — treat the count as a floor, and do not read the weakest '
+        + 'rows as real.'
+      wrap.append(warn)
+    }
 
     const table = document.createElement('table')
     table.className = 'peaks'

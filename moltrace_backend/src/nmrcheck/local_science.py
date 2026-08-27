@@ -20,6 +20,7 @@ they appear. This lists what crosses the boundary.
 
 from __future__ import annotations
 
+import re
 from collections.abc import Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -29,10 +30,12 @@ import numpy as np
 from moltrace.spectroscopy.io.fid_reader import (
     FIDReaderError,
     NMRSpectrum,
+    read_fid,
     read_processed_spectrum,
 )
 from moltrace.spectroscopy.multiplet.analysis import detect_multiplets
 from moltrace.spectroscopy.peaks import gsd_peak_pick
+from moltrace.spectroscopy.peaks.gsd import _MAX_PEAKS_BY_LEVEL
 
 
 @dataclass(frozen=True)
@@ -128,6 +131,26 @@ class SpectrumUnreadable(ValueError):
     """The file is not a spectrum this service can read. Names no path."""
 
 
+#: Text the reader writes for a developer, which must not reach a chemist: a
+#: function name, a module path, or the absolute path of their own file.
+_DEVELOPER_WORDS = re.compile(
+    r"\b\w+\(\)"                      # a function call, e.g. "use read_fid()"
+    r"|\bread_fid\b|\bread_processed_spectrum\b"
+    r"|(?:/[\w.-]+){2,}"                # an absolute path
+)
+
+
+def _readable_refusal(error: Exception, source: Path) -> str:
+    """Why it could not be opened, without naming the machinery or the path."""
+    text = str(error).replace(str(source), source.name)
+    if _DEVELOPER_WORDS.search(text):
+        return (
+            "that acquisition is not in a form this can read: it holds neither a processed "
+            "spectrum nor a readable free-induction decay"
+        )
+    return text
+
+
 def _readable_name(source: Path) -> str:
     """What to call this acquisition on screen.
 
@@ -145,6 +168,11 @@ def _readable_name(source: Path) -> str:
     return source.name
 
 
+#: The level gsd_peak_pick defaults to. Named here so the ceiling this module
+#: compares against is the ceiling that will actually apply.
+_DEFAULT_GSD_LEVEL = 2
+
+
 def open_spectrum(path: str) -> dict:
     """Read an acquisition off this computer and summarise what is in it.
 
@@ -160,19 +188,58 @@ def open_spectrum(path: str) -> dict:
     source = Path(path)
     if not source.exists():
         raise SpectrumUnreadable("that file is no longer where it was")
+
+    # TWO WAYS IN, and which one was used changes what the numbers mean.
+    #
+    # An acquisition may carry a spectrum the instrument already processed, or
+    # only the raw time-domain data it was derived from. Reading the processed
+    # one first is deliberate: it is what the chemist saw on the spectrometer,
+    # and reproducing their own numbers is worth more than improving on them.
+    #
+    # Falling back matters more than it sounds. Measured across every acquisition
+    # in this repository: 7 of 23 carry a processed spectrum and 16 carry only the
+    # FID -- so reading the processed one ALONE refuses two thirds of real
+    # datasets, including every 400-600 MHz acquisition here. What comes off an
+    # instrument is usually the FID.
+    #
+    # Any reader failure falls through rather than matching on the message text.
+    # Deciding by message means a reworded exception silently becomes a refusal.
+    processing = "instrument"
     try:
         spectrum = read_processed_spectrum(source)
-    except FIDReaderError as unreadable:
-        # The reader's own words, which describe the FORMAT rather than the
-        # sample. The path is deliberately not interpolated: a filename can carry
-        # a compound name, and this cause is written to the device journal.
-        raise SpectrumUnreadable(str(unreadable).replace(str(source), source.name)) from None
-    except (OSError, ValueError) as unreadable:
-        raise SpectrumUnreadable(
-            f"that file could not be read as a spectrum ({type(unreadable).__name__})"
-        ) from None
+    except (FIDReaderError, OSError, ValueError):
+        try:
+            spectrum = read_fid(source)
+            processing = "moltrace"
+        except FIDReaderError as unreadable:
+            # The reader's words describe the FORMAT rather than the sample, but
+            # they are written for a developer and name functions. Neither the
+            # path nor the internals go out: a filename can carry a compound
+            # name, and this cause is written to the device journal.
+            raise SpectrumUnreadable(_readable_refusal(unreadable, source)) from None
+        except (OSError, ValueError) as unreadable:
+            raise SpectrumUnreadable(
+                f"that file could not be read as a spectrum ({type(unreadable).__name__})"
+            ) from None
 
     peaks = gsd_peak_pick(spectrum)
+
+    # DID THE DETECTOR RUN OUT OF ROOM? It keeps at most a fixed number of
+    # candidates per level and discards the rest by prominence, so a spectrum
+    # that hits the ceiling has been TRUNCATED and the count below is a floor
+    # rather than a finding.
+    #
+    # Measured across this repository's acquisitions: four instrument-processed
+    # 13C spectra came back with exactly 220 lines -- the level-2 ceiling -- and
+    # were then reported as 68 to 188 distinct signals. No 13C spectrum of a real
+    # compound has 188 carbons, and a chemist shown that number would stop
+    # trusting everything beside it.
+    #
+    # Read from the engine's own constant rather than repeated here. One number
+    # written down twice is one that gets raised in one place.
+    ceiling = _MAX_PEAKS_BY_LEVEL[_DEFAULT_GSD_LEVEL]
+    saturated = len(peaks) >= ceiling
+
     multiplets = detect_multiplets(peaks)
     total_area = sum(abs(p.area) for m in multiplets for p in m.peaks) or 1.0
 
@@ -194,6 +261,8 @@ def open_spectrum(path: str) -> dict:
         "field_mhz": float(spectrum.field_mhz),
         "points": int(len(spectrum.data)),
         "file_name": _readable_name(source),
+        "processing": processing,
+        "saturated": saturated,
         "peak_count": len(peaks),
         "multiplets": [m.to_dict() for m in summaries],
         # Stated by the engine, not by the interface, so a caller cannot render
@@ -206,5 +275,25 @@ def open_spectrum(path: str) -> dict:
             "assigning protons needs a structure this analysis was not given.",
             "Multiplicity and coupling assignment is a fit. A crowded or overlapping region can "
             "be grouped more than one way.",
+            *(
+                []
+                if not saturated
+                else [
+                    "The peak detector reached the most lines it will fit for one spectrum, so "
+                    "anything weaker than those was discarded. Treat the count below as a floor "
+                    "rather than a result, and do not read the weakest signals as real."
+                ]
+            ),
+            *(
+                []
+                if processing == "instrument"
+                else [
+                    "This acquisition held no processed spectrum, so one was computed here from "
+                    "the "
+                    "raw measurement using this application's own phasing and baseline settings. "
+                    "Those settings are not the ones your spectrometer used, so shifts and "
+                    "integrals can differ from the printout it produced."
+                ]
+            ),
         ],
     }
