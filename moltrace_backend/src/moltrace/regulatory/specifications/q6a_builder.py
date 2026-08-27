@@ -21,6 +21,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from moltrace.regulatory.impurities import calculate_q3ab_thresholds, classify_cpca, classify_m7
+from moltrace.regulatory.infra.validation import DataValidationError
 
 __all__ = [
     "BatchResult",
@@ -250,8 +251,20 @@ def _genotoxic_parameter(
     compound-specific acceptable intake is flagged as required.
     """
 
+    cpca = None
     if m7.coc_flag:
-        cpca = classify_cpca(imp.structural_assignment)
+        try:
+            cpca = classify_cpca(imp.structural_assignment)
+        except DataValidationError:
+            # M7's Cohort of Concern is wider than the CPCA scheme's: alkyl-azoxy compounds are
+            # CoC but carry no N-nitroso centre, and CPCA refuses them. Deciding here whether a
+            # structure is a nitrosamine would be a second canonical answer to a question CPCA
+            # already owns, so ask it and fall through on refusal -- to M7's own verdict, which
+            # for a CoC compound is that no TTC applies and a compound-specific intake is
+            # required. Previously this raised out of build_specification and destroyed the
+            # entire specification, every unrelated parameter with it.
+            cpca = None
+    if cpca is not None:
         rule_set_versions["cpca"] = cpca.rule_set_version
         ppm = cpca.ai_limit_ng_per_day / profile.max_daily_dose_g / 1000.0
         return SpecificationParameter(
@@ -363,18 +376,55 @@ def _impurity_parameters(
     return params
 
 
-def _dissolution(profile: SubstanceProfile, mv: MethodValidation) -> SpecificationParameter | None:
-    """ICH Q6A Decision Tree #3 — dissolution for an immediate-release solid oral product."""
+_DISSOLUTION_Q_PERCENT = 80.0
+_DISSOLUTION_MINUTES = 30
+
+
+def _dissolution(
+    profile: SubstanceProfile, mv: MethodValidation, batches: Sequence[BatchResult]
+) -> SpecificationParameter | None:
+    """ICH Q6A Decision Tree #3 — dissolution for an immediate-release solid oral product.
+
+    The proposed criterion is the Q6A default and stays the default: deriving an acceptance
+    criterion from batch results is a regulatory judgement this engine does not make. What it
+    must not do is ignore the batches it was handed -- ``dissolution_percent_30min`` was declared
+    on :class:`BatchResult` and read nowhere, so a batch measured at 42% produced a row identical
+    to one measured at 99%, neither of them mentioning the measurement.
+    """
 
     if not profile.is_solid_oral or (profile.high_solubility and profile.rapidly_dissolving):
         return None
     method = "USP <711> Apparatus 2 (paddle)"
+
+    observed = [
+        b.dissolution_percent_30min for b in batches if b.dissolution_percent_30min is not None
+    ]
+    if observed:
+        # The minimum is the batch that decides conformance, not the mean and not the best one.
+        worst = min(observed)
+        batch_summary = (
+            f" Supplied batches (n={len(observed)}): minimum {worst:.3g}% at "
+            f"{_DISSOLUTION_MINUTES} minutes."
+        )
+        if worst < _DISSOLUTION_Q_PERCENT:
+            batch_summary += (
+                f" The supplied batches do not meet the proposed Q = "
+                f"{_fmt_pct(_DISSOLUTION_Q_PERCENT)}% criterion; justify the criterion against "
+                "the batch data or investigate before filing."
+            )
+    else:
+        batch_summary = (
+            f" No {_DISSOLUTION_MINUTES}-minute dissolution data was supplied, so this criterion "
+            "is the ICH Q6A default and is not derived from batch results."
+        )
+
     return SpecificationParameter(
         parameter="Dissolution",
-        proposed_limit="Q = 80% in 30 minutes",
+        proposed_limit=f"Q = {_fmt_pct(_DISSOLUTION_Q_PERCENT)}% in {_DISSOLUTION_MINUTES} minutes",
         justification=(
             "ICH Q6A Decision Tree #3 (immediate-release solid oral): a single-point dissolution "
             "acceptance criterion (Q at a defined time) ensures consistent in-vitro release."
+            + batch_summary
             + ("" if mv.is_validated("dissolution") else " (dissolution method validation pending)")
         ),
         method_reference=method,
@@ -447,7 +497,7 @@ def build_specification(
         *_impurity_parameters(substance_profile, batch_analysis_data, rule_set_versions),
     ]
     for optional in (
-        _dissolution(substance_profile, method_validation),
+        _dissolution(substance_profile, method_validation, batch_analysis_data),
         _disintegration(substance_profile),
         _water_content(substance_profile, batch_analysis_data, method_validation),
     ):
