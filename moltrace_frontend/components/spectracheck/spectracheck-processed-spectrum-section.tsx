@@ -45,7 +45,6 @@ import {
   PROCESSED_NMR_BACKEND_MSG,
 } from "@/components/spectracheck/spectracheck-nmr-endpoint-messages"
 import { Button } from "@/components/ui/button"
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { Card, CardContent } from "@/components/ui/card"
 import {
   GsdAnalysisControls,
@@ -64,6 +63,7 @@ import { SpectrumRetrievePanel } from "@/components/spectracheck/spectrum-retrie
 import { SpectrumReasonPanel } from "@/components/spectracheck/spectrum-reason-panel"
 import { AlertCard } from "@/components/dashboard/alert-card"
 import { ModuleCard } from "@/components/dashboard/module-card"
+import { SpectraCheckRunTile } from "@/components/spectracheck/spectracheck-run-tile"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
@@ -71,7 +71,6 @@ import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
 import {
   AlertTriangle,
-  ArrowRight,
   BarChart3,
   ChevronDown,
   Eye,
@@ -1055,120 +1054,51 @@ export function SpectraCheckProcessedSpectrumSection({
           />
 
           {/* Two prominent action cards */}
-          <div className="grid gap-4 sm:grid-cols-2">
-            {/* Preview card (secondary action) */}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  type="button"
-                  disabled={foregroundActionLoading}
-                  onClick={runPreview}
-                  className={cn(
-                    "group relative flex min-h-[148px] flex-col items-start gap-2.5 overflow-hidden rounded-2xl border-2 bg-card p-5 text-left shadow-sm transition-all duration-200",
-                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--mt-teal)] focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-                    foregroundActionLoading
-                      ? "cursor-wait opacity-60"
-                      : "cursor-pointer border-[color:var(--mt-teal)]/30 hover:-translate-y-0.5 hover:border-[color:var(--mt-teal)] hover:shadow-lg hover:shadow-[color:var(--mt-teal)]/10 active:translate-y-0 active:shadow-md"
-                  )}
-                >
-                  <div className="flex w-full items-center justify-between">
-                    <span
-                      className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.18em]"
-                      style={{
-                        backgroundColor: "var(--mt-teal-soft)",
-                        color: "var(--mt-teal-ink)",
-                      }}
-                    >
-                      <Eye className="h-3.5 w-3.5" aria-hidden />
-                      Preview
-                    </span>
-                    <span className="font-mono text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
-                      Quick look
-                    </span>
-                  </div>
-                  <span className="font-mono text-lg font-bold leading-tight text-foreground">
-                    {previewLoading ? "Previewing…" : "Inspect spectrum"}
-                  </span>
-                  <span className="text-sm leading-snug text-muted-foreground">
-                    Show peaks, intensities, and shape before running evidence matching.
-                  </span>
-                  <span
-                    className="mt-auto inline-flex items-center gap-1.5 pt-1 font-mono text-xs font-semibold uppercase tracking-[0.14em] transition-transform duration-200 group-hover:translate-x-1"
-                    style={{ color: "var(--mt-teal-ink)" }}
-                  >
-                    {previewLoading ? "Working" : "Click to preview"}
-                    <ArrowRight className="h-3.5 w-3.5" aria-hidden />
-                  </span>
-                </button>
-              </TooltipTrigger>
-              <TooltipContent sideOffset={4} className="max-w-xs text-xs">
-                Renders the parsed spectrum only — no candidate matching.
-              </TooltipContent>
-            </Tooltip>
-
-            {/* Analyze card (primary action) — routes to legacy or GSD
-                backend based on the Analysis backend selector above. */}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  type="button"
-                  disabled={foregroundActionLoading || gsdLoading}
-                  onClick={analysisBackend === "gsd_prompt3" ? runGSDAnalyze : runAnalyze}
-                  className={cn(
-                    "group relative flex min-h-[148px] flex-col items-start gap-2.5 overflow-hidden rounded-2xl border-2 border-transparent p-5 text-left text-white shadow-lg transition-all duration-200",
-                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--mt-teal)] focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-                    (foregroundActionLoading || gsdLoading)
-                      ? "cursor-wait opacity-70"
-                      : "cursor-pointer hover:-translate-y-0.5 hover:shadow-xl hover:shadow-[color:var(--mt-teal)]/30 active:translate-y-0 active:shadow-md"
-                  )}
-                  style={{
-                    background:
-                      analysisBackend === "gsd_prompt3"
-                        ? "linear-gradient(135deg, #B45309 0%, #D97706 100%)"
-                        : "linear-gradient(135deg, var(--mt-teal) 0%, #00B884 100%)",
-                  }}
-                >
-                  <div className="flex w-full items-center justify-between">
-                    <span className="inline-flex items-center gap-1.5 rounded-full bg-white/20 px-2.5 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-white backdrop-blur-sm">
-                      {analysisBackend === "gsd_prompt3" ? (
-                        <FlaskConical className="h-3.5 w-3.5" aria-hidden />
-                      ) : (
-                        <Sparkles className="h-3.5 w-3.5" aria-hidden />
-                      )}
-                      {analysisBackend === "gsd_prompt3" ? "GSD analyze" : "Analyze"}
-                    </span>
-                    {analysisBackend === "gsd_prompt3" ? (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.12em] shadow-sm text-amber-700">
-                        Experimental
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.12em] shadow-sm" style={{ color: "var(--mt-teal-ink)" }}>
-                        ★ Recommended
-                      </span>
-                    )}
-                  </div>
-                  <span className="font-mono text-lg font-bold leading-tight text-white">
-                    {analysisBackend === "gsd_prompt3"
-                      ? (gsdLoading ? "Running GSD…" : `Run GSD analysis (level ${gsdLevel})`)
-                      : (analyzeLoading ? "Analyzing…" : "Run evidence match")}
-                  </span>
-                  <span className="text-sm leading-snug text-white/85">
-                    {analysisBackend === "gsd_prompt3"
-                      ? "Peak detection with auto-classification — no candidate matching. Sends the parsed ppm + intensity arrays."
-                      : "Detect peaks and match against candidate structures with scoring."}
-                  </span>
-                  <span className="mt-auto inline-flex items-center gap-1.5 pt-1 font-mono text-xs font-semibold uppercase tracking-[0.14em] text-white transition-transform duration-200 group-hover:translate-x-1">
-                    {(analysisBackend === "gsd_prompt3" ? gsdLoading : analyzeLoading) ? "Working" : "Click to run analysis"}
-                    <ArrowRight className="h-3.5 w-3.5" aria-hidden />
-                  </span>
-                </button>
-              </TooltipTrigger>
-              <TooltipContent sideOffset={4} className="max-w-xs text-xs">
-                {analysisBackend === "gsd_prompt3"
+          <div className="grid gap-3 sm:grid-cols-2">
+            <SpectraCheckRunTile
+              eyebrow="Preview"
+              eyebrowIcon={Eye}
+              badge="Quick look"
+              headline={previewLoading ? "Previewing…" : "Inspect spectrum"}
+              description="Show peaks, intensities, and shape before running evidence matching."
+              tone="secondary"
+              loading={previewLoading}
+              disabled={foregroundActionLoading && !previewLoading}
+              disabledReason={
+                foregroundActionLoading && !previewLoading
+                  ? "Waiting for the analysis already running to finish."
+                  : undefined
+              }
+              tooltip="Renders the parsed spectrum only — no candidate matching."
+              onClick={runPreview}
+            />
+            <SpectraCheckRunTile
+              eyebrow={analysisBackend === "gsd_prompt3" ? "GSD analyze" : "Analyze"}
+              eyebrowIcon={analysisBackend === "gsd_prompt3" ? FlaskConical : Sparkles}
+              badge={analysisBackend === "gsd_prompt3" ? "Experimental" : "Recommended"}
+              headline={
+                analysisBackend === "gsd_prompt3"
+                  ? gsdLoading
+                    ? "Running GSD…"
+                    : `Run GSD analysis (level ${gsdLevel})`
+                  : analyzeLoading
+                    ? "Analyzing…"
+                    : "Run evidence match"
+              }
+              description={
+                analysisBackend === "gsd_prompt3"
+                  ? "Peak detection with auto-classification — no candidate matching. Sends the parsed ppm + intensity arrays."
+                  : "Detect peaks and match against candidate structures with scoring."
+              }
+              tone={analysisBackend === "gsd_prompt3" ? "experimental" : "primary"}
+              loading={analysisBackend === "gsd_prompt3" ? gsdLoading : analyzeLoading}
+              tooltip={
+                analysisBackend === "gsd_prompt3"
                   ? "Experimental GSD peak detection — peak picking and classification only."
-                  : "Standard analysis — peak detection plus candidate matching and scoring."}
-              </TooltipContent>
-            </Tooltip>
+                  : "Standard analysis — peak detection plus candidate matching and scoring."
+              }
+              onClick={analysisBackend === "gsd_prompt3" ? runGSDAnalyze : runAnalyze}
+            />
           </div>
 
           {/* Background job + clear row */}
