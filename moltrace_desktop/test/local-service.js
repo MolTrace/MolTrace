@@ -175,6 +175,10 @@ const asyncChecks = [
         started: { socketPath: sock, failure: () => null, diagnostic: () => '' },
         headers: () => ({}),
         attempts: ATTEMPTS,
+        // Counted at the SERVER, so the fork count is what is measured and the
+        // probe budget is irrelevant to it -- there is no reason to spend 8s of
+        // real timeout proving arithmetic about how many requests were issued.
+        probeTimeoutMs: 150, backoffMs: 20,
       })
       assert.strictEqual(state.reachable, false, 'a silent socket must not read as ready')
       assert.ok(connections <= ATTEMPTS + 1,
@@ -198,6 +202,9 @@ const asyncChecks = [
       const state = await svc.waitUntilReady({
         started: { socketPath: sock, failure: () => null, diagnostic: () => '' },
         headers: () => ({}), attempts: 1,
+        // Still a multi-second wait, because a duration a person could time with
+        // a wristwatch is exactly what this asserts -- just not four of them.
+        probeTimeoutMs: 900, backoffMs: 100,
       })
       const actual = (Date.now() - t0) / 1000
       const claimed = Number((state.reason.match(/within (\d+) seconds/) || [])[1])
