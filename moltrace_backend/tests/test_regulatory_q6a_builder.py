@@ -165,6 +165,104 @@ def test_q3ab_is_recorded_even_with_no_named_impurities() -> None:
     assert set(spec.source_rule_set_versions) == {"q3ab"}
 
 
+def test_a_cohort_of_concern_impurity_that_is_not_a_nitrosamine_does_not_crash() -> None:
+    """ICH M7's Cohort of Concern is wider than nitrosamines, and the builder assumed it was not.
+
+    M7 sets coc_flag for alkyl-azoxy compounds as well as N-nitroso ones, but the CoC branch
+    called classify_cpca unconditionally -- and CPCA refuses anything without an N-nitroso centre.
+    An alkyl-azoxy impurity therefore raised DataValidationError out of build_specification and
+    took the whole specification with it, including every unrelated parameter.
+
+    M7 already returns the right answer for this case (no applicable TTC, compound-specific
+    acceptable intake required); the builder simply never reached it.
+    """
+
+    azoxy = "CN=[N+]([O-])C"  # azoxymethane
+    m7 = classify_m7(azoxy)
+    assert m7.coc_flag is True and m7.ttc_ug_per_day is None  # the shape that broke it
+
+    profile = SubstanceProfile(
+        name="API",
+        max_daily_dose_g=1.0,
+        impurities=(ImpurityObservation("azoxymethane", structural_assignment=azoxy),),
+    )
+    spec = _spec(profile)  # must not raise
+
+    row = spec.parameter("Impurity: azoxymethane (mutagenic)")
+    assert row is not None
+    # No guessed number: the deterministic refusal, carrying M7's own stated reason.
+    assert row.proposed_limit == "Compound-specific acceptable intake required"
+    assert "Cohort of Concern" in row.justification
+
+    # CPCA never ran, so no CPCA version may be claimed.
+    assert "cpca" not in spec.source_rule_set_versions
+    assert "m7" in spec.source_rule_set_versions
+
+    # And the rest of the specification survived.
+    assert spec.parameter("Assay") is not None
+
+
+def test_a_nitrosamine_still_uses_the_cpca_limit() -> None:
+    """The fallback must not swallow the case the CoC branch exists for."""
+
+    spec = _spec(
+        SubstanceProfile(
+            name="API",
+            max_daily_dose_g=1.0,
+            impurities=(ImpurityObservation("NDMA", structural_assignment="CN(C)N=O"),),
+        )
+    )
+    row = spec.parameter("Impurity: NDMA (Cohort of Concern)")
+    assert row is not None and "CPCA" in row.justification
+    assert "cpca" in spec.source_rule_set_versions
+
+
+def test_supplied_dissolution_data_reaches_the_dissolution_row() -> None:
+    """BatchResult.dissolution_percent_30min was declared and read nowhere.
+
+    A batch measured at 42% at 30 minutes -- which does not meet a Q = 80% criterion -- produced
+    a byte-identical specification row to one measured at 99%. The proposed criterion is the
+    Q6A default either way, but a specification that cannot tell the reader its own batches
+    miss it is not corresponding to the data it was given.
+    """
+
+    profile = SubstanceProfile(
+        name="Tab",
+        substance_type="drug_product",
+        dosage_form="tablet",
+        is_solid_oral=True,
+    )
+    mv = MethodValidation(validated_methods=frozenset({"dissolution"}))
+
+    failing = build_specification(
+        profile, (BatchResult("B1", dissolution_percent_30min=42.0),), mv
+    ).parameter("Dissolution")
+    passing = build_specification(
+        profile,
+        (
+            BatchResult("B1", dissolution_percent_30min=95.0),
+            BatchResult("B2", dissolution_percent_30min=99.0),
+        ),
+        mv,
+    ).parameter("Dissolution")
+    absent = build_specification(profile, (), mv).parameter("Dissolution")
+
+    # The Q6A default criterion is unchanged -- deriving a criterion from batch data is a
+    # regulatory judgement this engine does not make.
+    for row in (failing, passing, absent):
+        assert row.proposed_limit == "Q = 80% in 30 minutes"
+
+    # But the justification must now reflect what was actually supplied.
+    assert "42" in failing.justification
+    assert "do not meet" in failing.justification.lower()
+
+    assert "95" in passing.justification  # the minimum across batches, not the maximum
+    assert "do not meet" not in passing.justification.lower()
+
+    assert "no 30-minute dissolution data" in absent.justification.lower()
+    assert "do not meet" not in absent.justification.lower()
+
+
 def test_process_capability_tightens_the_limit() -> None:
     # Tight, well-centred batch data (Cpk > 1.33) -> limit tightened below the Q3A/B ceiling.
     profile = SubstanceProfile(
