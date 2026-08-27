@@ -49,7 +49,32 @@ export function robustSpectrumYRange(
   options: SpectrumYRangeOptions = {},
 ): SpectrumYRange {
   const lowerQuantile = options.lowerQuantile ?? 0.01
-  const upperQuantile = options.upperQuantile ?? 0.99
+  /**
+   * The upper bound is the observed MAXIMUM, so no peak apex is ever drawn
+   * flat-topped against the top of the frame.
+   *
+   * This was 0.99, and that is a deliberate reversal rather than a typo fix.
+   * The reasoning it replaced — anchoring to the absolute max lets one
+   * enormous solvent spike squash the analyte region — is real, but a
+   * percentile over ALL samples is the wrong instrument for it. In an NMR
+   * spectrum peaks are a tiny minority of samples and baseline is the
+   * overwhelming majority, so the 99th percentile lands barely above the noise
+   * floor and clips genuine analyte peaks, not just the runaway one. Measured
+   * on 3 real Bruker 13C datasets, the frame top sat at 22.4% / 22.2% / 9.8%
+   * of the tallest analyte peak, with 16 / 19 / 18 samples outside the frame.
+   *
+   * The runaway-solvent case is handled upstream instead, by the dominant-peak
+   * mask in SpectrumViewer: it removes that peak's samples before this function
+   * sees them, and it is a visible, user-controlled toggle rather than a silent
+   * clamp. Vertical Gain/yZoom then lift small peaks against a fixed axis,
+   * which is how NMR software has always let you inspect weak signal — tall
+   * peaks run off the top because the USER scaled them there.
+   *
+   * The lower bound deliberately keeps its quantile and noise-floor clamp:
+   * negative dispersion lobes below the baseline are a separate case, and one
+   * this change must not reopen.
+   */
+  const upperQuantile = options.upperQuantile ?? 1
   const paddingRatio = options.paddingRatio ?? 0.12
   const noiseFloor = options.noiseFloor
   const noiseFloorSigmas = options.noiseFloorSigmas ?? 4
