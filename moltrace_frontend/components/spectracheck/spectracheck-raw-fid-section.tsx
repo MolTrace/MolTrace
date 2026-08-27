@@ -2464,7 +2464,6 @@ export function SpectraCheckRawFidSection({
                   peaks={viewerPeaks}
                   nucleus={resolvedNucleus}
                   renderMode="webgl"
-                  rawFidAromaticBaseSmoothing
                 />
               ) : processLoading || previewLoading || previewSpectrumLoading ? (
                 <div

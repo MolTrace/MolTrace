@@ -5,7 +5,6 @@ import {
   SpectrumViewer,
   chemicalShiftFromPlotPointer,
   nearestSourcePointAtPpm,
-  smoothRawFidAromaticBaseForDisplay,
 } from "@/components/science/SpectrumViewer"
 
 /**
@@ -499,29 +498,24 @@ describe("SpectrumViewer — hover chemical shift mapping", () => {
   })
 })
 
-describe("SpectrumViewer — raw FID aromatic base display smoothing", () => {
-  it("smooths only aromatic base samples while preserving peak apices and outside regions", () => {
-    const x = [
-      9.0, 8.55, 8.45, 8.35, 8.25, 8.15, 8.05, 7.95, 7.85, 7.75,
-      7.65, 7.55, 7.45, 7.35, 7.25, 7.15, 7.05, 6.95, 6.0,
-    ]
-    const y = [
-      99, 0.1, -2.2, 0.2, 0.0, 0.1, 30, -3.0, 0.2, 0.1,
-      5.0, 0.0, -1.6, 0.1, 0.0, 0.2, 0.1, 0.0, -9,
-    ]
-
-    const smoothed = smoothRawFidAromaticBaseForDisplay(x, y)
-
-    expect(smoothed[0]).toBe(y[0])
-    expect(smoothed[18]).toBe(y[18])
-    expect(smoothed[6]).toBe(y[6])
-    expect(smoothed[10]).toBe(y[10])
-    expect(smoothed[2]).toBeGreaterThan(y[2])
-    expect(smoothed[7]).toBeGreaterThan(y[7])
-    expect(smoothed[12]).toBeGreaterThan(y[12])
-  })
-
-  it("applies the aromatic base cleanup only when explicitly enabled", () => {
+describe("SpectrumViewer — the drawn trace is the trace received", () => {
+  /**
+   * Replaces two tests that pinned a raw-FID-only "aromatic base cleanup".
+   * One of them asserted, literally, that no drawn sample below -2 survived —
+   * i.e. it required the display to erase negative excursions. That is a
+   * display transform deciding a signal does not exist, which this codebase
+   * forbids, and it is the same class of rule as never letting a scaling
+   * decision determine whether a peak is real.
+   *
+   * Measured before removal, on an envelope-shaped trace: 100% of the samples
+   * inside 6.45-8.65 ppm were altered, values below a floor were pinned onto
+   * one constant, and the drawn noise band stepped 2.42x at the window edge
+   * where the underlying data stepped 0.99x — a seam manufactured entirely by
+   * the transform. The baseline it was cosmetically tidying is now handled by
+   * correct rasterisation (one vertex per pixel column) plus the backend's own
+   * phase and Bernstein baseline correction.
+   */
+  it("preserves negative excursions instead of rectifying them away", () => {
     const x = [
       8.55, 8.45, 8.35, 8.25, 8.15, 8.05, 7.95, 7.85, 7.75, 7.65,
       7.55, 7.45, 7.35, 7.25, 7.15, 7.05,
@@ -529,12 +523,23 @@ describe("SpectrumViewer — raw FID aromatic base display smoothing", () => {
     const y = [0, -2.4, 0.1, 0, 24, -3.1, 0.2, 0, 4.5, 0, -1.7, 0, 0.1, 0, 0.2, 0]
 
     freshRender(<SpectrumViewer x={x} y={y} renderMode="webgl" />)
-    const rawTraceY = capturedPlotProps?.data?.[0]?.y as number[] | undefined
-    expect(rawTraceY).toContain(-3.1)
+    const traceY = capturedPlotProps?.data?.[0]?.y as number[] | undefined
 
-    freshRender(<SpectrumViewer x={x} y={y} renderMode="webgl" rawFidAromaticBaseSmoothing />)
-    const smoothedTraceY = capturedPlotProps?.data?.[0]?.y as number[] | undefined
-    expect(smoothedTraceY?.some((value) => Number.isFinite(value) && value < -2)).toBe(false)
-    expect(smoothedTraceY).toContain(24)
+    // Every input value reaches the chart, negative excursions included.
+    expect(traceY).toContain(-3.1)
+    expect(traceY).toContain(-2.4)
+    expect(traceY).toContain(24)
+  })
+
+  it("applies no ppm-window-dependent transform to the drawn values", () => {
+    // Same value placed inside and outside the old aromatic window must be
+    // drawn identically — there is no longer a boundary at 6.45 / 8.65 ppm.
+    const x = [9.5, 8.0, 7.0, 5.0]
+    const y = [-1.5, -1.5, -1.5, -1.5]
+
+    freshRender(<SpectrumViewer x={x} y={y} renderMode="webgl" />)
+    const traceY = (capturedPlotProps?.data?.[0]?.y as number[] | undefined) ?? []
+
+    expect(traceY.filter((v) => v === -1.5)).toHaveLength(4)
   })
 })
