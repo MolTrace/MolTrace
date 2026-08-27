@@ -88,7 +88,14 @@ async function main() {
     // The frozen service rides in Resources/service/; local-service.js looks for
     // it there and falls back to running from source when it is absent.
     extraResource: [FROZEN_SERVICE],
-    ignore: [/^\/out($|\/)/, /^\/test($|\/)/, /^\/scripts($|\/)/, /^\/\.git($|\/)/],
+    // Tests, build scripts and internal documentation are not part of the
+    // product. PACKAGING.md in particular is a runbook for whoever builds this,
+    // and shipping it inside the artifact it describes is just noise on an
+    // evaluator's disk.
+    ignore: [
+      /^\/out($|\/)/, /^\/test($|\/)/, /^\/scripts($|\/)/,
+      /^\/\.git($|\/)/, /^\/\.gitignore$/, /^\/[^/]*\.md$/,
+    ],
     afterCopy: [
       // v20 passes ONE options object and awaits the promise — the older
       // (buildPath, version, platform, arch, callback) signature silently yields
