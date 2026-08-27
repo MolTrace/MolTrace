@@ -9,7 +9,9 @@
  *   perfect-looking bar impossible to earn.
  * - `dp4_posterior` — a probability over only the candidates supplied. It redistributes across
  *   that closed set, so it says which of *these* fits best, not whether the right structure was
- *   among them.
+ *   among them. Two caveats, not one: the set may not contain the answer, AND the number is a
+ *   relative ranking rather than a calibrated probability, which is what the backend reports as
+ *   `probability_is_calibrated: false`. Stating only the first leaves 0.9 reading as 90%.
  *
  * A null confidence is a third case and not an empty one: the engine ran and abstained. It is
  * reported with the warning that names the cause, never as a dash or a zeroed gauge.
@@ -41,7 +43,7 @@ const SCALES: Record<ConfidenceScale, ScaleDescriptor> = {
     label: "DP4 posterior",
     allowsProportionalBar: true,
     meaning:
-      "A probability across only the candidates supplied. It says which of those fits best, not whether the correct structure was among them.",
+      "A probability across only the candidates supplied. It says which of those fits best, not whether the correct structure was among them, and it is not calibrated \u2014 0.9 is a relative ranking, not a 90% chance of being right.",
   },
 }
 

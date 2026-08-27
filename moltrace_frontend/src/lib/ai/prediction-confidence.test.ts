@@ -45,6 +45,16 @@ describe("confidence scales", () => {
     expect(scale?.meaning).toContain("only the candidates supplied")
   })
 
+  it("says the DP4 figure is uncalibrated, not only that it is closed-world", () => {
+    // Two different caveats. Closed-world says the right structure may not be in the set;
+    // uncalibrated says the NUMBER itself is a relative ranking and 0.9 does not mean a
+    // 90% chance of being right. The backend emits probability_is_calibrated: false on
+    // both its readers; this surface stated only the first caveat.
+    const scale = describeScale("dp4_posterior")
+    expect(scale?.meaning).toContain("only the candidates supplied")
+    expect(scale?.meaning?.toLowerCase()).toContain("not calibrated")
+  })
+
   it("returns null for an unknown or absent scale", () => {
     expect(describeScale("percentage")).toBeNull()
     expect(describeScale(undefined)).toBeNull()
