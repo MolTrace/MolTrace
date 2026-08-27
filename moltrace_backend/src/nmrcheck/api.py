@@ -3260,6 +3260,23 @@ def _health_response(request: Request | None = None) -> dict[str, object]:
         checks["hose_kb"] = "error"
     else:
         checks["hose_kb"] = "ok"
+
+    from moltrace.spectroscopy.eval.conformal import conformal_calibration_status
+
+    calibration = conformal_calibration_status()
+    if calibration["configured"] and not calibration["path_present"]:
+        # Set-and-missing is a deploy that forgot to stage the artifact.
+        checks["shift_calibration"] = "error"
+    elif not calibration["configured"] and app_env == "production":
+        # The image sets MOLTRACE_CONFORMAL_CALIBRATION and ships the artifact, so unset
+        # in production means it was removed. Verification still returns verdicts, but on
+        # the predicted-sigma basis that held-out measurement showed is differentially
+        # mis-scaled -- and worst where the arbiter leans hardest. That is a degradation
+        # an operator should see, for the same reason the seed table is.
+        checks["shift_calibration"] = "error"
+    else:
+        checks["shift_calibration"] = "ok"
+
     status_value = "ok" if all(value == "ok" for value in checks.values()) else "degraded"
     # Only the coarse verdict is public. /health is deliberately unauthenticated,
     # and the detailed block (source, reference_count, path) is deployment
@@ -9702,7 +9719,9 @@ async def spectrum_reason(
         build_reasoning_context,
         propose_structures,
     )
+    from moltrace.spectroscopy.eval.conformal import load_deployed_calibration
     from moltrace.spectroscopy.io.fid_reader import NMRSpectrum
+    from moltrace.spectroscopy.verification.scorer import VerificationOptions
 
     spectrum = NMRSpectrum(
         data=np.asarray(payload.intensity, dtype=np.float64),
@@ -9787,6 +9806,16 @@ async def spectrum_reason(
             rag_context,
             max_candidates=payload.max_candidates,
             model=DEFAULT_MODEL,
+            # The verifier is the arbiter, so the basis it weighs evidence on is not an
+            # implementation detail. Without this the arbiter scored every match on the
+            # predictor's claimed sigma, which held-out measurement showed is
+            # differentially mis-scaled -- worst in the tight bins, which is exactly
+            # where the weighting leans hardest. Unset in a dev checkout, the verifier
+            # falls back to that sigma basis and each result says which basis scored it.
+            verification_options=VerificationOptions(
+                nucleus=payload.nucleus,
+                shift_calibration=load_deployed_calibration(),
+            ),
         )
     except RAGLLMUnavailable:
         warnings.append(
@@ -28355,6 +28384,7 @@ def admin_system(
 
 @router.get("/admin/deployment", dependencies=[Depends(require_admin)])
 def admin_deployment_diagnostics(request: Request) -> dict[str, object]:
+    from moltrace.spectroscopy.eval.conformal import conformal_calibration_status
     from moltrace.spectroscopy.predict.nmrnet_wrapper import knowledge_base_status
 
     settings = _state(request).settings
@@ -28364,6 +28394,7 @@ def admin_deployment_diagnostics(request: Request) -> dict[str, object]:
     )
     return {
         "hose_kb": knowledge_base_status(),
+        "shift_calibration": conformal_calibration_status(),
         "app_env": settings.app_env,
         "database_url_configured": bool(settings.database_url),
         "redis_configured": bool(settings.redis_url),

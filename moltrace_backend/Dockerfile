@@ -74,10 +74,18 @@ COPY --from=build --chown=app:app /app /app
 # See data/hose/README.md to build it. The file is gitignored (NMRShiftDB2
 # derivative, CC BY-SA — see NOTICE), so it must be placed in the build context
 # before `gcloud builds submit`.
+# Conformal shift calibration. Unlike the HOSE table this one IS in the repository
+# (4.7 KB of residual quantiles, reconstructing nothing of NMRShiftDB2 -- see
+# data/conformal/README.md), so `COPY . .` always carries it and there is nothing to
+# stage. Without it the verifier weighs every matched resonance on the predictor's
+# claimed sigma, which held-out measurement showed is differentially mis-scaled --
+# half-width/sigma running 8.66x down to 1.77x where a correct sigma gives a constant,
+# and worst in the tight bins the arbiter leans on hardest. /health reports it.
 ENV PATH="/app/.venv/bin:$PATH" \
     APP_ENV=production \
     PYTHONUNBUFFERED=1 \
     MOLTRACE_HOSE_KB=/app/data/hose/hose_index.json.gz \
+    MOLTRACE_CONFORMAL_CALIBRATION=/app/data/conformal/shift_calibration.json \
     PORT=8080
 
 # Fail the build when the knowledge base is absent: a clean CI checkout lacks the
