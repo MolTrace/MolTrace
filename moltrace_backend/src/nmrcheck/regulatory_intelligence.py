@@ -4,6 +4,7 @@ import hashlib
 import json
 import re
 import zipfile
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
 from io import BytesIO
@@ -13,6 +14,8 @@ from xml.etree import ElementTree
 from sqlalchemy import or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
+
+from moltrace.regulatory.intelligence import LexicalRetriever
 
 from . import org_membership
 from .analytics_store import record_automation_event
@@ -1089,7 +1092,6 @@ def _search_source_rows(
     source_type: str | None = None,
     limit: int = 10,
 ) -> tuple[list[RegulatorySourceDocumentORM], list[RegulatoryCitationORM]]:
-    tokens = _query_tokens(query)
     stmt = select(RegulatorySourceDocumentORM).where(RegulatorySourceDocumentORM.status == "active")
     if jurisdiction_id is not None:
         stmt = stmt.where(
@@ -1099,64 +1101,88 @@ def _search_source_rows(
     if source_type is not None:
         stmt = stmt.where(RegulatorySourceDocumentORM.source_type == source_type)
     source_rows = session.scalars(stmt.order_by(RegulatorySourceDocumentORM.id.desc())).all()
-    scored_sources: list[tuple[int, RegulatorySourceDocumentORM]] = []
-    scored_citations: list[tuple[int, RegulatoryCitationORM]] = []
-    for source in source_rows:
-        text = " ".join([source.title or "", source.text_excerpt or ""]).lower()
-        source_score = _score_text(tokens, text)
-        citations = _citations_for_source(session, source.id)
-        citation_best = 0
-        for citation in citations:
-            citation_text = " ".join(
+
+    citations_by_source = {
+        source.id: _citations_for_source(session, source.id) for source in source_rows
+    }
+
+    source_scores = _rank_texts(
+        query,
+        {
+            source.id: " ".join([source.title or "", source.text_excerpt or ""])
+            for source in source_rows
+        },
+    )
+    citation_scores = _rank_texts(
+        query,
+        {
+            citation.id: " ".join(
                 [
                     citation.citation_label or "",
                     citation.section_title or "",
                     citation.quote_excerpt or "",
                     citation.summary or "",
                 ]
-            ).lower()
-            score = _score_text(tokens, citation_text)
-            if score:
+            )
+            for citations in citations_by_source.values()
+            for citation in citations
+        },
+    )
+
+    scored_sources: list[tuple[float, RegulatorySourceDocumentORM]] = []
+    scored_citations: list[tuple[float, RegulatoryCitationORM]] = []
+    for source in source_rows:
+        citation_best = 0.0
+        for citation in citations_by_source[source.id]:
+            score = citation_scores.get(citation.id, 0.0)
+            if score > 0.0:
                 scored_citations.append((score, citation))
                 citation_best = max(citation_best, score)
-        score = max(source_score, citation_best)
-        if score:
+        score = max(source_scores.get(source.id, 0.0), citation_best)
+        if score > 0.0:
             scored_sources.append((score, source))
     scored_sources.sort(key=lambda item: (item[0], item[1].id), reverse=True)
     scored_citations.sort(key=lambda item: (item[0], item[1].id), reverse=True)
     return [row for _, row in scored_sources[:limit]], [row for _, row in scored_citations[:limit]]
 
 
-def _query_tokens(query: str) -> list[str]:
-    stop = {
-        "the",
-        "and",
-        "or",
-        "for",
-        "with",
-        "this",
-        "that",
-        "does",
-        "what",
-        "when",
-        "where",
-        "require",
-        "requires",
-        "required",
-        "regulatory",
-        "dossier",
+@dataclass(frozen=True)
+class _ScorableChunk:
+    """The two attributes :class:`LexicalRetriever` reads off a chunk.
+
+    Deliberately not an ``IndexChunk``: that type carries ``CorpusSource`` and ``CorpusLicense``,
+    a closed vocabulary of guidance publishers (FDA / ICH / EMA / WHO). A document a customer
+    uploaded to their own dossier is none of those, and forcing one would record a licence and a
+    redistribution flag that are simply untrue.
+    """
+
+    chunk_id: str
+    text: str
+
+
+def _rank_texts(query: str, texts: Mapping[int, str]) -> dict[int, float]:
+    """Score each candidate against the query with the tested deterministic TF-IDF retriever.
+
+    Replaces a raw count of query terms found as SUBSTRINGS of the candidate. That scored "led"
+    against every "controlled", "compelled" and "scheduled", and weighted every term equally, so
+    a word common to the whole corpus counted as much as the one rare word that actually says
+    which document to read. On this path the ranking selects the excerpts quoted back in a
+    drafted answer, so a false match does not just add noise to a list.
+
+    Term rarity now comes from the candidate set itself rather than a hand-maintained stop-list,
+    which is why the old ``_query_tokens`` stop-words are gone: IDF derives the same judgement
+    from the data, and keeps deriving it when the corpus changes.
+    """
+
+    if not texts:
+        return {}
+    by_key = {str(key): key for key in texts}
+    chunks = [_ScorableChunk(chunk_id=str(key), text=value or "") for key, value in texts.items()]
+    return {
+        by_key[chunk.chunk_id]: score
+        for chunk, score in LexicalRetriever().search(query, chunks)  # type: ignore[arg-type]
+        if score > 0.0
     }
-    return [
-        token
-        for token in re.findall(r"[a-zA-Z0-9_%-]{3,}", query.lower())
-        if token not in stop
-    ]
-
-
-def _score_text(tokens: list[str], text: str) -> int:
-    if not tokens:
-        return 0
-    return sum(1 for token in tokens if token in text)
 
 
 def _citation_snippet(row: RegulatoryCitationORM) -> str:

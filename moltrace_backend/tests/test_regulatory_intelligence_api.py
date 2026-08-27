@@ -296,6 +296,103 @@ def test_regulatory_risk_review_and_readiness_report(client, api_headers):
         assert listed_reports[0]["id"] == readiness["id"]
 
 
+def _upload(client, headers, jurisdiction_id: int, *, title: str, body: str) -> dict:
+    res = client.post(
+        "/regulatory/sources/upload",
+        headers=headers,
+        data={
+            "title": title,
+            "source_type": "guidance",
+            "jurisdiction_id": str(jurisdiction_id),
+            "version": "2026-draft",
+            "status": "active",
+        },
+        files={"file": (f"{title.lower().replace(' ', '-')}.txt", body.encode("utf-8"), "text/plain")},
+    )
+    assert res.status_code == 201, res.text
+    return res.json()
+
+
+def test_source_search_does_not_match_a_word_inside_another_word(client, api_headers):
+    """Retrieval scored by substring containment, so a short query term matched inside longer words.
+
+    "led" scored a hit on every occurrence of "controlled", "compelled" and "scheduled", tying a
+    document that never uses the word with one that does. On a regulatory Q&A path the ranking is
+    what selects the quoted citations, so a false match does not merely add noise -- it can put an
+    unrelated excerpt into a drafted answer.
+    """
+
+    headers = api_headers
+    with client:
+        jurisdiction = _jurisdiction(client, headers)
+        _upload(
+            client, headers, jurisdiction["id"],
+            title="Controlled Storage Guidance",
+            body=(
+                "Every batch is controlled and scheduled under the quality system. Storage areas "
+                "remain controlled throughout, and controlled documents are retained on file."
+            ),
+        )
+        _upload(
+            client, headers, jurisdiction["id"],
+            title="Acceptable Intake Guidance",
+            body=(
+                "Nitrosamine limits are led by the acceptable intake for the compound. The "
+                "assessment is led by a qualified reviewer before any release decision."
+            ),
+        )
+
+        search = client.post(
+            "/regulatory/sources/search",
+            headers=headers,
+            json={"query": "led", "jurisdiction_id": jurisdiction["id"]},
+        )
+        assert search.status_code == 200, search.text
+        titles = [s["title"] for s in search.json()["sources"]]
+
+    assert "Acceptable Intake Guidance" in titles, titles
+    assert "Controlled Storage Guidance" not in titles, titles
+
+
+def test_source_search_ranks_the_rarer_term_higher(client, api_headers):
+    """A term common to every document carries no discriminating power; a rare one does.
+
+    Constructed so a raw count of matched terms cannot separate the two: both candidates match
+    exactly two of the three query terms, so the old scorer tied them and fell through to its
+    id-descending tie-break -- which here favours the document uploaded last, i.e. the wrong one.
+    Weighting each term by how rare it is across the candidates is what breaks the tie on meaning
+    rather than on insertion order.
+    """
+
+    headers = api_headers
+    with client:
+        jurisdiction = _jurisdiction(client, headers)
+        # Uploaded FIRST, so the id tie-break works against it.
+        _upload(
+            client, headers, jurisdiction["id"],
+            title="Sulfolane Guidance",
+            body="Residual sulfolane is assessed against its own storage limit.",
+        )
+        for i in range(4):
+            _upload(
+                client, headers, jurisdiction["id"],
+                title=f"Common Guidance {i}",
+                body="Storage conditions apply to the batch and the conditions are documented.",
+            )
+
+        search = client.post(
+            "/regulatory/sources/search",
+            headers=headers,
+            json={"query": "storage conditions sulfolane", "jurisdiction_id": jurisdiction["id"]},
+        )
+        assert search.status_code == 200, search.text
+        titles = [s["title"] for s in search.json()["sources"]]
+
+    # Both match two of three terms. "sulfolane" appears once across the corpus; "storage" and
+    # "conditions" appear in all five, so they say nothing about which document to read.
+    assert titles[0] == "Sulfolane Guidance", titles
+
+
 def test_phase53_openapi_includes_regulatory_intelligence_endpoints(client):
     with client:
         res = client.get("/openapi.json")
