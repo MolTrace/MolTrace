@@ -89,6 +89,31 @@ _RUNNERS: dict[str, str] = {
     "nmr_candidate_ranking": "_run_candidate_ranking",
 }
 
+#: Which confidence scale each service's engine reports on. These are NOT comparable and
+#: must never be pooled or screened as if they were: ``verifier_quality`` summarises the
+#: deterministic verifier's predicted uncertainty and its own note says it "is not a
+#: probability that the structure is correct", while ``dp4_posterior`` is a closed-world
+#: share that redistributes over the candidates supplied -- 0.71 of the mass over two
+#: candidates says nothing a 0.71 verifier score says.
+#:
+#: The scale travels in each result's ``uncertainty["scale"]``, but a stored run keeps only
+#: ``service_key``, so anything reading ``confidence_score`` back out of the database needs
+#: this map to know what the number means. Adding a runner means adding its scale here.
+_SERVICE_CONFIDENCE_SCALES: dict[str, str] = {
+    "nmr_shift_prediction": "verifier_quality",
+    "nmr_candidate_ranking": "dp4_posterior",
+}
+
+
+def confidence_scale_for_service(service_key: str) -> str | None:
+    """The scale a stored ``confidence_score`` for this service is on, or ``None``.
+
+    ``None`` means an unregistered service, and an unknown scale is not a licence to treat
+    the number as comparable with any other -- it is the reason not to.
+    """
+
+    return _SERVICE_CONFIDENCE_SCALES.get(service_key)
+
 
 @dataclass(frozen=True)
 class EngineResult:

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
@@ -1111,6 +1112,7 @@ def list_monitoring_events(
 
 def model_monitoring_summary(session_factory: sessionmaker[Session]) -> AIModelMonitoringSummary:
     with session_scope(session_factory) as session:
+        by_scale, scale_warnings = _runs_by_confidence_scale(session)
         recent_events = session.scalars(
             select(ModelMonitoringEventORM).order_by(ModelMonitoringEventORM.id.desc()).limit(10)
         ).all()
@@ -1137,8 +1139,67 @@ def model_monitoring_summary(session_factory: sessionmaker[Session]) -> AIModelM
             active_learning_candidate_count=_count(session, ActiveLearningCandidateORM.id),
             recent_events=[_monitoring_to_record(row) for row in recent_events],
             notes=[_REVIEW_NOTE],
-            metadata_json={"builtin_ai_service_count": len(BUILTIN_AI_SERVICES)},
+            warnings=scale_warnings,
+            metadata_json={
+                "builtin_ai_service_count": len(BUILTIN_AI_SERVICES),
+                "by_confidence_scale": by_scale,
+            },
         )
+
+
+def _runs_by_confidence_scale(session: Session) -> tuple[dict[str, dict[str, int]], list[str]]:
+    """Split the run counts by the confidence scale their service reports on.
+
+    ``requires_review_count`` above pools every service, and the two engines behind it report
+    on scales the codebase elsewhere calls not comparable: a verifier-quality figure that "is
+    not a probability that the structure is correct", and a closed-world DP4 share. Both are
+    screened against one threshold, so a pooled count of low-confidence runs is a count of two
+    different things. The pooled figures stay -- they are a live contract -- but the split sits
+    beside them and the warning says why it is there.
+
+    Derived from the persisted ``service_key`` rather than a stored scale column: the mapping is
+    a property of which engine ran, and it is already recorded.
+    """
+
+    rows = session.execute(
+        select(
+            PredictionRunORM.service_key,
+            PredictionRunORM.status,
+            func.count(PredictionRunORM.id),
+        ).group_by(PredictionRunORM.service_key, PredictionRunORM.status)
+    ).all()
+
+    by_scale: dict[str, dict[str, int]] = {}
+    for service_key, status, count in rows:
+        scale = (
+            ai_engine_adapter.confidence_scale_for_service(str(service_key))
+            or "unregistered_service"
+        )
+        bucket = by_scale.setdefault(scale, {"prediction_count": 0, "requires_review_count": 0})
+        bucket["prediction_count"] += int(count)
+        if status == "requires_review":
+            bucket["requires_review_count"] += int(count)
+
+    return by_scale, scale_comparability_warnings(by_scale)
+
+
+def scale_comparability_warnings(by_scale: Mapping[str, Any]) -> list[str]:
+    """Warn only when two or more *known* scales are actually present.
+
+    Split out so the wording can be tested without standing up two engines: the shift
+    predictor is a long synchronous computation and running it inside a request just to
+    produce a second scale is not a test of this logic.
+    """
+
+    scored = sorted(s for s in by_scale if s != "unregistered_service")
+    if len(scored) < 2:
+        return []
+    return [
+        "Predictions here span more than one confidence scale ("
+        + ", ".join(scored)
+        + "), and those scales are not comparable. The pooled review and low-confidence "
+        "counts mix them; read the per-scale split in metadata_json instead."
+    ]
 
 
 def prediction_audit(
