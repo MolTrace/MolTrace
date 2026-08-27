@@ -188,6 +188,22 @@ def match_expected_correlations(
 
     Each expectation matches at most once, so a single observed peak sitting
     between two expectations cannot satisfy both.
+
+    **Not used by the 2D analyzer, and that is deliberate.** ``nmr2d_analyzer``
+    scores structural coverage by matching against the OBSERVED 1D shifts and takes
+    only the denominator from the structure, because matching against predicted
+    shifts is ambiguous at any window: measured over six molecules / 57 expectations,
+    the share of predictions with at least one rival prediction inside the window is
+    84.2 % at the pooled 90 % window, 80.7 % at the (tighter, measured) conformal 90 %
+    window, and still 77.2 % at +/-0.15 / +/-2.0 ppm. Expected correlations cluster
+    because the chemistry does.
+
+    Two further properties matter to any future caller. The matching here is greedy
+    first-fit in expectation order, not an optimal assignment and not even
+    nearest-first, so with several candidates per expectation it can consume a peak a
+    later expectation needed and undercount -- and the result depends on the order
+    ``expected`` arrives in. That is fine for the sparse, well-separated cases the
+    tests cover; it is not fine as a coverage metric on a crowded aliphatic region.
     """
     remaining = list(observed)
     matched = 0
