@@ -23,7 +23,6 @@ import { DeveloperJsonPanel } from "@/components/spectracheck/spectracheck-resul
 import {
   EnrichedPickedPeaksPanel,
   InferredNmrTextPanel,
-  ReferencesPanel,
   SpectraCheckEvidencePanels,
 } from "@/components/spectracheck/spectracheck-evidence-panels"
 import { findRelativeIntegralDisclosure } from "@/components/spectracheck/spectracheck-relative-integrals"
@@ -48,21 +47,16 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import {
   GsdAnalysisControls,
-  GsdResultsPanel,
   type AnalysisBackendChoice,
   type GSDLevel,
   type SpectrumGSDAnalyzeRequest,
   type SpectrumGSDAnalyzeResult,
 } from "@/components/spectracheck/gsd-analysis-ui"
-import { GsdMultipletPanel } from "@/components/spectracheck/gsd-multiplet-panel"
-import { GsdJCouplingPanel } from "@/components/spectracheck/gsd-jcoupling-panel"
-import { GsdIntegrationPanel } from "@/components/spectracheck/gsd-integration-panel"
 import { QnmrPurityPanel } from "@/components/spectracheck/qnmr-purity-panel"
-import { ShiftPredictionPanel } from "@/components/spectracheck/shift-prediction-panel"
-import { SpectrumRetrievePanel } from "@/components/spectracheck/spectrum-retrieve-panel"
 import { SpectrumReasonPanel } from "@/components/spectracheck/spectrum-reason-panel"
 import { AlertCard } from "@/components/dashboard/alert-card"
 import { ModuleCard } from "@/components/dashboard/module-card"
+import { SpectraCheckAnalysisPanels } from "@/components/spectracheck/spectracheck-analysis-panels"
 import { SpectraCheckRunTile } from "@/components/spectracheck/spectracheck-run-tile"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -1588,85 +1582,34 @@ export function SpectraCheckProcessedSpectrumSection({
       {/* ── Step 3b — GSD-Prompt-3 output (experimental) ──────────────────
           Only renders when the user has run the experimental backend.
           Lives alongside the legacy Step 3 results without replacing them. */}
-      <GsdResultsPanel result={gsdResult} />
-
-      {/* ── Step 3c — Multiplet analysis (Phase 26) ───────────────────────
-          Chained automatically off the GSD result — peaks above S/N>3
-          are forwarded to /spectrum/analyze/multiplets for first-order +
-          complex multiplet detection. */}
-      <GsdMultipletPanel gsdResult={gsdResult} testId="processed-multiplet-results-surface" />
-
-      {/* ── Step 3d — Candidate J-agreement (Phase 26b / v0.7.1) ──────────
-          When candidate SMILES are provided, score them against the
-          observed J couplings recovered from the multiplet pass. Shares
-          the multiplet WeakMap cache so the multiplet POST fires once
-          for both panels. */}
-      <GsdJCouplingPanel
+      <SpectraCheckAnalysisPanels
         gsdResult={gsdResult}
+        trace={xy}
+        nucleus={nucleus}
+        solvent={solvent}
+        fieldMhz={Number(spectrometerMhz.trim() || "500") || 500}
         candidatesText={candidatesOptional.trim() || candidatesText}
         sampleId={sampleId}
         compoundClass={compoundClassForRequest(compoundClass) || undefined}
-        testId="processed-jcoupling-results-surface"
-      />
-
-      {/* ── Step 3e — Region integration (Prompt 5) ───────────────────────
-          Integrate each detected multiplet range on the displayed trace
-          for the canonical relative proton-ratio readout. Shares the
-          multiplet WeakMap cache; integrates the same xy the
-          SpectrumViewer renders. */}
-      <GsdIntegrationPanel
-        gsdResult={gsdResult}
-        trace={xy}
-        nucleus={nucleus}
-        solvent={solvent}
-        fieldMhz={Number(spectrometerMhz.trim() || "500") || 500}
-        testId="processed-integration-results-surface"
-      />
-
-      {/* ── qNMR purity ──────────────────────────────────────────────────
-          Sits beside the region integrals because purity is what an analyst
-          computes *from* the integrals just reviewed. Takes its numbers by
-          hand, so it stays usable with integrals from any source and never
-          gates on the GSD chain — stateless compute, nothing persisted. */}
-      <QnmrPurityPanel testId="processed-qnmr-purity-surface" />
-
-      {/* Reference material, below the results rather than inside them — the citation
-          list used to close the evidence composite a third of the way down the page,
-          landing between two sets of numbers a reader was working through. It
-          documents the analysis; it is not a step in it. The candidate tools below
-          were already at the foot here, which is where the Raw FID tab now puts them
-          too. */}
-      {displayPayload != null ? <ReferencesPanel payload={displayPayload} /> : null}
-
-      {/* ── Candidate tool — per-atom shift prediction (v0.7.8) ──────────
-          Structure-derived (not part of the observed-spectrum chain):
-          predicts ¹H/¹³C shifts from a candidate SMILES. Self-gates on
-          the candidate list; independent of the GSD run. */}
-      <ShiftPredictionPanel
-        candidatesText={candidatesOptional.trim() || candidatesText}
-        testId="processed-shift-prediction-surface"
-      />
-
-      {/* ── Candidate tool — spectral-similarity retrieval ──────────────
-          Encodes a candidate SMILES and queries the server-configured
-          FAISS similarity index for nearest reference spectra. Self-gates
-          on the candidate list; independent of the GSD run. */}
-      <SpectrumRetrievePanel
-        candidatesText={candidatesOptional.trim() || candidatesText}
-        testId="processed-spectrum-retrieve-surface"
-      />
-
-      {/* ── Decision-support — retrieval-augmented reasoning (Prompt 14) ─
-          Encodes the displayed ppm + intensity trace, retrieves precedent
-          analogues, and asks the reasoning backend to propose verifier-
-          arbitrated candidate structures. Server-side similarity index +
-          reasoning model gating — both flags surfaced independently. */}
-      <SpectrumReasonPanel
-        trace={xy}
-        nucleus={nucleus}
-        solvent={solvent}
-        fieldMhz={Number(spectrometerMhz.trim() || "500") || 500}
-        testId="processed-spectrum-reason-surface"
+        displayPayload={displayPayload}
+        testIdPrefix="processed"
+        resultsExtras={
+          <>
+            {/* Purity is what an analyst computes FROM the integrals just
+                reviewed, so it sits beside them. Takes its numbers by hand and
+                never gates on the GSD chain. */}
+            <QnmrPurityPanel testId="processed-qnmr-purity-surface" />
+            {/* Spectrum-derived, so it belongs with the results. It used to
+                render below the reference material. */}
+            <SpectrumReasonPanel
+              trace={xy}
+              nucleus={nucleus}
+              solvent={solvent}
+              fieldMhz={Number(spectrometerMhz.trim() || "500") || 500}
+              testId="processed-spectrum-reason-surface"
+            />
+          </>
+        }
       />
       </SpectrumResultsFullscreen>
     </div>

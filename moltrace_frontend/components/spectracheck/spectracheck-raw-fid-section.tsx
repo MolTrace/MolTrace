@@ -58,7 +58,6 @@ import { DeveloperJsonPanel } from "@/components/spectracheck/spectracheck-resul
 import {
   EnrichedPickedPeaksPanel,
   InferredNmrTextPanel,
-  ReferencesPanel,
   SpectraCheckEvidencePanels,
 } from "@/components/spectracheck/spectracheck-evidence-panels"
 import { SpectraCheckFidRunReview } from "@/components/spectracheck/spectracheck-fid-run-review"
@@ -81,11 +80,11 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { AlertCard } from "@/components/dashboard/alert-card"
 import { ModuleCard } from "@/components/dashboard/module-card"
+import { SpectraCheckAnalysisPanels } from "@/components/spectracheck/spectracheck-analysis-panels"
 import { SpectraCheckRunTile } from "@/components/spectracheck/spectracheck-run-tile"
 import {
   DetectionResultsPanel,
   GsdAnalysisControls,
-  GsdResultsPanel,
   adaptLegacyRawFidResult,
   type AnalysisBackendChoice,
   type GSDLevel,
@@ -93,11 +92,6 @@ import {
   type SpectrumGSDAnalyzeRequest,
   type SpectrumGSDAnalyzeResult,
 } from "@/components/spectracheck/gsd-analysis-ui"
-import { GsdMultipletPanel } from "@/components/spectracheck/gsd-multiplet-panel"
-import { GsdJCouplingPanel } from "@/components/spectracheck/gsd-jcoupling-panel"
-import { GsdIntegrationPanel } from "@/components/spectracheck/gsd-integration-panel"
-import { ShiftPredictionPanel } from "@/components/spectracheck/shift-prediction-panel"
-import { SpectrumRetrievePanel } from "@/components/spectracheck/spectrum-retrieve-panel"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -2835,78 +2829,28 @@ export function SpectraCheckRawFidSection({
       {/* ── Step 4b — GSD-Prompt-3 output (experimental) ──────────────────
           Only renders when the user has run the experimental backend.
           Lives alongside the legacy Step 4 results without replacing them. */}
-      <GsdResultsPanel result={gsdResult} testId="raw-fid-gsd-results-surface" />
-
-      {/* ── Step 4c — Multiplet analysis (Phase 26) ───────────────────────
-          Chained automatically off the GSD result — peaks above S/N>3
-          forwarded to /spectrum/analyze/multiplets for first-order +
-          complex multiplet detection. */}
-      <GsdMultipletPanel gsdResult={gsdResult} testId="raw-fid-multiplet-results-surface" />
-
-      {/* ── Step 4d — Candidate J-agreement (Phase 26b / v0.7.1) ──────────
-          Same panel as the processed section; shares the multiplet
-          WeakMap cache so the multiplet POST fires once per gsdResult. */}
-      <GsdJCouplingPanel
-        gsdResult={gsdResult}
-        candidatesText={candidatesText}
-        sampleId={sampleId}
-        compoundClass={compoundClassForRequest(compoundClass) || undefined}
-        testId="raw-fid-jcoupling-results-surface"
-      />
-
-      {/* ── Step 4e — Region integration (Prompt 5) ───────────────────────
-          Integrate each detected multiplet range on the FT-processed
-          trace. field_mhz pulled from the vendor metadata (same cascade
-          as the GSD call); shares the multiplet WeakMap cache. */}
-      <GsdIntegrationPanel
+      <SpectraCheckAnalysisPanels
         gsdResult={gsdResult}
         trace={xy}
         nucleus={nucleus}
         solvent={solvent}
         fieldMhz={extractFieldMhz(processResult) ?? extractFieldMhz(previewResult) ?? 500}
-        testId="raw-fid-integration-results-surface"
-      />
-
-      {/* ── Step 4f — Legacy detection summary (unified panel) ──────────
-          Post-Phase-11 the raw-FID responses expose the same envelope
-          (`peaks` + `environments` + `category_counts`) as GSD. Render
-          them through the same component so users get a consistent
-          summary view regardless of which backend they chose. The
-          existing Step 4 evidence-detail rendering above is untouched. */}
-      {legacyDetectionResult ? (
-        <DetectionResultsPanel
-          result={legacyDetectionResult}
-          testId="raw-fid-legacy-results-surface"
-        />
-      ) : null}
-
-      {/* ── Reference material and candidate tools — everything BELOW here is
-          not a result of the run above ────────────────────────────────────
-          These three used to sit inside the results: the citation list closed
-          the evidence composite about a third of the way down, and the two
-          candidate tools sat between the integration panels and the detection
-          summary. Both interrupted a reader working through the numbers their
-          own upload had just produced.
-
-          They are all reference material rather than output. The citations
-          document the analysis, and the two tools are structure-derived — they
-          take a candidate SMILES and answer a question about the CANDIDATE, not
-          about this spectrum, which is why they self-gate on the candidate list
-          and stay empty until one is entered. Everything the run produced now
-          reads top to bottom without them in the way. */}
-      {displayPayload != null ? <ReferencesPanel payload={displayPayload} /> : null}
-
-      {/* Predicts ¹H/¹³C shifts from a candidate SMILES. */}
-      <ShiftPredictionPanel
         candidatesText={candidatesText}
-        testId="raw-fid-shift-prediction-surface"
-      />
-
-      {/* Encodes a candidate SMILES and queries the server-configured
-          similarity index for nearest reference spectra. */}
-      <SpectrumRetrievePanel
-        candidatesText={candidatesText}
-        testId="raw-fid-spectrum-retrieve-surface"
+        sampleId={sampleId}
+        compoundClass={compoundClassForRequest(compoundClass) || undefined}
+        displayPayload={displayPayload}
+        testIdPrefix="raw-fid"
+        resultsExtras={
+          legacyDetectionResult ? (
+            /* Raw-FID responses expose the same peaks + environments +
+               category_counts envelope as GSD, so they render through the same
+               component whichever backend produced them. */
+            <DetectionResultsPanel
+              result={legacyDetectionResult}
+              testId="raw-fid-legacy-results-surface"
+            />
+          ) : null
+        }
       />
       </SpectrumResultsFullscreen>
     </div>
