@@ -313,9 +313,16 @@ def _run_candidate_ranking(
     # clear a review threshold on the strength of a fit to a quarter of the
     # spectrum. Withholding the number routes the run to review; the share is
     # still reported per candidate for a reader.
+    from .peak_categorization import DP4_MIN_COVERAGE
+
     _observed_n = len(observed) if isinstance(observed, list) else 0
     _top_fraction = (top.matched_peaks / _observed_n) if _observed_n else 0.0
-    low_coverage_top = _top_fraction < 0.75
+    # The same constant the per-candidate rows below flag against. This gate used to carry
+    # its own literal 0.75; equal to the constant then, independent of it afterwards, so
+    # tuning DP4_MIN_COVERAGE would have left a row reporting coverage as sufficient while
+    # the confidence was withheld for insufficiency, or the reverse. Two disclosures about
+    # one quantity that can disagree are worse than either on its own.
+    low_coverage_top = _top_fraction < DP4_MIN_COVERAGE
     confidence: float | None = (
         None if (single_candidate or low_coverage_top) else float(top.dp4_probability)
     )
@@ -348,7 +355,7 @@ def _run_candidate_ranking(
     # peaks, so a candidate that explains a sixth of the spectrum can advertise a
     # small MAE. Documented in docs/fe_handoff_dp4_ranking_coverage.md, which was
     # written for exactly this failure on the other surface.
-    from .peak_categorization import DP4_MIN_COVERAGE, DP4_PROBABILITY_BASIS
+    from .peak_categorization import DP4_PROBABILITY_BASIS
 
     observed_count = len(observed)
 
@@ -387,6 +394,18 @@ def _run_candidate_ranking(
         confidence=confidence,
         uncertainty={
             "matched_peaks": top.matched_peaks,
+            # The denominator. Two surfaces read these DP4 numbers by different keys --
+            # the SpectraCheck panel reads the per-candidate rows below, the
+            # AI-predictions workspace reads this block by its `scale` -- and the
+            # coverage work reached only the rows. That left this reader a bare
+            # numerator: "matched 3 peaks", with nothing saying whether that is 3 of 3
+            # or 3 of 12, and no statement that the probability is uncalibrated. Same
+            # five keys, same meanings, same vocabulary as the rows.
+            "observed_peak_count": _observed_n,
+            "matched_fraction": _top_fraction,
+            "low_coverage": low_coverage_top,
+            "error_basis": "matched_peaks_only",
+            "probability_is_calibrated": False,
             "mae_ppm": top.mae_ppm,
             "rms_ppm": top.rms_ppm,
             "n_candidates": len(ranked),

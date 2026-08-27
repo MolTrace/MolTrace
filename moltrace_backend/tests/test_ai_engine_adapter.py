@@ -157,6 +157,86 @@ def test_a_single_candidate_posterior_is_not_a_confidence() -> None:
     assert result.uncertainty["mae_ppm"] >= 0.0
 
 
+def test_the_confidence_gate_and_the_row_flag_share_one_coverage_threshold(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """One threshold, two readers -- they must not drift apart.
+
+    The per-row ``low_coverage`` flag reads ``DP4_MIN_COVERAGE``; the gate that decides whether
+    to report a confidence at all had its own literal. Equal today, independent tomorrow: tune
+    the constant and a row can say coverage is fine while the confidence is withheld, or the
+    reverse. Two disclosures about the same quantity that disagree are worse than either alone.
+    """
+
+    from nmrcheck import peak_categorization
+
+    # Demand near-total coverage. The fixture below sits at 4/5 = 0.80 -- ABOVE the old
+    # literal 0.75 and BELOW this, so the two readers can only agree if they read the same
+    # constant. A case failing both thresholds would pass this test without proving anything.
+    monkeypatch.setattr(peak_categorization, "DP4_MIN_COVERAGE", 0.99)
+
+    result = adapter.run_prediction(
+        "nmr_candidate_ranking",
+        {
+            "nucleus": "13C",
+            "observed_shifts_ppm": [18.0, 58.0, 120.0, 140.0, 170.0],
+            "candidates": [
+                {"candidate_id": "a", "predicted_shifts_ppm": [18.1, 58.2, 120.3, 140.2]},
+                {"candidate_id": "b", "predicted_shifts_ppm": [40.0, 90.0]},
+            ],
+        },
+    )
+
+    top_row = result.output["candidates"][0]
+    assert top_row["low_coverage"] is True, "the row flag must follow the raised threshold"
+    # The gate must follow the same constant, not a literal of its own.
+    assert result.uncertainty["low_coverage"] is True
+    assert result.confidence is None, (
+        "coverage the row calls insufficient must also withhold the confidence"
+    )
+
+
+def test_the_uncertainty_block_carries_the_same_disclosure_as_the_candidate_rows() -> None:
+    """The per-candidate rows got the coverage + calibration keys; ``uncertainty`` did not.
+
+    Two frontend surfaces read the same DP4 numbers by different keys: the SpectraCheck panel
+    reads the per-candidate rows, and the AI-predictions workspace reads ``uncertainty`` (keyed
+    on its ``scale``). Applying the disclosure to the rows alone leaves the second surface
+    reporting ``matched_peaks`` as a bare numerator -- 3 matched, with nothing saying whether
+    that is 3 of 3 or 3 of 12 -- and no statement that the probability is uncalibrated.
+    """
+
+    result = adapter.run_prediction(
+        "nmr_candidate_ranking",
+        {
+            "nucleus": "13C",
+            # Twelve observed signals; each candidate can explain at most a few of them.
+            "observed_shifts_ppm": [10.0, 18.0, 25.0, 33.0, 41.0, 58.0, 66.0, 74.0, 90.0, 110.0, 128.0, 170.0],
+            "candidates": [
+                {"candidate_id": "a", "predicted_shifts_ppm": [18.1, 58.2]},
+                {"candidate_id": "b", "predicted_shifts_ppm": [41.4, 128.6]},
+            ],
+        },
+    )
+
+    unc = result.uncertainty
+    # The denominator that makes matched_peaks readable.
+    assert unc["observed_peak_count"] == 12
+    assert unc["matched_fraction"] == pytest.approx(unc["matched_peaks"] / 12)
+    # The same three disclosure keys the candidate rows carry.
+    assert unc["probability_is_calibrated"] is False
+    assert unc["error_basis"] == "matched_peaks_only"
+    assert unc["low_coverage"] is True  # two matches out of twelve signals
+
+    # And the row-level disclosure is unchanged -- this adds a reader, it does not move one.
+    row = result.output["candidates"][0]
+    for key in ("observed_peak_count", "matched_fraction", "low_coverage", "error_basis", "probability_is_calibrated"):
+        assert key in row, f"row lost {key}"
+
+    # Coverage this poor must not report a confidence at all.
+    assert result.confidence is None
+
+
 # --------------------------------------------------------------------------- #
 # The promotion gate
 # --------------------------------------------------------------------------- #
