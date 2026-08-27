@@ -128,6 +128,23 @@ class SpectrumUnreadable(ValueError):
     """The file is not a spectrum this service can read. Names no path."""
 
 
+def _readable_name(source: Path) -> str:
+    """What to call this acquisition on screen.
+
+    A Bruker experiment lives in a NUMBERED directory inside the dataset -- so
+    the last path segment is "251" or "10", which tells a chemist nothing about
+    which sample they just opened. Measured on a real acquisition: the name shown
+    was "251". Where the segment is purely a number, the dataset name above it is
+    the part that identifies the work, so both are shown.
+
+    The full path is never returned. A path carries a compound name into a
+    screenshot, and this string is rendered.
+    """
+    if source.name.isdigit() and source.parent.name:
+        return f"{source.parent.name}/{source.name}"
+    return source.name
+
+
 def open_spectrum(path: str) -> dict:
     """Read an acquisition off this computer and summarise what is in it.
 
@@ -176,7 +193,7 @@ def open_spectrum(path: str) -> dict:
         "nucleus": spectrum.nucleus,
         "field_mhz": float(spectrum.field_mhz),
         "points": int(len(spectrum.data)),
-        "file_name": source.name,
+        "file_name": _readable_name(source),
         "peak_count": len(peaks),
         "multiplets": [m.to_dict() for m in summaries],
         # Stated by the engine, not by the interface, so a caller cannot render
