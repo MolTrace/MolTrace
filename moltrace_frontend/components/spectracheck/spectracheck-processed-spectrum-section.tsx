@@ -30,6 +30,7 @@ import { SpectraCheckUseUnifiedEvidenceButton } from "@/components/spectracheck/
 import { SpectrumResultsFullscreen } from "@/components/spectracheck/spectracheck-fullscreen-results"
 import { formatApiError } from "@/components/spectracheck/spectracheck-helpers"
 import {
+  displayedDatasetName,
   extractNotes,
   extractPeaksFromPayload,
   extractPredictedOverlay,
@@ -1167,7 +1168,7 @@ export function SpectraCheckProcessedSpectrumSection({
         onClose={() => setFullscreenOpen(false)}
         eyebrow={`Full screen · Processed ${nucleus}`}
         title={resultTitle}
-        subtitle={selectedFileName ?? payloadFilename(displayPayload) ?? undefined}
+        subtitle={displayedDatasetName(displayPayload, selectedFileName) ?? undefined}
         tag={sampleId.trim() || undefined}
         testId="processed-fullscreen-view"
       >

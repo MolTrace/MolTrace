@@ -198,6 +198,30 @@ function flattenProcessingParameters(raw: Record<string, unknown>): Record<strin
  * / etc). Renders every primitive key/value as a row, hides nested or empty
  * fields. Sister to ProcessingParametersCard.
  */
+/**
+ * The acquisition fields a chemist reads first — nucleus, field, solvent, pulse
+ * programme, and the four numbers that describe the acquisition itself. Lower
+ * case because vendor dumps disagree on capitalisation (PULPROG vs pulprog).
+ */
+const PRIMARY_ACQUISITION_KEYS = new Set([
+  "nucleus",
+  "solvent",
+  "pulprog",
+  "pulse_program",
+  "sfo1",
+  "sfo1_mhz",
+  "bf1",
+  "field_mhz",
+  "td",
+  "sw",
+  "sw_h",
+  "sw_hz",
+  "ns",
+  "rg",
+  "instrument",
+  "probe",
+])
+
 export function MetadataKeyValueCard({
   payload,
   title,
@@ -228,10 +252,31 @@ export function MetadataKeyValueCard({
       ? (provenance[field] as Record<string, unknown>)
       : null
   if (!meta) return null
-  const rows = Object.entries(meta)
+  const allRows = Object.entries(meta)
     .filter(([, v]) => v !== null && v !== undefined && v !== "")
     .map(([k, v]) => ({ key: k, label: humanizeLabel(k), value: formatValue(v as FormattableValue) }))
-  if (rows.length === 0) return null
+  if (allRows.length === 0) return null
+
+  /* A vendor dump repeats the same reading under more than one spelling — the
+     instrument's own key and the canonical one. Two rows that normalise to the
+     same key AND carry the same value are the same reading twice, so only the
+     first is kept. Deliberately an exact normalised-key match rather than a
+     fuzzy one: merging `sw_hz` into `SW_h` on a value coincidence would hide a
+     genuinely different parameter, which is worse than showing one row twice. */
+  const seen = new Set<string>()
+  const rows = allRows.filter((row) => {
+    const fingerprint = `${row.key.toLowerCase().replace(/[^a-z0-9]/g, "")}=${row.value}`
+    if (seen.has(fingerprint)) return false
+    seen.add(fingerprint)
+    return true
+  })
+
+  /* ~38 rows arrived fully expanded, which buries the handful anyone reads. The
+     fields a chemist checks first lead; the rest stay one disclosure away. */
+  const primary = rows.filter((row) => PRIMARY_ACQUISITION_KEYS.has(row.key.toLowerCase()))
+  const rest = rows.filter((row) => !PRIMARY_ACQUISITION_KEYS.has(row.key.toLowerCase()))
+  const leading = primary.length > 0 ? primary : rows
+  const remainder = primary.length > 0 ? rest : []
   return (
     <Card
       className="overflow-hidden rounded-xl py-0"
@@ -244,13 +289,28 @@ export function MetadataKeyValueCard({
           {title}
         </p>
         <dl className="grid grid-cols-1 gap-x-6 gap-y-1 text-[11px] sm:grid-cols-2">
-          {rows.map((row) => (
+          {leading.map((row) => (
             <div key={row.key} className="flex justify-between gap-2">
               <dt className="text-muted-foreground">{row.label}</dt>
               <dd className="text-right font-mono font-medium">{row.value}</dd>
             </div>
           ))}
         </dl>
+        {remainder.length > 0 ? (
+          <details className="group">
+            <summary className="cursor-pointer list-none font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground hover:text-foreground">
+              {`Show all ${rows.length} acquisition parameters`}
+            </summary>
+            <dl className="mt-2 grid grid-cols-1 gap-x-6 gap-y-1 text-[11px] sm:grid-cols-2">
+              {remainder.map((row) => (
+                <div key={row.key} className="flex justify-between gap-2">
+                  <dt className="text-muted-foreground">{row.label}</dt>
+                  <dd className="text-right font-mono font-medium">{row.value}</dd>
+                </div>
+              ))}
+            </dl>
+          </details>
+        ) : null}
       </CardContent>
     </Card>
   )

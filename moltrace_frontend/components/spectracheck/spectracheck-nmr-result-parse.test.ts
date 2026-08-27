@@ -4,6 +4,8 @@ import {
   extractPeaksFromPayload,
   extractSpectrumXY,
   extractNotes,
+  extractRawFidArchiveFacts,
+  displayedDatasetName,
 } from "@/components/spectracheck/spectracheck-nmr-result-parse"
 
 describe("extractSpectrumXY", () => {
@@ -205,3 +207,59 @@ describe("extractNotes", () => {
     expect(extractNotes(null)).toBeNull()
   })
 })
+
+describe("extractRawFidArchiveFacts", () => {
+  /**
+   * The results header read `raw_file_sha256`, `spectral_width_hz` and
+   * `time_domain_points` off the top level of the payload. SpectrumPreviewReport
+   * is `extra="forbid"` and declares none of them, so those keys could never
+   * arrive and the SHA-256, spectral-width and TD tiles were permanently blank.
+   */
+  const realShapedPayload = {
+    filename: "sample.zip",
+    point_count: 9173,
+    processing_metadata: {
+      raw_upload_provenance: { sha256: "abc123def456" },
+      acquisition_parameters: {
+        sw_hz: 4800.5,
+        fid_points_after_group_delay: 32768,
+        sfo1_mhz: 400.13,
+      },
+    },
+  }
+
+  it("reads the nested shape the response models actually declare", () => {
+    const facts = extractRawFidArchiveFacts(realShapedPayload)
+    expect(facts.sha).toBe("abc123def456")
+    expect(facts.sweepWidthHz).toBe(4800.5)
+    expect(facts.fidPoints).toBe(32768)
+  })
+
+  it("returns nulls rather than throwing on an unrelated payload", () => {
+    expect(extractRawFidArchiveFacts({})).toEqual({
+      sha: null,
+      sweepWidthHz: null,
+      fidPoints: null,
+    })
+    expect(extractRawFidArchiveFacts(null).sha).toBeNull()
+  })
+})
+
+describe("displayedDatasetName", () => {
+  it("names the dataset on screen, not the one in the file input", () => {
+    // The user ran "first.zip", then picked "second.zip" without running it.
+    // The results still show first.zip, so that is what the header must say.
+    expect(displayedDatasetName({ filename: "first.zip" }, "second.zip")).toBe("first.zip")
+  })
+
+  it("falls back to the selection before anything has run", () => {
+    expect(displayedDatasetName(null, "second.zip")).toBe("second.zip")
+    expect(displayedDatasetName({}, "second.zip")).toBe("second.zip")
+  })
+
+  it("returns null when neither is known", () => {
+    expect(displayedDatasetName(null, null)).toBeNull()
+    expect(displayedDatasetName(null, "   ")).toBeNull()
+  })
+})
+

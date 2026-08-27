@@ -69,7 +69,9 @@ import { SpectraCheckUseUnifiedEvidenceButton } from "@/components/spectracheck/
 import { SpectrumResultsFullscreen } from "@/components/spectracheck/spectracheck-fullscreen-results"
 import { formatApiError } from "@/components/spectracheck/spectracheck-helpers"
 import {
+  displayedDatasetName,
   extractPeaksFromPayload,
+  extractRawFidArchiveFacts,
   extractSpectrumXY,
   isRecord,
 } from "@/components/spectracheck/spectracheck-nmr-result-parse"
@@ -1459,21 +1461,19 @@ export function SpectraCheckRawFidSection({
   }, [previewResult, previewSpectrum])
 
   const meta = displayPayload && isRecord(displayPayload) ? displayPayload : null
-  const sha =
-    meta &&
-    (typeof meta.raw_file_sha256 === "string"
-      ? meta.raw_file_sha256
-      : typeof meta.sha256 === "string"
-        ? meta.sha256
-        : typeof meta.checksum_sha256 === "string"
-          ? meta.checksum_sha256
-          : null)
+  /* Read through the shared reader, which knows the nested shape the response
+     models actually declare. These three tiles used to read `raw_file_sha256`,
+     `spectral_width_hz` and `time_domain_points` off the top level — names
+     `SpectrumPreviewReport` (extra="forbid") does not declare, so they could
+     never arrive and all three tiles were permanently blank. */
+  const archiveFacts = extractRawFidArchiveFacts(displayPayload)
+  const sha = archiveFacts.sha
   const vendorDetected =
     meta && (typeof meta.vendor_detected === "string" ? meta.vendor_detected : typeof meta.vendor === "string" ? meta.vendor : null)
   const nucleusMeta = meta && typeof meta.nucleus === "string" ? meta.nucleus : null
   const resolvedNucleus = nucleusMeta === "13C" || nucleusMeta === "1H" ? nucleusMeta : nucleus
-  const sw = meta && (meta.spectral_width_hz ?? meta.spectral_width ?? meta.sw)
-  const td = meta && (meta.time_domain_points ?? meta.td ?? meta.np)
+  const sw = archiveFacts.sweepWidthHz
+  const td = archiveFacts.fidPoints
   // procParams derivation removed — ProcessingParametersCard reads
   // ``payload.processing_parameters`` directly with its own type guards.
 
@@ -2163,7 +2163,7 @@ export function SpectraCheckRawFidSection({
         onClose={() => setRawFullscreenOpen(false)}
         eyebrow={`Full screen · Raw FID ${resolvedNucleus}`}
         title={resultTitle}
-        subtitle={selectedFileName ?? undefined}
+        subtitle={displayedDatasetName(displayPayload, selectedFileName) ?? undefined}
         tag={sampleId.trim() || undefined}
         testId="raw-fid-fullscreen-view"
       >
@@ -2482,11 +2482,11 @@ export function SpectraCheckRawFidSection({
                   onClick={() =>
                     sendTabLink({
                       kind: "raw_fid_to_processed",
-                      sourceLabel: `Raw FID · ${selectedFileName ?? "uploaded archive"}`,
+                      sourceLabel: `Raw FID · ${displayedDatasetName(displayPayload, selectedFileName) ?? "uploaded archive"}`,
                       payload: {
                         sample_id: sampleId.trim() || null,
                         nucleus,
-                        filename: selectedFileName ?? undefined,
+                        filename: displayedDatasetName(displayPayload, selectedFileName) ?? undefined,
                         point_count: xy.x.length,
                         x: xy.x,
                         y: xy.y,

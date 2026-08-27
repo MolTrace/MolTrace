@@ -195,3 +195,109 @@ export function extractNotes(payload: unknown): string | null {
   if (typeof n === "string" && n.trim()) return n
   return null
 }
+
+/**
+ * Archive facts for the Raw FID results header.
+ *
+ * These three tiles were reading top-level keys — `raw_file_sha256`, `sha256`,
+ * `checksum_sha256`, `spectral_width_hz`, `spectral_width`, `sw`,
+ * `time_domain_points`, `td`, `np` — that the response models FORBID.
+ * `SpectrumPreviewReport` is `extra="forbid"`, and none of those names is one
+ * of its fields, so no such key could ever appear and all three tiles were
+ * permanently blank.
+ *
+ * The values live nested, under the shapes the backend actually declares:
+ *   sha  -> processing_metadata.raw_upload_provenance.sha256
+ *   sw   -> processing_metadata.acquisition_parameters.sw_hz
+ *   td   -> processing_metadata.acquisition_parameters.fid_points_after_group_delay
+ *
+ * Legacy top-level and `metadata.*` spellings are still accepted, matching the
+ * both-shapes pattern `extractRawArchiveId` already uses in this module.
+ */
+export type RawFidArchiveFacts = {
+  sha: string | null
+  sweepWidthHz: number | null
+  fidPoints: number | null
+}
+
+function firstString(...values: unknown[]): string | null {
+  for (const value of values) {
+    if (typeof value === "string" && value.trim()) return value.trim()
+  }
+  return null
+}
+
+function firstFinite(...values: unknown[]): number | null {
+  for (const value of values) {
+    const n = typeof value === "string" ? Number(value) : value
+    if (typeof n === "number" && Number.isFinite(n)) return n
+  }
+  return null
+}
+
+export function extractRawFidArchiveFacts(payload: unknown): RawFidArchiveFacts {
+  if (!isRecord(payload)) return { sha: null, sweepWidthHz: null, fidPoints: null }
+  const meta = isRecord(payload.metadata) ? payload.metadata : null
+  const pm = isRecord(payload.processing_metadata) ? payload.processing_metadata : null
+  const provenance = pm && isRecord(pm.raw_upload_provenance) ? pm.raw_upload_provenance : null
+  const acq = pm && isRecord(pm.acquisition_parameters) ? pm.acquisition_parameters : null
+
+  return {
+    sha: firstString(
+      provenance?.sha256,
+      payload.raw_sha256,
+      payload.content_sha256,
+      meta?.sha256,
+    ),
+    sweepWidthHz: firstFinite(acq?.sw_hz, meta?.sw_hz, payload.sw_hz),
+    fidPoints: firstFinite(
+      acq?.fid_points_after_group_delay,
+      acq?.fft_size,
+      meta?.fid_points,
+      payload.point_count,
+    ),
+  }
+}
+
+/** Filename the response itself reports, across the shapes it can arrive in. */
+export function payloadFilename(payload: unknown): string | null {
+  if (!isRecord(payload)) return null
+  const metadata = isRecord(payload.metadata) ? payload.metadata : null
+  const values = [
+    payload.filename,
+    payload.file_name,
+    payload.name,
+    metadata?.filename,
+    metadata?.file_name,
+    metadata?.name,
+  ]
+  for (const value of values) {
+    if (typeof value === "string" && value.trim()) return value.trim()
+  }
+  return null
+}
+
+/**
+ * What to CALL the dataset currently on screen.
+ *
+ * The payload wins over the file input, and that order is the whole point. The
+ * two disagree more often than it looks: the raw FID tab has a batch queue, a
+ * separately selected file, and independent preview/process payloads, so
+ * picking a new archive — or activating a different queue row — leaves
+ * `selectedFileName` describing something other than the results being
+ * displayed. Both the full-screen subtitle and the cross-tab handoff read that
+ * name, so a mismatch does not just mislabel a header, it can carry the wrong
+ * provenance into another tab.
+ *
+ * The selection is still the right answer before anything has run, which is
+ * why it remains the fallback rather than being dropped.
+ */
+export function displayedDatasetName(
+  payload: unknown,
+  selectedFileName: string | null | undefined,
+): string | null {
+  const fromPayload = payloadFilename(payload)
+  if (fromPayload) return fromPayload
+  const selected = selectedFileName?.trim()
+  return selected ? selected : null
+}

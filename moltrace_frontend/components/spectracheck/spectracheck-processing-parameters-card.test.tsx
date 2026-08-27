@@ -165,3 +165,59 @@ describe("MetadataKeyValueCard", () => {
     expect(emptyDict.firstChild).toBeNull()
   })
 })
+
+describe("MetadataKeyValueCard — density", () => {
+  /** A vendor dump as it actually lands: the readings a chemist checks first,
+   *  buried among thirty-odd others, with some values repeated under both the
+   *  instrument's spelling and the canonical one. */
+  function dump() {
+    const params: Record<string, unknown> = {
+      NUCLEUS: "1H",
+      SOLVENT: "CDCl3",
+      PULPROG: "zg30",
+      TD: 32768,
+      NS: 16,
+      SW_h: 4800.5,
+      sw_h: 4800.5, // same reading, instrument vs canonical spelling
+    }
+    for (let i = 0; i < 30; i++) params[`AUX_${i}`] = i + 1
+    return {
+      metadata: { raw_upload_provenance: { acquisition_parameters: params } },
+    }
+  }
+
+  it("keeps the leading fields visible and puts the long tail behind a disclosure", () => {
+    render(
+      <MetadataKeyValueCard
+        payload={dump()}
+        title="Acquisition metadata"
+        field="acquisition_parameters"
+      />,
+    )
+
+    // Read-first fields are on screen without interaction.
+    expect(screen.getByText("PULPROG")).toBeInTheDocument()
+    expect(screen.getByText("zg30")).toBeInTheDocument()
+    // The thirty auxiliary rows sit behind the disclosure rather than beside
+    // them. `details` keeps its content in the DOM when collapsed, so this
+    // asserts WHERE a row lives, not whether it exists.
+    const summary = screen.getByText(/Show all \d+ acquisition parameters/i)
+    const disclosure = summary.closest("details")
+    expect(disclosure).not.toBeNull()
+    expect(disclosure).toHaveTextContent("AUX 17")
+    expect(disclosure).not.toHaveTextContent("PULPROG")
+  })
+
+  it("prints a reading once when two vendor spellings carry the same value", () => {
+    render(
+      <MetadataKeyValueCard
+        payload={dump()}
+        title="Acquisition metadata"
+        field="acquisition_parameters"
+      />,
+    )
+    // SW_h and sw_h normalise to the same key and carry the same value.
+    expect(screen.getAllByText("4800.5")).toHaveLength(1)
+  })
+})
+
