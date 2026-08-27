@@ -212,6 +212,23 @@ const asyncChecks = [
       // the pipe handler deliberately removed: 1 run in 3 went green. The settle
       // is what makes the guard reliable. It is 120ms, not the 1200 it replaced.
       await new Promise((r) => setTimeout(r, 120))
+
+      // THE LOAD-BEARING HALF, and it is structural rather than timed. A settle
+      // long enough to catch the second channel today is a settle that is too
+      // short on a slower machine: measured with the pipe handler removed, the
+      // timed assertion below alone missed 3 runs in 14 even WITH the settle.
+      // Whether a reader is ATTACHED is decidable now and cannot race, which is
+      // the same fix the stdout/stderr drain assertion needed for the same
+      // reason. The timed check stays underneath it, because it can still catch
+      // an escape a listener count cannot see -- a handler that is attached and
+      // throws.
+      const pipe = started.child.stdio && started.child.stdio[3]
+      assert.ok(pipe, 'there is no credential pipe to attach an error handler to')
+      assert.ok(pipe.listenerCount('error') > 0,
+        'nothing handles EPIPE on the credential pipe — writing to a child that never launched '
+        + 'throws asynchronously, and an unhandled error on the PIPE is a separate escape from the '
+        + 'one on the ChildProcess')
+
       assert.strictEqual(uncaught, null, `spawn failure escaped as an uncaught exception: ${uncaught && uncaught.message}`)
       const f = started.failure()
       assert.ok(f, 'the spawn failed and nothing recorded why')
