@@ -18,8 +18,24 @@ directions and both have to be reported:
   EXPOSURE   the mean number of *other* atoms in the same molecule whose observed
              shift also falls inside the window. Every one of those is a line the
              matcher could bind instead, scoring a wrong assignment as
-             corroboration. With the picker over-picking 3–7×, real spectra carry
-             more candidate lines than this — so this is a lower bound.
+             corroboration.
+
+             This is computed from reference shifts — one line per atom — not from
+             detected peaks. It was previously described here as a LOWER bound, on
+             the reasoning that a picker over-picking 3-7x puts more candidate lines
+             in a real spectrum. **Measured, that is wrong in direction.** Counting
+             rivals against what the matcher actually sees (13C: classified compound
+             peaks; 1H: clustered environments) over the 19-fixture Bruker corpus,
+             detected rival density is 0.16-0.41x the reference-shift estimate across
+             every window tried, rising gently with width but never approaching 1.
+
+             The mechanism: a reference list carries every distinct atom environment,
+             and a real spectrum does not resolve them all — an unresolved pair
+             contributes two reference rivals and one detected line — while
+             auto_classify removes the solvent, artifact and satellite picks that the
+             raw over-pick factor counts. So exposure here OVERSTATES the rival
+             density a wide window really faces, which cuts against wide windows, not
+             for them. On 19 fixtures; a larger corpus could move it.
 
 Sweeping the coverage target lets the window be chosen from the measured
 distribution rather than from a round number. Note the reported interval and the
