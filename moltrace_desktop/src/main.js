@@ -148,9 +148,21 @@ ipcMain.handle('moltrace:capability-readout', () => {
   // The service source is now REAL. The other three are still null and null
   // fails closed, which is the honest answer while they do not exist.
   return capabilities
-    .readout(DECLARED_CAPABILITIES, localService.capabilityWorld(serviceState))
+    .readout(DECLARED_CAPABILITIES, currentWorld())
     .map(capabilityView.present)
 })
+
+// The capability world, assembled once. The readout and the gate both call this
+// -- they used to build it separately, which is how a button comes to be drawn
+// from one view of the world and enforced against another.
+function currentWorld() {
+  const base = localService.capabilityWorld(serviceState)
+  const preview = product.previewWorld()
+  // `service` always comes from the live state. A preview build declares which
+  // PRODUCTS it stands in for; it does not get to declare that a service which
+  // is not running is running.
+  return preview ? { ...base, ...preview, service: base.service } : base
+}
 
 // Reading a spectrum, end to end.
 //
@@ -161,7 +173,7 @@ ipcMain.handle('moltrace:capability-readout', () => {
 // readout which drew the button is still true.
 ipcMain.handle('moltrace:open-spectrum', async () => {
   const declared = DECLARED_CAPABILITIES.find((c) => c.key === 'spectrum.open')
-  const verdict = capabilities.assess(declared, localService.capabilityWorld(serviceState))
+  const verdict = capabilities.assess(declared, currentWorld())
   if (!verdict.available) {
     return { ok: false, reason: capabilityView.present(verdict).reason }
   }

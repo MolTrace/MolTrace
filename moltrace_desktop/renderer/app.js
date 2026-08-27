@@ -53,6 +53,19 @@
       return
     }
 
+    // A preview build says so before anything else on the page. Someone
+    // evaluating this needs to know that what unlocked these capabilities was a
+    // declaration in a development build and not a verified licence -- and they
+    // need to know it before they read the numbers, not after.
+    if (readout.some((c) => c.preview)) {
+      const banner = document.createElement('p')
+      banner.className = 'preview-banner'
+      banner.textContent =
+        'Preview build. Entitlement has not been verified — the products below are declared by this ' +
+        'build, not confirmed by a licence.'
+      root.append(banner)
+    }
+
     const list = document.createElement('ul')
     list.className = 'capabilities'
     for (const c of readout) {

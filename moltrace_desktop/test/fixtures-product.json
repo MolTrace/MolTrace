@@ -1,5 +1,8 @@
 {
   "workspaceUrl": "https://workspace.invalid",
   "entitlementRootPublicKey": "ed25519:0000000000000000000000000000000000000000000000000000000000000000",
-  "entitlementRootKeyId": "mtroot1:testfixture0"
+  "entitlementRootKeyId": "mtroot1:testfixture0",
+  "previewModules": [
+    "spectracheck"
+  ]
 }

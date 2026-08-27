@@ -34,23 +34,37 @@ function assess(capability, world = {}) {
   }
 
   // 2. Is it entitled? An absent or invalid statement is not a soft yes.
-  const ent = world.entitlement
-  if (!ent || ent.valid !== true) {
-    return locked('product_not_enabled', `${name} is switched off for this installation, or its licence could not be confirmed.`)
-  }
-  // The statement's OWN module list. `Array.isArray(...) &&` was here and made
-  // the check permissive: an entitlement with `valid: true` and no `modules`
-  // field — truncated, malformed, or an older schema — granted every module.
-  // That is the exact inversion of this file's doctrine ten lines up, and of the
-  // gate one step earlier, where a non-array `world.modules` is coerced to null
-  // and immediately locked. An absent list is not an empty constraint; it is no
-  // answer, and no answer is not available.
-  if (capability.requiresModule) {
-    if (!Array.isArray(ent.modules)) {
-      return locked('product_not_enabled', `${name} is unavailable because this installation could not read which products its licence covers.`)
+  //
+  // A PREVIEW build is the one declared exception, and it is deliberately not a
+  // silent one. There is no statement to check: a prototype has no way to obtain
+  // a signed one, and FABRICATING an entitlement object with `valid: true` would
+  // be this client minting the very thing it must only ever verify. So the
+  // absence is named instead, and `preview: true` travels with every verdict
+  // below so that no consumer can render this as ordinary availability.
+  //
+  // What makes it safe is upstream, in product.js: a preview world only exists
+  // when the BAKED product configuration is incomplete, which a shipped
+  // installation's never is.
+  const preview = world.preview === true
+  if (!preview) {
+    const ent = world.entitlement
+    if (!ent || ent.valid !== true) {
+      return locked('product_not_enabled', `${name} is switched off for this installation, or its licence could not be confirmed.`)
     }
-    if (!ent.modules.includes(capability.requiresModule)) {
-      return locked('product_not_enabled', `${name} is not switched on for this installation.`)
+    // The statement's OWN module list. `Array.isArray(...) &&` was here and made
+    // the check permissive: an entitlement with `valid: true` and no `modules`
+    // field — truncated, malformed, or an older schema — granted every module.
+    // That is the exact inversion of this file's doctrine ten lines up, and of
+    // the gate one step earlier, where a non-array `world.modules` is coerced to
+    // null and immediately locked. An absent list is not an empty constraint; it
+    // is no answer, and no answer is not available.
+    if (capability.requiresModule) {
+      if (!Array.isArray(ent.modules)) {
+        return locked('product_not_enabled', `${name} is unavailable because this installation could not read which products its licence covers.`)
+      }
+      if (!ent.modules.includes(capability.requiresModule)) {
+        return locked('product_not_enabled', `${name} is not switched on for this installation.`)
+      }
     }
   }
 
@@ -75,7 +89,7 @@ function assess(capability, world = {}) {
     return locked('role_required', `${name} is available here, but your account does not have permission to use it.`)
   }
 
-  return { key: capability.key, displayName: name, available: true, code: null, reason: null }
+  return { key: capability.key, displayName: name, available: true, code: null, reason: null, preview }
 
   function locked(code, reason) {
     return { key: capability.key, displayName: name, available: false, code, reason }

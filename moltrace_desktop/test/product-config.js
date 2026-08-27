@@ -111,6 +111,61 @@ check('a CONFIGURED build may carry the official name', () => {
   assert.strictEqual(v.configured, true)
 })
 
+// --- the preview world, and the one condition that makes it safe -----------
+
+/** Run `fn` with the BAKED config temporarily looking like a shipped build. */
+function withConfiguredBakedBuild(fn) {
+  const saved = {}
+  for (const k of product.REQUIRED_FOR_LAUNCH) {
+    saved[k] = product.baked[k]
+    product.baked[k] = 'set-by-the-packager'
+  }
+  try { return fn() } finally {
+    for (const k of product.REQUIRED_FOR_LAUNCH) product.baked[k] = saved[k]
+  }
+}
+
+check('a preview build with no declaration unlocks nothing', () => {
+  assert.strictEqual(product.previewWorld({}), null)
+  assert.strictEqual(product.previewWorld({ previewModules: [] }), null)
+  assert.strictEqual(product.previewWorld({ previewModules: 'spectracheck' }), null,
+    'a string was accepted where a list is required')
+})
+
+check('an unconfigured build MAY declare the products it stands in for', () => {
+  const w = product.previewWorld({ previewModules: ['spectracheck'] })
+  assert.ok(w, 'the preview world was refused in an unconfigured build')
+  assert.strictEqual(w.preview, true, 'the world does not mark itself as a preview')
+  assert.deepStrictEqual(w.modules, ['spectracheck'])
+})
+
+check('a CONFIGURED build ignores previewModules entirely — the security property', () => {
+  // This is the assertion the whole mechanism rests on. A shipped installation
+  // always carries a baked configuration, so it must never be able to take this
+  // path — not through the environment, and NOT by someone baking
+  // `previewModules` into the packaged file, because the test is on the baked
+  // config's completeness rather than on where the key came from.
+  withConfiguredBakedBuild(() => {
+    assert.strictEqual(product.previewWorld({ previewModules: ['spectracheck'] }), null,
+      'a configured build honoured previewModules — this is a licence bypass on every customer machine')
+    assert.strictEqual(product.previewWorld({ previewModules: ['spectracheck', 'regentry'] }), null)
+  })
+})
+
+check('a preview build NEVER fabricates an entitlement statement', () => {
+  // The client verifies statements against a pinned key and never mints one.
+  // Handing assess() an object shaped like a verified statement would be exactly
+  // that, dressed up as configuration.
+  const w = product.previewWorld({ previewModules: ['spectracheck'] })
+  assert.strictEqual(w.entitlement, null, 'the preview world invented an entitlement statement')
+  assert.deepStrictEqual(w.packs, [], 'a preview build claimed reference data it does not have')
+})
+
+check('previewModules is inside the reviewed key allowlist', () => {
+  assert.ok(product.ALLOWED_KEYS.includes('previewModules'),
+    'a key the loader honours is not in the allowlist validate() checks')
+})
+
 for (const [s, n] of results) console.log(`  ${s === 'PASS' ? '✓' : '✗'} ${n}`)
 const failed = results.filter(([s]) => s === 'FAIL').length
 console.log(failed ? `\nPRODUCT CONFIG FAILED (${failed})` : `\nPRODUCT CONFIG OK — ${results.length} assertions`)
