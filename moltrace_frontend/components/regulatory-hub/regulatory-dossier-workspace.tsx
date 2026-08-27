@@ -304,6 +304,11 @@ const DOSSIER_NAV: WorkspaceStageGroup[] = [
         desc: "Residual solvent findings measured against their class limits.",
       },
       {
+        value: "elemental-impurities",
+        label: "Elemental Impurities",
+        desc: "ICH Q3D elemental findings measured against their permitted concentrations at this dossier's daily dose.",
+      },
+      {
         value: "nitrosamine-watch",
         label: "Nitrosamine Watch",
         desc: "Nitrosamine risk items flagged for assessment, with their cumulative exposure picture.",
@@ -842,6 +847,10 @@ export function RegulatoryDossierWorkspace() {
   const [impAssessErr, setImpAssessErr] = useState("")
 
   const [residualAssessments, setResidualAssessments] = useState<Record<string, unknown>[]>([])
+  const [elementalAssessments, setElementalAssessments] = useState<Record<string, unknown>[]>([])
+  const [eiElements, setEiElements] = useState<Record<string, unknown>[]>([])
+  const [eiAssessBusy, setEiAssessBusy] = useState(false)
+  const [eiAssessErr, setEiAssessErr] = useState("")
   const [ruleSets, setRuleSets] = useState<Record<string, unknown>[]>([])
   const [rsSolvents, setRsSolvents] = useState<Record<string, unknown>[]>([])
   const [rsSourceEvidence, setRsSourceEvidence] = useState("user_entered")
@@ -1006,6 +1015,16 @@ export function RegulatoryDossierWorkspace() {
       }
 
       try {
+        const eiRaw = await apiFetch<unknown>(
+          `/regulatory/dossiers/${dossierId}/elemental-impurity-assessment`,
+          { method: "GET" }
+        )
+        setElementalAssessments(asArray(eiRaw).filter(isRecord) as Record<string, unknown>[])
+      } catch {
+        setElementalAssessments([])
+      }
+
+      try {
         // Rehydrate a persisted readiness report on load (v0.24.5). load()
         // resets readinessReport to null above; the in-session generate is a
         // POST, so without this GET a saved report never reappears on reload.
@@ -1124,6 +1143,7 @@ export function RegulatoryDossierWorkspace() {
       setDossier(null)
       setImpurityRegisterRows([])
       setResidualAssessments([])
+      setElementalAssessments([])
       setRuleSets([])
       setNitrosamineAssessments([])
       setQnmrProfiles([])
@@ -1198,6 +1218,19 @@ export function RegulatoryDossierWorkspace() {
         { method: "GET" }
       )
       setResidualAssessments(asArray(raw).filter(isRecord) as Record<string, unknown>[])
+    } catch {
+      /* list refresh is best-effort */
+    }
+  }, [dossierId])
+
+  const refreshElementalAssessments = useCallback(async () => {
+    if (!Number.isFinite(dossierId)) return
+    try {
+      const raw = await apiFetch<unknown>(
+        `/regulatory/dossiers/${dossierId}/elemental-impurity-assessment`,
+        { method: "GET" }
+      )
+      setElementalAssessments(asArray(raw).filter(isRecord) as Record<string, unknown>[])
     } catch {
       /* list refresh is best-effort */
     }
@@ -1441,6 +1474,16 @@ export function RegulatoryDossierWorkspace() {
     return null
   }, [residualAssessments])
 
+  const latestElementalAssessment = useMemo(() => {
+    for (const a of elementalAssessments) {
+      const summary = a.elemental_summary_json
+      if (!summary || typeof summary !== "object") continue
+      const m = (summary as Record<string, unknown>).assessed_elements
+      if (Array.isArray(m) && m.length > 0) return a
+    }
+    return null
+  }, [elementalAssessments])
+
   const residualSolventMissingRuleHint = useMemo(() => {
     if (activeRuleSetsForDossier.length === 0) return true
     const latest = latestResidualSolventAssessment
@@ -1652,6 +1695,36 @@ export function RegulatoryDossierWorkspace() {
       setRsAssessErr(formatApiError(e, "Assess residual solvents failed."))
     } finally {
       setRsAssessBusy(false)
+    }
+  }
+
+  async function runAssessElementalImpurities() {
+    if (!Number.isFinite(dossierId)) return
+    const elements_json: Record<string, unknown>[] = []
+    for (const r of eiElements) {
+      const element = typeof r.element === "string" ? r.element.trim() : ""
+      if (!element) continue
+      const row: Record<string, unknown> = { element }
+      const ppm = typeof r.observed_ppm === "number" ? r.observed_ppm : Number(r.observed_ppm)
+      if (Number.isFinite(ppm)) row.observed_ppm = ppm
+      elements_json.push(row)
+    }
+    if (elements_json.length === 0) {
+      setEiAssessErr("Add at least one element.")
+      return
+    }
+    setEiAssessBusy(true)
+    setEiAssessErr("")
+    try {
+      await apiFetch(`/regulatory/dossiers/${dossierId}/elemental-impurity-assessment`, {
+        method: "POST",
+        body: { elements_json },
+      })
+      await refreshElementalAssessments()
+    } catch (e) {
+      setEiAssessErr(formatApiError(e, "Assess elemental impurities failed."))
+    } finally {
+      setEiAssessBusy(false)
     }
   }
 
@@ -3863,6 +3936,167 @@ export function RegulatoryDossierWorkspace() {
                 })()}
               </div>
             </ModuleCard>
+          </TabsContent>
+
+          <TabsContent value="elemental-impurities" className="min-w-0 max-w-full space-y-6">
+            <div className="space-y-1">
+              <p
+                className="font-mono text-[11px] font-bold uppercase tracking-[0.2em]"
+                style={{ color: "var(--mt-cyan-ink)" }}
+              >
+                Dossier · Elemental Impurities
+              </p>
+              <h2 className="font-mono text-2xl font-bold tracking-tight">ICH Q3D elemental impurities</h2>
+              <p className="text-sm text-muted-foreground">
+                Each element&apos;s permitted concentration is its ICH Q3D permitted daily exposure divided by this
+                dossier&apos;s maximum daily dose, so the limit is specific to this product rather than a reference dose.
+              </p>
+            </div>
+
+            <div className="space-y-4">
+                <div className="space-y-4 rounded-lg border bg-muted/20 p-4">
+                  <h3 className="text-sm font-semibold">Measured elements</h3>
+                  <ObjectArrayField
+                    label="Elements"
+                    itemLabel="Element"
+                    addLabel="Add element"
+                    fields={[
+                      { key: "element", label: "Element symbol" },
+                      { key: "observed_ppm", label: "Observed ppm (optional)", type: "number" },
+                    ]}
+                    initialValue={eiElements}
+                    onChange={setEiElements}
+                    description="Element symbol (Pb, Cd, As, Hg, ...) with its measured level in ppm if known. Without a measurement the limit is still reported, so a specification can be set before the batch is tested."
+                    idPrefix="reg-ei-elements"
+                  />
+                  {eiAssessErr ? (
+                    <Alert variant="destructive">
+                      <AlertDescription className="text-sm">{eiAssessErr}</AlertDescription>
+                    </Alert>
+                  ) : null}
+                  <Button type="button" disabled={eiAssessBusy} onClick={() => void runAssessElementalImpurities()}>
+                    {eiAssessBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                    Assess elemental impurities
+                  </Button>
+                </div>
+
+                <Separator />
+
+                {(() => {
+                  const assess = latestElementalAssessment
+                  if (!assess) {
+                    return <p className="text-sm text-muted-foreground">No elemental impurity assessment rows yet.</p>
+                  }
+                  const summary = assess.elemental_summary_json
+                  const sumRec = summary && typeof summary === "object" ? (summary as Record<string, unknown>) : null
+                  const raw = sumRec?.assessed_elements
+                  const rows = Array.isArray(raw) ? (raw.filter(isRecord) as Record<string, unknown>[]) : []
+                  const assessWarnings = regulatoryAssessmentWarnings(assess)
+                  return (
+                    <div className="space-y-4">
+                      <div className="text-xs text-muted-foreground">
+                        Latest assessment id{" "}
+                        <span className="font-mono text-foreground">{readRecordNumber(assess, "id") ?? "—"}</span>
+                        {readRecordString(sumRec ?? {}, "route") ? (
+                          <> · route {readRecordString(sumRec ?? {}, "route")}</>
+                        ) : null}
+                      </div>
+
+                      {assessWarnings.length ? (
+                        <Alert>
+                          <AlertDescription className="space-y-1 text-sm">
+                            {assessWarnings.map((w, i) => (
+                              <p key={`ei-warn-${i}`}>{w}</p>
+                            ))}
+                          </AlertDescription>
+                        </Alert>
+                      ) : null}
+
+                      <div className="table-scroll">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Element</TableHead>
+                              <TableHead>Class</TableHead>
+                              <TableHead className="text-right">PDE</TableHead>
+                              <TableHead className="text-right">Permitted</TableHead>
+                              <TableHead className="text-right">Observed</TableHead>
+                              <TableHead>Outcome</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {rows.map((m, idx) => {
+                              const name =
+                                readRecordString(m, "element") || readRecordString(m, "input_element") || "—"
+                              const cls = readRecordString(m, "element_class")
+                              const pde = m.pde_ug_per_day
+                              const permitted = m.permitted_concentration_ppm
+                              const control = m.control_threshold_ppm
+                              const observed = m.observed_concentration
+                              const triggered = m.threshold_triggered === true
+                              const review = m.review_required === true
+                              // route_data_available false means Q3D lists no PDE for this
+                              // element by this route -- an absent limit, not a permissive one.
+                              const noRouteData = m.route_data_available === false
+                              return (
+                                <TableRow key={`ei-${idx}`}>
+                                  <TableCell className="font-medium">{name}</TableCell>
+                                  <TableCell className="text-xs">
+                                    {cls ? `Class ${cls}` : <span className="text-muted-foreground">not listed</span>}
+                                  </TableCell>
+                                  <TableCell className="text-right tabular-nums text-xs">
+                                    {typeof pde === "number" && Number.isFinite(pde) ? `${pde} µg/day` : "—"}
+                                  </TableCell>
+                                  <TableCell className="text-right tabular-nums text-xs">
+                                    {typeof permitted === "number" && Number.isFinite(permitted) ? (
+                                      <>
+                                        {permitted} ppm
+                                        {typeof control === "number" && Number.isFinite(control) ? (
+                                          <span className="block text-[10px] text-muted-foreground">
+                                            control threshold {control} ppm
+                                          </span>
+                                        ) : null}
+                                      </>
+                                    ) : noRouteData ? (
+                                      <span className="text-[10px] text-muted-foreground">
+                                        no Q3D limit for this route
+                                      </span>
+                                    ) : (
+                                      "—"
+                                    )}
+                                  </TableCell>
+                                  <TableCell className="text-right tabular-nums text-xs">
+                                    {typeof observed === "number" && Number.isFinite(observed) ? `${observed} ppm` : "—"}
+                                  </TableCell>
+                                  <TableCell>
+                                    {triggered ? (
+                                      <Badge variant="outline" className="border-destructive/50 font-normal text-destructive">
+                                        at or above limit
+                                      </Badge>
+                                    ) : review ? (
+                                      <Badge variant="outline" className="border-warning/50 font-normal text-warning">
+                                        review required
+                                      </Badge>
+                                    ) : typeof observed === "number" && typeof permitted === "number" ? (
+                                      <Badge variant="outline" className="border-success/50 font-normal text-success">
+                                        within limit
+                                      </Badge>
+                                    ) : (
+                                      <Badge variant="outline" className="font-normal text-muted-foreground">
+                                        not measured
+                                      </Badge>
+                                    )}
+                                  </TableCell>
+                                </TableRow>
+                              )
+                            })}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+                  )
+                })()}
+            </div>
           </TabsContent>
 
           <TabsContent value="nitrosamine-watch" className="min-w-0 max-w-full space-y-6">
