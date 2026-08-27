@@ -31,6 +31,19 @@ export default defineConfig({
     // slowest honest test would have to hit a contention spike as bad as the worst
     // one recorded, on top of its own worst recorded run, before this fires.
     // Not a round number on purpose: raise it only against a fresh measurement.
+    //
+    // WHAT THIS DOES NOT COVER, because the measurement behind it could not: every
+    // untruncated run used to derive 4689.4ms had a healthy `transform` phase
+    // (18.8-26s). It is therefore sized against CPU contention only. There is a
+    // second, rarer local mode where the FILESYSTEM stalls and transform runs
+    // 93-190s — 2029s once — and in that state tests still die here, because the
+    // graph these tests transform inside the test body (an `await import()` in the
+    // *-render suites, `next/dynamic` inside spectracheck-workspace) is charged to
+    // this budget. No value fixes a 60x transform stall; the fix would be moving
+    // those transforms out of the test body. Not done, because it is a local-only
+    // mode: CI's transform is flat at 8.9-13.0s over 8 consecutive runs and vitest
+    // has not timed out there in 30. A local run that trips this is worth re-running
+    // and checking `transform` in the summary line before touching the number.
     testTimeout: 14411,
   },
   resolve: {
