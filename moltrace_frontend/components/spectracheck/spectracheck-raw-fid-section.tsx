@@ -82,10 +82,10 @@ import { useStableXY } from "@/components/spectracheck/use-stable-xy"
 import { isMissingNmrEndpoint, RAW_FID_BACKEND_MSG } from "@/components/spectracheck/spectracheck-nmr-endpoint-messages"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { Card, CardContent } from "@/components/ui/card"
 import { AlertCard } from "@/components/dashboard/alert-card"
 import { ModuleCard } from "@/components/dashboard/module-card"
+import { SpectraCheckRunTile } from "@/components/spectracheck/spectracheck-run-tile"
 import {
   DetectionResultsPanel,
   GsdAnalysisControls,
@@ -2064,110 +2064,47 @@ export function SpectraCheckRawFidSection({
             onSolventChange={setGsdSolvent}
           />
 
-          {/* Two prominent action tiles */}
+          {/* Two run tiles — same shared component, and therefore the same
+              geometry and type scale, as the Processed tab's pair. */}
           <div className="grid gap-3 sm:grid-cols-2">
-            {/* Inspect (preview) tile */}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  type="button"
-                  disabled={previewLoading}
-                  onClick={runPreview}
-                  className={cn(
-                    "group relative flex flex-col items-start gap-2 overflow-hidden rounded-xl border p-4 text-left transition-all",
-                    "hover:-translate-y-px hover:shadow-md",
-                    previewLoading
-                      ? "cursor-wait opacity-70"
-                      : "border-input hover:border-[color:var(--mt-teal)]/40"
-                  )}
-                  style={{
-                    borderTop: "3px solid var(--mt-teal)",
-                  }}
-                >
-                  <div className="flex w-full items-center justify-between">
-                    <span
-                      className="flex items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-[0.18em]"
-                      style={{ color: "var(--mt-teal-ink)" }}
-                    >
-                      <Eye className="h-3.5 w-3.5" aria-hidden />
-                      Inspect
-                    </span>
-                    <span className="font-mono text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
-                      Metadata + quick FT
-                    </span>
-                  </div>
-                  <span className="font-mono text-base font-bold leading-tight">
-                    {previewLoading ? `Reading…${elapsedLabel}` : "Preview spectrum"}
-                  </span>
-                  <span className="text-xs text-muted-foreground">
-                    Read archive contents, vendor, file hash, and acquisition parameters, then display a quick spectrum.
-                  </span>
-                </button>
-              </TooltipTrigger>
-              <TooltipContent sideOffset={4} className="max-w-xs text-xs">
-                Preview the archive metadata and a quick spectrum.
-              </TooltipContent>
-            </Tooltip>
-
-            {/* Process tile (primary) — routes to legacy or GSD backend
-                based on the Analysis backend selector above. */}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  type="button"
-                  disabled={processLoading || gsdLoading}
-                  onClick={analysisBackend === "gsd_prompt3" ? runGSDAnalyze : runProcess}
-                  className={cn(
-                    "group relative flex flex-col items-start gap-2 overflow-hidden rounded-xl border p-4 text-left transition-all",
-                    "hover:-translate-y-px hover:shadow-md",
-                    (processLoading || gsdLoading)
-                      ? "cursor-wait opacity-70"
-                      : analysisBackend === "gsd_prompt3"
-                        ? "border-amber-500/40 hover:border-amber-600"
-                        : "border-[color:var(--mt-teal)]/40 hover:border-[color:var(--mt-teal)]"
-                  )}
-                  style={{
-                    borderTop: analysisBackend === "gsd_prompt3" ? "3px solid #D97706" : "3px solid var(--mt-teal)",
-                    backgroundColor: analysisBackend === "gsd_prompt3" ? "rgb(254 243 199 / 0.5)" : "var(--mt-teal-soft)",
-                  }}
-                >
-                  <div className="flex w-full items-center justify-between">
-                    <span
-                      className="flex items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-[0.18em]"
-                      style={{ color: analysisBackend === "gsd_prompt3" ? "#B45309" : "var(--mt-teal-ink)" }}
-                    >
-                      {analysisBackend === "gsd_prompt3" ? (
-                        <FlaskConical className="h-3.5 w-3.5" aria-hidden />
-                      ) : (
-                        <Sparkles className="h-3.5 w-3.5" aria-hidden />
-                      )}
-                      {analysisBackend === "gsd_prompt3" ? "GSD analyze" : "Process"}
-                    </span>
-                    <span
-                      className="font-mono text-[10px] font-bold uppercase tracking-[0.12em]"
-                      style={{ color: analysisBackend === "gsd_prompt3" ? "#B45309" : "var(--mt-teal-ink)" }}
-                    >
-                      {analysisBackend === "gsd_prompt3" ? "Experimental" : "Generates spectrum"}
-                    </span>
-                  </div>
-                  <span className="font-mono text-base font-bold leading-tight">
-                    {analysisBackend === "gsd_prompt3"
-                      ? (gsdLoading ? "Running GSD…" : `Run GSD analysis (level ${gsdLevel})`)
-                      : (processLoading ? `Processing…${elapsedLabel}` : "Process FID")}
-                  </span>
-                  <span className="text-xs text-muted-foreground">
-                    {analysisBackend === "gsd_prompt3"
-                      ? "Industry-standard peak detection with auto-classification on the FT-processed spectrum."
-                      : "Fourier transform + apodization on a derived copy. Generates the displayable spectrum."}
-                  </span>
-                </button>
-              </TooltipTrigger>
-              <TooltipContent sideOffset={4} className="max-w-xs text-xs">
-                {analysisBackend === "gsd_prompt3"
+            <SpectraCheckRunTile
+              eyebrow="Inspect"
+              eyebrowIcon={Eye}
+              badge="Metadata + quick FT"
+              headline={previewLoading ? `Reading…${elapsedLabel}` : "Preview spectrum"}
+              description="Read archive contents, vendor, file hash, and acquisition parameters, then display a quick spectrum."
+              tone="secondary"
+              loading={previewLoading}
+              tooltip="Preview the archive metadata and a quick spectrum."
+              onClick={runPreview}
+            />
+            <SpectraCheckRunTile
+              eyebrow={analysisBackend === "gsd_prompt3" ? "GSD analyze" : "Process"}
+              eyebrowIcon={analysisBackend === "gsd_prompt3" ? FlaskConical : Sparkles}
+              badge={analysisBackend === "gsd_prompt3" ? "Experimental" : "Generates spectrum"}
+              headline={
+                analysisBackend === "gsd_prompt3"
+                  ? gsdLoading
+                    ? "Running GSD…"
+                    : `Run GSD analysis (level ${gsdLevel})`
+                  : processLoading
+                    ? `Processing…${elapsedLabel}`
+                    : "Process FID"
+              }
+              description={
+                analysisBackend === "gsd_prompt3"
+                  ? "Industry-standard peak detection with auto-classification on the FT-processed spectrum."
+                  : "Fourier transform + apodization on a derived copy. Generates the displayable spectrum."
+              }
+              tone={analysisBackend === "gsd_prompt3" ? "experimental" : "primary"}
+              loading={processLoading || gsdLoading}
+              tooltip={
+                analysisBackend === "gsd_prompt3"
                   ? "Run GSD analysis (experimental)"
-                  : "Process the FID through the full recipe"}
-              </TooltipContent>
-            </Tooltip>
+                  : "Process the FID through the full recipe"
+              }
+              onClick={analysisBackend === "gsd_prompt3" ? runGSDAnalyze : runProcess}
+            />
           </div>
 
           {/* Background job + clear row */}
