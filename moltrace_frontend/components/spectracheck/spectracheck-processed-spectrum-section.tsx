@@ -682,8 +682,8 @@ export function SpectraCheckProcessedSpectrumSection({
   const resultTitle = resultsMode === "analyze" ? "Analysis output" : "Preview output"
   const resultDescription =
     resultsMode === "analyze"
-      ? "Spectrum, picked peaks, and matching score from /nmr/processed/analyze."
-      : "Spectrum and picked peaks from /nmr/processed/preview."
+      ? "Spectrum, picked peaks, and the match score against your candidates."
+      : "Spectrum and picked peaks, with no candidate matching."
 
   // Memoise every extraction against ``displayPayload``. Without these the
   // helpers would run on every parent re-render (e.g. typing the Sample ID
