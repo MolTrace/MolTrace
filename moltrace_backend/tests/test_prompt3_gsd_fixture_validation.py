@@ -46,6 +46,46 @@ _MAX_MEDIAN_ABS_COMPOUND_DELTA_FLOOR = 4.0
 _MIN_COMPOUND_ENV_WITHIN_MANIFEST_TOL_RATE_FLOOR = 0.55
 _MAX_MEDIAN_ABS_COMPOUND_ENV_DELTA_FLOOR = 3.0
 
+# Direction and ratio floors, added 2026-08-27 (report v2).
+#
+# Every floor above is an absolute-value median or a within-tolerance rate, so none of
+# them can distinguish picking too many lines from picking too few. A change that traded
+# over-picking for under-picking would have scored as an improvement on all of them.
+#
+# Measured on the 19-fixture corpus at level 2, per-detector
+# (moltrace.spectroscopy.peaks.gsd -- the harness does not exercise nmrcheck.gsd):
+#
+#   stage                     median   p90    max     what it is
+#   raw total picks            3.00x   5.00x  32.00x  the detector, before classification
+#   after classification       1.20x   3.20x   7.00x  compound lines only
+#   after clustering           1.14x   1.60x   7.00x  environments -- what analysis consumes
+#
+#   signed median delta: total +17, compound +1, environment +1
+#   over/under/exact:    total 18/1/0, compound 12/5/2, environment 11/7/1
+#
+# So the documented "3-7x over-pick" is real and reproducible, but it describes the RAW
+# detector. Classification and clustering remove most of it, and the stage that feeds
+# analysis sits at 1.14x. Tightening the detector to chase 3x would push a stage that is
+# already near-centred into systematic under-picking, which is why these bounds are
+# two-sided rather than ceilings.
+#
+# Bounds come from the measured leave-one-out spread, not from round numbers, and were
+# calibrated against a specific adversarial case: mirroring every signed delta about zero
+# (a change that trades over-picking for under-picking) must FAIL. A first draft of these
+# bounds used comfortable-looking margins -- ratio [0.85, 1.45], signed [-1.0, 3.0] -- and
+# the mirrored case passed all three, which is the whole defect reproduced inside the fix.
+#
+#   quantity                   observed   leave-one-out spread   mirrored case
+#   raw total ratio median       3.000          0.464                 --
+#   env ratio median             1.143          0.009               0.86  -> must fail
+#   env signed median delta      1.0            0.0                -1.0   -> must fail
+#
+# The env median is stable to nine thousandths under removal of any single fixture, so a
+# band of 0.14 below and 0.21 above observed is already ~15x any plausible wiggle.
+_MAX_RAW_TOTAL_RATIO_MEDIAN = 3.6            # observed 3.00, LOO spread 0.46
+_ENV_RATIO_MEDIAN_BOUNDS = (1.00, 1.35)      # observed 1.143, LOO spread 0.009
+_ENV_SIGNED_MEDIAN_DELTA_BOUNDS = (0.0, 3.0)  # observed +1; 0 is ideal, negative is the trade
+
 # Strict Prompt 3 promotion targets.
 _PROMOTION_MIN_SOLVENT_DETECT_RATE = 0.95
 _PROMOTION_MAX_MEDIAN_ABS_COMPOUND_DELTA = 2.0
@@ -115,6 +155,38 @@ def test_prompt3_gsd_harness_smoke_and_baseline_floor() -> None:
         f"floor {_MAX_MEDIAN_ABS_COMPOUND_ENV_DELTA_FLOOR}"
     )
 
+    # --- Direction and ratio (report v2) --------------------------------- #
+    # A truncated pick is a floor, not a measurement, and every count downstream of it
+    # inherits that -- so the ratios below would stop meaning anything.
+    assert summary["peak_cap_saturated_count"] == 0, (
+        f"{summary['peak_cap_saturated_count']} fixture(s) hit the level-{DEFAULT_LEVEL} "
+        f"cap of {summary['peak_cap']} picks; their counts are floors, not measurements"
+    )
+
+    raw_median = summary["over_pick_ratio"]["all"]["raw_total"]["median"]
+    assert raw_median is not None and raw_median <= _MAX_RAW_TOTAL_RATIO_MEDIAN, (
+        f"Raw detector picked {raw_median:.2f}x the expected line count, above "
+        f"{_MAX_RAW_TOTAL_RATIO_MEDIAN}x"
+    )
+
+    # Two-sided. This is the stage analysis consumes, and under-picking a real resonance
+    # is not an improvement over over-picking a spurious one -- it is the worse error,
+    # because a missing line cannot be filtered downstream.
+    env_ratio = summary["over_pick_ratio"]["all"]["after_clustering"]["median"]
+    low, high = _ENV_RATIO_MEDIAN_BOUNDS
+    assert env_ratio is not None and low <= env_ratio <= high, (
+        f"Environment pick ratio {env_ratio:.2f}x left the band [{low}, {high}] -- "
+        f"{'under' if env_ratio is not None and env_ratio < low else 'over'}-picking"
+    )
+
+    env_signed = summary["direction"]["compound_environment_count"]["median_signed"]
+    low, high = _ENV_SIGNED_MEDIAN_DELTA_BOUNDS
+    assert env_signed is not None and low <= env_signed <= high, (
+        f"Signed median environment delta {env_signed} left the band [{low}, {high}]; "
+        f"over={summary['direction']['compound_environment_count']['over_count']} "
+        f"under={summary['direction']['compound_environment_count']['under_count']}"
+    )
+
 
 @pytest.mark.slow
 def test_prompt3_gsd_meets_promotion_gate() -> None:
@@ -148,4 +220,32 @@ def test_prompt3_gsd_meets_promotion_gate() -> None:
     ), (
         f"Median abs compound environment-count delta {env_median} above "
         f"promotion gate {_PROMOTION_MAX_MEDIAN_ABS_COMPOUND_ENV_DELTA}"
+    )
+
+
+def _within(value: float, bounds: tuple[float, float]) -> bool:
+    return bounds[0] <= value <= bounds[1]
+
+
+def test_the_direction_bounds_reject_an_over_for_under_trade() -> None:
+    """The bounds must fail the case they exist for, not merely pass today.
+
+    Absolute-value medians cannot see direction: mirroring every signed delta about zero
+    leaves ``median_abs_compound_environment_count_delta`` bit-identical, so every v1 floor
+    scores the mirrored detector exactly as it scores this one. These are the numbers that
+    mirrored run produces, and the bounds must reject them.
+
+    Under-picking is the worse failure of the two. A spurious line can be filtered
+    downstream; a resonance that was never picked cannot be recovered.
+    """
+
+    # Measured on the 19-fixture corpus, then mirrored (see the table above).
+    assert _within(1.1429, _ENV_RATIO_MEDIAN_BOUNDS), "today's ratio must pass"
+    assert _within(1.0, _ENV_SIGNED_MEDIAN_DELTA_BOUNDS), "today's signed median must pass"
+
+    assert not _within(0.8571, _ENV_RATIO_MEDIAN_BOUNDS), (
+        "a detector under-picking by the same margin it currently over-picks must fail"
+    )
+    assert not _within(-1.0, _ENV_SIGNED_MEDIAN_DELTA_BOUNDS), (
+        "a signed median of -1 is systematic under-picking and must fail"
     )
