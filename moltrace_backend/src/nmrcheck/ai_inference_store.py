@@ -538,6 +538,7 @@ def create_prediction(
             input_hash=_input_hash(request_summary),
             status=status,
             confidence_score=confidence,
+            confidence_source=confidence_source,
             uncertainty_json=_json_dump(uncertainty),
             ood_status=ood_status,
             warnings_json=_json_dump(warnings),
@@ -576,6 +577,7 @@ def create_prediction(
             or _RESULT_TYPE_BY_SERVICE.get(service.service_key, "other"),
             output_json=_json_dump(output),
             confidence_score=confidence,
+            confidence_source=confidence_source,
             uncertainty_json=_json_dump(uncertainty),
             explanation_id=explanation.id,
             human_review_required=human_review_required,
@@ -1728,6 +1730,7 @@ def _prediction_run_to_record(row: PredictionRunORM) -> PredictionRun:
         status=row.status,  # type: ignore[arg-type]
         prediction_result_id=row.prediction_result_id,
         confidence_score=row.confidence_score,
+        confidence_source=_confidence_source(row.confidence_source),
         uncertainty_json=_json_dict(row.uncertainty_json),
         ood_status=row.ood_status,  # type: ignore[arg-type]
         warnings_json=_json_list(row.warnings_json),
@@ -1738,6 +1741,17 @@ def _prediction_run_to_record(row: PredictionRunORM) -> PredictionRun:
     )
 
 
+def _confidence_source(value: str | None) -> str | None:
+    """Only the two recorded values reach the contract.
+
+    Rows written before this column existed carry NULL, and anything else in the column is a
+    value this code never wrote -- neither is evidence of provenance, so both read as None
+    rather than being surfaced as a third, unexplained source.
+    """
+
+    return value if value in {"engine", "caller_supplied"} else None
+
+
 def _result_to_record(row: PredictionResultORM) -> PredictionResult:
     return PredictionResult(
         id=row.id,
@@ -1745,6 +1759,7 @@ def _result_to_record(row: PredictionResultORM) -> PredictionResult:
         result_type=row.result_type,  # type: ignore[arg-type]
         output_json=_json_dict(row.output_json),
         confidence_score=row.confidence_score,
+        confidence_source=_confidence_source(row.confidence_source),
         uncertainty_json=_json_dict(row.uncertainty_json),
         explanation_id=row.explanation_id,
         human_review_required=row.human_review_required,
@@ -1766,6 +1781,7 @@ def _prediction_response(
         status=run.status,  # type: ignore[arg-type]
         result=_json_dict(result.output_json) if result is not None else {},
         confidence_score=run.confidence_score,
+        confidence_source=_confidence_source(run.confidence_source),
         uncertainty=_json_dict(run.uncertainty_json),
         ood_status=run.ood_status,  # type: ignore[arg-type]
         explanation=_explanation_to_record(explanation) if explanation is not None else None,

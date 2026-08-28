@@ -5804,6 +5804,10 @@ class PredictionRun(BaseModel):
     status: PredictionRunStatus
     prediction_result_id: int | None = None
     confidence_score: float | None = None
+    #: Who produced ``confidence_score``. ``caller_supplied`` means the figure came from the
+    #: request rather than from a model this platform ran, and cannot approve the prediction;
+    #: ``None`` means no confidence was recorded, or the row predates this field.
+    confidence_source: Literal["engine", "caller_supplied"] | None = None
     uncertainty_json: dict[str, Any] = Field(default_factory=dict)
     ood_status: PredictionOODStatus
     warnings_json: list[str] = Field(default_factory=list)
@@ -5821,6 +5825,10 @@ class PredictionResult(BaseModel):
     result_type: PredictionResultType
     output_json: dict[str, Any] = Field(default_factory=dict)
     confidence_score: float | None = None
+    #: Who produced ``confidence_score``. ``caller_supplied`` means the figure came from the
+    #: request rather than from a model this platform ran, and cannot approve the prediction;
+    #: ``None`` means no confidence was recorded, or the row predates this field.
+    confidence_source: Literal["engine", "caller_supplied"] | None = None
     uncertainty_json: dict[str, Any] = Field(default_factory=dict)
     explanation_id: int | None = None
     human_review_required: bool = True
@@ -5876,6 +5884,9 @@ class PredictionResponse(BaseModel):
     status: PredictionRunStatus
     result: dict[str, Any] = Field(default_factory=dict)
     confidence_score: float | None = None
+    #: Who produced ``confidence_score``. ``caller_supplied`` means the figure came from this
+    #: request rather than from a model the platform ran, and it cannot approve the prediction.
+    confidence_source: Literal["engine", "caller_supplied"] | None = None
     uncertainty: dict[str, Any] = Field(default_factory=dict)
     ood_status: PredictionOODStatus
     explanation: InferenceExplanation | None = None
