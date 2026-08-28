@@ -14,6 +14,34 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.72.1 — Say what the analysis cannot separate (2026-08-27)
+
+Two lines closer than the detector's minimum separation come back as **one
+signal**. That is a hard limit of the method rather than a confidence caveat, and
+a peak table that does not state it invites a coupling to be read off a merged
+pair.
+
+Every result now carries `resolution_hz` and says so in its limits, and every
+signal carries `width_hz`.
+
+**Width is the only observable that shows a merge happened.** Measured on planted
+pairs at 150.9 MHz against a 3.23 Hz linewidth: a merged pair fits **3.3-4.5x**
+the true width while a single line fits **1.0-1.3x**. Clean separation.
+
+**It is deliberately NOT flagged automatically.** On the 588 fitted lines in this
+repository's acquisitions, the width distribution has a long tail — p90 is 4.96x
+the acquisition median, p99 is 222x, the maximum 975x — and **14% exceed 3x**.
+Most of those are broad features or poor fits rather than merged pairs, so an
+automatic "this may be two lines" would cry wolf on one signal in seven. The
+number is shown beside the others and the chemist reads it.
+
+The reported figure is the detector's minimum separation, which is the part the
+software knows. The true limit is coarser: measured, two strong lines are
+recovered separately only from about **four linewidths** apart, because below
+that there is one apex to find.
+
+---
+
 ## v0.72.0 — The 13C detection threshold sat at 1.4 sigma (2026-08-27)
 
 `_detection_noise` measures the baseline on the lower half of the sorted spectrum

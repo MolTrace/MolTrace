@@ -280,7 +280,12 @@
     // "Share of signal", never "H". Without an assigned structure there is
     // nothing to normalise a proton count against, so a column headed H would be
     // a number this analysis did not compute.
-    for (const label of ['', 'Shift (ppm)', 'Pattern', 'Couplings (Hz)', 'Lines', 'Share of signal']) {
+    // Width is here because two lines closer than the analysis can separate come
+    // back as ONE, and the tell is that the signal is wider than its neighbours.
+    // Not flagged automatically: on real acquisitions 14% of lines exceed three
+    // times the median width and most are broad features or poor fits, so a flag
+    // would cry wolf. The number is shown next to the others; a chemist reads it.
+    for (const label of ['', 'Shift (ppm)', 'Pattern', 'Couplings (Hz)', 'Lines', 'Width (Hz)', 'Share of signal']) {
       const th = document.createElement('th')
       th.textContent = label
       hrow.append(th)
@@ -296,6 +301,7 @@
         m.multiplicity,
         m.j_couplings_hz.length ? m.j_couplings_hz.map((j) => j.toFixed(1)).join(', ') : '—',
         String(m.line_count),
+        Number.isFinite(m.width_hz) && m.width_hz > 0 ? m.width_hz.toFixed(1) : '—',
         `${(m.relative_area * 100).toFixed(1)}%`,
       ]
       for (const c of cells) {
