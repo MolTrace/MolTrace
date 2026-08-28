@@ -58,3 +58,8 @@ body { margin: 0; padding: 2rem; }
 .spectrum__tick-label { fill: currentColor; font-size: 11px; opacity: .75; }
 .spectrum__marker { stroke: #6a1b9a; stroke-width: 2; }
 .spectrum__caption { margin: .35rem 0 0; font-size: .8rem; opacity: .8; }
+
+/* A signal that fits as more than one line. */
+.result__refined { margin: .4rem 0 .6rem; padding: .5rem .8rem; font-size: .875rem;
+                   border: 1px solid currentColor; border-left: 4px solid #1565c0;
+                   border-radius: .5rem; }
