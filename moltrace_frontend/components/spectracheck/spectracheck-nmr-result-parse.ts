@@ -301,3 +301,55 @@ export function displayedDatasetName(
   const selected = selectedFileName?.trim()
   return selected ? selected : null
 }
+
+/**
+ * How far referencing moved the axis, and what it anchored on.
+ *
+ * The applied shift and the anchor selection are already on the wire
+ * (`FIDProcessingMetadata.reference_shift_applied_ppm` and
+ * `reference_peak_selection`) and were read by nothing. A warning sentence
+ * names the two endpoints of the mapping, but not the delta and not the mode —
+ * and the mode is exactly what separates a 0.02 ppm solvent correction from a
+ * shift that should not have happened. Every reported chemical shift depends on
+ * this number, so it belongs on screen.
+ */
+export type ReferenceReadout = {
+  shiftPpm: number | null
+  observedPpm: number | null
+  targetPpm: number | null
+  mode: string | null
+}
+
+export function extractReferenceReadout(payload: unknown): ReferenceReadout {
+  const empty: ReferenceReadout = { shiftPpm: null, observedPpm: null, targetPpm: null, mode: null }
+  if (!isRecord(payload)) return empty
+  const pm = isRecord(payload.processing_metadata) ? payload.processing_metadata : null
+  if (!pm) return empty
+  const selection = isRecord(pm.reference_peak_selection) ? pm.reference_peak_selection : null
+  const num = (v: unknown): number | null => {
+    const n = typeof v === "string" ? Number(v) : v
+    return typeof n === "number" && Number.isFinite(n) ? n : null
+  }
+  return {
+    shiftPpm: num(pm.reference_shift_applied_ppm),
+    observedPpm: num(selection?.observed_ppm),
+    targetPpm: num(selection?.target_ppm),
+    mode: typeof selection?.mode === "string" ? selection.mode : null,
+  }
+}
+
+/** Human wording for an anchor-selection mode. Never shows the raw token. */
+export function describeReferenceMode(mode: string | null): string | null {
+  switch (mode) {
+    case "nearest_target_window":
+      return "anchored on the solvent signal"
+    case "anomeric_window_fallback":
+      return "anchored in the anomeric region"
+    case "none_target_off_axis":
+      return "not referenced — the expected anchor is outside this spectrum"
+    case "none_no_positive_peak_in_window":
+      return "not referenced — no peak found at the expected anchor"
+    default:
+      return null
+  }
+}

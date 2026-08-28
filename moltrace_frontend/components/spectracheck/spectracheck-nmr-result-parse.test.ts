@@ -5,7 +5,9 @@ import {
   extractSpectrumXY,
   extractNotes,
   extractRawFidArchiveFacts,
+  describeReferenceMode,
   displayedDatasetName,
+  extractReferenceReadout,
 } from "@/components/spectracheck/spectracheck-nmr-result-parse"
 
 describe("extractSpectrumXY", () => {
@@ -260,6 +262,41 @@ describe("displayedDatasetName", () => {
   it("returns null when neither is known", () => {
     expect(displayedDatasetName(null, null)).toBeNull()
     expect(displayedDatasetName(null, "   ")).toBeNull()
+  })
+})
+
+describe("extractReferenceReadout", () => {
+  it("reads the applied shift and the anchor selection off the wire", () => {
+    const facts = extractReferenceReadout({
+      processing_metadata: {
+        reference_shift_applied_ppm: -0.024,
+        reference_peak_selection: {
+          observed_ppm: 7.284,
+          target_ppm: 7.26,
+          mode: "nearest_target_window",
+        },
+      },
+    })
+    expect(facts.shiftPpm).toBe(-0.024)
+    expect(facts.observedPpm).toBe(7.284)
+    expect(facts.targetPpm).toBe(7.26)
+    expect(facts.mode).toBe("nearest_target_window")
+  })
+
+  it("returns nulls on a payload that carries no referencing", () => {
+    expect(extractReferenceReadout({}).shiftPpm).toBeNull()
+    expect(extractReferenceReadout(null).mode).toBeNull()
+  })
+
+  it("never shows a raw engine token to the reader", () => {
+    // The mode distinguishes a routine solvent correction from a refusal, so it
+    // has to reach the user — but as words, not as the wire value.
+    expect(describeReferenceMode("nearest_target_window")).toMatch(/solvent signal/i)
+    expect(describeReferenceMode("none_target_off_axis")).toMatch(/not referenced/i)
+    for (const mode of ["nearest_target_window", "anomeric_window_fallback", "none_target_off_axis"]) {
+      expect(describeReferenceMode(mode)).not.toContain("_")
+    }
+    expect(describeReferenceMode("something_new")).toBeNull()
   })
 })
 
