@@ -6445,6 +6445,10 @@ class PredictionRunORM(Base):
     status: Mapped[str] = mapped_column(String(32), default="queued", index=True)
     prediction_result_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
     confidence_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    #: Who produced ``confidence_score``: the platform's own engine, or the caller's request.
+    #: A number a client sent is not evidence the platform computed anything, and an audit
+    #: reading the score back out cannot tell the two apart without this.
+    confidence_source: Mapped[str | None] = mapped_column(String(32), nullable=True)
     uncertainty_json: Mapped[str] = mapped_column(Text, default="{}")
     ood_status: Mapped[str] = mapped_column(String(32), default="not_assessed", index=True)
     warnings_json: Mapped[str] = mapped_column(Text, default="[]")
@@ -6468,6 +6472,10 @@ class PredictionResultORM(Base):
     result_type: Mapped[str] = mapped_column(String(64), index=True)
     output_json: Mapped[str] = mapped_column(Text, default="{}")
     confidence_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    #: Who produced ``confidence_score``: the platform's own engine, or the caller's request.
+    #: A number a client sent is not evidence the platform computed anything, and an audit
+    #: reading the score back out cannot tell the two apart without this.
+    confidence_source: Mapped[str | None] = mapped_column(String(32), nullable=True)
     uncertainty_json: Mapped[str] = mapped_column(Text, default="{}")
     explanation_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
     human_review_required: Mapped[bool] = mapped_column(Boolean, default=True)

@@ -162,6 +162,22 @@ def _ensure_sqlite_schema(engine: Engine) -> None:
                 connection.exec_driver_sql(
                     f"ALTER TABLE {revisioned_table} ADD COLUMN {revision_column} INTEGER"
                 )
+        # Migration 0050 records whether a prediction's confidence came from an engine or
+        # from the caller's own request. Same reason as the block above: create_all() will
+        # not add a column to a table it already knows about.
+        for prediction_table in ("prediction_runs", "prediction_results"):
+            if prediction_table not in tables:
+                continue
+            prediction_existing = {
+                str(row[1])
+                for row in connection.exec_driver_sql(
+                    f"PRAGMA table_info({prediction_table})"
+                ).fetchall()
+            }
+            if "confidence_source" not in prediction_existing:
+                connection.exec_driver_sql(
+                    f"ALTER TABLE {prediction_table} ADD COLUMN confidence_source VARCHAR(32)"
+                )
         if "fid_runs" in tables:
             existing = {
                 str(row[1])

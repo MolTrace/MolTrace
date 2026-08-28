@@ -30070,6 +30070,8 @@ export interface components {
             };
             /** Confidence Score */
             confidence_score?: number | null;
+            /** Confidence Source */
+            confidence_source?: ("engine" | "caller_supplied") | null;
             /** Uncertainty */
             uncertainty?: {
                 [key: string]: unknown;
@@ -30107,6 +30109,8 @@ export interface components {
             };
             /** Confidence Score */
             confidence_score?: number | null;
+            /** Confidence Source */
+            confidence_source?: ("engine" | "caller_supplied") | null;
             /** Uncertainty Json */
             uncertainty_json?: {
                 [key: string]: unknown;
@@ -30185,6 +30189,8 @@ export interface components {
             prediction_result_id?: number | null;
             /** Confidence Score */
             confidence_score?: number | null;
+            /** Confidence Source */
+            confidence_source?: ("engine" | "caller_supplied") | null;
             /** Uncertainty Json */
             uncertainty_json?: {
                 [key: string]: unknown;

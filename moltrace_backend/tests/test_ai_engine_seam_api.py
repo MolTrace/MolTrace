@@ -406,6 +406,33 @@ def test_a_caller_supplied_confidence_cannot_approve_its_own_prediction(client, 
     assert any("did not compute" in w or "caller" in w.lower() for w in body["warnings"]), body["warnings"]
 
 
+def test_the_confidence_source_is_recorded_and_returned(client, api_headers) -> None:
+    """The audit fact: which of the two produced the number, stored beside it.
+
+    Without this, a reader pulling ``confidence_score`` back out of the database cannot tell a
+    figure a model computed from one a client asserted -- the same indistinguishability that
+    made the old hard-coded 0.82 a defect.
+    """
+
+    with client:
+        engine = _post_prediction(client, api_headers)
+        assert engine.status_code == 201, engine.text
+
+        caller = client.post(
+            "/ai/predictions",
+            headers=api_headers,
+            json={
+                "service_key": "reaction_outcome_predictor",
+                "development_mode": True,
+                "request_json": {"temperature_c": 80, "confidence_score": 0.99},
+            },
+        )
+        assert caller.status_code == 201, caller.text
+
+    assert engine.json()["confidence_source"] == "engine"
+    assert caller.json()["confidence_source"] == "caller_supplied"
+
+
 def test_an_engine_computed_confidence_still_clears_the_gate(client, api_headers) -> None:
     """The rule must key on who produced the number, not punish every confidence."""
 
