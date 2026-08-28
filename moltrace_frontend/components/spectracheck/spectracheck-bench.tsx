@@ -193,7 +193,6 @@ export function SpectraCheckBench() {
                     y={xy.y}
                     peaks={peaks}
                     nucleus={nucleus}
-                    renderMode="webgl"
                   />
                 ) : (
                   <p className="text-sm text-muted-foreground">

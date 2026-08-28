@@ -708,7 +708,12 @@ describe("SpectraCheck preview rendering", () => {
     expect(await screen.findByText(/Nucleus context/i)).toBeInTheDocument()
     expect(await screen.findByTestId("prompt-sidecar-qa-details")).toBeInTheDocument()
     expect(screen.getByTestId("spectrum-viewer")).toHaveAttribute("data-peak-count", "1")
-    expect(screen.getByTestId("spectrum-viewer")).toHaveAttribute("data-render-mode", "webgl")
+    // Re-baselined: this pinned scattergl, chosen when the surface handed Plotly
+    // a ~9,173-point trace. Density is now derived from chart width — 2,578
+    // vertices even at 2560px — so SVG renders it comfortably, draws crisper
+    // lines, and is the only renderer that can produce a real vector export
+    // (Plotly serialises a GL canvas into SVG as an embedded raster).
+    expect(screen.getByTestId("spectrum-viewer")).toHaveAttribute("data-render-mode", "svg")
     expect(screen.queryByText(/No spectrum loaded/i)).not.toBeInTheDocument()
 
     const viewerProps = lastSpectrumViewerProps()
@@ -814,7 +819,9 @@ describe("SpectraCheck preview rendering", () => {
     expect(processBody.get("carbon13_text")).toContain("13C NMR")
 
     const viewerProps = lastSpectrumViewerProps()
-    expect(viewerProps?.renderMode).toBe("webgl")
+    // Re-baselined alongside the data-render-mode assertion above: the surface
+    // sets no renderMode override at all now, so it inherits the SVG default.
+    expect(viewerProps?.renderMode).toBeUndefined()
     // Re-baselined: this pinned a raw-FID-only display transform that altered
     // 100% of the values it drew inside 6.45-8.65 ppm, rectified samples below
     // a floor onto one constant, and produced a 2.4x texture step at the window

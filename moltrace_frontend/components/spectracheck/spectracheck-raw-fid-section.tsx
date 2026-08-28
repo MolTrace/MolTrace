@@ -2386,6 +2386,13 @@ export function SpectraCheckRawFidSection({
                 </div>
               ) : null}
               {xy ? (
+                // SVG renderer, not WebGL. The reason for scattergl was a
+                // ~9,173-point trace; density is now derived from chart width,
+                // so even a 2560px chart hands Plotly 2,578 vertices — well
+                // inside what an SVG path handles. It also buys crisper lines
+                // and, decisively, real vector export: Plotly serialises a GL
+                // canvas into SVG as an embedded raster <image>, so a scattergl
+                // trace cannot produce a publication figure.
                 // Trace density is derived from the chart's own pixel width
                 // (see spectrumPointBudgetForWidth). This surface used to
                 // override it to 12_000 points / 24 per pixel to make dd/t/q/m
@@ -2399,7 +2406,6 @@ export function SpectraCheckRawFidSection({
                   y={xy.y}
                   peaks={viewerPeaks}
                   nucleus={resolvedNucleus}
-                  renderMode="webgl"
                 />
               ) : processLoading || previewLoading || previewSpectrumLoading ? (
                 <div
