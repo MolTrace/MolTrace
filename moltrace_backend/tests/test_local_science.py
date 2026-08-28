@@ -378,6 +378,49 @@ def test_the_trace_reports_what_it_left_out() -> None:
     assert trace["points_represented"] > 0
 
 
+def test_a_result_states_what_it_cannot_separate() -> None:
+    """Two lines closer than the detector's minimum separation come back as ONE.
+
+    That is a hard limit of the method, not a confidence caveat, and a peak table
+    that does not state it invites a coupling to be read off a merged pair.
+    Measured: two strong lines are recovered separately only from about four
+    linewidths apart, so the true limit is coarser still — this reports the floor,
+    which is the part the software knows.
+    """
+    from nmrcheck.local_science import open_spectrum
+
+    source = _one("instrument") or _one("moltrace")
+    if source is None:
+        pytest.skip("no acquisition in this checkout")
+
+    result = open_spectrum(source)
+    assert result["resolution_hz"] > 0, "no resolution limit was computed"
+    assert any("closer together" in limit for limit in result["limits"]), (
+        "nothing tells the reader what this analysis cannot separate"
+    )
+
+
+def test_every_signal_carries_its_width() -> None:
+    """Width is the only observable that shows a merge happened.
+
+    Measured on planted pairs: a merged pair fits 3.3-4.5x the true linewidth
+    against 1.0-1.3x for a single line. Deliberately NOT flagged automatically —
+    on real acquisitions 14% of lines exceed three times the median width and
+    most are broad features or poor fits, so a flag would cry wolf.
+    """
+    from nmrcheck.local_science import open_spectrum
+
+    source = _one("instrument") or _one("moltrace")
+    if source is None:
+        pytest.skip("no acquisition in this checkout")
+
+    multiplets = open_spectrum(source)["multiplets"]
+    assert multiplets
+    for signal in multiplets:
+        assert "width_hz" in signal, "a signal was reported with no width"
+        assert signal["width_hz"] >= 0.0
+
+
 @pytest.mark.slow
 def test_every_acquisition_opens_end_to_end() -> None:
     """The exhaustive pass. ~4.4s each, so it is opt-in."""

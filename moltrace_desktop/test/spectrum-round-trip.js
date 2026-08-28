@@ -191,6 +191,20 @@ app.whenReady().then(async () => {
     }
   })
 
+  check('the table says how wide each signal is', () => {
+    // Two lines closer than the analysis can separate are reported as one, and
+    // width is the only thing on screen that shows it happened.
+    const heads = dom.heads.join('|')
+    if (!/width/i.test(heads)) throw new Error(`no width column: ${heads}`)
+  })
+
+  check('the limits state what cannot be separated at all', () => {
+    const joined = (dom.limits || []).join(' ')
+    if (!/closer together than about [\d.]+ Hz/.test(joined)) {
+      throw new Error('nothing states the resolution limit of this analysis')
+    }
+  })
+
   check('the limits are rendered with the numbers, every time', () => {
     if (dom.limits.length < 3) throw new Error(`only ${dom.limits.length} limits rendered`)
     const joined = dom.limits.join(' ').toLowerCase()

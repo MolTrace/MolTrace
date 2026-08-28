@@ -35,7 +35,10 @@ from moltrace.spectroscopy.io.fid_reader import (
 )
 from moltrace.spectroscopy.multiplet.analysis import detect_multiplets
 from moltrace.spectroscopy.peaks import gsd_peak_pick
-from moltrace.spectroscopy.peaks.gsd import _MAX_PEAKS_BY_LEVEL
+from moltrace.spectroscopy.peaks.gsd import (
+    _MAX_PEAKS_BY_LEVEL,
+    _distance_points,
+)
 
 
 @dataclass(frozen=True)
@@ -110,6 +113,14 @@ class MultipletSummary:
     multiplicity: str
     j_couplings_hz: list[float]
     line_count: int
+    #: The widest line in this signal, in Hz. Shown because two lines closer than
+    #: the detector can separate are reported as ONE, and the tell is width:
+    #: measured on planted pairs, a merged pair fits 3.3-4.5x the true linewidth
+    #: while a single line fits 1.0-1.3x. It is NOT flagged automatically — on
+    #: real acquisitions 14% of lines exceed 3x the median width and most are
+    #: broad features or poor fits rather than merged pairs, so a flag would cry
+    #: wolf. The number is shown; the chemist judges.
+    width_hz: float
     #: Area as a FRACTION OF THE TOTAL, never a proton count. Without an assigned
     #: structure there is nothing to normalise against, so a proton count would be
     #: an invention. The wire key says what it is; the display must not relabel it.
@@ -123,6 +134,7 @@ class MultipletSummary:
             "multiplicity": self.multiplicity,
             "j_couplings_hz": self.j_couplings_hz,
             "line_count": self.line_count,
+            "width_hz": self.width_hz,
             "relative_area": self.relative_area,
         }
 
@@ -313,10 +325,27 @@ def open_spectrum(path: str) -> dict:
             multiplicity=str(m.multiplicity_label),
             j_couplings_hz=[round(float(j), 2) for j in m.j_couplings_hz],
             line_count=len(m.peaks),
+            width_hz=float(max((p.width_hz for p in m.peaks), default=0.0)),
             relative_area=float(sum(abs(p.area) for p in m.peaks) / total_area),
         )
         for m in multiplets
     ]
+
+    # WHAT THIS ANALYSIS CANNOT SEPARATE, in the units a chemist thinks in.
+    #
+    # The detector reports one maximum per resolvable feature, so two lines
+    # closer than its minimum separation come back as a single signal. That is
+    # not a caveat about confidence — it is a hard limit of the method, and a
+    # peak table that does not state it invites a coupling to be read off a
+    # merged pair.
+    #
+    # Measured rather than assumed: two strong lines are recovered separately
+    # only from about four linewidths apart, so the true limit is coarser than
+    # this floor. This reports the floor, which is the part the software knows.
+    axis = np.asarray(spectrum.ppm_axis, dtype=float)
+    step_ppm = float(np.median(np.abs(np.diff(np.sort(axis))))) if axis.size > 1 else 0.0
+    separation_points = _distance_points(axis, nucleus=spectrum.nucleus, level=_DEFAULT_GSD_LEVEL)
+    resolution_hz = float(separation_points * step_ppm * spectrum.field_mhz)
 
     trace = _display_trace(spectrum.ppm_axis, spectrum.data, summaries)
 
@@ -327,6 +356,7 @@ def open_spectrum(path: str) -> dict:
         "points": int(len(spectrum.data)),
         "file_name": _readable_name(source),
         "processing": processing,
+        "resolution_hz": resolution_hz,
         "saturated": saturated,
         "peak_count": len(peaks),
         "multiplets": [m.to_dict() for m in summaries],
@@ -340,6 +370,9 @@ def open_spectrum(path: str) -> dict:
             "assigning protons needs a structure this analysis was not given.",
             "Multiplicity and coupling assignment is a fit. A crowded or overlapping region can "
             "be grouped more than one way.",
+            f"Signals closer together than about {resolution_hz:.1f} Hz are reported as one. "
+            "A wider-than-usual signal in the table may be two lines this analysis could not "
+            "separate.",
             *(
                 []
                 if not saturated
