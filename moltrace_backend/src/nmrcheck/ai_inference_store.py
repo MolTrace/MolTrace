@@ -486,6 +486,13 @@ def create_prediction(
             ood_status = _extract_ood_status(payload, config)
             uncertainty = _extract_uncertainty(payload, confidence, ood_status)
             engine_provenance = None
+        # Who produced the number. `engine_result is None` is exactly the engine-less case,
+        # where _extract_confidence reads the figure out of the caller's own request_json.
+        confidence_source = (
+            "engine"
+            if engine_result is not None
+            else ("caller_supplied" if confidence is not None else None)
+        )
         human_review_required = True
         status = "succeeded"
         low_confidence = confidence is not None and confidence < threshold
@@ -507,6 +514,17 @@ def create_prediction(
         if service.target_module == "regulatory":
             status = "requires_review"
             notes.append("Regulatory prediction output requires human review.")
+        # A number the caller sent cannot be the number that clears the caller's own gate.
+        # Services with no engine wired take their confidence straight from request_json, so
+        # without this a client posts 0.99 and is told "succeeded" on its own say-so. The
+        # figure is still recorded -- suppressing it would hide what was claimed -- it simply
+        # buys nothing. Same rule, same shape, as the regulatory forcing above.
+        if confidence_source == "caller_supplied":
+            status = "requires_review"
+            warnings.append(
+                "The confidence figure came from the request, not from a model this platform "
+                "ran, so it did not compute this number and cannot approve on it."
+            )
 
         now = utcnow()
         run = PredictionRunORM(
