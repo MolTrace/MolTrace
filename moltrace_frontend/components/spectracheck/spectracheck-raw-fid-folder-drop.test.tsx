@@ -209,7 +209,10 @@ describe("dropping an instrument folder", () => {
     await waitFor(() => expect(readout()).toBeInTheDocument())
     expect(readout()).toHaveTextContent(/instrument recorded CDCl3/i)
     expect(readout()).toHaveTextContent(/set to DMSO-d6, and that is what the analysis will use/i)
-    // The read-only session solvent is untouched.
+    // The read-only session solvent is untouched. It now lives behind Advanced
+    // — the routine path is nucleus, vendor and preset — but the disagreement
+    // itself is stated in the readout above, which is what the user must see.
+    fireEvent.click(screen.getByRole("button", { name: /Advanced options/i }))
     expect(screen.getByLabelText(/Solvent/i)).toHaveValue("DMSO-d6")
   })
 
