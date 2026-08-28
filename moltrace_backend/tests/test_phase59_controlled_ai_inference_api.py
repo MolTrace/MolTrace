@@ -164,7 +164,11 @@ def test_phase59_controlled_ai_inference_workflow(client, api_headers):
             },
         )
         assert experimental.status_code == 201, experimental.text
-        assert experimental.json()["status"] == "succeeded"
+        # Re-baselined 2026-08-27. This asserted "succeeded" on a confidence the CALLER
+        # supplied in request_json (0.91) for a service with no engine wired -- the request
+        # approving itself. Caller-supplied confidence now forces review, so the expected
+        # status changed; nothing else about this flow did. The figure is still recorded.
+        assert experimental.json()["status"] == "requires_review"
         assert experimental.json()["human_review_required"] is True
         assert any("Experimental model" in warning for warning in experimental.json()["warnings"])
 

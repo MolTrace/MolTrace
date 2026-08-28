@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from typing import Any
 
+import pytest
 from fastapi.testclient import TestClient
 
 _RANKING_REQUEST: dict[str, Any] = {
@@ -369,3 +370,50 @@ def test_the_comparability_warning_fires_only_when_scales_are_actually_mixed() -
     assert "not comparable" in warnings[0]
     # Both scales are named, so the reader knows which two were mixed.
     assert "dp4_posterior" in warnings[0] and "verifier_quality" in warnings[0]
+
+
+def test_a_caller_supplied_confidence_cannot_approve_its_own_prediction(client, api_headers) -> None:
+    """A number the caller sent must not be the number that clears the caller's review gate.
+
+    Services with no engine wired take their confidence straight out of ``request_json``
+    (``confidence_score`` / ``mock_confidence_score`` / ``score``). That value is then compared
+    against the auto-review threshold, so a caller could post 0.99 and receive ``succeeded`` on
+    its own say-so. The hard-coded 0.82 this path used to invent was removed for the same
+    reason -- recording a confidence no model computed -- and the caller-supplied case is the
+    remaining half of it.
+
+    The rule already exists for regulatory targets, which are forced to review regardless of
+    any number. This extends the same rule to any confidence the platform did not compute.
+    """
+
+    with client:
+        response = client.post(
+            "/ai/predictions",
+            headers=api_headers,
+            json={
+                "service_key": "reaction_outcome_predictor",
+                "development_mode": True,
+                "request_json": {"temperature_c": 80, "confidence_score": 0.99},
+            },
+        )
+        assert response.status_code == 201, response.text
+        body = response.json()
+
+    # The number is still recorded -- suppressing it would hide what the caller claimed.
+    assert body["confidence_score"] == pytest.approx(0.99)
+    # But it cannot buy an approval.
+    assert body["status"] == "requires_review"
+    assert any("did not compute" in w or "caller" in w.lower() for w in body["warnings"]), body["warnings"]
+
+
+def test_an_engine_computed_confidence_still_clears_the_gate(client, api_headers) -> None:
+    """The rule must key on who produced the number, not punish every confidence."""
+
+    with client:
+        response = _post_prediction(client, api_headers)
+        assert response.status_code == 201, response.text
+        body = response.json()
+
+    # The ranking engine computed this one, and its coverage is good, so it is allowed to pass.
+    assert body["confidence_score"] is not None
+    assert body["status"] == "succeeded", body
