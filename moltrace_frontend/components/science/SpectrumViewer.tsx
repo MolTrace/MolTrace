@@ -41,6 +41,7 @@ import {
   ArrowLeft,
   ArrowRight,
   Check,
+  Download,
   Droplets,
   Expand,
   Eye,
@@ -1375,6 +1376,45 @@ function SpectrumViewerImpl({
     ],
   )
 
+  /**
+   * Vector export of the current view.
+   *
+   * SVG rather than PDF because Plotly's toImage offers png/jpeg/webp/svg only —
+   * a PDF would mean a new dependency or a render service, and a journal's
+   * production team consumes SVG directly.
+   *
+   * Exported from a FIGURE OBJECT, not the live graph div, so the intensity
+   * axis can be corrected on the way out. The axis range is anchored to the
+   * unscaled source while the drawn trace is multiplied by the display gain, so
+   * once gain leaves 1x the tick values no longer describe the plotted curve.
+   * That is defensible on an interactive display the reader is driving; in a
+   * published figure a reader takes the axis as data, so the tick labels are
+   * dropped whenever a gain is applied and the caption says the trace is scaled.
+   */
+  const exportVector = useCallback(async () => {
+    const gd = plotDivRef.current
+    if (!gd) return
+    const scaled = Math.abs(displayScale - 1) > 1e-9
+    const exportLayout = {
+      ...layout,
+      yaxis: {
+        ...(layout as { yaxis?: Record<string, unknown> }).yaxis,
+        ...(scaled ? { showticklabels: false, title: { text: `${yLabel} (scaled ×${displayScale.toFixed(1)})` } } : {}),
+      },
+    }
+    const Plotly = (await import("plotly.js-dist-min")).default as unknown as {
+      toImage: (fig: unknown, opts: Record<string, unknown>) => Promise<string>
+    }
+    const url = await Plotly.toImage(
+      { data, layout: exportLayout },
+      { format: "svg", width: 1200, height: 600 },
+    )
+    const link = document.createElement("a")
+    link.href = url
+    link.download = "spectrum.svg"
+    link.click()
+  }, [data, layout, displayScale, yLabel])
+
   const rememberPlotlyGraphDiv = useCallback((_figure: unknown, graphDiv: unknown) => {
     plotDivRef.current = (graphDiv as PlotlyGraphDivLike | null) ?? null
   }, [])
@@ -2245,6 +2285,17 @@ function SpectrumViewerImpl({
               >
                 <Minus className="h-3.5 w-3.5" aria-hidden />
                 <span className="sr-only">Shorter peaks</span>
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="h-7 w-7"
+                onClick={() => void exportVector()}
+                title="Download this view as SVG"
+              >
+                <Download className="h-3.5 w-3.5" aria-hidden />
+                <span className="sr-only">Download this view as SVG</span>
               </Button>
               <Button
                 type="button"
