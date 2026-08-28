@@ -1524,28 +1524,10 @@ export function SpectraCheckRawFidSection({
         className="min-w-0"
       >
         <div className="space-y-5">
-          {/* Sample ID + Solvent */}
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-1.5">
-              <Label htmlFor="raw-sample" className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                Sample ID
-              </Label>
-              <Input
-                id="raw-sample"
-                value={sampleId}
-                onChange={(e) => onSampleIdChange(e.target.value)}
-                className="font-mono"
-              />
-              <p className="text-[11px] text-muted-foreground">Shared with SpectraCheck session.</p>
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="raw-solvent" className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                Solvent <span className="ml-1 text-[10px] font-normal text-muted-foreground/70">(read-only)</span>
-              </Label>
-              <Input id="raw-solvent" value={solvent} readOnly className="bg-muted/40 font-mono" />
-            </div>
-          </div>
-
+          {/* Routine path: nucleus, vendor, preset. Everything else — sample
+              identity, the read-only solvent, and the experimental GSD backend
+              controls — sits behind a disclosure, so a normal run needs the
+              three controls that actually change the result. */}
           {/* Nucleus + Vendor pill toggles */}
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-1.5">
@@ -1609,6 +1591,30 @@ export function SpectraCheckRawFidSection({
                 ))}
               </div>
             </div>
+          </div>
+
+          {/* Processing preset — a routine control, not an advanced one. It
+              decides what the Process action actually does, so it belongs
+              beside nucleus and vendor rather than behind a disclosure. */}
+          <div className="space-y-1.5">
+            <Label htmlFor="raw-preset" className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Processing preset
+            </Label>
+            <select
+              id="raw-preset"
+              className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 font-mono text-sm shadow-xs outline-none sm:max-w-sm"
+              value={preset}
+              onChange={(e) => setPreset(e.target.value as (typeof PRESETS)[number]["value"])}
+            >
+              {PRESETS.map((p) => (
+                <option key={p.value} value={p.value}>
+                  {p.label}
+                </option>
+              ))}
+            </select>
+            <p className="text-[11px] text-muted-foreground">
+              Used for full processing; preview uses the locked quick-spectrum preset.
+            </p>
           </div>
 
           {/* What the instrument itself recorded — read from the dropped dataset, before upload. */}
@@ -1986,25 +1992,25 @@ export function SpectraCheckRawFidSection({
                   paths — a feature, and its own change. A control that lies is
                   worse than one that is absent. */}
 
-              <div className="space-y-1.5">
-                <Label htmlFor="raw-preset" className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                  Processing preset
-                </Label>
-                <select
-                  id="raw-preset"
-                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 font-mono text-sm shadow-xs outline-none"
-                  value={preset}
-                  onChange={(e) => setPreset(e.target.value as (typeof PRESETS)[number]["value"])}
-                >
-                  {PRESETS.map((p) => (
-                    <option key={p.value} value={p.value}>
-                      {p.label}
-                    </option>
-                  ))}
-                </select>
-                <p className="text-[11px] text-muted-foreground">
-                  Used for full processing; preview uses the locked quick-spectrum preset.
-                </p>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label htmlFor="raw-sample" className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    Sample ID
+                  </Label>
+                  <Input
+                    id="raw-sample"
+                    value={sampleId}
+                    onChange={(e) => onSampleIdChange(e.target.value)}
+                    className="font-mono"
+                  />
+                  <p className="text-[11px] text-muted-foreground">Shared with SpectraCheck session.</p>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="raw-solvent" className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    Solvent <span className="ml-1 text-[10px] font-normal text-muted-foreground/70">(read-only)</span>
+                  </Label>
+                  <Input id="raw-solvent" value={solvent} readOnly className="bg-muted/40 font-mono" />
+                </div>
               </div>
             </CollapsibleContent>
           </Collapsible>
@@ -2041,15 +2047,29 @@ export function SpectraCheckRawFidSection({
       >
         <div className="space-y-4">
           {/* Analysis backend selector — opt-in experimental GSD-Prompt-3.
-              Default MUST remain `legacy`; do not silently flip tenants. */}
-          <GsdAnalysisControls
-            backend={analysisBackend}
-            onBackendChange={setAnalysisBackend}
-            level={gsdLevel}
-            onLevelChange={setGsdLevel}
-            solvent={gsdSolvent}
-            onSolventChange={setGsdSolvent}
-          />
+              Default MUST remain `legacy`; do not silently flip tenants.
+
+              Behind a disclosure because a routine run never touches it, but
+              kept HERE rather than moved to Setup: it changes what the Process
+              tile below actually does, and a control that redefines a button
+              belongs beside that button. It opens itself whenever the
+              experimental backend is selected, so the tile can never claim
+              "GSD analyze" with the reason why hidden. */}
+          <details open={analysisBackend === "gsd_prompt3"}>
+            <summary className="cursor-pointer list-none font-mono text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground hover:text-foreground">
+              Analysis backend
+            </summary>
+            <div className="pt-3">
+              <GsdAnalysisControls
+                backend={analysisBackend}
+                onBackendChange={setAnalysisBackend}
+                level={gsdLevel}
+                onLevelChange={setGsdLevel}
+                solvent={gsdSolvent}
+                onSolventChange={setGsdSolvent}
+              />
+            </div>
+          </details>
 
           {/* Two run tiles — same shared component, and therefore the same
               geometry and type scale, as the Processed tab's pair. */}
