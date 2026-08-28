@@ -2091,6 +2091,94 @@ class TestSolventReferenceTarget:
         assert _solvent_reference_target("not-a-solvent") == (None, None)
 
 
+class TestReferenceAxisNucleus:
+    """A 13C axis must not be referenced to a 1H shift.
+
+    `_reference_axis` took no nucleus, and `_solvent_reference_target` reads
+    SOLVENT_PROFILES, which carries 1H residual shifts only. On a carbon
+    spectrum the 7.26 ppm CDCl3 target is not a real feature of the axis, so the
+    anchor became whatever sample happened to be tallest near 7.26 — noise — and
+    the applied shift was irreproducible run to run.
+    """
+
+    def test_carbon_anchors_on_the_solvent_carbon_not_the_residual_proton(self) -> None:
+        from nmrcheck.fid import _solvent_reference_target
+
+        assert _solvent_reference_target("CDCl3", nucleus="13C") == (
+            77.16,
+            "solvent_carbon_peak",
+        )
+        assert _solvent_reference_target("DMSO-d6", nucleus="13C") == (
+            39.52,
+            "solvent_carbon_peak",
+        )
+
+    def test_proton_is_unchanged(self) -> None:
+        from nmrcheck.fid import _solvent_reference_target
+
+        assert _solvent_reference_target("CDCl3") == (7.26, "solvent_residual_peak")
+        assert _solvent_reference_target("CDCl3", nucleus="1H") == (
+            7.26,
+            "solvent_residual_peak",
+        )
+
+    def test_a_carbon_spectrum_is_referenced_to_its_own_solvent_carbon(self) -> None:
+        """End to end: the carbon axis moves by the solvent carbon's offset."""
+        from nmrcheck.fid import _reference_axis
+
+        # Carbon axis with the CDCl3 triplet 0.12 ppm off its literature value
+        # — inside the +/-0.18 ppm search window, which is the real bound.
+        points = [(20.0 + i * 0.01, 1.0) for i in range(20000)]
+        points[int((77.28 - 20.0) / 0.01)] = (77.28, 1.0e8)
+        _, shift, selection = _reference_axis(
+            points, None, None, "CDCl3", nucleus="13C"
+        )
+        assert selection["target_ppm"] == 77.16
+        assert shift == pytest.approx(-0.12, abs=0.02)
+
+
+class TestReferenceAxisBounds:
+    """Referencing must never move the axis by more than the anchor's own error.
+
+    `_select_single_reference_peak` widened its candidate set to the ENTIRE
+    trace when the target lay off the acquired axis, then ranked by intensity.
+    On a carbon sweep that does not contain 7.26 ppm this mapped the tallest
+    carbon peak onto a proton shift: measured -69.9 ppm, with 77.16 becoming
+    7.26 and 128.5 becoming 58.6. An unreferenced axis is imprecise; an axis
+    wrong by 70 ppm is a fabrication, so refusing to reference is the correct
+    answer when the anchor is not on the axis.
+    """
+
+    def test_a_target_off_the_axis_refuses_rather_than_inventing_an_anchor(self) -> None:
+        from nmrcheck.fid import _select_single_reference_peak
+
+        # 7.26 ppm is nowhere on a 20-220 ppm carbon sweep.
+        points = [(20.0 + i * 0.1, 1.0) for i in range(2000)]
+        points[571] = (77.1, 1.0e8)
+        selected, mode = _select_single_reference_peak(points, 7.26)
+        assert selected is None
+        assert mode == "none_target_off_axis"
+
+    def test_the_axis_is_left_alone_when_the_anchor_is_off_axis(self) -> None:
+        from nmrcheck.fid import _reference_axis
+
+        points = [(20.0 + i * 0.1, 1.0) for i in range(2000)]
+        points[571] = (77.1, 1.0e8)
+        out, shift, _ = _reference_axis(points, None, None, "CDCl3", nucleus="1H")
+        assert shift == 0.0
+        assert out[571][0] == pytest.approx(77.1)
+
+    def test_the_bounded_anomeric_fallback_is_preserved(self) -> None:
+        """A separate, genuinely bounded branch (4.35-5.85 ppm) must survive."""
+        from nmrcheck.fid import _select_single_reference_peak
+
+        points = [(4.0 + i * 0.001, 1.0) for i in range(2000)]
+        points[1200] = (5.2, 1.0e8)
+        selected, mode = _select_single_reference_peak(points, 4.79)
+        assert selected is not None
+        assert mode in {"nearest_target_window", "anomeric_window_fallback"}
+
+
 class TestReferencePeakSelection:
     """A reference peak is a maximum, not the nearest sample to the target."""
 

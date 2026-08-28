@@ -69,8 +69,10 @@ import { SpectraCheckUseUnifiedEvidenceButton } from "@/components/spectracheck/
 import { SpectrumResultsFullscreen } from "@/components/spectracheck/spectracheck-fullscreen-results"
 import { formatApiError } from "@/components/spectracheck/spectracheck-helpers"
 import {
+  describeReferenceMode,
   displayedDatasetName,
   extractPeaksFromPayload,
+  extractReferenceReadout,
   extractRawFidArchiveFacts,
   extractSpectrumXY,
   isRecord,
@@ -1485,6 +1487,7 @@ export function SpectraCheckRawFidSection({
      `SpectrumPreviewReport` (extra="forbid") does not declare, so they could
      never arrive and all three tiles were permanently blank. */
   const archiveFacts = extractRawFidArchiveFacts(displayPayload)
+  const referencing = extractReferenceReadout(displayPayload)
   const sha = archiveFacts.sha
   const vendorDetected =
     meta && (typeof meta.vendor_detected === "string" ? meta.vendor_detected : typeof meta.vendor === "string" ? meta.vendor : null)
@@ -2569,6 +2572,29 @@ export function SpectraCheckRawFidSection({
                           <p className="mt-1 break-all font-mono text-[10px]">{sha}</p>
                         </div>
                       )}
+                      {/* Every reported shift depends on how far the axis was
+                          moved and what it was anchored on. The wire has both;
+                          nothing read them. */}
+                      {referencing.shiftPpm != null || referencing.mode != null ? (
+                        <div data-testid="raw-fid-referencing-readout">
+                          <p className="text-[11px] font-medium text-muted-foreground">
+                            Chemical shift reference
+                          </p>
+                          <p className="mt-1 font-mono text-[11px]">
+                            {referencing.shiftPpm != null && referencing.shiftPpm !== 0
+                              ? `axis moved ${referencing.shiftPpm > 0 ? "+" : ""}${referencing.shiftPpm.toFixed(4)} ppm`
+                              : "axis unchanged"}
+                          </p>
+                          {describeReferenceMode(referencing.mode) ? (
+                            <p className="mt-0.5 text-[11px] text-muted-foreground">
+                              {describeReferenceMode(referencing.mode)}
+                              {referencing.observedPpm != null && referencing.targetPpm != null
+                                ? ` — ${referencing.observedPpm.toFixed(3)} ppm read as ${referencing.targetPpm.toFixed(2)} ppm`
+                                : ""}
+                            </p>
+                          ) : null}
+                        </div>
+                      ) : null}
                       {(vendorDetected || nucleusMeta) && (
                         <div className="flex flex-wrap gap-1.5">
                           {vendorDetected && (

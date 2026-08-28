@@ -40,6 +40,7 @@ from .models import (
 )
 from .compound_class_priors import diagnostic_regions_for
 from .fid_pipeline_adapter import build_prompt_pipeline_runtime_contract
+from .impurities import C13_IMPURITY_SHIFTS
 from .nmr_tables import canonical_solvent
 from .integration_scale import disclose_relative_integrals
 from .parser import ReferencePeakAssignment, normalize_nmr_text, parse_reference_nmr_text
@@ -2407,8 +2408,14 @@ def _select_single_reference_peak(
         ]
         mode = "anomeric_window_fallback"
     if not candidates:
-        candidates = points
-        mode = "global_nearest_fallback"
+        # No unbounded fallback. Widening the candidate set to the whole trace
+        # and then ranking by intensity mapped the tallest peak anywhere onto a
+        # target the axis does not contain: measured -69.9 ppm on a 20-220 ppm
+        # carbon sweep asked for 7.26 (77.16 became 7.26, 128.5 became 58.6),
+        # and -5.6 ppm on a 6-9 ppm proton sweep asked for 2.50. An unreferenced
+        # axis is imprecise; an axis wrong by a sweep width is a fabrication, so
+        # refusing is the honest answer and the caller reports it.
+        return (None, "none_target_off_axis")
     # Rank by intensity, not by distance to the target.
     #
     # This used to sort on ``abs(shift - target)`` with intensity only breaking
@@ -2438,7 +2445,9 @@ def _select_single_reference_peak(
     return (selected, mode)
 
 
-def _solvent_reference_target(solvent: str | None) -> tuple[float | None, str | None]:
+def _solvent_reference_target(
+    solvent: str | None, nucleus: str | None = None
+) -> tuple[float | None, str | None]:
     """The residual solvent peak, as a last-resort referencing anchor.
 
     Referencing a raw FID used to require the caller to hand in a shift or a
@@ -2463,6 +2472,25 @@ def _solvent_reference_target(solvent: str | None) -> tuple[float | None, str | 
     if not solvent:
         return (None, None)
     canonical = canonical_solvent(solvent) or solvent
+    # A carbon spectrum has no residual-PROTON line to anchor on. Referencing it
+    # to 7.26 ppm meant the anchor was whatever sample sat tallest near a shift
+    # the axis does not contain -- noise -- so the applied correction was
+    # irreproducible run to run. The solvent CARBON is the standard anchor and
+    # is already tabulated for review flagging.
+    if _normalize_nucleus_label(nucleus) == "13C":
+        carbon = next(
+            (
+                entry
+                for entry in C13_IMPURITY_SHIFTS
+                if entry.kind == "solvent"
+                and entry.solvent is not None
+                and (canonical_solvent(entry.solvent) or entry.solvent) == canonical
+            ),
+            None,
+        )
+        if carbon is not None:
+            return (float(carbon.shift_ppm), "solvent_carbon_peak")
+        return (None, None)
     profile = next(
         (p for p in SOLVENT_PROFILES if p.canonical_name == canonical), None
     )
@@ -2483,6 +2511,7 @@ def _reference_axis(
     reference_ppm: float | None,
     reference_nmr_text: str | None,
     solvent: str | None = None,
+    nucleus: str | None = None,
 ) -> tuple[list[tuple[float, float]], float, dict[str, Any]]:
     if not points:
         return (points, 0.0, {"mode": "none", "selected_peak_count": 0})
@@ -2491,7 +2520,7 @@ def _reference_axis(
     if target_ppm is None:
         target_ppm, target_source = _reference_target_from_text(reference_nmr_text)
     if target_ppm is None:
-        target_ppm, target_source = _solvent_reference_target(solvent)
+        target_ppm, target_source = _solvent_reference_target(solvent, nucleus)
     selected_peak, selection_mode = _select_single_reference_peak(points, target_ppm)
     if target_ppm is None or selected_peak is None:
         return (
@@ -3162,6 +3191,7 @@ def process_bruker_1d_zip(
             reference_ppm,
             reference_nmr_text,
             solvent,
+            nucleus,
         )
         if reference_shift_applied:
             original_spectrum_points = [
