@@ -421,6 +421,76 @@ def test_every_signal_carries_its_width() -> None:
         assert signal["width_hz"] >= 0.0
 
 
+def test_a_single_line_signal_is_still_examined_for_more() -> None:
+    """A one-line multiplet has a ZERO-WIDTH range, and that ate the guard.
+
+    Measured: `range_ppm` for a single-line signal is 125.2953 to 125.2953 ppm,
+    so an unpadded window holds no points, the apex measured as zero, and the
+    quantitation guard refused every one-line signal — precisely the population
+    this refinement exists to re-examine. Three real splits silently became none.
+    """
+    from nmrcheck.local_science import open_spectrum
+
+    source = _one("instrument") or _one("moltrace")
+    if source is None:
+        pytest.skip("no acquisition in this checkout")
+
+    multiplets = open_spectrum(source)["multiplets"]
+    singles = [m for m in multiplets if m["line_count"] == 1]
+    if not singles:
+        pytest.skip("no single-line signals in this acquisition")
+    assert all(m["resolved_lines"] >= 1 for m in singles), (
+        "a single-line signal came back with no resolved count at all"
+    )
+
+
+def test_the_refinement_never_reports_fewer_lines_than_the_detector() -> None:
+    """It is an additional reading, not a replacement for the peak list."""
+    from nmrcheck.local_science import open_spectrum
+
+    source = _one("instrument") or _one("moltrace")
+    if source is None:
+        pytest.skip("no acquisition in this checkout")
+    for signal in open_spectrum(source)["multiplets"]:
+        assert signal["resolved_lines"] >= signal["line_count"], (
+            "the refinement removed lines the detector found — it may only add"
+        )
+
+
+def test_a_signal_below_the_quantitation_floor_is_not_split() -> None:
+    """Claiming structure inside a bump barely above the baseline is reading noise.
+
+    Measured on a real acquisition: of three signals split further, two stood at
+    842 and 121 sigma and one at 4.3.
+    """
+    import numpy as np
+
+    from moltrace.spectroscopy.io.fid_reader import NMRSpectrum
+    from moltrace.spectroscopy.peaks.gsd import gsd_peak_pick
+    from nmrcheck.local_science import _baseline_sigma, _resolved_line_count
+
+    # One weak line, at about five sigma.
+    field, fwhm = 150.9, 3.23
+    hz = np.linspace(60.0 * field - 60.0, 60.0 * field + 60.0, 2048)
+    ppm = hz / field
+    y = np.random.default_rng(9100).normal(0.0, 1.0, 2048)
+    half = fwhm / 2
+    y += 5.0 * (half * half) / ((hz - 60.0 * field) ** 2 + half * half)
+    spectrum = NMRSpectrum(data=y, ppm_axis=ppm, nucleus="13C", field_mhz=field)
+
+    peaks = gsd_peak_pick(spectrum)
+    if not peaks:
+        pytest.skip("the detector found nothing to refine")
+
+    class _Stub:
+        range_ppm = (60.0, 60.0)
+
+    stub = _Stub()
+    stub.peaks = peaks[:1]
+    resolved = _resolved_line_count(spectrum, stub, _baseline_sigma(spectrum))
+    assert resolved == 1, f"a ~5 sigma signal was reported as {resolved} lines"
+
+
 @pytest.mark.slow
 def test_every_acquisition_opens_end_to_end() -> None:
     """The exhaustive pass. ~4.4s each, so it is opt-in."""

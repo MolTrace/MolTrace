@@ -35,6 +35,7 @@ from moltrace.spectroscopy.io.fid_reader import (
 )
 from moltrace.spectroscopy.multiplet.analysis import detect_multiplets
 from moltrace.spectroscopy.peaks import gsd_peak_pick
+from moltrace.spectroscopy.peaks.deconvolve import resolve_region
 from moltrace.spectroscopy.peaks.gsd import (
     _MAX_PEAKS_BY_LEVEL,
     _distance_points,
@@ -113,6 +114,14 @@ class MultipletSummary:
     multiplicity: str
     j_couplings_hz: list[float]
     line_count: int
+    #: How many lines a deconvolution finds in this signal's window.
+    #:
+    #: The detector reports one maximum per resolvable feature, so two lines
+    #: closer than about four linewidths arrive as ONE. Asking whether two
+    #: Lorentzians explain the window better than one can — by more than noise
+    #: allows — recovers pairs from about one linewidth apart. Where this exceeds
+    #: `line_count`, the signal beside it is more than one line.
+    resolved_lines: int
     #: The widest line in this signal, in Hz. Shown because two lines closer than
     #: the detector can separate are reported as ONE, and the tell is width:
     #: measured on planted pairs, a merged pair fits 3.3-4.5x the true linewidth
@@ -134,6 +143,7 @@ class MultipletSummary:
             "multiplicity": self.multiplicity,
             "j_couplings_hz": self.j_couplings_hz,
             "line_count": self.line_count,
+            "resolved_lines": self.resolved_lines,
             "width_hz": self.width_hz,
             "relative_area": self.relative_area,
         }
@@ -161,6 +171,85 @@ def _readable_refusal(error: Exception, source: Path) -> str:
             "spectrum nor a readable free-induction decay"
         )
     return text
+
+
+#: Where "a signal worth reading numbers off" starts, in noise sigmas. The
+#: conventional limit of quantitation, and the floor below which this module
+#: will not claim to resolve structure.
+_QUANTIFIABLE_SIGMA = 10.0
+
+
+def _baseline_sigma(spectrum: NMRSpectrum) -> float:
+    """The noise width, measured the way the detector measures it.
+
+    A deconvolution decides whether a residual improvement is bigger than noise,
+    so a noise figure that is wrong by 40% decides nothing. This is the same
+    peak-free estimate the detector now uses.
+    """
+    from moltrace.spectroscopy.peaks.gsd import _positive_peak_orientation, _robust_noise
+
+    oriented = _positive_peak_orientation(np.asarray(spectrum.data, dtype=float))
+    signal = oriented - float(np.median(oriented))
+    median = float(np.median(signal))
+    peak_free = signal[signal <= median]
+    if peak_free.size >= 8:
+        reflected = np.concatenate([peak_free, 2.0 * median - peak_free])
+        estimate = 1.4826 * float(np.median(np.abs(reflected - median)))
+        if np.isfinite(estimate) and estimate > 0:
+            return estimate
+    return float(_robust_noise(signal))
+
+
+def _resolved_line_count(spectrum: NMRSpectrum, multiplet, baseline_sigma: float) -> int:
+    """How many lines a deconvolution finds where the detector reported some.
+
+    Returns the detector's own count when the deconvolution finds no more, so
+    this can only ever say "there is more here", never "there is less". It is an
+    additional reading of the same window, not a replacement for the peak list.
+    """
+    from moltrace.spectroscopy.peaks.gsd import _positive_peak_orientation
+
+    if baseline_sigma <= 0:
+        return len(multiplet.peaks)
+
+    axis = np.asarray(spectrum.ppm_axis, dtype=float)
+    low, high = min(multiplet.range_ppm), max(multiplet.range_ppm)
+
+    # PADDED FIRST, and everything below uses this window.
+    #
+    # A single-line multiplet has a ZERO-WIDTH range — measured: 125.2953 to
+    # 125.2953 ppm — so an unpadded window holds no points at all. A guard that
+    # measured its apex there saw zero and refused every one-line signal, which
+    # is exactly the population this stage exists to re-examine. The padding is
+    # also what the fit needs: a Lorentzian's tails carry the information that
+    # separates two of them, and a window clipped to the peak throws it away.
+    pad = max((high - low) * 1.5, 0.02)
+    window = (axis >= low - pad) & (axis <= high + pad)
+    if int(np.count_nonzero(window)) < 16:
+        return len(multiplet.peaks)
+
+    # Oriented and centred, the way the detector sees it — a spectrum stored
+    # negative-going would otherwise measure as no signal at all.
+    oriented = _positive_peak_orientation(np.asarray(spectrum.data, dtype=float))
+    centred = oriented - float(np.median(oriented))
+
+    # A SIGNAL THAT IS NOT ITSELF QUANTIFIABLE IS NOT CREDIBLY TWO SIGNALS.
+    # Measured on a real acquisition: of three signals split further, two stood
+    # at 842 and 121 sigma and one at 4.3 — barely above the detection limit.
+    # Claiming structure inside that third one is claiming to read noise.
+    if float(np.max(centred[window])) < baseline_sigma * _QUANTIFIABLE_SIGMA:
+        return len(multiplet.peaks)
+
+    try:
+        components = resolve_region(
+            axis[window],
+            centred[window],
+            field_mhz=float(spectrum.field_mhz),
+            noise_sigma=baseline_sigma,
+        )
+    except Exception:  # noqa: BLE001 - a refinement that fails leaves the reading unchanged
+        return len(multiplet.peaks)
+    return max(len(components), len(multiplet.peaks))
 
 
 def _readable_name(source: Path) -> str:
@@ -317,6 +406,14 @@ def open_spectrum(path: str) -> dict:
     multiplets = detect_multiplets(peaks)
     total_area = sum(abs(p.area) for m in multiplets for p in m.peaks) or 1.0
 
+    # WHAT THE DETECTOR COULD NOT SEPARATE, asked again with a different question.
+    #
+    # This runs on the desktop path only, deliberately: `gsd_peak_pick` is shared
+    # by SpectraCheck, qNMR and the verifier, and a change there is a change to
+    # every peak list this platform has ever produced. Here it adds a column and
+    # takes nothing away.
+    baseline_sigma = _baseline_sigma(spectrum)
+
     summaries = [
         MultipletSummary(
             name=m.name,
@@ -326,6 +423,7 @@ def open_spectrum(path: str) -> dict:
             j_couplings_hz=[round(float(j), 2) for j in m.j_couplings_hz],
             line_count=len(m.peaks),
             width_hz=float(max((p.width_hz for p in m.peaks), default=0.0)),
+            resolved_lines=_resolved_line_count(spectrum, m, baseline_sigma),
             relative_area=float(sum(abs(p.area) for p in m.peaks) / total_area),
         )
         for m in multiplets

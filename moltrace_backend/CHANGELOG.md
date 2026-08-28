@@ -14,6 +14,62 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.73.0 — Separating lines the detector reports as one (2026-08-27)
+
+A peak finder reports one maximum per resolvable feature, so two lines closer
+than about **four linewidths** arrive as a single signal. Three levers were tried
+and measured against that and none was the constraint — below four linewidths
+there is genuinely one apex to find.
+
+`spectroscopy.peaks.deconvolve` asks a different question of the same data: do
+two Lorentzians explain this window better than one, by more than noise allows?
+
+**What was missing was model selection, not fitting.** `gsd._fit_peak_groups`
+fits the maxima it is handed and has no opinion about how many lines are there,
+so the only way to get more components was to lower the detection threshold —
+which is why level 3 returned **21 components for two planted lines** at 4,096
+points and 37 at 8,192. A component costs three parameters, so a spurious one
+still cuts the sum of squares by ~3 sigma-squared by chance; this requires the
+99.9th percentile of chi-squared with 3 dof before believing one.
+
+It became answerable only once the noise estimate was unbiased (v0.72.0): a test
+against a noise level that is itself wrong by 40% decides nothing.
+
+Measured over 40 seeds at 150.9 MHz:
+
+  a single line kept as one line        40/40
+  a pair 1.0 linewidths apart, found    39/40
+  a pair 1.5 / 2.0 / 2.5 / 3.0 / 4.0    38-39/40
+  median error in recovered centres     0.00 Hz
+
+So pairs are recovered from **one linewidth apart**, where the detector needs
+four, with no false splitting. It holds down to 20 sigma line height.
+
+Three things the fit had to be defended against, each measured:
+
+  * **A component narrower than the sampling.** An arbitrarily narrow Lorentzian
+    fits one noise sample exactly, so extra components converged to spikes at
+    **0.01 Hz**. The residual drop is real, so no selection threshold rejects it;
+    the model has to exclude the shape.
+  * **A bad local minimum.** Seeded symmetrically, a pair three linewidths apart
+    fitted as 172 units at 4.0 Hz beside 50 at 9.2 — instead of two 200-unit
+    3.23 Hz lines — and the residual left behind justified a third component.
+    Seeding from the structure already visible in the region fixed it.
+  * **A component below the noise.** Not a line however much it improves the
+    arithmetic.
+
+**Wired into the desktop path only.** `gsd_peak_pick` is shared by SpectraCheck,
+qNMR and the verifier, and a change there is a change to every peak list this
+platform has produced. Here it adds a column and takes nothing away: the count
+can only ever rise above the detector's, never fall below.
+
+A signal below the **limit of quantitation** is not split: on a real acquisition
+three signals fitted as more than one line, two standing at 842 and 121 sigma and
+one at 4.3, and claiming structure inside the third is claiming to read noise.
+Across six acquisitions, **10 of 173 signals** fit as more than one line.
+
+---
+
 ## v0.72.1 — Say what the analysis cannot separate (2026-08-27)
 
 Two lines closer than the detector's minimum separation come back as **one

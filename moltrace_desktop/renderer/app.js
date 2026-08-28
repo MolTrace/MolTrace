@@ -261,6 +261,18 @@
     // the count is a floor rather than a result, and a reader who misses that
     // will quote a number that means something else. A bullet among three others
     // is a bullet most readers skim.
+    const refined = (s.multiplets || []).filter((m) => m.resolved_lines > m.line_count)
+    if (refined.length) {
+      const note = document.createElement('p')
+      note.className = 'result__refined'
+      note.textContent =
+        `${refined.length} signal${refined.length === 1 ? '' : 's'} below fit as more than one line. `
+        + 'The detector reports one maximum per resolvable feature, so lines closer than it can '
+        + 'separate arrive as a single signal; fitting the window asks whether more than one '
+        + 'explains it better than noise allows.'
+      wrap.append(note)
+    }
+
     if (s.saturated) {
       const warn = document.createElement('p')
       warn.className = 'result__warning'
@@ -300,7 +312,12 @@
         m.center_ppm.toFixed(3),
         m.multiplicity,
         m.j_couplings_hz.length ? m.j_couplings_hz.map((j) => j.toFixed(1)).join(', ') : '—',
-        String(m.line_count),
+        // "1 (2 fitted)" where a deconvolution finds more lines in the window
+        // than the detector reported as maxima. Shown in the Lines column rather
+        // than as a separate one: it is the same quantity, read two ways.
+        m.resolved_lines > m.line_count
+          ? `${m.line_count} (${m.resolved_lines} fitted)`
+          : String(m.line_count),
         Number.isFinite(m.width_hz) && m.width_hz > 0 ? m.width_hz.toFixed(1) : '—',
         `${(m.relative_area * 100).toFixed(1)}%`,
       ]
