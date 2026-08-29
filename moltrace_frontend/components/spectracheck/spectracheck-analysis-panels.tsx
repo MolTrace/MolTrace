@@ -14,6 +14,7 @@ import {
 import { GsdResultsPanel, type SpectrumGSDAnalyzeResult } from "@/components/spectracheck/gsd-analysis-ui"
 import { isRecord } from "@/components/spectracheck/spectracheck-nmr-result-parse"
 import type {
+  SpectrumExpansion,
   SpectrumIntegralRegion,
   SpectrumMultipletBracket,
 } from "@/components/science/SpectrumViewer"
@@ -152,7 +153,11 @@ export function SpectraCheckAnalysisPanels({
 export function useSpectrumAnalysisOverlays(
   gsdResult: SpectrumGSDAnalyzeResult | null,
   integralRegions: RegionIntegrationResult[],
-): { integrals: SpectrumIntegralRegion[]; multipletBrackets: SpectrumMultipletBracket[] } {
+): {
+  integrals: SpectrumIntegralRegion[]
+  multipletBrackets: SpectrumMultipletBracket[]
+  expansions: SpectrumExpansion[]
+} {
   const multipletState = useGsdMultipletAnalysis(gsdResult, 0.5)
 
   const integrals = useMemo(
@@ -186,6 +191,31 @@ export function useSpectrumAnalysisOverlays(
     })
   }, [multipletState])
 
-  return { integrals, multipletBrackets }
+  /**
+   * Expansion candidates: the busiest multiplets, widened slightly so the
+   * lines are not flush against the box edge.
+   *
+   * Ranked by line count rather than width — the regions worth magnifying are
+   * the ones carrying the most structure, not the widest. Three at most; the
+   * viewer caps there too, and past three the main trace is what suffers.
+   */
+  const expansions = useMemo(() => {
+    const scored = multipletBrackets
+      .map((b) => {
+        const lines = (b.label.match(/,/g)?.length ?? 0) + (b.label ? 1 : 0)
+        const pad = Math.max(Math.abs(b.to - b.from) * 0.25, 0.01)
+        return {
+          lines,
+          from: Math.min(b.from, b.to) - pad,
+          to: Math.max(b.from, b.to) + pad,
+          label: b.label,
+        }
+      })
+      .filter((e) => Number.isFinite(e.from) && Number.isFinite(e.to))
+    scored.sort((a, b) => b.lines - a.lines)
+    return scored.slice(0, 3).map(({ from, to, label }) => ({ from, to, label }))
+  }, [multipletBrackets])
+
+  return { integrals, multipletBrackets, expansions }
 }
 

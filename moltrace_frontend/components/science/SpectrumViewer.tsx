@@ -87,6 +87,20 @@ export type SpectrumIntegralRegion = {
   relative: number
 }
 
+/**
+ * A ppm window to redraw magnified, as a boxed inset over the main trace.
+ *
+ * An inset magnifies what the trace already carries; it does not recover
+ * detail the wire never sent. The backend's display-point budget is the
+ * binding constraint on lineshape, so a crowded multiplet expanded here is
+ * limited by that budget, not by this component.
+ */
+export type SpectrumExpansion = {
+  from: number
+  to: number
+  label?: string
+}
+
 /** A multiplet span with its first-order label, e.g. "d, J = 7.2 Hz". */
 export type SpectrumMultipletBracket = {
   from: number
@@ -132,6 +146,13 @@ export type SpectrumViewerProps = {
   integrals?: SpectrumIntegralRegion[]
   /** Multiplet spans + first-order labels, drawn as brackets under the trace. */
   multipletBrackets?: SpectrumMultipletBracket[]
+  /**
+   * Magnified ppm windows, drawn as boxed insets across the top of the frame
+   * with the source region outlined on the main axes. Native Plotly inset axes
+   * (an extra x/y pair with a fractional `domain`), so they survive SVG export
+   * as vector rather than needing a second chart.
+   */
+  expansions?: SpectrumExpansion[]
   /**
    * Optional observed-trace sampling budget. Processed spectra use the compact
    * defaults; raw FID can opt into a denser Plotly trace so fine multiplet
@@ -887,6 +908,7 @@ function SpectrumViewerImpl({
   observedPointsPerPixel = VIEWPORT_POINTS_PER_PIXEL,
   integrals,
   multipletBrackets,
+  expansions,
   defaultShowPeaks = false,
   defaultShowPeakGuides = false,
   className,
@@ -903,6 +925,9 @@ function SpectrumViewerImpl({
   // the rest of the spectrum is visible. Auto-enabled — uses the runtime
   // detector below to decide whether a mask is actually needed.
   const [maskDominantPeak, setMaskDominantPeak] = useState(true)
+  // Off by default: insets take the top third of the plot, and a reader who
+  // has not asked for them wants the whole frame for the spectrum.
+  const [showExpansions, setShowExpansions] = useState(false)
   // Compact mode (default) keeps the chart at ~360 px so the rest of Step 3
   // (KPI tiles, picked peaks, evidence panels) remains on screen. The user
   // can expand it via the toolbar when they need more vertical room for
@@ -1174,6 +1199,111 @@ function SpectrumViewerImpl({
    * that do not collide with the apex label row at 92% — integrals ride at
    * 70-86%, brackets sit just above the floor.
    */
+  /**
+   * Boxed expansion insets.
+   *
+   * Each window is resampled AGAINST ITS OWN RANGE, so an inset draws the
+   * source points inside that window at inset density rather than magnifying
+   * the coarse full-view trace — which would blow up the same vertices and show
+   * nothing new. What it cannot do is exceed what the wire carries: the
+   * backend's display budget is the binding constraint on lineshape, so a
+   * multiplet the backend under-sampled stays under-sampled here.
+   *
+   * Capped at three. Insets consume plot area, and past three the main trace is
+   * the thing that suffers.
+   */
+  const expansionInsets = useMemo(() => {
+    const usable = (showExpansions ? expansions ?? [] : [])
+      .map((e) => ({
+        ...e,
+        lo: Math.min(e.from, e.to),
+        hi: Math.max(e.from, e.to),
+      }))
+      .filter((e) => Number.isFinite(e.lo) && Number.isFinite(e.hi) && e.hi > e.lo)
+      .slice(0, 3)
+    if (usable.length === 0 || x.length === 0) {
+      return { traces: [] as object[], axes: {} as Record<string, object>, shapes: [] as object[] }
+    }
+
+    const traces: object[] = []
+    const axes: Record<string, object> = {}
+    const shapes: object[] = []
+    // Insets ride the top third, left to right, leaving the apex label row clear.
+    const top = 0.98
+    const bottom = 0.66
+    const gap = 0.03
+    const width = (1 - gap * (usable.length + 1)) / usable.length
+
+    usable.forEach((expansion, index) => {
+      const n = index + 2 // x2/y2 upward; x/y stay the main axes
+      const left = gap + index * (width + gap)
+      const sample = sampleSpectrumTraceForPlot(x, displaySourceY, {
+        maxPoints: spectrumPointBudgetForWidth(Math.max(160, plotPixelWidth * width)),
+        xRange: [expansion.lo, expansion.hi],
+        maskRange: null,
+      })
+      if (sample.x.length === 0) return
+
+      traces.push({
+        type: renderMode === "webgl" ? "scattergl" : "scatter",
+        mode: "lines",
+        x: sample.x,
+        y: Array.from(sample.y, (v) => scaleDisplayYValue(v, displayScale)),
+        xaxis: `x${n}`,
+        yaxis: `y${n}`,
+        line: { width: 1, color: "#2563eb" },
+        showlegend: false,
+        hoverinfo: "skip",
+      })
+      axes[`xaxis${n}`] = {
+        domain: [left, left + width],
+        anchor: `y${n}`,
+        // Same convention as the main axis: high ppm on the left.
+        range: reversedXAxis ? [expansion.hi, expansion.lo] : [expansion.lo, expansion.hi],
+        showgrid: false,
+        zeroline: false,
+        fixedrange: true,
+        tickfont: { size: 8 },
+        nticks: 3,
+      }
+      axes[`yaxis${n}`] = {
+        domain: [bottom, top],
+        anchor: `x${n}`,
+        showgrid: false,
+        zeroline: false,
+        fixedrange: true,
+        // The inset is a shape readout, not a second intensity scale — showing
+        // ticks here would invite reading two different y scales as one.
+        showticklabels: false,
+      }
+      // Outline the source region on the MAIN axes so the reader can see what
+      // each box magnifies.
+      shapes.push({
+        type: "rect",
+        xref: "x",
+        yref: "paper",
+        x0: expansion.lo,
+        x1: expansion.hi,
+        y0: 0,
+        y1: 0.62,
+        line: { width: 1, dash: "dot", color: "rgba(100,116,139,0.6)" },
+        fillcolor: "rgba(0,0,0,0)",
+        layer: "below",
+      })
+    })
+
+    return { traces, axes, shapes }
+  }, [
+    expansions,
+    showExpansions,
+    x,
+    displaySourceY,
+    plotPixelWidth,
+    displayScale,
+    renderMode,
+    reversedXAxis,
+  ])
+
   const analysisOverlayLayout = useMemo(() => {
     const shapes: object[] = []
     const annotations: object[] = []
@@ -1390,6 +1520,7 @@ function SpectrumViewerImpl({
         })
       }
     }
+    traces.push(...expansionInsets.traces)
     return traces
   }, [
     observedSample,
@@ -1401,6 +1532,8 @@ function SpectrumViewerImpl({
     renderMode,
     showPeaks,
     showPredicted,
+  
+    expansionInsets,
   ])
 
   /**
@@ -1450,8 +1583,11 @@ function SpectrumViewerImpl({
         showgrid: false,
         fixedrange: true,
       },
+      ...expansionInsets.axes,
       yaxis: {
         title: yLabel,
+        // Yield the top third to the insets rather than drawing under them.
+        ...(expansionInsets.traces.length > 0 ? { domain: [0, 0.6] } : {}),
         // Anchored to the robust source range — the baseline stays visible
         // instead of being clipped at y=0, and dominant solvent peaks can
         // still clip at the top like a standard NMR display.
@@ -1471,7 +1607,12 @@ function SpectrumViewerImpl({
       // label row near the top of the frame. The drop-line gives the eye a
       // direct mapping from peak → ppm axis; the apex tick + rotated label
       // makes the multiplicity readable at any zoom level.
-      shapes: [...peakGuideShapes, ...peakApexLabelLayout.shapes, ...analysisOverlayLayout.shapes],
+      shapes: [
+        ...peakGuideShapes,
+        ...peakApexLabelLayout.shapes,
+        ...analysisOverlayLayout.shapes,
+        ...expansionInsets.shapes,
+      ],
       annotations: [...peakApexLabelLayout.annotations, ...analysisOverlayLayout.annotations],
       transition: { duration: 0 },
       uirevision: "spectrum",
@@ -1490,6 +1631,7 @@ function SpectrumViewerImpl({
       peakGuideShapes,
       peakApexLabelLayout,
       analysisOverlayLayout,
+      expansionInsets,
     ],
   )
 
@@ -2403,6 +2545,22 @@ function SpectrumViewerImpl({
                 <Minus className="h-3.5 w-3.5" aria-hidden />
                 <span className="sr-only">Shorter peaks</span>
               </Button>
+              {(expansions?.length ?? 0) > 0 ? (
+                <Button
+                  type="button"
+                  variant={showExpansions ? "secondary" : "outline"}
+                  size="icon"
+                  className="h-7 w-7"
+                  onClick={() => setShowExpansions((v) => !v)}
+                  title={showExpansions ? "Hide expansion insets" : "Show expansion insets"}
+                  aria-pressed={showExpansions}
+                >
+                  <Layers className="h-3.5 w-3.5" aria-hidden />
+                  <span className="sr-only">
+                    {showExpansions ? "Hide expansion insets" : "Show expansion insets"}
+                  </span>
+                </Button>
+              ) : null}
               <Button
                 type="button"
                 variant="outline"

@@ -1495,7 +1495,7 @@ export function SpectraCheckRawFidSection({
   // Region integrals are reported upward by the integration panel below; the
   // chart draws exactly what that table computed, from the same request.
   const [integralRegions, setIntegralRegions] = useState<RegionIntegrationResult[]>([])
-  const { integrals, multipletBrackets } = useSpectrumAnalysisOverlays(gsdResult, integralRegions)
+  const { integrals, multipletBrackets, expansions } = useSpectrumAnalysisOverlays(gsdResult, integralRegions)
   const archiveFacts = extractRawFidArchiveFacts(displayPayload)
   const referencing = extractReferenceReadout(displayPayload)
   const sha = archiveFacts.sha
@@ -2417,6 +2417,7 @@ export function SpectraCheckRawFidSection({
                   peaks={viewerPeaks}
                   integrals={integrals}
                   multipletBrackets={multipletBrackets}
+                  expansions={expansions}
                   nucleus={resolvedNucleus}
                 />
               ) : processLoading || previewLoading || previewSpectrumLoading ? (
