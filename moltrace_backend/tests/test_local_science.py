@@ -572,12 +572,19 @@ def test_a_saturated_detector_says_the_count_is_a_floor() -> None:
     """The detector keeps a fixed number of candidates and discards the rest.
 
     A spectrum that hits that ceiling has been TRUNCATED, so its count is a floor
-    rather than a finding. Measured: four instrument-processed 13C acquisitions
-    came back at exactly the level-2 ceiling and were reported as 68 to 188
-    distinct signals. No 13C spectrum of a real compound has 188 carbons, and a
-    chemist shown that number stops trusting everything beside it.
+    rather than a finding. Measured when this was written: four instrument-processed
+    13C acquisitions came back at exactly the level-2 ceiling and were reported as
+    68 to 188 distinct signals. No 13C spectrum of a real compound has 188 carbons,
+    and a chemist shown that number stops trusting everything beside it.
 
     Both halves, because a warning on every spectrum is a warning nobody reads.
+
+    This used to also require that SOMETHING here saturates, which was true when the
+    13C height gate sat at 1.4x MAD instead of 3.5x. Correcting that estimator was
+    the point of the fix, and it took the four saturating acquisitions with it — so
+    the requirement had become a requirement that the bug come back, and it went red
+    on the first green run after the correction. What survives is the contract: a
+    truncated result says so, and an untruncated one does not.
     """
     from moltrace.spectroscopy.peaks.gsd import _MAX_PEAKS_BY_LEVEL
     from nmrcheck.local_science import _DEFAULT_GSD_LEVEL, open_spectrum
@@ -589,7 +596,7 @@ def test_a_saturated_detector_says_the_count_is_a_floor() -> None:
 
     saturated = [r for r in results if r["peak_count"] >= ceiling]
     clean = [r for r in results if r["peak_count"] < ceiling]
-    assert saturated, "nothing saturates here — this guard is asserting against an empty set"
+    assert clean, "nothing here is untruncated — this guard is asserting against an empty set"
 
     for result in saturated:
         assert result["saturated"] is True, "a truncated result did not say it was truncated"
