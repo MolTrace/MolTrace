@@ -201,16 +201,62 @@ def resolve_region(
         if improvement < _CHI2_3DOF_P999:
             break
 
+        candidate = _components(params, field_mhz)
+
         # A component that does not clear the noise is not a line, however much
         # it improves the arithmetic. Same floor the detector uses.
-        candidate = _components(params, field_mhz)
         if any(component.height < noise_sigma * _MIN_COMPONENT_SIGMA for component in candidate):
+            break
+
+        # TWO COMPONENTS ON TOP OF EACH OTHER ARE ONE LINE.
+        #
+        # A real line is not exactly Lorentzian — shimming leaves it slightly
+        # asymmetric — and least squares will happily model that asymmetry with a
+        # second component sitting almost on top of the first. Measured on a real
+        # acquisition: three strong carbons came back as two components separated
+        # by 0.2 to 0.8 Hz against linewidths of 1 to 3 Hz, which is a fourteenth
+        # to a quarter of a linewidth. Nothing is resolvable at that separation;
+        # the second component is lineshape, not chemistry.
+        #
+        # The earlier Voigt guard could not see this because a Voigt is
+        # SYMMETRIC. Asymmetry is what buys the second component.
+        if _components_overlap(candidate, min_fwhm_hz, field_mhz):
             break
 
         previous_rss = rss
         best = candidate
 
     return best
+
+
+#: How far apart two components must sit to be two lines, in linewidths.
+#:
+#: Chosen from the measured gap between what this recovers and what it invents:
+#: validated pairs are recovered from 1.0 linewidth apart, while the artefacts
+#: measured on real acquisitions sat at 0.07 to 0.27. Half a linewidth is between
+#: the two with room on both sides.
+_MIN_COMPONENT_SEPARATION_LINEWIDTHS = 0.5
+
+
+def _components_overlap(
+    components: list[Component], min_fwhm_hz: float, field_mhz: float
+) -> bool:
+    """Are any two of these so close that they are one line?"""
+    if len(components) < 2:
+        return False
+    centres_hz = sorted(c.position_ppm * field_mhz for c in components)
+    widths = [c.fwhm_hz for c in components if c.fwhm_hz > 0]
+    # The BROADEST component sets the scale, not the narrowest.
+    #
+    # Using the minimum lets an artefact define the floor that is meant to catch
+    # it: a spurious narrow component shrinks the linewidth, which shrinks the
+    # separation required, which admits the component. Measured — a 0.44 Hz
+    # component beside a 1.09 Hz line at 0.25 Hz separation scored 0.56
+    # linewidths against a 0.50 floor and survived; against the real line it is
+    # 0.23 and does not.
+    linewidth = max(widths) if widths else min_fwhm_hz
+    floor = max(linewidth * _MIN_COMPONENT_SEPARATION_LINEWIDTHS, min_fwhm_hz)
+    return any(b - a < floor for a, b in zip(centres_hz, centres_hz[1:], strict=False))
 
 
 def _components(params: np.ndarray, field_mhz: float) -> list[Component]:
