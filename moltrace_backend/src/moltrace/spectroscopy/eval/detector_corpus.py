@@ -190,6 +190,76 @@ def synthesise_clustered(
     )
 
 
+def synthesise_multiplet(
+    *,
+    nucleus: str,
+    field_mhz: float,
+    points: int,
+    sweep_ppm: tuple[float, float],
+    fwhm_hz: float,
+    spacing_hz: float,
+    lines_per_multiplet: int = 3,
+    multiplet_count: int = 6,
+    snr: float = 40.0,
+    noise_sigma: float = 1.0,
+    seed: int = 0,
+    label: str = "",
+) -> SyntheticAcquisition:
+    """Multiplets of EQUAL-HEIGHT lines at a caller-chosen spacing.
+
+    ``synthesise_clustered`` above plants weak partners on the shoulder of a
+    dominant line, which asks whether prominence drops a small peak beside a big
+    one. That is an intensity-contrast question. This asks a different one: do
+    lines of the SAME height, close together, survive — and how close is too
+    close?
+
+    Spacing is a parameter rather than a constant precisely so it can be swept.
+    Two independent measurements on the real corpus point at line separation as
+    where the detector loses things: recall against the curated carbon shifts
+    correlates -0.729 with how many carbons a molecule has (93% mean recall at
+    <=6 assigned carbons against 42% above), and a survey of fitted-centre drift
+    found the band immediately below the half-gap cut empty. Neither could be
+    tested here, because every existing planted line sits further apart than the
+    gap those findings implicate.
+
+    That real corpus is 12 acquisitions and cannot grow — 13 13C acquisitions
+    exist on disk and 12 already carry curated shifts — so the hypothesis cannot
+    be strengthened by measuring more spectra. Only by varying the suspected
+    cause directly, which is what a spacing parameter is for.
+
+    Equal heights are the point. A multiplet's lines differ by binomial weights,
+    not orders of magnitude, so a detector that keeps the tallest and drops its
+    neighbours fails differently here than it does on a solvent shoulder.
+    """
+    rng = np.random.default_rng(seed)
+    high, low = max(sweep_ppm), min(sweep_ppm)
+    ppm = np.linspace(high, low, points)
+    hz = ppm * field_mhz
+    intensity = rng.normal(0.0, noise_sigma, points)
+    planted: list[PlantedLine] = []
+
+    span = high - low
+    # Multiplets spread evenly across the middle 80% of the sweep, so no group
+    # sits close enough to another to blur the question being asked.
+    for index in range(multiplet_count):
+        centre = low + span * (0.1 + 0.8 * (index + 0.5) / multiplet_count)
+        first = -(lines_per_multiplet - 1) / 2.0
+        for line in range(lines_per_multiplet):
+            offset_hz = (first + line) * spacing_hz
+            position = centre + offset_hz / field_mhz
+            intensity += snr * noise_sigma * _lorentzian(hz, position * field_mhz, fwhm_hz)
+            planted.append(
+                PlantedLine(position_ppm=float(position), snr=float(snr), fwhm_hz=fwhm_hz)
+            )
+
+    return SyntheticAcquisition(
+        spectrum=NMRSpectrum(data=intensity, ppm_axis=ppm, nucleus=nucleus, field_mhz=field_mhz),
+        lines=tuple(planted),
+        noise_sigma=noise_sigma,
+        label=label or f"multiplet-{nucleus}-J{spacing_hz:.1f}Hz",
+    )
+
+
 def default_corpus(seed: int = 20260827) -> list[SyntheticAcquisition]:
     """Acquisitions spanning the measured parameter ranges.
 
@@ -297,19 +367,43 @@ def score_detection(
     tol_ppm = (acquisition.lines[0].fwhm_hz * tolerance_linewidths) / field if field else 0.01
     picked = np.asarray(sorted(picked_ppm), dtype=float)
 
+    # ONE PICK SATISFIES ONE LINE. Each planted line used to take its own
+    # nearest pick, so a single peak inside tolerance of several planted lines
+    # was credited to all of them. That inflates recall exactly where lines are
+    # close together — which is the regime this corpus exists to probe.
+    # Measured on 3-line multiplets at 100 MHz, FWHM 3.23 Hz: below ~1 spacing
+    # per linewidth the detector returns one merged peak per multiplet, and the
+    # old rule scored that 100% where the truth is 33%. `recall_against_curated`
+    # in curated_shifts already enforced this constraint; this did not.
+    #
+    # Assigned nearest-pair-first, so a pick goes to the line it sits closest to
+    # rather than to whichever line happened to be considered first.
+    candidates: list[tuple[float, int, int]] = []
+    for line_index, line in enumerate(acquisition.lines):
+        if picked.size == 0:
+            break
+        for pick_index in range(int(picked.size)):
+            distance = abs(float(picked[pick_index]) - line.position_ppm)
+            if distance <= tol_ppm:
+                candidates.append((distance, line_index, pick_index))
+    candidates.sort()
+
     matched_picks: set[int] = set()
+    matched_lines: dict[int, int] = {}
+    for _distance, line_index, pick_index in candidates:
+        if line_index in matched_lines or pick_index in matched_picks:
+            continue
+        matched_lines[line_index] = pick_index
+        matched_picks.add(pick_index)
+
     by_band: dict[str, tuple[int, int]] = {}
     for name, low, high in BANDS:
-        in_band = [line for line in acquisition.lines if low <= line.snr < high]
-        found = 0
-        for line in in_band:
-            if picked.size == 0:
-                continue
-            distances = np.abs(picked - line.position_ppm)
-            nearest = int(np.argmin(distances))
-            if distances[nearest] <= tol_ppm:
-                found += 1
-                matched_picks.add(nearest)
+        in_band = [
+            index
+            for index, line in enumerate(acquisition.lines)
+            if low <= line.snr < high
+        ]
+        found = sum(1 for index in in_band if index in matched_lines)
         by_band[name] = (found, len(in_band))
 
     return DetectionScore(
