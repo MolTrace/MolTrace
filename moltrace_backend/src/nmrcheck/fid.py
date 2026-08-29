@@ -1672,6 +1672,12 @@ def _apply_line_broadening(
     return windowed
 
 
+# First-order phase ramps from this index. nmrglue's ``ps`` uses 0, and every
+# reporting path here now agrees, so a reported (p0, p1) pair reproduces the
+# spectrum it describes when replayed. Three conventions used to coexist.
+_PHASE_PIVOT_INDEX = 0
+
+
 def _phase_spectrum(spectrum: np.ndarray, *, ph0: float, ph1: float = 0.0, pivot: int | None = None) -> np.ndarray:
     size = int(np.asarray(spectrum).size)
     if size <= 1:
@@ -1727,8 +1733,11 @@ def _fallback_auto_phase_grid(
     *,
     include_p1: bool = True,
 ) -> tuple[np.ndarray, dict[str, Any]]:
-    real_initial = np.real(spectrum)
-    pivot = int(np.argmax(np.abs(real_initial))) if real_initial.size else None
+    # Searched about the shared pivot rather than argmax(|real|). The grid used
+    # to optimise about the tallest point and report that index, so its angles
+    # only reproduced the spectrum if the caller also applied that pivot — which
+    # no replay path does.
+    pivot = _PHASE_PIVOT_INDEX
     best_ph0 = 0.0
     best_ph1 = 0.0
     best_score = phase_score(np.real(spectrum), np.imag(spectrum))
@@ -1842,14 +1851,18 @@ def _auto_phase_spectrum(
             warnings,
         )
     if normalized_mode == "manual":
-        phased = apply_phase(spectrum, p0=phase_p0, p1=phase_p1)
+        # Pivot 0, the convention nmrglue's ps uses and the one the other paths
+        # here already report. Manual silently used size // 2 while reporting it,
+        # so replaying a reported (p0, p1) pair reproduced a different spectrum
+        # than the run it came from.
+        phased = apply_phase(spectrum, p0=phase_p0, p1=phase_p1, pivot=_PHASE_PIVOT_INDEX)
         return (
             phased,
             {
                 "phase_mode": "manual",
                 "zero_order_degrees": round(float(phase_p0), 3),
                 "first_order_degrees": round(float(phase_p1), 3),
-                "pivot_index": int(spectrum.size // 2 if spectrum.size else 0),
+                "pivot_index": _PHASE_PIVOT_INDEX,
                 "phase_score": round(float(phase_score(np.real(phased), np.imag(phased))), 6),
                 "phase_correction_applied": not (
                     math.isclose(float(phase_p0), 0.0, abs_tol=1e-12)
