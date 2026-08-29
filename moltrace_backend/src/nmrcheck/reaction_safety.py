@@ -120,6 +120,7 @@ def screen_smiles(smiles: str | None) -> dict[str, Any]:
             "parsed": False,
             "flagged_groups": [],
             "overall_risk": "unknown",
+            "risk_basis": "not_screened",
             "requires_expert_review": True,
             "disclaimer": _DISCLAIMER,
             "screen_version": _SCREEN_VERSION,
@@ -131,6 +132,7 @@ def screen_smiles(smiles: str | None) -> dict[str, Any]:
             "parsed": False,
             "flagged_groups": [],
             "overall_risk": "unknown",
+            "risk_basis": "not_screened",
             "requires_expert_review": True,
             "disclaimer": _DISCLAIMER,
             "screen_version": _SCREEN_VERSION,
@@ -159,6 +161,17 @@ def screen_smiles(smiles: str | None) -> dict[str, Any]:
         "parsed": True,
         "flagged_groups": flagged,
         "overall_risk": overall,
+        # What "low" actually means here. Every severity in the SMARTS table is medium, high
+        # or critical, so `low` is produced by exactly one thing -- `_worst([])`, no listed
+        # motif matched. Reported as a bare risk level it reads as an assessment, and it is
+        # not one: this screen knows a finite list of energetic groups, and a hazard outside
+        # that list is indistinguishable from no hazard at all.
+        #
+        # The verdict vocabulary is deliberately unchanged. reaction_forward documents the
+        # frozen engine as the thing overlays strengthen rather than edit, `_RANK` orders on
+        # it, and the frontend renders it -- so this says what the value MEANS beside it,
+        # the same way the DP4 surfaces carry their disclosure beside the number.
+        "risk_basis": "matched_listed_motifs" if flagged else "no_listed_motifs",
         "requires_expert_review": overall != "low",
         "disclaimer": _DISCLAIMER,
         "screen_version": _SCREEN_VERSION,
