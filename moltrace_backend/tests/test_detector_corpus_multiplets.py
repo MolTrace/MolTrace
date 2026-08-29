@@ -66,25 +66,38 @@ class TestRecallDegradesWithLineSpacing:
 
     @pytest.mark.slow
     def test_well_separated_multiplets_are_fully_recovered(self) -> None:
-        """~2.5 linewidths apart and wider: nothing should be lost.
+        """3.7 linewidths apart: the genuinely easy case.
 
-        THE 8.0 Hz CASE IS NOT THE EASY ONE ITS NAME SUGGESTS. At the measured
-        13C FWHM of 3.23 Hz it is 2.48 linewidths, and it recalls 100% only
-        because of the own-line judgement in ``gsd._fit_single_peak`` (13f9629).
-        Measured with that judgement disabled and nothing else changed:
+        Kept separate from the 2.48-linewidth case below, which shares none of
+        its cause. A failure here is the peak picker losing lines that are not
+        close to anything.
+        """
+        assert _recall_at(12.0) == pytest.approx(1.0)
+
+    @pytest.mark.slow
+    def test_lines_two_and_a_half_linewidths_apart_survive_the_fitter(self) -> None:
+        """8.0 Hz at the measured 13C FWHM of 3.23 Hz is 2.48 linewidths, and it
+        is NOT an easy case — it recalls 100% only because of the own-line
+        judgement in ``gsd._fit_single_peak`` (13f9629). Measured with that
+        judgement disabled and nothing else changed:
 
             J/FWHM   4.95  3.72  2.48  1.86  1.24
             with     100%  100%  100%   44%   33%
             without  100%  100%   56%   33%   33%
 
-        So this assertion is what pins that fix, and 12.0 Hz is the genuinely
-        easy case beside it. If this goes red at 8.0 while 12.0 stays green, look
-        at the fitter before the detector: a fitted centre free to walk onto its
-        neighbour is deduplicated away as a duplicate of the line it became, which
-        is a merge produced one line at a time rather than by the peak picker.
+        So this assertion is what pins that fix. It sat under a name promising
+        "well separated multiplets", which would have sent whoever saw it go red
+        to read the peak picker; the cause is one line at a time in the fitter —
+        a fitted centre free to walk onto its neighbour, then deduplicated away
+        as a duplicate of the line it became. Same merged output as the picker
+        produces below ~1.2 linewidths, entirely different code, so the name has
+        to separate them.
+
+        Reading it against its neighbours: red here with 12.0 Hz green is the
+        fitter; red at 12.0 too is the picker; the 1/3 floor below is the picker
+        and the fitter cannot reach it.
         """
         assert _recall_at(8.0) == pytest.approx(1.0)
-        assert _recall_at(12.0) == pytest.approx(1.0)
 
     @pytest.mark.slow
     def test_recall_collapses_once_lines_close_to_within_two_linewidths(self) -> None:
