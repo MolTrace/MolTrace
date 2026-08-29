@@ -14,6 +14,31 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.74.1 — A withdrawn label must take its coupling with it (2026-08-29)
+
+v0.74.0 gated only the first-order label. Two routes to a coupling stayed open:
+the complex-hypothesis step could still hand the same lines a confident `dd`, and
+the fallback still reported their spacings in a column headed **couplings**.
+Measured: four signals kept 9.5 to 28.9 Hz couplings after their doublet labels
+had been withdrawn — the label corrected, the number beside it left standing,
+which is the same claim in a different cell.
+
+A spacing between two independent carbons is a shift difference. Those four now
+report no couplings at all.
+
+**And the intensity check was too strict, which the platform's own reference test
+caught.** Binomial coefficients describe n EQUIVALENT neighbours; n DIFFERENT
+couplings give all lines EQUAL. A dd is 1:1:1:1 and a ddd is eight equal lines,
+nothing like the 1:7:21:35:35:21:7:1 of seven equivalent neighbours. Omitting
+that family reclassified **quinine's H10 vinyl ddd** as `m` and discarded its
+couplings.
+
+Three families are accepted now — binomial, trinomial (deuterium is spin-1), and
+uniform — and adding the third does not reopen the hole the check exists to
+close: two lines 186:1 apart are not equal either. Both halves proven red.
+
+---
+
 ## v0.74.0 — A multiplet must have the intensities of one, not just the spacings (2026-08-29)
 
 `_build_multiplet_for_cluster` chose its label from inter-line SPACINGS alone, so

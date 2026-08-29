@@ -59,6 +59,30 @@ def test_deuterium_is_spin_one_and_its_septet_survives() -> None:
     assert _trinomial_pattern(7) == [1.0, 3.0, 6.0, 7.0, 6.0, 3.0, 1.0]
 
 
+def test_a_dd_and_a_ddd_have_EQUAL_lines_and_are_accepted() -> None:
+    """The false-positive half, and the one that bit.
+
+    Binomial coefficients describe n EQUIVALENT neighbours. n DIFFERENT couplings
+    give all lines equal: a dd is 1:1:1:1 and a ddd is eight equal lines, nothing
+    like the 1:7:21:35:35:21:7:1 of seven equivalent neighbours. Omitting that
+    family reclassified quinine's H10 vinyl ddd as `m` and discarded its
+    couplings — caught by the reference test, which is exactly what it is for.
+    """
+    from moltrace.spectroscopy.multiplet.analysis import _uniform_pattern
+
+    assert _uniform_pattern(4) == [1.0, 1.0, 1.0, 1.0]
+    assert _intensities_fit_a_multiplet(_lines(1.0, 1.0, 1.0, 1.0)), "a dd was rejected"
+    assert _intensities_fit_a_multiplet(
+        _lines(1.0, 1.1, 0.95, 1.05, 1.0, 0.9, 1.02, 0.98)
+    ), "a ddd with ordinary scatter was rejected"
+
+
+def test_the_uniform_family_does_not_reopen_the_hole() -> None:
+    """Accepting equal lines must not accept a 186:1 pair — they are not equal."""
+    for ratio in (62.0, 186.0, 237.0):
+        assert not _intensities_fit_a_multiplet(_lines(ratio, 1.0))
+
+
 def test_a_spin_half_triplet_is_accepted() -> None:
     assert _binomial_pattern(3) == [1.0, 2.0, 1.0]
     assert _intensities_fit_a_multiplet(_lines(1.0, 2.0, 1.0))
@@ -123,3 +147,76 @@ def test_the_label_on_a_real_spectrum_changes_only_where_it_should() -> None:
             f"a {multiplet.multiplicity_label} at {multiplet.center_ppm:.3f} ppm has lines "
             f"{extreme:.0f}:1 apart — that is two signals, not one multiplet"
         )
+
+
+def test_a_rejected_pattern_reports_no_couplings_either() -> None:
+    """Correcting the label and leaving the number beside it is the same claim.
+
+    The first fix gated only the first-order label. Step 3 could still hand these
+    lines a confident `dd`, and step 4 still reported their spacings in a column
+    headed "couplings" — measured, four signals kept 9.5 to 28.9 Hz couplings
+    after their doublet labels had been withdrawn. A spacing between two
+    independent carbons is a shift difference, not a coupling.
+    """
+    import glob
+    import os
+
+    from moltrace.spectroscopy.io.fid_reader import read_processed_spectrum
+    from moltrace.spectroscopy.multiplet.analysis import detect_multiplets
+    from moltrace.spectroscopy.peaks.gsd import gsd_peak_pick
+
+    roots = sorted(
+        {p.split("/pdata")[0] for p in glob.glob("tests/fixtures/**/pdata", recursive=True)}
+    )
+    spectrum = None
+    for root in roots:
+        try:
+            candidate = read_processed_spectrum(os.fspath(root))
+        except Exception:  # noqa: BLE001
+            continue
+        if "13C" in candidate.nucleus:
+            spectrum = candidate
+            break
+    if spectrum is None:
+        pytest.skip("no instrument-processed 13C acquisition in this checkout")
+
+    offenders = []
+    for multiplet in detect_multiplets(gsd_peak_pick(spectrum)):
+        intensities = [max(float(p.intensity), 0.0) for p in multiplet.peaks]
+        if len(intensities) < 2 or min(intensities) <= 0:
+            continue
+        if not _intensities_fit_a_multiplet(multiplet.peaks) and multiplet.j_couplings_hz:
+            offenders.append(
+                (round(multiplet.center_ppm, 3), [round(j, 1) for j in multiplet.j_couplings_hz])
+            )
+    assert not offenders, (
+        f"signals whose intensities rule out a multiplet still report couplings: {offenders[:4]}"
+    )
+
+
+def test_a_pattern_that_FITS_keeps_its_couplings() -> None:
+    """The false-positive half. Withdrawing every coupling would also be wrong."""
+    import glob
+    import os
+
+    from moltrace.spectroscopy.io.fid_reader import read_processed_spectrum
+    from moltrace.spectroscopy.multiplet.analysis import detect_multiplets
+    from moltrace.spectroscopy.peaks.gsd import gsd_peak_pick
+
+    roots = sorted(
+        {p.split("/pdata")[0] for p in glob.glob("tests/fixtures/**/pdata", recursive=True)}
+    )
+    for root in roots:
+        try:
+            spectrum = read_processed_spectrum(os.fspath(root))
+        except Exception:  # noqa: BLE001
+            continue
+        multiplets = detect_multiplets(gsd_peak_pick(spectrum))
+        keeping = [
+            m
+            for m in multiplets
+            if m.multiplicity_label not in {"s", "m"} and m.j_couplings_hz
+        ]
+        if keeping:
+            return
+    pytest.skip("no first-order multiplet with couplings in this checkout")
