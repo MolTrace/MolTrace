@@ -84,7 +84,11 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { AlertCard } from "@/components/dashboard/alert-card"
 import { ModuleCard } from "@/components/dashboard/module-card"
-import { SpectraCheckAnalysisPanels } from "@/components/spectracheck/spectracheck-analysis-panels"
+import {
+  SpectraCheckAnalysisPanels,
+  useSpectrumAnalysisOverlays,
+} from "@/components/spectracheck/spectracheck-analysis-panels"
+import type { RegionIntegrationResult } from "@/components/spectracheck/gsd-integration-panel"
 import { SpectraCheckRunTile } from "@/components/spectracheck/spectracheck-run-tile"
 import {
   DetectionResultsPanel,
@@ -404,6 +408,8 @@ function extractRawArchiveId(payload: unknown): string | null {
   }
   return null
 }
+
+
 
 export function SpectraCheckRawFidSection({
   sampleId,
@@ -1486,6 +1492,10 @@ export function SpectraCheckRawFidSection({
      `spectral_width_hz` and `time_domain_points` off the top level — names
      `SpectrumPreviewReport` (extra="forbid") does not declare, so they could
      never arrive and all three tiles were permanently blank. */
+  // Region integrals are reported upward by the integration panel below; the
+  // chart draws exactly what that table computed, from the same request.
+  const [integralRegions, setIntegralRegions] = useState<RegionIntegrationResult[]>([])
+  const { integrals, multipletBrackets } = useSpectrumAnalysisOverlays(gsdResult, integralRegions)
   const archiveFacts = extractRawFidArchiveFacts(displayPayload)
   const referencing = extractReferenceReadout(displayPayload)
   const sha = archiveFacts.sha
@@ -2405,6 +2415,8 @@ export function SpectraCheckRawFidSection({
                   x={xy.x}
                   y={xy.y}
                   peaks={viewerPeaks}
+                  integrals={integrals}
+                  multipletBrackets={multipletBrackets}
                   nucleus={resolvedNucleus}
                 />
               ) : processLoading || previewLoading || previewSpectrumLoading ? (
@@ -2910,6 +2922,7 @@ export function SpectraCheckRawFidSection({
         compoundClass={compoundClassForRequest(compoundClass) || undefined}
         displayPayload={displayPayload}
         testIdPrefix="raw-fid"
+        onIntegralRegionsChange={setIntegralRegions}
         resultsExtras={
           legacyDetectionResult ? (
             /* Raw-FID responses expose the same peaks + environments +

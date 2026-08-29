@@ -1,11 +1,22 @@
 "use client"
 
-import type { ReactNode } from "react"
+import { useMemo, type ReactNode } from "react"
 
-import { GsdIntegrationPanel } from "@/components/spectracheck/gsd-integration-panel"
+import {
+  GsdIntegrationPanel,
+  type RegionIntegrationResult,
+} from "@/components/spectracheck/gsd-integration-panel"
 import { GsdJCouplingPanel } from "@/components/spectracheck/gsd-jcoupling-panel"
-import { GsdMultipletPanel } from "@/components/spectracheck/gsd-multiplet-panel"
+import {
+  GsdMultipletPanel,
+  useGsdMultipletAnalysis,
+} from "@/components/spectracheck/gsd-multiplet-panel"
 import { GsdResultsPanel, type SpectrumGSDAnalyzeResult } from "@/components/spectracheck/gsd-analysis-ui"
+import { isRecord } from "@/components/spectracheck/spectracheck-nmr-result-parse"
+import type {
+  SpectrumIntegralRegion,
+  SpectrumMultipletBracket,
+} from "@/components/science/SpectrumViewer"
 import { ReferencesPanel } from "@/components/spectracheck/spectracheck-evidence-panels"
 import { ShiftPredictionPanel } from "@/components/spectracheck/shift-prediction-panel"
 import { SpectrumRetrievePanel } from "@/components/spectracheck/spectrum-retrieve-panel"
@@ -53,6 +64,8 @@ export type SpectraCheckAnalysisPanelsProps = {
    * group 1 so they cannot drift below the reference material.
    */
   resultsExtras?: ReactNode
+  /** Lifts the computed region integrals so the spectrum above can draw them. */
+  onIntegralRegionsChange?: (regions: RegionIntegrationResult[]) => void
 }
 
 export function SpectraCheckAnalysisPanels({
@@ -67,6 +80,7 @@ export function SpectraCheckAnalysisPanels({
   displayPayload,
   testIdPrefix,
   resultsExtras,
+  onIntegralRegionsChange,
 }: SpectraCheckAnalysisPanelsProps) {
   return (
     <>
@@ -98,6 +112,7 @@ export function SpectraCheckAnalysisPanels({
         solvent={solvent}
         fieldMhz={fieldMhz}
         testId={`${testIdPrefix}-integration-results-surface`}
+        onRegionsChange={onIntegralRegionsChange}
       />
 
       {resultsExtras}
@@ -120,3 +135,57 @@ export function SpectraCheckAnalysisPanels({
     </>
   )
 }
+
+/**
+ * Chart overlays derived from the analysis the panels below already ran.
+ *
+ * Lives here, beside the panels it reads, so both upload tabs get the same
+ * overlays from one implementation — the duplication that made those tabs drift
+ * is the thing this module exists to prevent.
+ *
+ * Integrals arrive by callback from the integration panel rather than a second
+ * request: method and region source are that panel's own state, so re-running
+ * the hook here would duplicate the POST per run AND could draw a different
+ * method than the table shows. Multiplets come from the WeakMap-cached hook two
+ * panels already share, so a third consumer costs nothing.
+ */
+export function useSpectrumAnalysisOverlays(
+  gsdResult: SpectrumGSDAnalyzeResult | null,
+  integralRegions: RegionIntegrationResult[],
+): { integrals: SpectrumIntegralRegion[]; multipletBrackets: SpectrumMultipletBracket[] } {
+  const multipletState = useGsdMultipletAnalysis(gsdResult, 0.5)
+
+  const integrals = useMemo(
+    () =>
+      integralRegions
+        .filter((r) => Array.isArray(r.region_ppm) && r.region_ppm.length === 2)
+        .map((r) => ({
+          from: Number(r.region_ppm[0]),
+          to: Number(r.region_ppm[1]),
+          relative: Number(r.relative_value),
+        }))
+        .filter((r) => Number.isFinite(r.from) && Number.isFinite(r.to) && Number.isFinite(r.relative)),
+    [integralRegions],
+  )
+
+  const multipletBrackets = useMemo(() => {
+    if (multipletState.status !== "ready") return []
+    const rows = (multipletState.result as unknown as { multiplets?: unknown }).multiplets
+    if (!Array.isArray(rows)) return []
+    return rows.flatMap((row): SpectrumMultipletBracket[] => {
+      if (!isRecord(row)) return []
+      const from = Number(row.range_start_ppm ?? row.from_ppm ?? row.start_ppm)
+      const to = Number(row.range_end_ppm ?? row.to_ppm ?? row.end_ppm)
+      if (!Number.isFinite(from) || !Number.isFinite(to)) return []
+      const pattern = typeof row.multiplicity === "string" ? row.multiplicity : ""
+      const js = Array.isArray(row.j_values_hz)
+        ? row.j_values_hz.map((j) => Number(j)).filter((j) => Number.isFinite(j))
+        : []
+      const jText = js.length > 0 ? `J = ${js.map((j) => j.toFixed(1)).join(", ")} Hz` : ""
+      return [{ from, to, label: [pattern, jText].filter(Boolean).join(", ") }]
+    })
+  }, [multipletState])
+
+  return { integrals, multipletBrackets }
+}
+

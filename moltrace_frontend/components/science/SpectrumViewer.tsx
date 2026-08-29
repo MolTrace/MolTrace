@@ -73,6 +73,27 @@ import {
  * chart by category so reviewers can see aromatic / aliphatic / labile groups
  * at a glance. See ``peak-category-style.ts`` for the palette.
  */
+/**
+ * A region integral, drawn as the classic stepped integral over the spectrum.
+ *
+ * `relative` is the RATIO the integration panel computed, never a proton count:
+ * the request model carries no structure on this route, so nothing grounds a
+ * proton budget and the chart label stays "rel." Relabelling it "H" would be
+ * the same class of error as letting a scaling rule decide a signal exists.
+ */
+export type SpectrumIntegralRegion = {
+  from: number
+  to: number
+  relative: number
+}
+
+/** A multiplet span with its first-order label, e.g. "d, J = 7.2 Hz". */
+export type SpectrumMultipletBracket = {
+  from: number
+  to: number
+  label: string
+}
+
 export type SpectrumPeakAnnotation = {
   ppm: number
   intensity?: number
@@ -99,6 +120,18 @@ export type SpectrumViewerProps = {
   yLabel?: string
   reversedXAxis?: boolean
   renderMode?: "svg" | "webgl"
+  /**
+   * Region integrals drawn over the trace. Deliberately NOT routed through
+   * `overlays.predicted`: that array feeds the y-range computation, and an
+   * integral has units of intensity x ppm — orders of magnitude above peak
+   * intensity — so it would drag the frame off the spectrum. It is also
+   * gain-scaled and envelope-resampled there, both wrong for a monotone step.
+   * These are drawn as layout shapes in data coordinates instead, exactly as
+   * the apex ticks are, which cannot disturb the observed range.
+   */
+  integrals?: SpectrumIntegralRegion[]
+  /** Multiplet spans + first-order labels, drawn as brackets under the trace. */
+  multipletBrackets?: SpectrumMultipletBracket[]
   /**
    * Optional observed-trace sampling budget. Processed spectra use the compact
    * defaults; raw FID can opt into a denser Plotly trace so fine multiplet
@@ -852,6 +885,8 @@ function SpectrumViewerImpl({
   renderMode = "svg",
   maxObservedPoints = MAX_VIEWPORT_TRACE_POINTS,
   observedPointsPerPixel = VIEWPORT_POINTS_PER_PIXEL,
+  integrals,
+  multipletBrackets,
   defaultShowPeaks = false,
   defaultShowPeakGuides = false,
   className,
@@ -1131,6 +1166,87 @@ function SpectrumViewerImpl({
    * a clipped residual solvent spike), the tick collapses to zero length
    * and the label sits next to the apex instead.
    */
+  /**
+   * Integral steps and multiplet brackets, in data coordinates.
+   *
+   * Built the same way the apex ticks are: yMin/yMax are INPUTS here and never
+   * outputs, so neither overlay can move the frame. They occupy reserved bands
+   * that do not collide with the apex label row at 92% — integrals ride at
+   * 70-86%, brackets sit just above the floor.
+   */
+  const analysisOverlayLayout = useMemo(() => {
+    const shapes: object[] = []
+    const annotations: object[] = []
+    if (!Number.isFinite(yMin) || !Number.isFinite(yMax) || yMax <= yMin) {
+      return { shapes, annotations }
+    }
+    const span = yMax - yMin
+
+    if (integrals && integrals.length > 0) {
+      const tallest = integrals.reduce((m, r) => Math.max(m, Math.abs(r.relative)), 0)
+      const base = yMin + span * 0.70
+      const headroom = span * 0.16
+      for (const region of integrals) {
+        const { from, to, relative } = region
+        if (![from, to, relative].every((v) => Number.isFinite(v))) continue
+        // Height encodes the ratio between regions; the label carries the number,
+        // so an unreadable height never has to be decoded.
+        const top = base + (tallest > 0 ? (Math.abs(relative) / tallest) * headroom : 0)
+        shapes.push({
+          type: "path",
+          xref: "x",
+          yref: "y",
+          // Riser, plateau, riser — the stepped integral a chemist reads.
+          path: `M ${from} ${base} L ${from} ${top} L ${to} ${top} L ${to} ${base}`,
+          line: { width: 1.1, color: "rgba(120,120,120,0.85)" },
+          layer: "above",
+        })
+        annotations.push({
+          xref: "x",
+          yref: "y",
+          x: (from + to) / 2,
+          y: top,
+          yshift: 8,
+          // "rel." not "H": nothing on this route grounds a proton count.
+          text: `${relative.toFixed(2)} rel.`,
+          showarrow: false,
+          font: { size: 9, color: "rgba(120,120,120,0.95)" },
+        })
+      }
+    }
+
+    if (multipletBrackets && multipletBrackets.length > 0) {
+      const floor = yMin + span * 0.045
+      const tick = span * 0.02
+      for (const bracket of multipletBrackets) {
+        const { from, to, label } = bracket
+        if (!Number.isFinite(from) || !Number.isFinite(to)) continue
+        shapes.push({
+          type: "path",
+          xref: "x",
+          yref: "y",
+          path: `M ${from} ${floor + tick} L ${from} ${floor} L ${to} ${floor} L ${to} ${floor + tick}`,
+          line: { width: 1, color: "var(--mt-teal-ink)" },
+          layer: "above",
+        })
+        if (label) {
+          annotations.push({
+            xref: "x",
+            yref: "y",
+            x: (from + to) / 2,
+            y: floor,
+            yshift: -9,
+            text: label,
+            showarrow: false,
+            font: { size: 9 },
+          })
+        }
+      }
+    }
+
+    return { shapes, annotations }
+  }, [integrals, multipletBrackets, yMin, yMax])
+
   const peakApexLabelLayout = useMemo(() => {
     if (!showPeakGuides || peakDisplayPoints.length === 0) {
       return { shapes: [] as object[], annotations: [] as object[] }
@@ -1355,8 +1471,8 @@ function SpectrumViewerImpl({
       // label row near the top of the frame. The drop-line gives the eye a
       // direct mapping from peak → ppm axis; the apex tick + rotated label
       // makes the multiplicity readable at any zoom level.
-      shapes: [...peakGuideShapes, ...peakApexLabelLayout.shapes],
-      annotations: peakApexLabelLayout.annotations,
+      shapes: [...peakGuideShapes, ...peakApexLabelLayout.shapes, ...analysisOverlayLayout.shapes],
+      annotations: [...peakApexLabelLayout.annotations, ...analysisOverlayLayout.annotations],
       transition: { duration: 0 },
       uirevision: "spectrum",
     }),
@@ -1373,6 +1489,7 @@ function SpectrumViewerImpl({
       hasPeakMarkers,
       peakGuideShapes,
       peakApexLabelLayout,
+      analysisOverlayLayout,
     ],
   )
 
