@@ -74,6 +74,7 @@ import {
   extractPeaksFromPayload,
   extractReferenceReadout,
   extractBaselineNoiseSigma,
+  extractFullTraceXY,
   extractRawFidArchiveFacts,
   extractSpectrumXY,
   isRecord,
@@ -1445,12 +1446,22 @@ export function SpectraCheckRawFidSection({
   // extractor produces fresh ``{x, y}`` arrays on every parent re-render
   // (e.g. typing the Sample ID field), which forces Plotly to redraw and
   // makes the chart shake/blink during unrelated interactions.
+  /* Prefer the packed full trace when the payload carries one: the viewer
+     resamples against the window on screen, so zooming then reaches source
+     density instead of magnifying a full-sweep decimation. Falls back to the
+     explicit preview points, which is also what a non-uniform axis gets. */
   const xyProcess = useMemo(
-    () => (processResult ? extractSpectrumXY(processResult) : null),
+    () =>
+      processResult
+        ? extractFullTraceXY(processResult) ?? extractSpectrumXY(processResult)
+        : null,
     [processResult],
   )
   const xyPreview = useMemo(
-    () => (previewResult ? extractSpectrumXY(previewResult) : null),
+    () =>
+      previewResult
+        ? extractFullTraceXY(previewResult) ?? extractSpectrumXY(previewResult)
+        : null,
     [previewResult],
   )
   // previewSpectrum is the auto-FT result chained from Preview — used when the

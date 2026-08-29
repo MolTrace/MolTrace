@@ -378,3 +378,60 @@ export function extractBaselineNoiseSigma(payload: unknown): number | undefined 
   return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : undefined
 }
 
+/**
+ * The whole trace, packed, at `metadata.full_trace`.
+ *
+ * A display budget computed over the full sweep cannot give zoom-level detail —
+ * measured on a 1H sweep whose source holds 16.4 points per linewidth, the
+ * shipped 12,000-point budget delivers 0.69 points per FWHM and even 65,536
+ * only reaches 3.66, because the budget is spread across the whole spectrum.
+ * Sending the trace once lets the viewer resample against whatever window is on
+ * screen and get source density when zoomed in.
+ *
+ * Nearly free on the wire: 7,450 preview points cost 487.7 KB (145.7 KB
+ * gzipped) against 512.0 KB (154.7 KB gzipped) for the full 98,304-point trace,
+ * because `SpectrumPoint` JSON is that verbose.
+ *
+ * x is reconstructed by interpolation, which the backend only permits itself
+ * when the axis is uniform — it returns nothing otherwise, and the caller falls
+ * back to the explicit preview points.
+ */
+export function extractFullTraceXY(payload: unknown): { x: number[]; y: number[] } | null {
+  if (!isRecord(payload)) return null
+  const metadata = isRecord(payload.metadata) ? payload.metadata : null
+  const trace = metadata && isRecord(metadata.full_trace) ? metadata.full_trace : null
+  if (!trace) return null
+  if (trace.encoding !== "base64_float32_le") return null
+
+  const n = Number(trace.point_count)
+  const first = Number(trace.ppm_first)
+  const last = Number(trace.ppm_last)
+  const encoded = trace.intensity
+  if (
+    !Number.isFinite(n) ||
+    n < 2 ||
+    !Number.isFinite(first) ||
+    !Number.isFinite(last) ||
+    typeof encoded !== "string"
+  ) {
+    return null
+  }
+
+  let bytes: Uint8Array
+  try {
+    const binary = atob(encoded)
+    bytes = new Uint8Array(binary.length)
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+  } catch {
+    return null
+  }
+  if (bytes.byteLength !== n * 4) return null
+
+  const values = new Float32Array(bytes.buffer, bytes.byteOffset, n)
+  const y = Array.from(values, (v) => Number(v))
+  const step = (last - first) / (n - 1)
+  const x = new Array<number>(n)
+  for (let i = 0; i < n; i++) x[i] = first + step * i
+  return { x, y }
+}
+

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import csv
 import io
 import math
@@ -7,6 +8,8 @@ import re
 from dataclasses import dataclass
 from statistics import median
 from typing import Any, NamedTuple
+
+import numpy as np
 
 from .baseline import (
     apply_bernstein_baseline_correction,
@@ -363,6 +366,59 @@ def _downsample_processed_display_points(
             selected[midpoint[2]] = midpoint
     ordered = [selected[idx] for idx in sorted(selected)]
     return [SpectrumPoint(shift_ppm=x, intensity=y) for x, y, _ in ordered[:safe_limit]]
+
+
+def compact_uniform_trace(
+    points: list[tuple[float, float]],
+    *,
+    max_points: int = 262144,
+    tolerance: float = 1e-6,
+) -> dict[str, Any] | None:
+    """The whole trace as packed float32, for a viewer that needs to zoom.
+
+    A display budget computed over the FULL sweep cannot give zoom-level detail,
+    because it is spread across the whole spectrum. Measured on a 1H sweep whose
+    source holds 16.4 points per linewidth: the shipped 12000-point budget
+    delivers 0.69 points per FWHM, and even 65536 only reaches 3.66. Raising it
+    costs wire in proportion and still never arrives.
+
+    Sending the trace once fixes it instead of chasing it — the client resamples
+    against whatever window is on screen and gets source density when zoomed in.
+    It is close to free because `SpectrumPoint` JSON is so verbose: measured on a
+    real fixture, 7,450 preview points cost 487.7 KB (145.7 KB gzipped) while the
+    full 98,304-point trace as base64 float32 costs 512.0 KB (154.7 KB gzipped) —
+    13x the data for about 6% more wire.
+
+    Returns None when the ppm axis is not uniform, because the compact form
+    reconstructs x by interpolation and would otherwise misplace every point.
+    Both raw-FID axis paths are uniform (np.linspace, or nmrglue's ppm_scale),
+    so this is a guard against a future non-uniform source rather than a case
+    that occurs today.
+    """
+    n = len(points)
+    if n < 2 or n > max_points:
+        return None
+    xs = [float(x) for x, _ in points]
+    first, last = xs[0], xs[-1]
+    span = last - first
+    if not math.isfinite(span) or span == 0.0:
+        return None
+    step = span / (n - 1)
+    scale = max(abs(first), abs(last), 1.0)
+    for index in range(1, n - 1):
+        expected = first + step * index
+        if abs(xs[index] - expected) > tolerance * scale:
+            return None
+    ys = np.asarray([y for _, y in points], dtype=np.float32)
+    if not np.all(np.isfinite(ys)):
+        return None
+    return {
+        "encoding": "base64_float32_le",
+        "point_count": n,
+        "ppm_first": first,
+        "ppm_last": last,
+        "intensity": base64.b64encode(ys.tobytes()).decode("ascii"),
+    }
 
 
 def _serialized_downsampled_points(
