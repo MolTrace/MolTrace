@@ -608,3 +608,54 @@ def test_a_saturated_detector_says_the_count_is_a_floor() -> None:
         assert not any("floor" in limit.lower() for limit in result["limits"]), (
             "an untruncated result carries a truncation warning"
         )
+
+
+@pytest.mark.slow
+def test_a_signal_below_the_quantitation_floor_claims_no_structure() -> None:
+    """A pattern and a coupling are structural claims, and this module has a floor.
+
+    `_resolved_line_count` already refuses to split a signal that is not itself
+    quantifiable -- "A SIGNAL THAT IS NOT ITSELF QUANTIFIABLE IS NOT CREDIBLY TWO
+    SIGNALS" -- but the multiplicity label and the couplings were assembled
+    unconditionally, so a row the desktop prints under "Detected, but not strong
+    enough to measure" still carried a pattern and a J value. The caveat written
+    for those rows withdraws a shift and an integral; it does not withdraw a
+    coupling constant.
+
+    Measured before the fix over the public Bruker acquisitions: 8 rows in the
+    first 8 acquisitions claimed structure below the floor, every one of them
+    carrying a coupling. The worst sits on a proton-decoupled 13C acquisition
+    (PULPROG zgpg30, CPDPRG2 waltz16) and reports a triplet with J = 22.07 Hz at
+    3.8 sigma -- a coupling that experiment cannot produce, on a signal the
+    module has already said it cannot read numbers off.
+    """
+    from nmrcheck.local_science import open_spectrum
+
+    sources = _acquisitions()
+    if not sources:
+        pytest.skip("no acquisition in this checkout")
+
+    below_floor = 0
+    offenders: list[str] = []
+    for source in sources:
+        try:
+            result = open_spectrum(source)
+        except Exception:  # noqa: BLE001 - unreadable fixtures are a different test's business
+            continue
+        for signal in result["multiplets"]:
+            if signal["quantifiable"]:
+                continue
+            below_floor += 1
+            if signal["j_couplings_hz"] or signal["multiplicity"]:
+                offenders.append(
+                    f"{os.path.basename(source)} {signal['name']} "
+                    f"{signal['multiplicity']!r} J={signal['j_couplings_hz']} "
+                    f"snr={signal['snr']:.1f}"
+                )
+
+    # A guard that never sees a row below the floor proves nothing.
+    assert below_floor, "no acquisition produced a signal below the quantitation floor"
+    assert not offenders, (
+        f"{len(offenders)} of {below_floor} signals below the quantitation floor still "
+        "claim a pattern or a coupling:\n  " + "\n  ".join(offenders[:10])
+    )

@@ -191,6 +191,48 @@ def _readable_refusal(error: Exception, source: Path) -> str:
 _QUANTIFIABLE_SIGMA = 10.0
 
 
+
+def _summarise_multiplet(
+    spectrum: NMRSpectrum,
+    multiplet: object,
+    baseline_sigma: float,
+    total_area: float,
+) -> MultipletSummary:
+    """One signal, with every claim held to the floor this module declares.
+
+    A MULTIPLICITY AND A COUPLING ARE STRUCTURAL CLAIMS, so they are withheld
+    below `_QUANTIFIABLE_SIGMA` for the same reason `_resolved_line_count`
+    refuses to split a signal there: a shape read off a three-sigma bump is a
+    shape read off noise. This was applied to the line count and not to the
+    label, so 227 of 227 signals below the floor still carried a pattern, 37 of
+    them with a coupling constant attached. The worst was a triplet at J = 22.07
+    Hz on a signal standing 3.8 times the baseline noise, in a proton-decoupled
+    13C acquisition (PULPROG zgpg30, CPDPRG2 waltz16) whose experiment cannot
+    produce a carbon-proton coupling at all.
+
+    Withheld at the boundary rather than blanked in the display, because the
+    label is a claim wherever it is read, and a reader added later would
+    otherwise inherit it. `snr` is computed once here; it decided the flag and
+    was separately recomputed for it.
+    """
+    snr = _signal_to_noise(spectrum, multiplet, baseline_sigma)
+    quantifiable = snr >= _QUANTIFIABLE_SIGMA
+    return MultipletSummary(
+        name=multiplet.name,
+        center_ppm=float(multiplet.center_ppm),
+        range_ppm=(float(multiplet.range_ppm[0]), float(multiplet.range_ppm[1])),
+        multiplicity=str(multiplet.multiplicity_label) if quantifiable else "",
+        j_couplings_hz=(
+            [round(float(j), 2) for j in multiplet.j_couplings_hz] if quantifiable else []
+        ),
+        line_count=len(multiplet.peaks),
+        width_hz=float(max((p.width_hz for p in multiplet.peaks), default=0.0)),
+        resolved_lines=_resolved_line_count(spectrum, multiplet, baseline_sigma),
+        snr=snr,
+        quantifiable=quantifiable,
+        relative_area=float(sum(abs(p.area) for p in multiplet.peaks) / total_area),
+    )
+
 def _baseline_sigma(spectrum: NMRSpectrum) -> float:
     """The noise width, measured the way the detector measures it.
 
@@ -453,21 +495,7 @@ def open_spectrum(path: str) -> dict:
     baseline_sigma = _baseline_sigma(spectrum)
 
     summaries = [
-        MultipletSummary(
-            name=m.name,
-            center_ppm=float(m.center_ppm),
-            range_ppm=(float(m.range_ppm[0]), float(m.range_ppm[1])),
-            multiplicity=str(m.multiplicity_label),
-            j_couplings_hz=[round(float(j), 2) for j in m.j_couplings_hz],
-            line_count=len(m.peaks),
-            width_hz=float(max((p.width_hz for p in m.peaks), default=0.0)),
-            resolved_lines=_resolved_line_count(spectrum, m, baseline_sigma),
-            snr=_signal_to_noise(spectrum, m, baseline_sigma),
-            quantifiable=(
-                _signal_to_noise(spectrum, m, baseline_sigma) >= _QUANTIFIABLE_SIGMA
-            ),
-            relative_area=float(sum(abs(p.area) for p in m.peaks) / total_area),
-        )
+        _summarise_multiplet(spectrum, m, baseline_sigma, total_area)
         for m in multiplets
     ]
 
