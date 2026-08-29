@@ -123,6 +123,46 @@ def test_fuse_is_calibrated_and_rt_downweights() -> None:
     assert fused[1].signals["rt_corroboration"] == pytest.approx(0.1)
 
 
+def test_absolute_msms_support_survives_the_fusion() -> None:
+    """Min-max normalisation erases how good the MS evidence actually was.
+
+    It maps the best candidate to 1.0 whatever its raw score, so a set whose CSI scores are
+    two orders of magnitude worse fuses to byte-identical output. Measured before this: CSI
+    {0.95, 0.60, 0.20} and {0.0095, 0.0060, 0.0020} both produced msms 1.0 and a combined
+    score of 0.5921 for the leader. Relative ordering is the right thing for the blend --
+    the raw scale is not comparable across runs -- but the absolute support has to survive
+    somewhere, or nothing downstream can gate on "the MS evidence was weak".
+    """
+
+    dp4 = {"a": 0.5, "b": 0.3, "c": 0.2}
+    strong = fuse_candidates(dp4=dp4, msms={"a": 0.95, "b": 0.60, "c": 0.20})[0]
+    weak = fuse_candidates(dp4=dp4, msms={"a": 0.0095, "b": 0.0060, "c": 0.0020})[0]
+
+    # The normalised blend is still relative, and still identical -- that part is by design.
+    assert strong.signals["msms"] == weak.signals["msms"] == 1.0
+
+    # The raw score is what tells them apart, and it must be there.
+    assert strong.signals["msms_raw"] == pytest.approx(0.95)
+    assert weak.signals["msms_raw"] == pytest.approx(0.0095)
+
+
+def test_a_fusion_without_ms_says_so_rather_than_scoring_zero() -> None:
+    """An absent signal and a signal that found nothing are different claims.
+
+    ``signals`` carries a key only for signals present, so a consumer reading
+    ``signals.get("msms", 0.0)`` gets 0.0 for a run where MS was never performed -- the same
+    value it would get if MS had run and supported nothing.
+    """
+
+    only_nmr = fuse_candidates(dp4={"a": 0.6, "b": 0.4})[0]
+    assert "msms" not in only_nmr.signals
+    assert "msms_raw" not in only_nmr.signals
+    assert any("MS/MS" in note for note in only_nmr.notes), only_nmr.notes
+
+    with_ms = fuse_candidates(dp4={"a": 0.6, "b": 0.4}, msms={"a": 0.9, "b": 0.1})[0]
+    assert not [note for note in with_ms.notes if "MS/MS" in note and "no" in note.lower()]
+
+
 def test_fuse_renormalises_when_a_signal_is_missing() -> None:
     # A has both NMR + MS evidence; B has only NMR — weights renormalise per candidate
     fused = fuse_candidates(dp4={"A": 0.6, "B": 0.4}, msms={"A": -5.0})
