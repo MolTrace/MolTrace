@@ -124,3 +124,54 @@ def test_metrics_payload_bundles_metrics_and_provenance():
     assert payload["provenance"]["spectracheck_session_ids"] == [3, 4]
     assert payload["dmta_sequence"] == list(DMTA_SEQUENCE)
     assert payload["engine"] == "reaction_loop.v1"
+
+
+def test_scores_reach_the_metering_so_best_objective_is_not_null_by_construction():
+    """The cycle-proposal path used to pass only a batch size.
+
+    `compute_loop_metrics(new_experiment_count=...)` with no scores returns best_objective
+    None and total_experiments 0, so every "how far has this campaign got" number the loop
+    UI rendered was null by construction rather than by absence of data -- the inputs were
+    in scope at the call site.
+    """
+
+    bare = compute_loop_metrics(new_experiment_count=3)
+    assert bare.best_objective is None
+    assert bare.total_experiments == 0
+
+    with_scores = compute_loop_metrics(experiment_scores=[41.0, 58.5, 62.0], new_experiment_count=3)
+    assert with_scores.best_objective == 62.0
+    assert with_scores.total_experiments == 3
+    # Still null, and now for a stated reason rather than by accident: the objective profile
+    # stores per-field target thresholds that nothing reduces to one scalarized target, and
+    # inventing that reduction would put a rule inside a metric.
+    assert with_scores.experiments_to_target is None
+
+
+def test_provenance_separates_the_surrogate_version_from_its_algorithm_family():
+    """The audit trail promises a version; it was handed the type.
+
+    `surrogate_model_version` used to receive `bo_run.model_type` -- "gaussian_process",
+    an algorithm family, recorded under a version's name. Both are real provenance facts and
+    they now occupy their own keys.
+    """
+
+    payload = build_cycle_metrics_payload(
+        compute_loop_metrics(experiment_scores=[10.0], new_experiment_count=1),
+        bo_run_id=7,
+        surrogate_model_version="phase50.1",
+        surrogate_model_type="gaussian_process",
+    )
+    provenance = payload["provenance"]
+    assert provenance["surrogate_model_version"] == "phase50.1"
+    assert provenance["surrogate_model_type"] == "gaussian_process"
+
+    # A run with no surrogate record records no version, rather than substituting the type.
+    absent = build_cycle_metrics_payload(
+        compute_loop_metrics(new_experiment_count=1),
+        bo_run_id=8,
+        surrogate_model_version=None,
+        surrogate_model_type="random_forest",
+    )
+    assert absent["provenance"]["surrogate_model_version"] is None
+    assert absent["provenance"]["surrogate_model_type"] == "random_forest"

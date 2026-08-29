@@ -925,12 +925,38 @@ def propose_next_cycle(
         session_factory, project_id, payload, actor=actor
     )
 
-    metrics = reaction_loop.compute_loop_metrics(new_experiment_count=payload.batch_size)
+    # The loop metering used to receive only a batch size, so best_objective,
+    # total_experiments and experiments_to_target were null by construction on every cycle
+    # the UI rendered -- "how far has this campaign got" answered with nothing, from a call
+    # site that had the answer in scope.
+    #
+    # The scores come from the same objective profile and the same _score_outcome the
+    # surrogate trains on, so a rendered metric and the model cannot disagree about what an
+    # experiment scored.
+    #
+    # Timestamps are deliberately still not passed. build_cycle_metrics_payload attaches
+    # this block to the NEW draft cycle, which has not run yet, so it has no elapsed time;
+    # the source cycle's latency is a different quantity and labelling it as this one's
+    # would be worse than leaving it null. objective_target likewise: the profile stores
+    # target_thresholds_json, a per-field mapping that nothing currently reduces to a single
+    # scalarized target, and inventing that reduction here would put a rule in a metric.
+    experiment_scores = reaction_bo.chronological_objective_scores(session_factory, project_id)
+    metrics = reaction_loop.compute_loop_metrics(
+        experiment_scores=experiment_scores,
+        new_experiment_count=payload.batch_size,
+    )
     cycle_metrics = reaction_loop.build_cycle_metrics_payload(
         metrics,
         bo_run_id=bo_run.id,
-        surrogate_model_version=getattr(bo_run, "model_type", None)
-        or getattr(bo_run, "model_version", None),
+        # The surrogate's VERSION, which is what the audit trail promises, taken from the
+        # surrogate record this run wrote. `model_type` is the algorithm family
+        # ("gaussian_process") and is always present on the run, so reading it here recorded
+        # the type under a version's name and made the `model_version` fallback unreachable.
+        # Kept separately rather than dropped: which family ran is a real provenance fact.
+        surrogate_model_version=reaction_bo.surrogate_model_version_for_run(
+            session_factory, bo_run.id
+        ),
+        surrogate_model_type=getattr(bo_run, "model_type", None),
     )
     return create_optimization_cycle(
         session_factory,

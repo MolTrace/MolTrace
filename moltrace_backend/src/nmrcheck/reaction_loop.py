@@ -204,6 +204,7 @@ def build_cycle_metrics_payload(
     *,
     bo_run_id: int | None = None,
     surrogate_model_version: str | None = None,
+    surrogate_model_type: str | None = None,
     spectracheck_session_ids: Sequence[int] | None = None,
     spectracheck_model_version_ids: Sequence[int] | None = None,
 ) -> dict[str, Any]:
@@ -218,6 +219,10 @@ def build_cycle_metrics_payload(
         "provenance": {
             "bo_run_id": bo_run_id,
             "surrogate_model_version": surrogate_model_version,
+            # The algorithm family, kept in its own key. It used to be written INTO
+            # surrogate_model_version, which recorded the type under a version's name --
+            # "gaussian_process" where an auditor reading the trail expects a revision.
+            "surrogate_model_type": surrogate_model_type,
             "spectracheck_session_ids": list(spectracheck_session_ids or []),
             "spectracheck_model_version_ids": list(spectracheck_model_version_ids or []),
         },
