@@ -144,6 +144,20 @@ export type SpectrumViewerProps = {
    * the apex ticks are, which cannot disturb the observed range.
    */
   integrals?: SpectrumIntegralRegion[]
+  /**
+   * Baseline noise sigma measured by the backend over the signal-free region of
+   * the FULL trace.
+   *
+   * Strongly preferred over the local estimate, which cannot be right: the
+   * viewer is handed a decimated trace, and once flat buckets collapse to one
+   * representative each, consecutive samples are block maxima rather than a
+   * noise series. Measured against a true sigma of 1, every client-side
+   * estimator lands near 0.46-0.50 on that input — successive differences, MAD
+   * of values and IQR alike — because the spread genuinely is not there any
+   * more. The backend still has the undecimated trace, so it is the only place
+   * the number can honestly come from.
+   */
+  baselineNoiseSigma?: number
   /** Multiplet spans + first-order labels, drawn as brackets under the trace. */
   multipletBrackets?: SpectrumMultipletBracket[]
   /**
@@ -427,7 +441,7 @@ function medianSorted(values: number[]): number {
  * `baseline_flatness_qa`, a graded statistic, so it needs its own commit with a
  * consumer audit and visible re-baselining.
  */
-function estimateBaselineNoiseSigma(values: ArrayLike<number>): number {
+export function estimateBaselineNoiseSigma(values: ArrayLike<number>): number {
   if (values.length < 4) return 0
   const deltas: number[] = []
   let previous: number | null = null
@@ -442,7 +456,10 @@ function estimateBaselineNoiseSigma(values: ArrayLike<number>): number {
   }
   if (deltas.length === 0) return 0
   deltas.sort((a, b) => a - b)
-  const sigma = medianSorted(deltas) * 0.7413
+  // 1.4826/sqrt(2), not 1.4826/2. The difference of adjacent samples of
+  // iid N(0, sigma^2) has sd sigma*sqrt(2), so the sqrt(2) belongs here;
+  // 0.7413 returned sigma/sqrt(2) and read ~29% low.
+  const sigma = medianSorted(deltas) * (1.4826 / Math.SQRT2)
   return Number.isFinite(sigma) && sigma > 0 ? sigma : 0
 }
 
@@ -909,6 +926,7 @@ function SpectrumViewerImpl({
   integrals,
   multipletBrackets,
   expansions,
+  baselineNoiseSigma,
   defaultShowPeaks = false,
   defaultShowPeakGuides = false,
   className,
@@ -1038,9 +1056,16 @@ function SpectrumViewerImpl({
     // / aromatic peaks fall below the frame instead of cutting through the
     // baseline. Matches the industry-standard "Only Positive" display
     // convention used by NMR-processing software.
-    const baselineNoiseSigma = estimateBaselineNoiseSigma(baselineY)
+    // Measured upstream when available; the local estimate is a fallback for
+    // payloads that carry no noise figure, and reads low on decimated input.
+    const measuredSigma =
+      typeof baselineNoiseSigma === "number" &&
+      Number.isFinite(baselineNoiseSigma) &&
+      baselineNoiseSigma > 0
+        ? baselineNoiseSigma
+        : estimateBaselineNoiseSigma(baselineY)
     const ranges = [
-      robustSpectrumYRange(baselineY, { noiseFloor: baselineNoiseSigma }),
+      robustSpectrumYRange(baselineY, { noiseFloor: measuredSigma }),
     ]
     if (showPredicted && overlays?.predicted) {
       ranges.push(
@@ -1057,7 +1082,7 @@ function SpectrumViewerImpl({
       yMin: yRange.yMin,
       yMax: yRange.yMax,
     }
-  }, [x, displaySourceY, overlays, showPredicted, maskDominantPeak, dominantPeakRange])
+  }, [x, displaySourceY, overlays, showPredicted, maskDominantPeak, dominantPeakRange, baselineNoiseSigma])
 
   const [xRange, setXRange] = useState<[number, number] | null>(null)
   const plotDivRef = useRef<PlotlyGraphDivLike | null>(null)

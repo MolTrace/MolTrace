@@ -353,3 +353,28 @@ export function describeReferenceMode(mode: string | null): string | null {
       return null
   }
 }
+
+/**
+ * Baseline noise sigma measured by the backend over the signal-free region of
+ * the full trace, at `metadata.display_preprocessing.trace_smoothing.noise_sigma`.
+ *
+ * The viewer cannot compute this for itself. It is handed a decimated trace, and
+ * once flat buckets collapse to one representative each its samples are block
+ * maxima rather than a noise series — measured against a true sigma of 1, every
+ * client-side estimator lands near 0.46-0.50 on that input. The undecimated
+ * trace only exists upstream, so the number has to come from there.
+ *
+ * Free-form metadata, so no contract change and no schema regeneration.
+ */
+export function extractBaselineNoiseSigma(payload: unknown): number | undefined {
+  if (!isRecord(payload)) return undefined
+  const metadata = isRecord(payload.metadata) ? payload.metadata : null
+  const display = metadata && isRecord(metadata.display_preprocessing)
+    ? metadata.display_preprocessing
+    : null
+  const smoothing = display && isRecord(display.trace_smoothing) ? display.trace_smoothing : null
+  const raw = smoothing?.noise_sigma
+  const value = typeof raw === "string" ? Number(raw) : raw
+  return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : undefined
+}
+

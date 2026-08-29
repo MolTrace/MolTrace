@@ -6,6 +6,7 @@ import {
   extractNotes,
   extractRawFidArchiveFacts,
   describeReferenceMode,
+  extractBaselineNoiseSigma,
   displayedDatasetName,
   extractReferenceReadout,
 } from "@/components/spectracheck/spectracheck-nmr-result-parse"
@@ -297,6 +298,30 @@ describe("extractReferenceReadout", () => {
       expect(describeReferenceMode(mode)).not.toContain("_")
     }
     expect(describeReferenceMode("something_new")).toBeNull()
+  })
+})
+
+describe("extractBaselineNoiseSigma", () => {
+  it("reads the sigma the backend measured on the undecimated trace", () => {
+    expect(
+      extractBaselineNoiseSigma({
+        metadata: {
+          display_preprocessing: { trace_smoothing: { noise_sigma: 3256.280991 } },
+        },
+      }),
+    ).toBe(3256.280991)
+  })
+
+  it("returns undefined rather than a guess when the payload carries none", () => {
+    expect(extractBaselineNoiseSigma({})).toBeUndefined()
+    expect(extractBaselineNoiseSigma({ metadata: {} })).toBeUndefined()
+    expect(extractBaselineNoiseSigma(null)).toBeUndefined()
+    // A non-positive or non-finite sigma is no sigma at all.
+    expect(
+      extractBaselineNoiseSigma({
+        metadata: { display_preprocessing: { trace_smoothing: { noise_sigma: 0 } } },
+      }),
+    ).toBeUndefined()
   })
 })
 
