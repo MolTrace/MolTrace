@@ -339,6 +339,89 @@ def detect_multiplets(
 # ---------------------------------------------------------------------------
 
 
+#: How far an observed line pattern may sit from the pattern a real multiplet
+#: has, as a ratio. Generous on purpose: the point is to reject 200:1, not to
+#: adjudicate 1.4:1.
+_INTENSITY_PATTERN_TOLERANCE = 3.0
+
+
+def _intensities_fit_a_multiplet(peaks: list[Peak]) -> bool:
+    """Do these lines have the INTENSITIES a multiplet has, not just the spacings?
+
+    **The label was decided from spacings alone**, so any two lines whose gap fell
+    inside the J window became a doublet however unequal they were. Measured on a
+    real 13C acquisition: four signals in the quantifiable half were labelled
+    doublets with J of 25-29 Hz and line ratios of **62, 101, 186 and 237 to
+    one**. A doublet is one nucleus split by one neighbour — its two lines are
+    equal. Those were a strong carbon beside a weak line a quarter of a ppm away,
+    which is an ordinary gap between two distinct carbons, and the reported J was
+    the gap rather than a coupling.
+
+    The tell that this is the right check: the same spectrum's DMSO-d6 septet
+    measures 1.0 : 3.1 : 6.2 : 7.3 : 6.2 : 3.1 : 1.0 against the 1:3:6:7:6:3:1
+    expected for coupling to three spin-1 deuterons. The pattern is there when
+    the multiplet is real.
+
+    Both families are accepted, because both occur: spin-1/2 neighbours give
+    binomial coefficients, and DEUTERIUM IS SPIN-1 and gives trinomial ones. A
+    binomial-only check would reject that septet, which is the most confidently
+    correct assignment on the page.
+
+    Returns True when the observed pattern matches either family, and True for
+    anything this cannot judge — the caller's other checks still apply, and a
+    silent extra rejection here would be worse than the label it prevents.
+    """
+    intensities = [max(float(p.intensity), 0.0) for p in peaks]
+    n = len(intensities)
+    if n < 2 or not any(intensities):
+        return True
+
+    peak_max = max(intensities)
+    if peak_max <= 0:
+        return True
+    observed = [v / peak_max for v in intensities]
+
+    for expected in (_binomial_pattern(n), _trinomial_pattern(n)):
+        if expected is None:
+            continue
+        top = max(expected)
+        scaled = [v / top for v in expected]
+        # Compared as ratios rather than differences: a multiplet's small outer
+        # lines carry the shape, and an absolute tolerance would ignore them.
+        if all(
+            max(o, s) <= min(o, s) * _INTENSITY_PATTERN_TOLERANCE
+            for o, s in zip(observed, scaled, strict=True)
+            if max(o, s) > 0.02
+        ):
+            return True
+    return False
+
+
+def _binomial_pattern(n: int) -> list[float] | None:
+    """n lines from n-1 equivalent spin-1/2 neighbours: Pascal's triangle."""
+    from math import comb
+
+    if n < 2:
+        return None
+    return [float(comb(n - 1, k)) for k in range(n)]
+
+
+def _trinomial_pattern(n: int) -> list[float] | None:
+    """n lines from m equivalent spin-1 neighbours (deuterium), n = 2m + 1."""
+    if n < 3 or n % 2 == 0:
+        return None
+    m = (n - 1) // 2
+    row = [1.0]
+    for _ in range(m):
+        nxt = [0.0] * (len(row) + 2)
+        for i, v in enumerate(row):
+            nxt[i] += v
+            nxt[i + 1] += v
+            nxt[i + 2] += v
+        row = nxt
+    return row
+
+
 def _build_multiplet_for_cluster(
     *,
     cluster_peaks: list[Peak],
@@ -402,7 +485,11 @@ def _build_multiplet_for_cluster(
     # --- Step 2: first-order Pascal-triangle match ---------------------------
     mean_spacing = sum(spacings_hz) / len(spacings_hz)
     eq_tol = max(0.6, mean_spacing * 0.18)
-    if all(abs(s - mean_spacing) <= eq_tol for s in spacings_hz) and n <= 7:
+    if (
+        all(abs(s - mean_spacing) <= eq_tol for s in spacings_hz)
+        and n <= 7
+        and _intensities_fit_a_multiplet(cluster_peaks)
+    ):
         label = _SIMPLE_LABEL[n]
         return Multiplet(
             name=placeholder_name,
