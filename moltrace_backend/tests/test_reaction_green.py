@@ -501,3 +501,47 @@ def test_green_metrics_cross_project_returns_404(client):
             headers=headers,
         )
         assert wrong_get.status_code == 404
+
+
+def test_green_score_carries_the_mass_it_was_actually_computed_over():
+    """A score averaged over 9 % of the mass must not read like one averaged over all of it.
+
+    Unrecognised solvents are excluded from BOTH the numerator and the denominator, so the
+    average is taken over recognised mass only. Measured: 500 g of an unlisted solvent plus
+    50 g of water scores 100.0 -- the greenest value available -- from 9 % of the material,
+    while 500 g toluene + 50 g water scores an honest 54.88 from 100 %. The score is
+    persisted onto the outcome and then scalarized and Pareto'd, so without its coverage the
+    optimizer is steered toward conditions nobody could assess.
+
+    The zero-coverage case was already handled (no score, explicit warning). This is the
+    partial case, which looked identical to a complete one.
+    """
+
+    from nmrcheck.models import ReactionGreenComponent, ReactionGreenMetricsRequest
+    from nmrcheck.reaction_green import _compute_green_metrics
+
+    def _c(name, mass):
+        return ReactionGreenComponent(name=name, mass_g=mass, role="solvent")
+
+    mostly_unknown, warnings, _ = _compute_green_metrics(
+        ReactionGreenMetricsRequest(components=[_c("Unobtainium-7", 500.0), _c("water", 50.0)]),
+        solvent_overrides={},
+    )
+    assert mostly_unknown["green_score"] == pytest.approx(100.0)
+    # 50 g of 550 g was assessable.
+    assert mostly_unknown["green_score_mass_coverage"] == pytest.approx(50.0 / 550.0)
+    assert any("Unobtainium-7" in w for w in warnings)
+
+    fully_known, _, _ = _compute_green_metrics(
+        ReactionGreenMetricsRequest(components=[_c("toluene", 500.0), _c("water", 50.0)]),
+        solvent_overrides={},
+    )
+    assert fully_known["green_score_mass_coverage"] == pytest.approx(1.0)
+
+    # And a perfect score over ALL the mass is still reported as such -- coverage is a
+    # qualifier on the number, not a penalty against it.
+    all_water, _, _ = _compute_green_metrics(
+        ReactionGreenMetricsRequest(components=[_c("water", 50.0)]), solvent_overrides={}
+    )
+    assert all_water["green_score"] == pytest.approx(100.0)
+    assert all_water["green_score_mass_coverage"] == pytest.approx(1.0)
