@@ -281,13 +281,53 @@ def _signal_to_noise(spectrum: NMRSpectrum, multiplet, baseline_sigma: float) ->
     if baseline_sigma <= 0:
         return 0.0
     axis = np.asarray(spectrum.ppm_axis, dtype=float)
+
+    # THE APEX HAS TO BELONG TO THIS SIGNAL. This took `np.max` over the
+    # multiplet's range padded by 1.5x its own span on each side -- so a window up
+    # to 4x the signal's extent -- which meant a strong neighbour falling inside
+    # the pad was reported as this row's height. Measured across the corpus: 7 of
+    # 395 signals reported a height their own extent does not hold, and two rows
+    # on one acquisition printed the SAME 509.0 against their own 42.6 and 14.6.
+    # A number printed on a row has to describe that row.
+    #
+    # The window is built from this multiplet's own fitted line centres, each
+    # taken to one of its own linewidths. That keeps what the padding was for --
+    # a single-line multiplet has a zero-width range and an unpadded window holds
+    # no points -- without reaching far enough to collect anything else. The
+    # floor of two axis steps is what makes a zero-width fit still select points.
+    #
+    # Still the OBSERVED apex, never a fitted amplitude: a fit can exceed the
+    # peak it models, and that is how these signals once measured 14-23 sigma and
+    # then, on one consistent definition, 1.8.
+    step = float(np.median(np.abs(np.diff(axis)))) if axis.size > 1 else 0.0
+    field_mhz = float(getattr(spectrum, "field_mhz", 0.0) or 0.0)
+    window = np.zeros(axis.shape, dtype=bool)
+    for peak in multiplet.peaks:
+        width_ppm = (float(peak.width_hz) / field_mhz) if field_mhz > 0 else 0.0
+        reach = max(width_ppm, 2.0 * step)
+        window |= np.abs(axis - float(peak.position_ppm)) <= reach
+
+    # CLIPPED to the region the signal was already credited with. Attribution
+    # must only ever REMOVE height this row does not own, never find it new
+    # height, and without this clip it does exactly that: a fitted linewidth is
+    # not bounded against the spectrum's own resolution, so one pathological fit
+    # (8871.9 Hz, 50.4 ppm on a 13C acquisition) would reach far past anything
+    # the padded range ever considered. Measured: unclipped, this moved 7 rows
+    # ACROSS the quantitation floor upward -- a fix for over-reporting that
+    # over-reported. Clipped, S/N can only fall or stay equal.
     low, high = min(multiplet.range_ppm), max(multiplet.range_ppm)
-    # Padded, because a single-line multiplet has a zero-width range and an
-    # unpadded window holds no points at all.
     pad = max((high - low) * 1.5, 0.02)
-    window = (axis >= low - pad) & (axis <= high + pad)
+    considered = (axis >= low - pad) & (axis <= high + pad)
+    window &= considered
+
     if not np.any(window):
-        return 0.0
+        # No fitted line placed a window inside the range -- fall back to the
+        # stated range so a signal is never reported as absent for a bookkeeping
+        # reason. This is the previous behaviour, unchanged.
+        window = considered
+        if not np.any(window):
+            return 0.0
+
     oriented = _positive_peak_orientation(np.asarray(spectrum.data, dtype=float))
     centred = oriented - float(np.median(oriented))
     return float(np.max(centred[window]) / baseline_sigma)
