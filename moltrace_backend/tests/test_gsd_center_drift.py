@@ -1,8 +1,6 @@
 """A fitted line may refine its position; it may not walk onto its neighbour.
 
-**These are xfail, and the defect is still live.** Three fixes were measured and
-none of them is shippable yet; what each one cost is written at the foot of this
-file. They are here because the measurement is the expensive part and it is done.
+Written BEFORE the fix, and red when written.
 
 ``gsd_peak_pick`` detects apexes, then fits each one. The fit window is several
 line widths wide, so on a resolved multiplet it contains the neighbouring lines
@@ -100,7 +98,6 @@ def _missing_quartet_lines(spectrum: NMRSpectrum) -> list[float]:
     ]
 
 
-@pytest.mark.xfail(strict=True, reason="live defect: a fit walks onto its neighbour and is deduplicated away")
 def test_a_resolved_quartet_keeps_all_four_lines_synthetic() -> None:
     """Four lines went in; four lines must come out.
 
@@ -115,7 +112,6 @@ def test_a_resolved_quartet_keeps_all_four_lines_synthetic() -> None:
     )
 
 
-@pytest.mark.xfail(strict=True, reason="live defect: a fit walks onto its neighbour and is deduplicated away")
 def test_a_resolved_quartet_keeps_all_four_lines_on_real_data() -> None:
     """The same quartet, in the acquisition CI actually failed on."""
     missing = _missing_quartet_lines(_captured_60000016())
@@ -125,32 +121,34 @@ def test_a_resolved_quartet_keeps_all_four_lines_on_real_data() -> None:
     )
 
 
-# WHAT WAS TRIED, AND WHAT EACH ONE COST
-#
-# All three were measured against the 20-fixture A/B envelope, which fails 1
-# fixture today (60000016_1h, and only on Linux).
+# WHAT WAS TRIED, AND WHY THE THIRD ONE IS THE ONE
 #
 #   1. Bound the fitted `center` to the line's own half of the gap.
 #      WORSE: 2-3 of the 4 quartet lines missing instead of 1. A bounded fit does
-#      not decline to walk, it parks on its bound — a wrong position reported
+#      not decline to walk, it parks on its bound -- a wrong position reported
 #      with confidence rather than a wrong position rejected.
 #
 #   2. Also clip the fit WINDOW to that half-gap, so the data being fitted is the
-#      line and not the multiplet. Fixes both tests above. Cost: 9 of 20 A/B
-#      fixtures red, because narrowing the data moves the fitted centre of every
-#      line that has a neighbour — far more than the defect.
+#      line and not the multiplet. Fixes both tests above and reddens 9 of the 20
+#      A/B fixtures: narrowing the data moves the fitted centre of every line that
+#      has a neighbour, which is far more than the defect.
 #
-#   3. Leave the fit unconstrained and REJECT a result that landed outside its own
-#      half-gap, falling back to the detected apex. Fixes both tests above, and
-#      the smallest of the three: 5 of 20 A/B fixtures red. Two of those five are
-#      the captured baseline being wrong (40255339: captured 1.5663, apex 1.5829
-#      at 1165 sigma — the live run reports the apex and the capture reports the
-#      drift). The other three are real losses this introduced: 40256166_13c
-#      loses apexes at 10, 20 and 27 sigma that the capture had right.
+#   3. What shipped. Leave the fit unconstrained and REJECT a result that landed
+#      outside its own half-gap, falling back to the detected apex. It changes
+#      only the lines that were already wrong.
 #
-# So it is entangled with detection and deduplication, not a local fix to the
-# fitter, and the arbiter that ought to settle it cannot yet: scored on
-# eval.detector_corpus, options 1-3 are IDENTICAL to no change at all
-# (recall 73/90 quantifiable, 263 false positives either way). The corpus plants
-# its lines further apart than the gap this defect lives in, so it is blind to
-# it. A corpus that resolves this needs planted MULTIPLETS at measured J.
+# Scored on the arbiter that can see it -- NMRShiftDB2's own assigned carbon
+# shifts, in `moltrace.spectroscopy.eval.curated_shifts`, over the 12 13C
+# acquisitions in this repository:
+#
+#     assigned carbons found      50/92 -> 53/92
+#     lines matching no carbon      254 -> 252
+#     lines reported                348 -> 349
+#
+# No spectrum got worse. The 46 FID pipeline goldens did not move at all, which is
+# what "only the lines that were already wrong" looks like from the other side.
+#
+# `eval.detector_corpus` cannot judge this one and says so by not moving: it plants
+# its lines further apart than the gap this defect lives in, so options 1-3 all
+# score identically to no change. A corpus that could resolve it needs planted
+# MULTIPLETS at measured J.

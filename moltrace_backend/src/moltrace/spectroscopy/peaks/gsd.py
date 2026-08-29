@@ -262,6 +262,7 @@ def gsd_peak_pick(spectrum: NMRSpectrum, level: int = 2) -> list[Peak]:
             indices = indices[:max_peaks]
             widths_points = widths_points[:max_peaks]
 
+    own_line = _own_line_bounds(x, indices)
     if level >= 3:
         raw_peaks = _fit_peak_groups(
             x,
@@ -271,6 +272,7 @@ def gsd_peak_pick(spectrum: NMRSpectrum, level: int = 2) -> list[Peak]:
             spectrum=spectrum,
             level=level,
             noise=noise,
+            own_line=own_line,
         )
     else:
         raw_peaks = [
@@ -282,6 +284,7 @@ def gsd_peak_pick(spectrum: NMRSpectrum, level: int = 2) -> list[Peak]:
                 spectrum=spectrum,
                 level=level,
                 noise=noise,
+                own_line=own_line.get(int(index)),
             )
             for index, width_points in zip(indices, widths_points, strict=False)
         ]
@@ -619,6 +622,7 @@ def _fit_single_peak(
     spectrum: NMRSpectrum,
     level: int,
     noise: float,
+    own_line: tuple[float, float] | None = None,
 ) -> Peak | None:
     lo, hi = _local_fit_bounds(x, index, width_points, level=level)
     x_fit = x[lo:hi]
@@ -627,25 +631,23 @@ def _fit_single_peak(
         return _fallback_peak(
             x, y, index, width_points, spectrum=spectrum, level=level, noise=noise
         )
-    if level == 1:
-        return _fit_single_with_model(
-            x_fit,
-            y_fit,
-            center_guess=float(x[index]),
-            spectrum=spectrum,
-            level=level,
-            shape="lorentzian",
-            noise=noise,
-        ) or _fallback_peak(x, y, index, width_points, spectrum=spectrum, level=level, noise=noise)
-    return _fit_single_with_model(
+    shape: PeakShape = "lorentzian" if level == 1 else "voigt"
+    fitted = _fit_single_with_model(
         x_fit,
         y_fit,
         center_guess=float(x[index]),
         spectrum=spectrum,
         level=level,
-        shape="voigt",
+        shape=shape,
         noise=noise,
-    ) or _fallback_peak(x, y, index, width_points, spectrum=spectrum, level=level, noise=noise)
+    )
+    if fitted is not None and _left_its_own_line(fitted.position_ppm, own_line):
+        # It converged on the line NEXT to the one it was seeded from, so it is
+        # not a measurement of this line. The detected apex is.
+        fitted = None
+    return fitted or _fallback_peak(
+        x, y, index, width_points, spectrum=spectrum, level=level, noise=noise
+    )
 
 
 def _fit_single_with_model(
@@ -719,7 +721,9 @@ def _fit_peak_groups(
     spectrum: NMRSpectrum,
     level: int,
     noise: float,
+    own_line: dict[int, tuple[float, float]] | None = None,
 ) -> list[Peak | None]:
+    own_line = own_line if own_line is not None else _own_line_bounds(x, indices)
     groups = _overlap_groups(x, indices, widths_points, level=level)
     peaks: list[Peak | None] = []
     for group in groups:
@@ -727,7 +731,16 @@ def _fit_peak_groups(
             idx = group[0]
             width = float(widths_points[np.where(indices == idx)[0][0]])
             peaks.append(
-                _fit_single_peak(x, y, int(idx), width, spectrum=spectrum, level=level, noise=noise)
+                _fit_single_peak(
+                    x,
+                    y,
+                    int(idx),
+                    width,
+                    spectrum=spectrum,
+                    level=level,
+                    noise=noise,
+                    own_line=own_line.get(int(idx)),
+                )
             )
             continue
         if level >= 4:
@@ -746,7 +759,8 @@ def _fit_peak_groups(
         else:
             peaks.extend(
                 _fit_group_with_model(
-                    x, y, group, spectrum=spectrum, level=level, noise=noise
+                    x, y, group, spectrum=spectrum, level=level, noise=noise,
+                    own_line=own_line,
                 )
             )
     return peaks
@@ -788,6 +802,7 @@ def _fit_group_with_model(
     spectrum: NMRSpectrum,
     level: int,
     noise: float,
+    own_line: dict[int, tuple[float, float]] | None = None,
 ) -> list[Peak | None]:
     if PseudoVoigtModel is None:
         return [
@@ -857,6 +872,10 @@ def _fit_group_with_model(
     for line, idx in enumerate(group):
         prefix = f"p{line}_"
         center = _param_value(result.params, f"{prefix}center", float(x[idx]))
+        # Same judgement as the lone-line fit: a component that ended up on its
+        # neighbour is not a measurement of the line it was seeded from.
+        if _left_its_own_line(center, (own_line or {}).get(int(idx))):
+            center = float(x[idx])
         sigma = _param_value(result.params, f"{prefix}sigma", step)
         fwhm = abs(_param_value(result.params, f"{prefix}fwhm", 2.0 * sigma))
         intensity = max(_param_value(result.params, f"{prefix}height", float(y[idx])), 0.0)
@@ -974,6 +993,58 @@ def _fit_group_with_deconvolve_region(
             )
         )
     return peaks
+
+
+def _own_line_bounds(x: np.ndarray, indices: np.ndarray) -> dict[int, tuple[float, float]]:
+    """The span each detected line owns: its own half of the gap to its neighbour.
+
+    The fit window around a detected apex is several line widths wide, so on a
+    resolved multiplet it contains the neighbouring lines as well.  With the
+    fitted ``center`` free to move anywhere in that window, a seeded line can
+    converge on the minimum belonging to the line beside it -- and
+    :func:`_deduplicate_peaks` then deletes it as a duplicate of the line it has
+    just become.  The detector found the line; the fitter lost it.
+
+    The midpoint is the boundary because it belongs to neither line, and the
+    measurement puts the cut there rather than roundness doing it.  Over the 23
+    acquisitions in this repository at full resolution (median 35.7 points per
+    linewidth), drift as a fraction of the gap to the nearest detected neighbour:
+
+        [0, 0.02)  473      [0.25, 0.30)  1        [0.50, 0.75)  12
+        [0.02, 0.05) 39     [0.30, 0.35)  4        [0.75, 1.00)  10
+        [0.05, 0.10) 19     [0.35, 0.40)  2        [1.00, 2.00)  12
+        [0.10, 0.25)  8     [0.40, 0.45)  2        [2.00, inf)   10
+                            [0.45, 0.50)  0
+
+    473 of 592 lines move less than a fiftieth of the gap, the band immediately
+    below the cut is EMPTY, and 44 sit past it -- on the neighbour's side.  There
+    is no continuum to cut through.
+    """
+
+    bounds: dict[int, tuple[float, float]] = {}
+    if indices.size == 0:
+        return bounds
+    positions = np.asarray([float(x[int(index)]) for index in indices], dtype=float)
+    order = np.argsort(positions)
+    ordered = positions[order]
+    for rank, slot in enumerate(order):
+        centre = float(ordered[rank])
+        low = -math.inf if rank == 0 else centre - (centre - float(ordered[rank - 1])) / 2.0
+        high = (
+            math.inf
+            if rank == ordered.size - 1
+            else centre + (float(ordered[rank + 1]) - centre) / 2.0
+        )
+        bounds[int(indices[int(slot)])] = (low, high)
+    return bounds
+
+
+def _left_its_own_line(center: float, bounds: tuple[float, float] | None) -> bool:
+    """Did this fit converge on the line next to the one it was seeded from?"""
+
+    if bounds is None or not math.isfinite(center):
+        return False
+    return center < bounds[0] or center > bounds[1]
 
 
 def _local_fit_bounds(

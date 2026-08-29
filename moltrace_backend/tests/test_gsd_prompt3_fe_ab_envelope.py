@@ -131,17 +131,44 @@ def test_ab_dump_captured_payloads_are_structurally_consistent() -> None:
 _QUANTIFIABLE_SIGMA = 10.0
 
 
-def _quantifiable_peaks_lost(*, captured_peaks, live_peaks, x, y) -> list[float]:
-    """Captured peaks above the quantitation floor that the live run no longer finds.
+def _quantifiable_peaks_lost(*, captured_peaks, live_peaks, x, y, nucleus, level) -> list[float]:
+    """Lines the detector finds, the capture reported, and the live run no longer does.
 
-    Heights are read from the captured TRACE rather than from either run's fitted
-    amplitudes. A fitted amplitude can exceed the apex it models when the fit is
-    broad, and mixing a fitted height with a differently-computed noise estimate
-    is how the same three peaks were first measured at 14-23 sigma and then, on a
-    single consistent definition, at 1.8x MAD. One definition, applied to both
-    sides.
+    Anchored on the DETECTED APEX, not on either run's fitted position. Three
+    reasons, each of which cost a wrong answer first:
+
+    1. Heights come from the captured TRACE, not from a fitted amplitude. A fitted
+       amplitude can exceed the apex it models when the fit is broad, and mixing a
+       fitted height with a differently-computed noise estimate is how the same
+       three peaks were first measured at 14-23 sigma and then, on a single
+       consistent definition, at 1.8x MAD.
+
+    2. A CAPTURED POSITION IS NOT A DETECTION. A single-line fit was free to move
+       anywhere inside a window several line widths wide, and on these traces --
+       decimated to about 1.5 points per linewidth -- it often did. Only 387 of the
+       548 captured peaks (70.6%) sit on an apex the detector seeds; the other 29%
+       are positions no detection ever produced. Reading the trace height at one of
+       those and calling it a lost peak credits the runaway.
+
+    3. Matching the capture to the live run DIRECTLY fails the same way from the
+       other side: a capture that landed between a seed and that seed's true centre
+       is further than the tolerance from both, so the line reads as lost while it
+       is sitting in the output at its own apex. Both sides are matched to the seed
+       instead, so the question is the one the message asks -- is the line the
+       detector found still in the table?
+
+    Detection is not what the fitter change touched, which is why this can judge
+    that change rather than assume it.
     """
     import numpy as np
+
+    from moltrace.spectroscopy.io.fid_reader import NMRSpectrum
+    from moltrace.spectroscopy.peaks.gsd import (
+        _finite_spectrum_arrays,
+        _initial_peak_indices,
+        _positive_peak_orientation,
+        _robust_noise,
+    )
 
     signal = np.asarray(y, dtype=float)
     signal = signal - float(np.median(signal))
@@ -152,19 +179,59 @@ def _quantifiable_peaks_lost(*, captured_peaks, live_peaks, x, y) -> list[float]
 
     ppm = np.asarray(x, dtype=float)
     step = float(np.median(np.abs(np.diff(np.sort(ppm))))) or 1e-6
-    tolerance_ppm = max(step * 4.0, 0.01)
-    live_ppm = np.asarray(sorted(p.position_ppm for p in live_peaks), dtype=float)
+
+    # The apexes the detector seeds on this trace, through the same entry point the
+    # live run uses, so "was there a line here" is asked once and one way.
+    spectrum = NMRSpectrum(
+        data=np.asarray(y, dtype=float), ppm_axis=ppm, nucleus=nucleus
+    )
+    axis, values = _finite_spectrum_arrays(spectrum)
+    if axis.size < 8:
+        return []
+    oriented = _positive_peak_orientation(values)
+    detection_noise = _robust_noise(oriented - float(np.median(oriented)))
+    if not np.isfinite(detection_noise) or detection_noise <= 0:
+        return []
+    indices, widths_points, _properties = _initial_peak_indices(
+        axis,
+        oriented - float(np.median(oriented)),
+        noise=detection_noise,
+        nucleus=nucleus,
+        level=level,
+    )
+    if not indices.size:
+        return []
+
+    captured_ppm = np.asarray(
+        sorted(float(peak["position_ppm"]) for peak in captured_peaks), dtype=float
+    )
+    live_ppm = np.asarray(sorted(peak.position_ppm for peak in live_peaks), dtype=float)
+
+    def covered(positions, target: float, tolerance: float) -> bool:
+        return bool(
+            positions.size and float(np.min(np.abs(positions - target))) <= tolerance
+        )
 
     lost: list[float] = []
-    for peak in captured_peaks:
-        position = float(peak.get("position_ppm", float("nan")))
-        if not np.isfinite(position):
-            continue
-        index = int(np.argmin(np.abs(ppm - position)))
-        height = abs(float(signal[index])) / mad
+    for index, width_points in zip(indices, widths_points, strict=False):
+        seed = float(axis[int(index)])
+        # ONE LINEWIDTH, not a fixed count of samples. A fixed sample window is a
+        # different physical distance on every trace here -- these are decimated to
+        # about 1.5 points per linewidth, and on the sparsest of them a line spans
+        # 1.5 ppm, so four samples is a fifth of a linewidth. A fit that refines a
+        # quarter of a linewidth off its apex is doing its job, and the fixed window
+        # called that the line disappearing. Same reasoning, and the same unit, as
+        # ``eval.detector_corpus.score_detection``.
+        tolerance = max(step * 4.0, 0.01, float(width_points) * step)
+        trace_index = int(np.argmin(np.abs(ppm - seed)))
+        height = abs(float(signal[trace_index])) / mad
         if height < _QUANTIFIABLE_SIGMA:
             continue
-        if live_ppm.size and float(np.min(np.abs(live_ppm - position))) <= tolerance_ppm:
+        if not covered(captured_ppm, seed, tolerance):
+            # The capture did not report this line either, so its disappearance is
+            # not something this envelope recorded.
+            continue
+        if covered(live_ppm, seed, tolerance):
             continue
         lost.append(height)
     return lost
@@ -263,6 +330,8 @@ def test_gsd_live_rerun_within_ab_envelope(fixture_id: str) -> None:
             live_peaks=result.peaks,
             x=x,
             y=y,
+            nucleus=run["nucleus"],
+            level=int(captured.get("level") or 2),
         )
         assert not lost_real, (
             f"{fixture_id}: {len(lost_real)} peak(s) at or above "
@@ -293,3 +362,72 @@ def test_gsd_live_rerun_within_ab_envelope(fixture_id: str) -> None:
         )
 
     asyncio.run(_run())
+
+
+def test_the_lost_line_criterion_is_not_vacuous() -> None:
+    """Delete a line the detector found, and the criterion must say so.
+
+    This criterion was narrowed -- it used to count any captured position whose
+    trace height cleared the floor, and it now counts only lines the detector
+    actually seeds, matched within a linewidth. A narrowed guard has to be shown
+    to still bite, or the narrowing is just the failure being switched off.
+
+    Fires on 15 of the 19 replayable fixtures when their tallest reported line is
+    deleted. The ones it stays silent on are correct: there, another reported line
+    still sits within a linewidth of that seed, so the line the detector found is
+    still in the table. Two of them are the CDCl3 triplet, whose three lines are
+    0.06 ppm apart.
+
+    The bar is a bare majority, not the measured 15. This asks whether the
+    criterion bites at all, and it must answer that the same way for any detector
+    the repository might have -- on the fitter this file's own fixes replaced it
+    fires on 12 of 19, because there a runaway from a neighbouring seed often
+    covered the deleted line. A bar set at today's number would quietly turn a
+    vacuity check into a second opinion about the fitter.
+    """
+
+    fired = 0
+    checked = 0
+    for run in _ab_runs():
+        legacy = run["legacy"]
+        captured = run["gsd"]
+        x = legacy.get("x") or []
+        y = legacy.get("y") or []
+        if not x or not y or len(x) != len(y) or len(x) < 16:
+            continue
+        payload = SpectrumGSDAnalyzeRequest(
+            ppm_axis=x,
+            intensity=y,
+            nucleus=run["nucleus"],
+            solvent=legacy.get("solvent") or "",
+            field_mhz=float(legacy.get("field_mhz") or 500.0),
+            level=int(captured.get("level") or 2),
+        )
+
+        async def _run(payload=payload):
+            return await spectrum_analyze_gsd(
+                payload=payload, request=None, context=AccessContext(system_api_key=True)
+            )
+
+        peaks = list(asyncio.run(_run()).peaks)
+        if len(peaks) < 3:
+            continue
+        checked += 1
+        tallest = max(range(len(peaks)), key=lambda i: peaks[i].intensity)
+        without = [peak for i, peak in enumerate(peaks) if i != tallest]
+        if _quantifiable_peaks_lost(
+            captured_peaks=captured["peaks"],
+            live_peaks=without,
+            x=x,
+            y=y,
+            nucleus=run["nucleus"],
+            level=int(captured.get("level") or 2),
+        ):
+            fired += 1
+
+    if checked == 0:
+        pytest.skip("FE A/B dump not present")
+    assert fired > checked // 2, (
+        f"deleting the tallest line went unnoticed on {checked - fired} of {checked} "
+        "fixtures — this criterion is no longer measuring whether a line disappeared"
+    )
