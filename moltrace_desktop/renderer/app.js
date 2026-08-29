@@ -360,7 +360,10 @@
       const cells = [
         m.name,
         m.center_ppm.toFixed(3),
-        m.multiplicity,
+        // Empty below the limit of quantitation: the service withholds the
+        // pattern and the couplings there rather than blanking them here, so an
+        // em dash means "not claimed", not "not applicable".
+        m.multiplicity || '—',
         m.j_couplings_hz.length ? m.j_couplings_hz.map((j) => j.toFixed(1)).join(', ') : '—',
         // "1 (2 fitted)" where a deconvolution finds more lines in the window
         // than the detector reported as maxima. Shown in the Lines column rather
