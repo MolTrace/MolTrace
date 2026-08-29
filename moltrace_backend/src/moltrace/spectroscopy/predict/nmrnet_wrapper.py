@@ -673,7 +673,19 @@ def molecule_from_record(record: Mapping[str, Any]) -> Chem.Mol | None:
     """
 
     if record.get("molblock"):
-        return Chem.MolFromMolBlock(record["molblock"], removeHs=False)
+        mol = Chem.MolFromMolBlock(record["molblock"], removeHs=False)
+        # ``removeHs=False`` keeps the hydrogens a molblock carries; it does not add the
+        # ones it omits. A molblock written without explicit H therefore produced an
+        # H-LESS molecule here, while the query path always AddHs -- and a HOSE code built
+        # without hydrogens shares nothing with one built with them. Measured: every
+        # comparable atom of such a record encodes differently from its own query (11/11,
+        # 14/14, 10/10 across a panel), so those reference atoms could never be matched.
+        #
+        # AddHs is a no-op when the hydrogens are already explicit (same atom count,
+        # identical codes), so this repairs the omitted case without touching any other.
+        # On the NMRShiftDB2 export 100% of records take this branch and ~0.2% of them
+        # were H-less, so the correction is small and the rest of the index is unchanged.
+        return Chem.AddHs(mol) if mol is not None else None
     mol = Chem.MolFromSmiles(record.get("smiles", ""))
     return Chem.AddHs(mol) if mol is not None else None
 
