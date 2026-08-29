@@ -634,7 +634,9 @@ bucketed by cause — no evidence, identical prediction, or a genuine tie — be
 broken spectrum otherwise reads as a perfect tie. An exact tie is credited to neither
 side, unlike `false_confirmation.py:217`, whose `>` comparison silently scores a 0.5/0.5
 DP4 tie as a win for the truth — biasing the 38.1 % optimistically, in exactly the
-population under study. That is recorded, not yet fixed.
+population under study. **Fixed 2026-08-27**: ties are bucketed separately and counted
+against the truth, which moves the published rate to 39.5 % on 42 ties out of 3,073 scored
+pairs. See the correction on v0.68.2.
 
 **The spectrum is a required caller input, because synthesising one was refuted.**
 Building a ¹³C spectrum at each record's experimental shift positions runs on the whole
@@ -1306,6 +1308,17 @@ rather than living in a terminal.
 | unscorable | 0 |
 
 **False-confirmation rate: 38.1 %** (1,172 / 3,073).
+
+> **Corrected 2026-08-27 — the rate is 39.5 %, not 38.1 %.** This figure credited an exact
+> 0.5/0.5 DP4 tie to the truth, so it counted only decoys that strictly won. There are **42**
+> such ties in this population, and a tie is DP4 failing to separate a wrong structure from the
+> right one, not the right one winning. Counting them against the truth gives
+> **39.5 % (1,214 / 3,073)**. Re-running the measurement reproduces every bucket above exactly
+> (1,657 molecules, 5,639 pairs, 3,073 scored, 2,287 formula-rejected, 279 indistinguishable),
+> so only the tie treatment moved. `FalseConfirmationReport` now publishes both:
+> `false_confirmation_rate` (39.5 %, ties against the truth) and `decoy_strict_win_rate`
+> (38.1 %, the figure above). The zero-regression gate reads the first, which is the one that
+> cannot be improved by producing more ties.
 
 | decoy kind | FC rate |
 |---|---|
