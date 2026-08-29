@@ -1,5 +1,7 @@
 import random
 
+import pytest
+
 from nmrcheck.compound_class_priors import diagnostic_regions_for
 from nmrcheck.models import Peak
 from nmrcheck.parser import parse_reference_nmr_text
@@ -542,6 +544,67 @@ def test_extrema_preserving_downsampling_keeps_sharp_peaks() -> None:
     assert len(downsampled) <= 300
     assert any(point.shift_ppm == 120.85 and point.intensity == 1000.0 for point in downsampled)
     assert any(point.shift_ppm == 159.95 and point.intensity == -500.0 for point in downsampled)
+
+
+def _synthetic_spectrum(seed: int = 7, n: int = 65536) -> list[tuple[float, float]]:
+    """Flat noisy baseline plus three sharp lines, in ppm order."""
+    import numpy as np
+
+    rng = np.random.default_rng(seed)
+    ppm = np.linspace(0.0, 12.0, n)
+    y = rng.normal(0.0, 1.0, n)
+    for centre, amplitude in ((2.05, 5000.0), (7.26, 600.0), (4.10, 400.0)):
+        y += amplitude * (0.002**2) / ((ppm - centre) ** 2 + 0.002**2)
+    return list(zip(ppm.tolist(), y.tolist(), strict=True))
+
+
+@pytest.mark.xfail(
+    strict=True,
+    reason=(
+        "Open defect, measured but NOT fixed. The sampler keeps the min AND the "
+        "max of every bucket unconditionally, so pure baseline ships its full "
+        "peak-to-peak noise excursion: 2.25-2.53 emitted points per bucket where "
+        "one is correct. A prototype guard (flat-bucket test in the bucket loop, "
+        "plus gating the LTTB top-up which otherwise puts the baseline back) cut "
+        "1H preview points 25-40% across the 17 nmrshiftdb2 fixtures and reached "
+        "1.00 points per baseline bucket. REVERTED because it also moved peak "
+        "detection: 2 pre-existing macOS golden failures became 19, with 'peak "
+        "count changed: 10 -> 11' and shifted apexes. So this sampler is NOT "
+        "display-only, contrary to an audit of its six call sites that found "
+        "only preview surfaces. Locating that coupling is the first task of any "
+        "real fix."
+    ),
+)
+def test_flat_baseline_buckets_emit_one_point_not_a_noise_envelope() -> None:
+    """A bucket holding only baseline is a line, not a band."""
+    import numpy as np
+
+    points = _synthetic_spectrum()
+    limit = 4000
+    out = _downsample_points(points, limit=limit)
+
+    xs = np.array([p.shift_ppm for p in out])
+    in_window = (xs > 9.5) & (xs < 11.5)
+    bucket_count = max(1, (max(3, limit) - 2) // 3)
+    buckets_in_window = bucket_count * (2.0 / 12.0)
+
+    assert in_window.sum() / buckets_in_window <= 1.35
+
+
+def test_downsampling_still_preserves_the_peaks() -> None:
+    """The counterweight: a flat-bucket guard must not eat real signal."""
+    import numpy as np
+
+    points = _synthetic_spectrum()
+    out = _downsample_points(points, limit=4000)
+    xs = np.array([p.shift_ppm for p in out])
+    ys = np.array([p.intensity for p in out])
+
+    for centre, expected in ((2.05, 5000.0), (7.26, 600.0), (4.10, 400.0)):
+        near = np.abs(xs - centre) < 0.02
+        assert near.any(), f"no sample emitted near {centre} ppm"
+        # The apex survives; the envelope is what preserves it.
+        assert ys[near].max() > expected * 0.5
 
 
 def test_peak_table_preview_emits_reference_guided_range_text_for_dense_assignments() -> None:
