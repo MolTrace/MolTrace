@@ -269,9 +269,10 @@ def _gather_observations(
             if exp.status != "completed":
                 continue
             outcome = _json_dict(exp.outcome_json)
-            score = reaction_bo._score_outcome(outcome, objective_type, weights)
-            if score is None:
+            scored = reaction_bo._score_outcome(outcome, objective_type, weights)
+            if scored is None:
                 continue
+            score = scored.score
             verified = exp.linked_spectracheck_session_id is not None or (
                 "outcome_confirmation" in _json_dict(exp.metadata_json)
             )
