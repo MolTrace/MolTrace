@@ -14,6 +14,32 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.73.1 — Detection and quantitation are different claims (2026-08-27)
+
+The peak table presented every signal as one kind of row. Measured on a real 13C
+acquisition: **47 of 55 signals** stood between **1.8 and 6.3** times the baseline
+noise, and every one of the **27 sitting above 220 ppm** — outside the range
+carbon-13 shifts occupy at all — was among them. Six sevenths of the table was
+the detection floor, and nothing on screen said so.
+
+Every signal now carries `snr` and `quantifiable`, and the table splits in two:
+**"Signals you can measure"** and **"Detected, but not strong enough to
+measure"**, on the limit of quantitation this codebase already reasons in.
+
+On that acquisition the split is 8 against 47, and the 8 carry **98% of the
+signal**. All 27 implausible shifts fall in the detected-only half without any
+rule mentioning ppm — the noise sorted itself.
+
+Signal-to-noise is computed from the **observed apex**, never a fitted amplitude:
+a broad fit can report an amplitude above the apex it models, and mixing a fitted
+height with a noise estimate computed another way is how the same peaks were once
+measured at 14-23 sigma and then, consistently, at 1.8.
+
+The column is in the table because it is what decides whether a row is worth
+reading, and a peak table almost never shows it.
+
+---
+
 ## v0.73.0 — Separating lines the detector reports as one (2026-08-27)
 
 A peak finder reports one maximum per resolvable feature, so two lines closer

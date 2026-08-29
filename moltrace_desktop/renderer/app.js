@@ -285,51 +285,23 @@
 
     if (s.trace && s.trace.ppm && s.trace.ppm.length > 1) wrap.append(spectrumView(s))
 
-    const table = document.createElement('table')
-    table.className = 'peaks'
-    const thead = document.createElement('thead')
-    const hrow = document.createElement('tr')
-    // "Share of signal", never "H". Without an assigned structure there is
-    // nothing to normalise a proton count against, so a column headed H would be
-    // a number this analysis did not compute.
-    // Width is here because two lines closer than the analysis can separate come
-    // back as ONE, and the tell is that the signal is wider than its neighbours.
-    // Not flagged automatically: on real acquisitions 14% of lines exceed three
-    // times the median width and most are broad features or poor fits, so a flag
-    // would cry wolf. The number is shown next to the others; a chemist reads it.
-    for (const label of ['', 'Shift (ppm)', 'Pattern', 'Couplings (Hz)', 'Lines', 'Width (Hz)', 'Share of signal']) {
-      const th = document.createElement('th')
-      th.textContent = label
-      hrow.append(th)
-    }
-    thead.append(hrow); table.append(thead)
+    const quantifiable = s.multiplets.filter((m) => m.quantifiable)
+    const detectedOnly = s.multiplets.filter((m) => !m.quantifiable)
 
-    const tbody = document.createElement('tbody')
-    for (const m of s.multiplets) {
-      const tr = document.createElement('tr')
-      const cells = [
-        m.name,
-        m.center_ppm.toFixed(3),
-        m.multiplicity,
-        m.j_couplings_hz.length ? m.j_couplings_hz.map((j) => j.toFixed(1)).join(', ') : '—',
-        // "1 (2 fitted)" where a deconvolution finds more lines in the window
-        // than the detector reported as maxima. Shown in the Lines column rather
-        // than as a separate one: it is the same quantity, read two ways.
-        m.resolved_lines > m.line_count
-          ? `${m.line_count} (${m.resolved_lines} fitted)`
-          : String(m.line_count),
-        Number.isFinite(m.width_hz) && m.width_hz > 0 ? m.width_hz.toFixed(1) : '—',
-        `${(m.relative_area * 100).toFixed(1)}%`,
-      ]
-      for (const c of cells) {
-        const td = document.createElement('td')
-        td.textContent = c
-        tr.append(td)
-      }
-      tbody.append(tr)
+    // TWO TABLES, because these are two different claims. Detection and
+    // quantitation are not the same thing and this platform draws that line
+    // everywhere else; a single table presents a three-sigma bump beside a real
+    // carbon as though they were the same kind of row. On a real acquisition
+    // that meant 47 of 55 rows were at the detection floor — six sevenths of the
+    // table was noise, and nothing on screen said so.
+    if (quantifiable.length) wrap.append(peakTable(quantifiable, s, 'Signals you can measure', null))
+    if (detectedOnly.length) {
+      wrap.append(peakTable(detectedOnly, s, 'Detected, but not strong enough to measure',
+        'These stand between ' + fmtSnr(Math.min(...detectedOnly.map((m) => m.snr)))
+        + ' and ' + fmtSnr(Math.max(...detectedOnly.map((m) => m.snr)))
+        + ' times the baseline noise. Real enough to see, not strong enough to read numbers off: '
+        + 'a shift or an integral taken from one of these is not a measurement.'))
     }
-    table.append(tbody)
-    wrap.append(table)
 
     // The limits travel WITH the numbers, and are rendered every time. A caveat
     // behind a disclosure control is a caveat most readers never see, and this
@@ -343,6 +315,73 @@
     }
     wrap.append(limits)
     return wrap
+  }
+
+  const fmtSnr = (v) => (v >= 100 ? Math.round(v).toLocaleString() : v.toFixed(1))
+
+  function peakTable(rows, s, heading, note) {
+    const section = document.createElement('section')
+    section.className = 'peaks-section'
+    const h = document.createElement('h2')
+    h.className = 'peaks-section__heading'
+    h.textContent = `${heading} (${rows.length})`
+    section.append(h)
+    if (note) {
+      const p = document.createElement('p')
+      p.className = 'peaks-section__note'
+      p.textContent = note
+      section.append(p)
+    }
+
+    const table = document.createElement('table')
+    table.className = 'peaks'
+    const thead = document.createElement('thead')
+    const hrow = document.createElement('tr')
+    // "Share of signal", never "H". Without an assigned structure there is
+    // nothing to normalise a proton count against, so a column headed H would be
+    // a number this analysis did not compute.
+    // Width is here because two lines closer than the analysis can separate come
+    // back as ONE, and the tell is that the signal is wider than its neighbours.
+    // Not flagged automatically: on real acquisitions 14% of lines exceed three
+    // times the median width and most are broad features or poor fits, so a flag
+    // would cry wolf. The number is shown next to the others; a chemist reads it.
+    // Signal-to-noise is in the table because it is what decides whether a row
+    // is worth reading, and a peak table almost never shows it.
+    for (const label of ['', 'Shift (ppm)', 'Pattern', 'Couplings (Hz)', 'Lines', 'Width (Hz)', 'S/N', 'Share of signal']) {
+      const th = document.createElement('th')
+      th.textContent = label
+      hrow.append(th)
+    }
+    thead.append(hrow); table.append(thead)
+
+    const tbody = document.createElement('tbody')
+    for (const m of rows) {
+      const tr = document.createElement('tr')
+      const cells = [
+        m.name,
+        m.center_ppm.toFixed(3),
+        m.multiplicity,
+        m.j_couplings_hz.length ? m.j_couplings_hz.map((j) => j.toFixed(1)).join(', ') : '—',
+        // "1 (2 fitted)" where a deconvolution finds more lines in the window
+        // than the detector reported as maxima. Shown in the Lines column rather
+        // than as a separate one: it is the same quantity, read two ways.
+        m.resolved_lines > m.line_count
+          ? `${m.line_count} (${m.resolved_lines} fitted)`
+          : String(m.line_count),
+        Number.isFinite(m.width_hz) && m.width_hz > 0 ? m.width_hz.toFixed(1) : '—',
+        fmtSnr(m.snr),
+        `${(m.relative_area * 100).toFixed(1)}%`,
+      ]
+      for (const c of cells) {
+        const td = document.createElement('td')
+        td.textContent = c
+        tr.append(td)
+      }
+      tbody.append(tr)
+    }
+    table.append(tbody)
+    section.append(table)
+    return section
   }
 
   await render()

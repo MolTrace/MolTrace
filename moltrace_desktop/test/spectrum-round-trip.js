@@ -114,6 +114,7 @@ app.whenReady().then(async () => {
     "    svgTicks: all('.spectrum__tick-label').map(parseFloat),",
     "    svgMarkers: document.querySelectorAll('.spectrum__marker').length,",
     "    svgCaption: g('.spectrum__caption'),",
+    "    sectionHeadings: all('.peaks-section__heading'),",
     "    head: g('.result__head'), counts: g('.result__counts'),",
     "    heads: all('.peaks thead th'), limits: all('.result__limits li'),",
     "    rows: [].slice.call(document.querySelectorAll('.peaks tbody tr')).map(function(tr){",
@@ -176,6 +177,16 @@ app.whenReady().then(async () => {
   check('every reported signal is findable on the trace', () => {
     if (dom.svgMarkers !== dom.rows.length) {
       throw new Error(`${dom.rows.length} rows in the table but ${dom.svgMarkers} marked on the spectrum`)
+    }
+  })
+
+  check('measurable and merely-detected signals are separate claims', () => {
+    // A three-sigma bump and a real carbon are not the same kind of row. On a
+    // real acquisition 47 of 55 signals sat at the detection floor, and every
+    // one outside the range carbon-13 shifts occupy was among them.
+    const headings = (dom.sectionHeadings || []).join(' | ')
+    if (!/measure/i.test(headings)) {
+      throw new Error(`the table does not separate what can be measured: ${headings}`)
     }
   })
 
