@@ -252,9 +252,15 @@
       `across ${s.points.toLocaleString()} points. ` +
       // Where the numbers came from changes what they mean, so it sits with them
       // rather than in the caveats underneath.
+      // Three cases, not two. "Your instrument produced no processed spectrum"
+      // is false when it produced one that could not be trusted — an incomplete
+      // 1r is refused rather than read — and it sends the reader to the wrong
+      // place: they go looking for a missing file that is sitting right there.
       (s.processing === 'instrument'
         ? 'Read from the spectrum your instrument produced.'
-        : 'Computed here from the raw measurement — your instrument produced no processed spectrum.')
+        : s.processed_spectrum_rejected
+          ? 'Computed here from the raw measurement — the processed spectrum in this acquisition could not be used.'
+          : 'Computed here from the raw measurement — your instrument produced no processed spectrum.')
     wrap.append(counts)
 
     // SATURATION IS A WARNING, NOT A CAVEAT. When the detector runs out of room

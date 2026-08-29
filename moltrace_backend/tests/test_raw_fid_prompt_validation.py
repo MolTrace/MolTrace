@@ -263,7 +263,20 @@ def test_raw_fid_prompt_fixture_report_is_reporting_only(tmp_path: Path) -> None
 
 
 @pytest.mark.slow
-def test_raw_fid_prompt_fixture_report_can_include_varian_fixture() -> None:
+def test_raw_fid_prompt_fixture_report_names_why_the_arrayed_varian_fixture_fails() -> None:
+    """Re-baselined: this fixture is arrayed, and is now refused rather than spliced.
+
+    This asserted `prompt_status == "ok"` for the only real Varian dataset in the
+    tree. That dataset is nmrglue's `separate_1d_varian` example -- 26 experiments,
+    shape (26, 1500) -- and both FID readers used to reshape it to a single
+    39000-point pseudo-FID. So the row validated cleanly against a splice.
+
+    What is worth pinning now is not that it fails, but that the report SAYS WHY:
+    a fixture that silently drops out of a validation report is indistinguishable
+    from one nobody added. The descriptive metadata still comes from procpar and
+    is still asserted, because the refusal is about how the traces are combined,
+    not about what the experiment was.
+    """
     fixture_root = Path(__file__).parent / "fixtures" / "nmrshiftdb2"
     varian_root = Path(__file__).parent / "fixtures" / "nmrglue" / "varian"
 
@@ -279,8 +292,13 @@ def test_raw_fid_prompt_fixture_report_can_include_varian_fixture() -> None:
     assert row["fixture_id"] == "nmrglue_example_separate_1d_varian"
     assert row["vendor"] == "Varian/Agilent"
     assert row["nucleus"] == "13C"
-    assert row["prompt_status"] == "ok"
-    assert row["prompt_hash_present"] is True
+
+    assert row["row_status"] == "failed"
+    reasons = " ".join(row["failure_reasons"])
+    assert "26" in reasons, "the report does not say how many experiments were found: " + reasons
+    assert "separate experiments" in reasons, (
+        "the report does not name the arrayed acquisition as the cause: " + reasons
+    )
 
 
 def test_admin_raw_fid_prompt_fixture_report_route_is_reporting_only(tmp_path: Path) -> None:

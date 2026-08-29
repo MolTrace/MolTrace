@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import math
+import shutil
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -284,43 +285,51 @@ def test_bruker_13c_reader_uses_carbon_apodization_and_ppm_scale(tmp_path: Path)
     _assert_reference_peaks_match(spectrum, REFERENCE_13C_PEAKS)
 
 
-def test_real_nmrglue_varian_fixture_reads_metadata_and_fingerprint() -> None:
+def test_the_real_nmrglue_varian_fixture_is_arrayed_and_is_refused() -> None:
+    """Re-baselined. This test used to pin the fingerprint of a splice.
+
+    The only real Varian dataset in the tree is nmrglue's `separate_1d_varian`
+    example -- named for what it demonstrates, and shipped with a `separate.py`.
+    nmrglue returns shape (26, 1500) for it. The reader reshaped that to one
+    39000-point pseudo-FID, and this test asserted `input_points == 39000`,
+    `peak_count == 75` and a reference-peak table: every one of those values
+    described 26 experiments laid end to end. The golden recorded the answer that
+    was produced first, not a true one.
+
+    What is worth pinning is that the refusal is not path-dependent -- a chemist
+    who hands it the directory and a chemist who hands it the zip must get the
+    same answer. Single-trace Varian metadata, ppm axis and peak coverage is
+    unaffected and still runs, against the synthesised dataset in
+    `test_varian_fid_reader_matches_reference_ppm_count_and_metadata`.
+    """
+    from moltrace.spectroscopy.io.fid_reader import FIDReaderError
+
     fixture_root = Path(__file__).parent / "fixtures" / "nmrglue" / "varian"
-    expected_path = fixture_root / "expected" / "example_separate_1d_varian.json"
-    fixture_spec = json.loads(expected_path.read_text(encoding="utf-8"))
+    fixture_spec = json.loads(
+        (fixture_root / "expected" / "example_separate_1d_varian.json").read_text(encoding="utf-8")
+    )
     expected = fixture_spec["expected"]
+    assert expected["arrayed"] is True, "the fixture no longer records this dataset as arrayed"
+
     dataset = fixture_root / fixture_spec["dataset_path"]
     archive = fixture_root / "raw" / "example_separate_1d_varian.zip"
 
-    spectrum = read_fid(dataset)
-    repeated = read_fid(dataset)
-    from_archive = read_fid(archive)
+    messages = []
+    for source in (dataset, archive):
+        if not source.exists():
+            continue
+        with pytest.raises(FIDReaderError) as excinfo:
+            read_fid(source)
+        messages.append(str(excinfo.value))
 
-    assert spectrum.metadata["vendor"] == expected["vendor"]
-    assert spectrum.nucleus == expected["nucleus"]
-    assert spectrum.solvent == expected["solvent"]
-    assert spectrum.field_mhz == pytest.approx(expected["field_mhz"])
-    assert spectrum.metadata["sweep_width_hz"] == pytest.approx(expected["sweep_width_hz"])
-    assert spectrum.metadata["zero_fill_points"] == expected["zero_fill_points"]
-    assert spectrum.metadata["input_points"] == expected["input_points"]
-    assert spectrum.data.shape == (expected["zero_fill_points"],)
-    assert spectrum.ppm_axis[0] == pytest.approx(expected["ppm_axis_start"])
-    assert spectrum.ppm_axis[-1] == pytest.approx(expected["ppm_axis_end"])
-    assert spectrum.acquisition_time == datetime.fromisoformat(expected["acquisition_time"])
-    assert spectrum.metadata["peak_count"] == expected["peak_count"]
-    # Cross-platform regression guard on the FFT output: assert spectral
-    # features (peak positions + heights normalized to the spectrum max) with
-    # tolerance instead of a byte-exact hash. A hash of the rounded spectrum is
-    # not portable across OS/arch (numpy/scipy BLAS + SIMD differences diverged
-    # it between macOS and the Linux CI runner), but these features agree to far
-    # better than the tolerances while still catching real pipeline regressions.
-    _assert_reference_peak_values(spectrum, expected["reference_peaks"])
-    # The fingerprint's actual contract is "identical input -> identical id", so
-    # validate format + within-run determinism (matching
-    # test_nmrshiftdb2_bruker_20_fids_match_processed_references below).
-    assert len(spectrum.fingerprint_hash) == 64
-    assert repeated.fingerprint_hash == spectrum.fingerprint_hash
-    assert from_archive.fingerprint_hash == spectrum.fingerprint_hash
+    assert messages, "neither the directory nor the archive is in this checkout"
+    assert str(expected["trace_count"]) in messages[0], (
+        "the refusal does not say how many experiments it found: " + messages[0]
+    )
+    assert len(set(messages)) == 1, (
+        "the directory and the archive give different answers for the same data:\n  "
+        + "\n  ".join(messages)
+    )
 
 
 def test_nmrshiftdb2_bruker_20_fids_match_processed_references() -> None:
@@ -350,3 +359,84 @@ def test_nmrshiftdb2_bruker_20_fids_match_processed_references() -> None:
         assert abs(spectrum.metadata["peak_count"] - fixture["reference_peak_count"]) <= fixture[
             "peak_count_tolerance"
         ]
+
+
+def test_a_processed_spectrum_shorter_than_its_declared_size_is_refused(tmp_path: Path) -> None:
+    """Half a `1r` must not be stretched across the whole sweep.
+
+    `_pdata_ppm_axis` spreads the sweep `procs.SW_p` declares across whatever
+    number of points it is handed, and the reader handed it `real.size` -- the
+    bytes actually present. A `1r` copied short therefore keeps the full sweep
+    and every point moves.
+
+    Measured on a 100.66 MHz 13C acquisition cut to half its 2097152 bytes: the
+    axis endpoints were IDENTICAL to the intact read (262.7726 .. -43.83 ppm)
+    while the data halved, so a carbon at 135.6074 ppm was reported at 8.4423 --
+    127.17 ppm out, and the error grew along the axis (-127.17, -137.48, -143.66)
+    because the stretch is linear about the axis start. The result still carried
+    `referencing.established = True`.
+
+    The evidence was already in the object: `procs.SI` is read into
+    `processing_provenance['processed_size']` and sat beside `input_points`
+    with nothing comparing them.
+    """
+    from moltrace.spectroscopy.io.fid_reader import FIDReaderError, read_processed_spectrum
+
+    sources = sorted(Path("tests/fixtures").glob("**/pdata/*/1r"))
+    if not sources:
+        pytest.skip("no processed Bruker acquisition in this checkout")
+    dataset = sources[0].parent.parent.parent
+
+    intact = read_processed_spectrum(dataset)
+    declared = intact.metadata["processing_provenance"].get("processed_size")
+    assert declared, "the fixture does not declare a processed size, so this proves nothing"
+
+    cut = tmp_path / "cut"
+    shutil.copytree(dataset, cut)
+    target = next(cut.glob("pdata/*/1r"))
+    with open(target, "r+b") as fh:
+        fh.truncate(target.stat().st_size // 2)
+
+    with pytest.raises(FIDReaderError) as excinfo:
+        read_processed_spectrum(cut)
+
+    message = str(excinfo.value)
+    assert "half" in message or str(int(declared)) in message, (
+        "the refusal does not name the shortfall it is refusing over: " + message
+    )
+    # A refusal a chemist cannot act on is a stack trace with better manners.
+    assert "1r" in message or "processed spectrum" in message.lower(), message
+
+
+def test_an_arrayed_acquisition_is_refused_rather_than_concatenated(tmp_path: Path) -> None:
+    """26 experiments laid end to end are not one spectrum.
+
+    `_flatten_1d_fid` squeezed and then reshaped `ndim > 1` to `-1`, so a genuinely
+    multi-trace acquisition was concatenated into a single pseudo-FID, apodized,
+    zero-filled and transformed. Measured on the repo's own Agilent arrayed
+    fixture (`procpar arraydim = 26`, arrayed on tHX, shape (26, 1500) -> 39000):
+    217 multiplets reported, ALL 217 marked quantifiable, at a median spacing of
+    0.2653 ppm against the 50000/1500 Hz = 0.2652 ppm the concatenation period
+    predicts at 125.68 MHz. That 0.04% agreement is the arithmetic signature of
+    the splice, not chemistry.
+
+    A kinetics or variable-temperature series is the most common arrayed
+    acquisition there is, so this is a shape a working chemist will hand it.
+    """
+    from moltrace.spectroscopy.io.fid_reader import FIDReaderError, read_fid
+
+    dataset = Path(
+        "tests/fixtures/nmrglue/varian/extracted/example_separate_1d_varian"
+        "/separate_1d_varian/arrayed_data.dir"
+    )
+    if not dataset.exists():
+        pytest.skip("the arrayed Agilent fixture is not in this checkout")
+
+    with pytest.raises(FIDReaderError) as excinfo:
+        read_fid(dataset)
+
+    message = str(excinfo.value)
+    assert "26" in message, "the refusal does not say how many experiments it found: " + message
+    assert "one" in message.lower() or "single" in message.lower(), (
+        "the refusal does not tell the chemist what to do instead: " + message
+    )

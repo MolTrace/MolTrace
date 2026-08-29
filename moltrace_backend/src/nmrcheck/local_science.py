@@ -233,6 +233,19 @@ def _summarise_multiplet(
         relative_area=float(sum(abs(p.area) for p in multiplet.peaks) / total_area),
     )
 
+
+def _has_processed_spectrum(source: Path) -> bool:
+    """Did the instrument write one at all?
+
+    Distinguishes the two reasons the processed read can fail. Looks for the file
+    rather than parsing it, because the question is whether the chemist should
+    expect one to be there -- and if it is there and unreadable, saying it is
+    absent sends them to the wrong place.
+    """
+    root = source if source.is_dir() else source.parent
+    return any(root.glob("pdata/*/1r"))
+
+
 def _baseline_sigma(spectrum: NMRSpectrum) -> float:
     """The noise width, measured the way the detector measures it.
 
@@ -448,9 +461,17 @@ def open_spectrum(path: str) -> dict:
     # Any reader failure falls through rather than matching on the message text.
     # Deciding by message means a reworded exception silently becomes a refusal.
     processing = "instrument"
+    # WHY the fallback happened, not just that it did. "No processed spectrum
+    # present" and "a processed spectrum was present and could not be trusted"
+    # send a chemist looking in different places, and the caveat below used to
+    # assert the first unconditionally. An incomplete `1r` is now refused rather
+    # than stretched, which made that assertion reachable and false.
+    rejected: str | None = None
     try:
         spectrum = read_processed_spectrum(source)
-    except (FIDReaderError, OSError, ValueError):
+    except (FIDReaderError, OSError, ValueError) as refused:
+        if _has_processed_spectrum(source):
+            rejected = str(refused)
         try:
             spectrum = read_fid(source)
             processing = "moltrace"
@@ -524,6 +545,7 @@ def open_spectrum(path: str) -> dict:
         "points": int(len(spectrum.data)),
         "file_name": _readable_name(source),
         "processing": processing,
+        "processed_spectrum_rejected": rejected,
         "resolution_hz": resolution_hz,
         "saturated": saturated,
         "peak_count": len(peaks),
@@ -559,9 +581,14 @@ def open_spectrum(path: str) -> dict:
                 []
                 if processing == "instrument"
                 else [
-                    "This acquisition held no processed spectrum, so one was computed here from "
-                    "the "
-                    "raw measurement using this application's own phasing and baseline settings. "
+                    (
+                        "The processed spectrum in this acquisition could not be used, so one "
+                        "was computed here from the raw measurement instead. " + rejected + " "
+                        if rejected
+                        else "This acquisition held no processed spectrum, so one was computed "
+                        "here from the raw measurement. "
+                    )
+                    + "It uses this application's own phasing and baseline settings. "
                     "Those settings are not the ones your spectrometer used, so shifts and "
                     "integrals can differ from the printout it produced."
                 ]

@@ -266,6 +266,38 @@ def _read_bruker_pdata_spectrum(pdata_dir: Path, source: Path) -> NMRSpectrum:
     acqus = dict(dictionary.get("acqus", {}) or {})
     params = {**acqus, **{f"procs.{k}": v for k, v in procs.items()}}
 
+    # THE AXIS IS SPREAD OVER THE POINTS IT IS HANDED. `_pdata_ppm_axis` divides
+    # the sweep `procs` declares by `size`, so a `1r` that is short -- copied
+    # part-way, truncated in transit -- keeps the FULL sweep and every shift
+    # moves. Measured on a 100.66 MHz 13C acquisition cut to half its 2097152
+    # bytes: the axis endpoints came back IDENTICAL to the intact read while the
+    # data halved, so a carbon at 135.6074 ppm was reported at 8.4423 -- 127.17
+    # ppm out, the error growing along the axis because the stretch is linear
+    # about its start. Nothing flagged it; the result still said the referencing
+    # was established and that it came from the instrument's own spectrum.
+    #
+    # `SI` was already being read into the provenance below, sitting beside
+    # `input_points`, and nothing compared them. Equality is the measured
+    # invariant rather than a chosen bound: all 6 processed acquisitions in the
+    # corpus have the two exactly equal, none short and none long.
+    #
+    # `_float_param` may answer None or NaN depending on which definition is in
+    # scope, so both are handled here rather than assuming one contract.
+    declared_size = _float_param(procs, "SI")
+    if (
+        declared_size is not None
+        and math.isfinite(declared_size)
+        and declared_size > 0
+        and int(declared_size) != int(real.size)
+    ):
+        raise FIDReaderError(
+            f"This processed spectrum is incomplete: its parameters describe "
+            f"{int(declared_size)} points but the 1r file holds {int(real.size)}. "
+            f"Reading it would spread the full sweep width across the points that "
+            f"are present and move every chemical shift. Re-copy the dataset from "
+            f"the instrument."
+        )
+
     ppm_axis, referencing = _pdata_ppm_axis(procs, real.size)
     ppm_axis, real = _ensure_descending_axis(ppm_axis, real)
 
@@ -710,7 +742,25 @@ def _flatten_1d_fid(data: np.ndarray) -> np.ndarray:
     if fid.ndim == 0:
         raise FIDReaderError("The raw FID did not contain a usable 1D array.")
     if fid.ndim > 1:
-        fid = fid.reshape(-1)
+        # AN ARRAYED ACQUISITION IS NOT ONE SPECTRUM. This reshaped to `-1`,
+        # laying every trace end to end into a single pseudo-FID that was then
+        # apodized, zero-filled and transformed as though it were one. `squeeze`
+        # above has already removed length-1 axes, so anything still here holds
+        # genuinely separate experiments.
+        #
+        # Measured on the Agilent arrayed fixture -- procpar arraydim 26, shape
+        # (26, 1500) spliced to 39000 points: 217 multiplets reported and all 217
+        # marked quantifiable, at a median spacing of 0.2653 ppm against the
+        # 0.2652 ppm the splice period predicts at 125.68 MHz. A 0.04% agreement
+        # is the arithmetic of the concatenation, not chemistry. A kinetics or
+        # variable-temperature series is the commonest arrayed acquisition there
+        # is, so this is a shape a working chemist will hand it.
+        traces = int(fid.shape[0])
+        raise FIDReaderError(
+            f"This acquisition holds {traces} separate experiments, not one "
+            f"spectrum. Reading them together would join them end to end and "
+            f"report the join as peaks. Open a single experiment from the series."
+        )
     if fid.size < 8:
         raise FIDReaderError("The raw FID is too short to process.")
     return fid.astype(np.complex128, copy=False)
