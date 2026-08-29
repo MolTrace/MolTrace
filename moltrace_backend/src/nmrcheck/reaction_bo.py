@@ -1913,6 +1913,61 @@ def _project_experiments(session: Session, project_id: int) -> list[ReactionExpe
     )
 
 
+def chronological_objective_scores(
+    session_factory: sessionmaker[Session], project_id: int
+) -> list[float]:
+    """This project's completed experiments' scalarized scores, oldest first.
+
+    Exposed because the loop metering needs exactly this and had no way to ask for it: the
+    cycle-proposal path called ``compute_loop_metrics`` with only a batch size, so
+    ``best_objective``, ``total_experiments`` and ``experiments_to_target`` were null by
+    construction on every cycle the UI rendered.
+
+    Reuses the same objective profile and the same ``_score_outcome`` the surrogate trains
+    on, so a metric and the model cannot disagree about what an experiment scored. Ordered
+    by id, which is the insertion order ``_project_experiments`` already returns.
+    """
+
+    with session_scope(session_factory) as session:
+        profile = _latest_objective_profile(session, project_id)
+        if profile is None:
+            return []
+        objective_type = profile.objective_type
+        weights = _json_dict(profile.weights_json)
+        scores: list[float] = []
+        for row in _project_experiments(session, project_id):
+            if row.status != "completed":
+                continue
+            scored = _score_outcome(_json_dict(row.outcome_json), objective_type, weights)
+            if scored is not None:
+                scores.append(scored.score)
+        return scores
+
+
+def surrogate_model_version_for_run(
+    session_factory: sessionmaker[Session], bo_run_id: int
+) -> str | None:
+    """The surrogate's version string for this run, or ``None`` if no record was written.
+
+    The cycle provenance promised a version and was handed ``model_type`` -- the algorithm
+    family ("gaussian_process"), which is always present on the run, so the intended
+    ``model_version`` fallback beside it could never be reached. The real version
+    (``_MODEL_VERSION``) is written to the surrogate record, which is where this reads it.
+
+    ``None`` rather than a substitute when no record exists: a provenance field that says
+    nothing is honest, and one that quietly says "gaussian_process" where an auditor expects
+    a revision is not.
+    """
+
+    with session_scope(session_factory) as session:
+        row = session.scalars(
+            select(ReactionSurrogateModelRecordORM)
+            .where(ReactionSurrogateModelRecordORM.bo_run_id == bo_run_id)
+            .order_by(ReactionSurrogateModelRecordORM.id.desc())
+        ).first()
+        return None if row is None else str(row.model_version)
+
+
 def _bo_candidates(session: Session, bo_run_id: int) -> list[ReactionAcquisitionCandidateORM]:
     return list(
         session.scalars(
