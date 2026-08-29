@@ -66,7 +66,23 @@ class TestRecallDegradesWithLineSpacing:
 
     @pytest.mark.slow
     def test_well_separated_multiplets_are_fully_recovered(self) -> None:
-        # ~2.5 linewidths apart and wider: nothing should be lost.
+        """~2.5 linewidths apart and wider: nothing should be lost.
+
+        THE 8.0 Hz CASE IS NOT THE EASY ONE ITS NAME SUGGESTS. At the measured
+        13C FWHM of 3.23 Hz it is 2.48 linewidths, and it recalls 100% only
+        because of the own-line judgement in ``gsd._fit_single_peak`` (13f9629).
+        Measured with that judgement disabled and nothing else changed:
+
+            J/FWHM   4.95  3.72  2.48  1.86  1.24
+            with     100%  100%  100%   44%   33%
+            without  100%  100%   56%   33%   33%
+
+        So this assertion is what pins that fix, and 12.0 Hz is the genuinely
+        easy case beside it. If this goes red at 8.0 while 12.0 stays green, look
+        at the fitter before the detector: a fitted centre free to walk onto its
+        neighbour is deduplicated away as a duplicate of the line it became, which
+        is a merge produced one line at a time rather than by the peak picker.
+        """
         assert _recall_at(8.0) == pytest.approx(1.0)
         assert _recall_at(12.0) == pytest.approx(1.0)
 
