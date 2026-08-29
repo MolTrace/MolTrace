@@ -1483,7 +1483,23 @@ def _flatten_1d_fid(data: np.ndarray) -> np.ndarray:
     if data.ndim == 0:
         raise FIDProcessingError("The raw fid data did not contain a usable 1D array.")
     if data.ndim > 1:
-        data = data.reshape(-1)
+        # AN ARRAYED ACQUISITION IS NOT ONE SPECTRUM. Reshaping to `-1` lays
+        # every trace end to end into one pseudo-FID and the join is then read as
+        # peaks. `squeeze` above has already dropped length-1 axes, so whatever
+        # is left holds genuinely separate experiments.
+        #
+        # The same defect sat in `moltrace.spectroscopy.io.fid_reader`, and both
+        # are fixed together: these are two independent readers, so a guard in
+        # one says nothing about the other. Measured there on the Agilent arrayed
+        # fixture -- procpar arraydim 26, shape (26, 1500) spliced to 39000 --
+        # 217 multiplets, all 217 marked quantifiable, at the splice period
+        # rather than at chemistry.
+        traces = int(data.shape[0])
+        raise FIDProcessingError(
+            f"This acquisition holds {traces} separate experiments, not one "
+            f"spectrum. Reading them together would join them end to end and "
+            f"report the join as peaks. Open a single experiment from the series."
+        )
     if data.size < 8:
         raise FIDProcessingError("The raw fid data is too short to process.")
     return data.astype(np.complex128, copy=False)

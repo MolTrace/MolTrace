@@ -11,17 +11,38 @@
     "solvent": "none",
     "field_mhz": 125.6811106,
     "sweep_width_hz": 50000.0,
-    "zero_fill_points": 65536,
-    "input_points": 39000,
-    "ppm_axis_start": 198.91612892860607,
-    "ppm_axis_end": -198.9100584901012,
-    "peak_count": 75,
     "acquisition_time": "2010-02-17T13:46:17+00:00",
-    "reference_peaks": [
-      {"ppm": -56.7586, "norm_intensity": 0.8402},
-      {"ppm": -66.5745, "norm_intensity": 0.65663},
-      {"ppm": -70.5506, "norm_intensity": 1.0},
-      {"ppm": -72.6692, "norm_intensity": 0.77628}
-    ]
+    "arrayed": true,
+    "trace_count": 26,
+    "points_per_trace": 1500,
+    "procpar_arraydim": 26,
+    "procpar_array": "tHX",
+    "refused": true,
+    "_rebaselined": "This dataset is ARRAYED and reading it is now refused. The keys above come from procpar and describe the experiment, so they are unchanged. The keys under superseded_splice_fingerprint did NOT: nmrglue returns shape (26, 1500) and the reader reshaped that to a single 39000-point pseudo-FID, so input_points 39000 is 26 x 1500 and the axis, peak count and reference peaks were all derived from that spliced length. Measured through the full pipeline the splice produced 217 multiplets, all 217 marked quantifiable, at a median spacing of 0.2653 ppm against the 0.2652 ppm the splice period predicts at 125.68 MHz. The upstream example is named 'separate_1d_varian' and ships a separate.py for exactly this reason.",
+    "superseded_splice_fingerprint": {
+      "input_points": 39000,
+      "zero_fill_points": 65536,
+      "ppm_axis_start": 198.91612892860607,
+      "ppm_axis_end": -198.9100584901012,
+      "peak_count": 75,
+      "reference_peaks": [
+        {
+          "ppm": -56.7586,
+          "norm_intensity": 0.8402
+        },
+        {
+          "ppm": -66.5745,
+          "norm_intensity": 0.65663
+        },
+        {
+          "ppm": -70.5506,
+          "norm_intensity": 1.0
+        },
+        {
+          "ppm": -72.6692,
+          "norm_intensity": 0.77628
+        }
+      ]
+    }
   }
 }
