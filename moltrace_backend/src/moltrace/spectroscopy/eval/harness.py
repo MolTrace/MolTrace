@@ -10,10 +10,25 @@ objective, reproducible, per-version acceptance criteria.
 
 Pieces
 ------
-* :class:`GoldSet` — 100 hand-validated spectra (60 NMRShiftDB2 + 20 HMDB +
-  20 in-house) with a manifest and a SHA-256 over the records. :meth:`GoldSet.
-  assert_integrity` aborts the run if the checksum drifts, so the holdout can
-  never be silently contaminated.
+* :class:`GoldSet` — a manifest of hand-validated spectra with a SHA-256 over the
+  records; :meth:`GoldSet.assert_integrity` aborts the run if the checksum drifts.
+
+  **What is actually built is 21 records, not the 100 this once claimed.**
+  ``tests/fixtures/nmr_gold_set/gold_set_v1.json`` holds 21 NMRShiftDB2 Bruker
+  fixtures, built by ``scripts/build_nmr_gold_set.py`` and named
+  ``nmr_gold_set_v1_regression_sentinel`` because that is what it is: several of
+  its molecules are in the shipped knowledge base's training data, so it detects
+  regressions and cannot support a held-out accuracy claim. Held-out numbers come
+  from ``eval/shift_accuracy.py``, which splits by molecule.
+
+  Two things block the "+ 20 HMDB" half, and neither is effort. The 100 HMDB FID
+  fixtures under ``tests/fixtures/hmdb/`` carry no structure — ``hmdb_id``,
+  ``expected_peak_count``, nucleus, solvent and frequency only — and a gold record
+  needs ``true_inchikey``, so they can validate peak counts (which
+  ``gsd_hmdb_validation`` does) but cannot verify a structure. And that corpus is
+  licensed "free for academic / non-commercial use", which is not a licence this
+  product can build a committed artifact on without a decision. Expanding the count
+  without resolving both would add records that look like evidence and are not.
 * :func:`evaluate` — computes the ten metrics on the gold set and returns a
   :class:`GoldMetricVector` carrying the metrics + metadata (``model_versions``,
   gold-set checksum, timestamp). It reuses the Prompt 19 metric framework
