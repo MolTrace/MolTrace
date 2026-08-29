@@ -204,6 +204,21 @@ def _downsample_points(points: list[tuple[float, float]], limit: int = 700) -> l
         return [SpectrumPoint(shift_ppm=x, intensity=y) for x, y, _ in clean]
     safe_limit = max(3, int(limit))
     bucket_count = max(1, (safe_limit - 2) // 3)
+    # Robust noise scale: the median |dy| between consecutive samples. Baseline
+    # dominates it because peaks are a sparse minority, so it tracks the noise
+    # floor rather than the dynamic range. A bucket whose whole span sits inside
+    # a few multiples of it is baseline, and shipping its min AND max renders a
+    # noise band where the data is a line. The 6x multiplier and this estimator
+    # are the frontend's `bucketIsFlat` criterion, deliberately: the two ends
+    # must agree about what "flat" means or one will undo the other.
+    _deltas = [
+        abs(clean[i][1] - clean[i - 1][1])
+        for i in range(1, len(clean))
+    ]
+    _flat_spread = 0.0
+    if _deltas:
+        _deltas.sort()
+        _flat_spread = _deltas[len(_deltas) // 2] * 6.0
     bucket_size = (len(clean) - 2) / bucket_count
     selected: dict[int, tuple[float, float, int]] = {
         clean[0][2]: clean[0],
@@ -211,6 +226,11 @@ def _downsample_points(points: list[tuple[float, float]], limit: int = 700) -> l
     }
     use_python_lttb = _lttbc is None
     anchor_position = 0
+    # Source positions inside buckets already judged flat. The LTTB top-up below
+    # runs over the whole trace, so without this it puts most of the baseline
+    # straight back: gating only the bucket loop was measured to recover 16% of
+    # the reduction instead of the full amount.
+    flat_positions: set[int] = set()
     for bucket_idx in range(bucket_count):
         start = 1 + int(math.floor(bucket_idx * bucket_size))
         end = 1 + int(math.floor((bucket_idx + 1) * bucket_size))
@@ -225,8 +245,19 @@ def _downsample_points(points: list[tuple[float, float]], limit: int = 700) -> l
                 min_point = item
             if item[1] > max_point[1]:
                 max_point = item
-        selected[min_point[2]] = min_point
-        selected[max_point[2]] = max_point
+        bucket_is_flat = (
+            _flat_spread > 0.0
+            and (max_point[1] - min_point[1]) <= _flat_spread
+        )
+        if bucket_is_flat:
+            # One representative for a baseline bucket. Keep the max so a line
+            # just under the flat threshold still reads as a bump rather than
+            # being replaced by its own trough.
+            selected[max_point[2]] = max_point
+            flat_positions.update(range(start, stop))
+        else:
+            selected[min_point[2]] = min_point
+            selected[max_point[2]] = max_point
         if use_python_lttb:
             next_start = 1 + int(math.floor((bucket_idx + 1) * bucket_size))
             next_stop = max(
@@ -242,12 +273,15 @@ def _downsample_points(points: list[tuple[float, float]], limit: int = 700) -> l
                 anchor_position=anchor_position,
             )
             if lttb_position is not None:
-                lttb_point = clean[lttb_position]
-                selected[lttb_point[2]] = lttb_point
+                if not bucket_is_flat:
+                    lttb_point = clean[lttb_position]
+                    selected[lttb_point[2]] = lttb_point
                 anchor_position = lttb_position
     if _lttbc is not None:
         lttb_target = max(3, safe_limit - (2 * bucket_count))
         for position in _lttbc_selected_positions(clean, target=lttb_target):
+            if position in flat_positions:
+                continue
             point = clean[position]
             selected[point[2]] = point
     ordered = [selected[idx] for idx in sorted(selected)]

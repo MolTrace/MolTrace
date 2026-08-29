@@ -1,7 +1,5 @@
 import random
 
-import pytest
-
 from nmrcheck.compound_class_priors import diagnostic_regions_for
 from nmrcheck.models import Peak
 from nmrcheck.parser import parse_reference_nmr_text
@@ -558,25 +556,15 @@ def _synthetic_spectrum(seed: int = 7, n: int = 65536) -> list[tuple[float, floa
     return list(zip(ppm.tolist(), y.tolist(), strict=True))
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "Open defect, measured but NOT fixed. The sampler keeps the min AND the "
-        "max of every bucket unconditionally, so pure baseline ships its full "
-        "peak-to-peak noise excursion: 2.25-2.53 emitted points per bucket where "
-        "one is correct. A prototype guard (flat-bucket test in the bucket loop, "
-        "plus gating the LTTB top-up which otherwise puts the baseline back) cut "
-        "1H preview points 25-40% across the 17 nmrshiftdb2 fixtures and reached "
-        "1.00 points per baseline bucket. REVERTED because it also moved peak "
-        "detection: 2 pre-existing macOS golden failures became 19, with 'peak "
-        "count changed: 10 -> 11' and shifted apexes. So this sampler is NOT "
-        "display-only, contrary to an audit of its six call sites that found "
-        "only preview surfaces. Locating that coupling is the first task of any "
-        "real fix."
-    ),
-)
 def test_flat_baseline_buckets_emit_one_point_not_a_noise_envelope() -> None:
-    """A bucket holding only baseline is a line, not a band."""
+    """A bucket holding only baseline is a line, not a band.
+
+    The sampler kept the min AND the max of every bucket unconditionally, so a
+    stretch of pure baseline shipped its full peak-to-peak noise excursion —
+    measured at 2.25-2.53 emitted points per bucket where one is correct. The
+    frontend applies the same criterion (`bucketIsFlat`, 6x the median |dy|);
+    matching it here keeps the wire honest and the two ends in agreement.
+    """
     import numpy as np
 
     points = _synthetic_spectrum()
