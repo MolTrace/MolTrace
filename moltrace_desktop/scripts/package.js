@@ -99,6 +99,36 @@ function scienceNewerThanFreeze(frozenBinary) {
   return { checked: true, frozenAt, commits, dirty }
 }
 
+// AD-HOC SIGNING IS NOT DISTRIBUTION SIGNING, and `osxSign` below stays false:
+// turning real signing on is still a visible change to that one line. This fixes
+// a different failure that looks the same from a distance.
+//
+// @electron/packager renames the `Electron` binary to the product name and
+// rewrites Info.plist AFTER the prebuilt binary was linker-signed. That
+// invalidates the signature it inherited. The bundle then ships with
+// `Identifier=Electron`, no `Contents/_CodeSignature` directory at all, and
+// `codesign -v` reporting "code has no resources but signature indicates they
+// must be present" — an ERROR, not the ordinary policy verdict. macOS presents
+// that as a damaged app, and the right-click-Open route does not recover it: the
+// evaluator never reaches a dialog with an Open button in it.
+//
+// Re-signing ad-hoc restores a valid seal over the renamed bundle. Measured on
+// this build: "code has no resources..." before, "valid on disk / satisfies its
+// Designated Requirement" after, with `spctl` moving from an error to a plain
+// `rejected`. Still untrusted — which is correct for an unsigned NDA preview —
+// but now untrusted in the class the tester can actually get past.
+function signAdHoc(appPath) {
+  execFileSync('codesign', ['--force', '--deep', '--sign', '-', appPath], { stdio: 'pipe' })
+  // Prove the seal landed rather than trusting the exit code, in the same spirit
+  // as the product.json check above. A signature that did not take is exactly the
+  // state this function exists to prevent, so it must not be assumed.
+  try {
+    execFileSync('codesign', ['--verify', '--deep', appPath], { stdio: 'pipe' })
+  } catch (e) {
+    throw new Error('the ad-hoc signature did not verify after signing: ' + String(e.stderr || e.message).trim())
+  }
+}
+
 async function main() {
   const overlayPath = process.argv.find((a) => a.startsWith('--config='))
   const config = overlayPath
@@ -215,17 +245,27 @@ async function main() {
     ],
   })
 
-  for (const p of appPaths) console.log('  built: ' + p)
+  for (const p of appPaths) {
+    // macOS only. On other platforms there is nothing to re-seal and codesign
+    // does not exist, so asking for it would fail the build for no reason.
+    if (process.platform === 'darwin') {
+      for (const app of fs.readdirSync(p).filter((n) => n.endsWith('.app'))) {
+        signAdHoc(path.join(p, app))
+      }
+    }
+    console.log('  built: ' + p)
+  }
   console.log(
-    '\nUNSIGNED. macOS will refuse it on first open: the evaluator right-clicks the app and chooses\n'
-    + 'Open, then Open again in the dialog. Gatekeeper remembers the choice. This is expected for an\n'
-    + 'NDA build and is not a warning about the contents.',
+    '\nUNSIGNED — ad-hoc sealed, not notarized. macOS will still refuse it on first open, and that\n'
+    + 'refusal is expected for an NDA build rather than a warning about the contents. The evaluator\n'
+    + 'opens System Settings > Privacy & Security, finds the blocked app near the bottom, and chooses\n'
+    + 'Open Anyway. macOS remembers the choice.',
   )
 }
 
 // Exported so the freshness gate can be tested rather than trusted. A guard nobody
 // can run both ways is indistinguishable from one that always fires.
-module.exports = { scienceNewerThanFreeze, FROZEN_SCIENCE_SURFACE, FROZEN_SERVICE }
+module.exports = { scienceNewerThanFreeze, signAdHoc, FROZEN_SCIENCE_SURFACE, FROZEN_SERVICE }
 
 if (require.main === module) {
   main().catch((e) => { console.error(e); process.exit(1) })
