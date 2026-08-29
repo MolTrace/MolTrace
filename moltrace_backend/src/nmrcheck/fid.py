@@ -47,6 +47,7 @@ from .parser import ReferencePeakAssignment, normalize_nmr_text, parse_reference
 from .solvents import SOLVENT_PROFILES
 from .raw_vault import RawVaultError, build_raw_upload_provenance, load_raw_archive_bytes
 from .spectrum import (
+    compact_uniform_trace,
     _apply_reference_multiplicity,
     _apply_solvent_mask,
     _build_impurity_candidates,
@@ -3558,6 +3559,10 @@ def process_bruker_1d_zip(
                 "automatic_phase_correction": settings.auto_phase,
                 "automatic_baseline_correction": baseline_applied,
                 "display_preprocessing": display_meta,
+                # The whole trace, once, so the viewer can resample against
+                # whatever window is on screen instead of magnifying a
+                # full-sweep decimation. None when the ppm axis is not uniform.
+                "full_trace": compact_uniform_trace(display_points),
                 "evidence_trace_mode": (
                     "raw_fid_fft_real_baseline_corrected"
                     if baseline_applied

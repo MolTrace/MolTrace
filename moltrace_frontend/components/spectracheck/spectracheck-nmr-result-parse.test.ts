@@ -7,6 +7,7 @@ import {
   extractRawFidArchiveFacts,
   describeReferenceMode,
   extractBaselineNoiseSigma,
+  extractFullTraceXY,
   displayedDatasetName,
   extractReferenceReadout,
 } from "@/components/spectracheck/spectracheck-nmr-result-parse"
@@ -322,6 +323,49 @@ describe("extractBaselineNoiseSigma", () => {
         metadata: { display_preprocessing: { trace_smoothing: { noise_sigma: 0 } } },
       }),
     ).toBeUndefined()
+  })
+})
+
+describe("extractFullTraceXY", () => {
+  function packed(values: number[], first: number, last: number) {
+    const f32 = new Float32Array(values)
+    const bytes = new Uint8Array(f32.buffer)
+    let binary = ""
+    for (const b of bytes) binary += String.fromCharCode(b)
+    return {
+      metadata: {
+        full_trace: {
+          encoding: "base64_float32_le",
+          point_count: values.length,
+          ppm_first: first,
+          ppm_last: last,
+          intensity: btoa(binary),
+        },
+      },
+    }
+  }
+
+  it("decodes the packed trace and rebuilds the ppm axis", () => {
+    const ys = [0, 1, 4, 9, 16]
+    const out = extractFullTraceXY(packed(ys, 10, 6))
+    expect(out).not.toBeNull()
+    expect(out!.y).toEqual(ys)
+    // Uniform axis from first to last, which is why the backend only emits this
+    // form when the axis really is uniform.
+    expect(out!.x).toEqual([10, 9, 8, 7, 6])
+  })
+
+  it("declines anything it cannot trust rather than guessing", () => {
+    expect(extractFullTraceXY({})).toBeNull()
+    expect(extractFullTraceXY(null)).toBeNull()
+    // Unknown encoding — never assume a layout.
+    const wrong = packed([1, 2, 3], 0, 2)
+    ;(wrong.metadata.full_trace as Record<string, unknown>).encoding = "float64"
+    expect(extractFullTraceXY(wrong)).toBeNull()
+    // Declared length disagreeing with the payload is corruption, not a trace.
+    const short = packed([1, 2, 3], 0, 2)
+    ;(short.metadata.full_trace as Record<string, unknown>).point_count = 99
+    expect(extractFullTraceXY(short)).toBeNull()
   })
 })
 

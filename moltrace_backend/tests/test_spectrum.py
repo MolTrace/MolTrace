@@ -12,6 +12,7 @@ from nmrcheck.spectrum import (
     _infer_peak_estimates,
     _round_half_integrations,
     _structure_guided_peak_estimates,
+    compact_uniform_trace,
     parse_processed_spectrum,
 )
 
@@ -678,3 +679,45 @@ def test_trace_reference_text_does_not_fabricate_missing_assignments() -> None:
     assert preview.metadata["peak_evidence_policy"] == "detected_peaks_only_no_reference_fabrication"
     assert preview.comparison is not None
     assert preview.comparison.missing_count >= 1
+
+
+def test_compact_uniform_trace_round_trips_exactly() -> None:
+    """The packed trace must decode to what was sent, or zoom lies."""
+    import base64
+
+    import numpy as np
+
+    points = [(0.0 + i * 0.001, float(i % 7) - 3.0) for i in range(4096)]
+    packed = compact_uniform_trace(points)
+    assert packed is not None
+    assert packed["encoding"] == "base64_float32_le"
+    assert packed["point_count"] == 4096
+
+    decoded = np.frombuffer(base64.b64decode(packed["intensity"]), dtype="<f4")
+    assert decoded.size == 4096
+    np.testing.assert_allclose(decoded, [y for _, y in points], rtol=0, atol=1e-6)
+
+    # x is reconstructed by interpolation, so the endpoints have to be exact.
+    rebuilt = np.linspace(packed["ppm_first"], packed["ppm_last"], packed["point_count"])
+    np.testing.assert_allclose(rebuilt, [x for x, _ in points], rtol=0, atol=1e-9)
+
+
+def test_compact_uniform_trace_refuses_a_non_uniform_axis() -> None:
+    """The compact form reconstructs x by interpolation.
+
+    On a non-uniform axis that would misplace every point, so the honest answer
+    is to decline and let the caller fall back to the explicit preview points.
+    Both raw-FID axis paths are uniform today; this guards a future source.
+    """
+    points = [(0.0, 1.0), (0.001, 1.0), (0.010, 1.0), (0.011, 1.0)] * 8
+    assert compact_uniform_trace(points) is None
+
+
+def test_compact_uniform_trace_declines_degenerate_input() -> None:
+    assert compact_uniform_trace([]) is None
+    assert compact_uniform_trace([(1.0, 1.0)]) is None
+    # Zero span: every x identical, so no step can be derived.
+    assert compact_uniform_trace([(1.0, 1.0)] * 16) is None
+    # Over the cap, rather than silently shipping an unbounded payload.
+    assert compact_uniform_trace([(i * 0.1, 1.0) for i in range(300000)]) is None
+
