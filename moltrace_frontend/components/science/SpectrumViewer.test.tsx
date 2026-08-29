@@ -27,6 +27,7 @@ type CapturedPlotProps = {
     connectgaps?: boolean
   }>
   layout?: {
+    [key: string]: unknown
     uirevision?: unknown
     showlegend?: boolean
     xaxis?: {
@@ -558,6 +559,79 @@ describe("SpectrumViewer — analysis overlays", () => {
     )
     const annotations = capturedPlotProps?.layout?.annotations ?? []
     expect(annotations.map((a) => String(a.text ?? ""))).toContain("dd, J = 8.1, 2.0 Hz")
+  })
+})
+
+describe("SpectrumViewer — expansion insets", () => {
+  const trace = () => {
+    const x: number[] = []
+    const y: number[] = []
+    for (let i = 0; i < 400; i++) {
+      const ppm = 9 - (i / 399) * 4
+      x.push(ppm)
+      y.push(Math.abs(ppm - 7.3) < 0.03 ? 1 : 0.01)
+    }
+    return { x, y }
+  }
+
+  it("draws nothing until asked — insets cost plot area", () => {
+    const { x, y } = trace()
+    freshRender(<SpectrumViewer x={x} y={y} expansions={[{ from: 7.2, to: 7.4 }]} />)
+
+    // One observed trace only, and the main y-axis still owns the full frame.
+    expect(capturedPlotProps?.data ?? []).toHaveLength(1)
+    expect((capturedPlotProps?.layout as Record<string, unknown>)?.xaxis2).toBeUndefined()
+  })
+
+  it("adds a native inset axis pair and outlines the source region once shown", () => {
+    const { x, y } = trace()
+    freshRender(<SpectrumViewer x={x} y={y} expansions={[{ from: 7.2, to: 7.4 }]} />)
+    fireEvent.click(screen.getByRole("button", { name: /Show expansion insets/i }))
+
+    const layout = capturedPlotProps?.layout as Record<string, unknown>
+    // Native Plotly inset: an extra axis pair with a fractional domain, which
+    // exports as vector rather than needing a second chart.
+    expect(layout?.xaxis2).toBeDefined()
+    expect(layout?.yaxis2).toBeDefined()
+    // The reader must be able to see WHICH region each box magnifies.
+    const shapes = (capturedPlotProps?.layout?.shapes ?? []) as Array<{ type?: string }>
+    expect(shapes.some((sh) => sh.type === "rect")).toBe(true)
+    // And the inset trace is drawn on that axis pair.
+    const data = (capturedPlotProps?.data ?? []) as Array<{ xaxis?: string }>
+    expect(data.some((t) => t.xaxis === "x2")).toBe(true)
+  })
+
+  it("keeps the NMR axis convention inside the inset", () => {
+    const { x, y } = trace()
+    freshRender(<SpectrumViewer x={x} y={y} expansions={[{ from: 7.2, to: 7.4 }]} />)
+    fireEvent.click(screen.getByRole("button", { name: /Show expansion insets/i }))
+
+    const xaxis2 = (capturedPlotProps?.layout as Record<string, unknown>)?.xaxis2 as {
+      range?: number[]
+    }
+    // High ppm on the left, exactly as the main axis does it.
+    expect(xaxis2.range?.[0]).toBeGreaterThan(xaxis2.range?.[1] ?? 0)
+  })
+
+  it("caps at three so the main trace keeps most of the frame", () => {
+    const { x, y } = trace()
+    freshRender(
+      <SpectrumViewer
+        x={x}
+        y={y}
+        expansions={[
+          { from: 7.2, to: 7.4 },
+          { from: 6.2, to: 6.4 },
+          { from: 8.2, to: 8.4 },
+          { from: 5.6, to: 5.8 },
+        ]}
+      />,
+    )
+    fireEvent.click(screen.getByRole("button", { name: /Show expansion insets/i }))
+
+    const layout = capturedPlotProps?.layout as Record<string, unknown>
+    expect(layout?.xaxis4).toBeDefined()
+    expect(layout?.xaxis5).toBeUndefined()
   })
 })
 

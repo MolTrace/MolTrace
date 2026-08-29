@@ -735,7 +735,7 @@ export function SpectraCheckProcessedSpectrumSection({
   )
   const warnings = useMemo(() => extractWarnings(displayPayload ?? {}), [displayPayload])
   const [integralRegions, setIntegralRegions] = useState<RegionIntegrationResult[]>([])
-  const { integrals, multipletBrackets } = useSpectrumAnalysisOverlays(gsdResult, integralRegions)
+  const { integrals, multipletBrackets, expansions } = useSpectrumAnalysisOverlays(gsdResult, integralRegions)
   const notes = useMemo(() => extractNotes(displayPayload ?? {}), [displayPayload])
   // Set when no structure grounded the proton budget, so `integration_h` below
   // holds multiples of the smallest resolved signal rather than proton counts.
@@ -1347,6 +1347,7 @@ export function SpectraCheckProcessedSpectrumSection({
                   overlays={overlays}
                   integrals={integrals}
                   multipletBrackets={multipletBrackets}
+                  expansions={expansions}
                   nucleus={nucleus}
                 />
               ) : foregroundActionLoading ? (
