@@ -14,6 +14,42 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.74.0 — A multiplet must have the intensities of one, not just the spacings (2026-08-29)
+
+`_build_multiplet_for_cluster` chose its label from inter-line SPACINGS alone, so
+any two lines whose gap fell inside the J window became a doublet however unequal
+they were.
+
+Measured on a real 13C acquisition, in the **quantifiable** half of the table —
+the part a chemist actually uses:
+
+    115.391 ppm   d   J = 25.4 Hz   lines 186 : 1
+    119.115 ppm   d   J = 27.2 Hz   lines 101 : 1
+    135.608 ppm   d   J = 28.9 Hz   lines 237 : 1
+    146.131 ppm   d   J =  9.5 Hz   lines  62 : 1
+
+A doublet is one nucleus split by one neighbour: its two lines are **equal**.
+These were a strong carbon beside a weak line about a quarter of a ppm away —
+25-29 Hz at 100.66 MHz, an ordinary gap between two distinct carbons — and the
+reported coupling was the gap. All four now read `m`.
+
+**The check accepts two families, because both occur.** Spin-1/2 neighbours give
+binomial coefficients; **deuterium is spin-1** and gives trinomial ones. The same
+spectrum's DMSO-d6 septet measures **1.0 : 3.1 : 6.2 : 7.3 : 6.2 : 3.1 : 1.0**
+against the 1:3:6:7:6:3:1 expected from three deuterons — a binomial-only rule
+would have rejected the most confidently correct assignment on the page. It
+survives, unchanged.
+
+Conservative by construction: an unmatched pattern falls through to `m`, the
+label the code already uses for a cluster it cannot read first-order. Nothing
+gains a more confident label than before.
+
+Diagnosis note. J values alone were not conclusive — a 25 Hz doublet in 13C could
+be a real 2J(C-F). What settled it was the intensity ratio, and the septet is the
+control that proves the method reads real patterns correctly.
+
+---
+
 ## v0.73.1 — Detection and quantitation are different claims (2026-08-27)
 
 The peak table presented every signal as one kind of row. Measured on a real 13C
