@@ -20,11 +20,33 @@
 // below is inert and says so in its own value.
 const fs = require('node:fs')
 const path = require('node:path')
+const { execFileSync } = require('node:child_process')
 const { packager } = require('@electron/packager')
 const product = require('../src/product.js')
 
 const ROOT = path.join(__dirname, '..')
 const FROZEN_SERVICE = path.join(ROOT, '..', 'moltrace_backend', 'dist', 'moltrace-local-service')
+
+// Named once because two refusals below quote it, and a runbook that drifts from
+// the command it documents is worse than no runbook.
+const REFREEZE_COMMAND =
+  '    uv run --with pyinstaller pyinstaller --noconfirm --onedir --name moltrace-local-service \\\n'
+  + '      --distpath dist --workpath build/pyi --specpath build/pyi \\\n'
+  + '      --collect-submodules nmrcheck --collect-submodules moltrace \\\n'
+  + '      --hidden-import uvicorn.protocols.http.h11_impl \\\n'
+  + '      --hidden-import uvicorn.lifespan.on --hidden-import uvicorn.loops.asyncio \\\n'
+  + '      --console packaging/moltrace_local_service.py'
+
+// What the frozen entry point actually pulls in: packaging/moltrace_local_service.py
+// -> nmrcheck.local_service_main -> nmrcheck.local_science -> moltrace.spectroscopy.
+// Scoped to exactly that, because gating on all of moltrace_backend/src would demand
+// a re-freeze for an api.py edit that cannot change a single number a tester sees —
+// and an obstructive gate is one that gets bypassed.
+const FROZEN_SCIENCE_SURFACE = [
+  'moltrace_backend/src/nmrcheck/local_service_main.py',
+  'moltrace_backend/src/nmrcheck/local_science.py',
+  'moltrace_backend/src/moltrace/spectroscopy',
+]
 
 const PREVIEW_CONFIG = {
   _comment:
@@ -41,6 +63,40 @@ const PREVIEW_CONFIG = {
 function refuse(why) {
   console.error('\nRefusing to package — ' + why)
   process.exit(1)
+}
+
+// The freeze is built by hand, so nothing forces it to be newer than the science it
+// claims to contain. That gap is not theoretical: the preview zip written at 07:49 on
+// 2026-08-29 carried a freeze from 07:48, and `fix(gsd): a fitted line may refine its
+// position, not walk onto its neighbour` landed at 09:56 — its hunks inside
+// `gsd_peak_pick` itself, which local_science.py calls directly. So the artifact
+// reported peak positions from before the fix, and nothing in it said so.
+//
+// The comparison is exact rather than a tolerance: a freeze older than the source it
+// packages IS stale, so there is no window to choose and no round number to defend.
+function scienceNewerThanFreeze(frozenBinary) {
+  const repo = path.join(ROOT, '..')
+  const frozenAt = Math.floor(fs.statSync(frozenBinary).mtimeMs / 1000)
+  const git = (args) => execFileSync('git', args, { cwd: repo, encoding: 'utf8' })
+  let commits
+  try {
+    commits = git(['log', `--since=@${frozenAt}`, '--format=%h %ad %s',
+      '--date=format-local:%Y-%m-%d %H:%M', '--', ...FROZEN_SCIENCE_SURFACE])
+      .split('\n').map((l) => l.trim()).filter(Boolean)
+  } catch (err) {
+    return { checked: false, why: String(err.message).trim().split('\n')[0] }
+  }
+  // A tracked file edited but not yet committed is exactly as stale, and in a worktree
+  // shared with other sessions that is the ordinary case rather than the exotic one.
+  let dirty = []
+  try {
+    dirty = git(['diff', '--name-only', 'HEAD', '--', ...FROZEN_SCIENCE_SURFACE])
+      .split('\n').map((l) => l.trim()).filter(Boolean)
+      .filter((rel) => {
+        try { return fs.statSync(path.join(repo, rel)).mtimeMs / 1000 > frozenAt } catch { return false }
+      })
+  } catch { /* the commit query already proved git answers here */ }
+  return { checked: true, frozenAt, commits, dirty }
 }
 
 async function main() {
@@ -60,16 +116,59 @@ async function main() {
 
   // A packaged app with no service can start, and can do nothing. That is worse
   // than not shipping: an evaluator reads it as the product being empty.
-  if (!fs.existsSync(path.join(FROZEN_SERVICE, 'moltrace-local-service'))) {
+  const frozenBinary = path.join(FROZEN_SERVICE, 'moltrace-local-service')
+  if (!fs.existsSync(frozenBinary)) {
     refuse(
       'the frozen local science service is not built, so the app would ship unable to read a spectrum.\n'
       + '  Build it first, from moltrace_backend:\n'
-      + '    uv run --with pyinstaller pyinstaller --noconfirm --onedir --name moltrace-local-service \\\n'
-      + '      --distpath dist --workpath build/pyi --specpath build/pyi \\\n'
-      + '      --collect-submodules nmrcheck --collect-submodules moltrace \\\n'
-      + '      --hidden-import uvicorn.protocols.http.h11_impl \\\n'
-      + '      --hidden-import uvicorn.lifespan.on --hidden-import uvicorn.loops.asyncio \\\n'
-      + '      --console packaging/moltrace_local_service.py',
+      + REFREEZE_COMMAND,
+    )
+  }
+
+  // A freeze that exists is not a freeze that is current. Presence was the only test
+  // here, which is how a zip went out carrying peak fitting two commits behind the
+  // source beside it — undetectable from inside the artifact, because nothing in the
+  // build records which science it holds.
+  const freshness = scienceNewerThanFreeze(frozenBinary)
+  if (!freshness.checked) {
+    // Fail closed. Packaging on an unanswerable check ships science of unknown vintage,
+    // which is the exact silence this gate exists to break. The override is deliberately
+    // wordy: it should read as a statement someone made, not a flag they reached for.
+    if (!process.argv.includes('--allow-unverified-freeze')) {
+      refuse(
+        'the frozen service could not be checked against the source it packages (' + freshness.why + ').\n'
+        + '  Re-run where git can answer, or pass --allow-unverified-freeze to state that you\n'
+        + '  accept shipping a freeze of unverified vintage.',
+      )
+    }
+    console.log('WARNING: freeze vintage unverified (' + freshness.why + ') — proceeding as instructed')
+  } else if (freshness.commits.length || freshness.dirty.length) {
+    // Local, to match git's format-local above. Printing the freeze in UTC beside
+    // commit times in local time made this refusal read as though the commits came
+    // BEFORE the freeze — the gate looked broken at exactly the moment it was right.
+    const d = new Date(freshness.frozenAt * 1000)
+    const pad = (n) => String(n).padStart(2, '0')
+    const frozenAt = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} `
+      + `${pad(d.getHours())}:${pad(d.getMinutes())}`
+    const detail = []
+    if (freshness.commits.length) {
+      detail.push('  committed since the freeze:')
+      for (const c of freshness.commits) detail.push('    ' + c)
+    }
+    if (freshness.dirty.length) {
+      detail.push('  uncommitted, and newer than the freeze:')
+      for (const f of freshness.dirty) detail.push('    ' + f)
+    }
+    // No override on this branch, on purpose. An escape hatch on the real condition is
+    // the one that gets used reflexively, and shipping stale science is not a judgement
+    // call a hurried packaging run should be able to make.
+    refuse(
+      'the frozen science service is older than the science it would ship.\n'
+      + '  frozen at ' + frozenAt + ', and superseded by:\n'
+      + detail.join('\n') + '\n'
+      + '  A tester cannot tell which of these produced an answer, and neither can their\n'
+      + '  bug report. Re-freeze from moltrace_backend:\n'
+      + REFREEZE_COMMAND,
     )
   }
 
@@ -124,4 +223,10 @@ async function main() {
   )
 }
 
-main().catch((e) => { console.error(e); process.exit(1) })
+// Exported so the freshness gate can be tested rather than trusted. A guard nobody
+// can run both ways is indistinguishable from one that always fires.
+module.exports = { scienceNewerThanFreeze, FROZEN_SCIENCE_SURFACE, FROZEN_SERVICE }
+
+if (require.main === module) {
+  main().catch((e) => { console.error(e); process.exit(1) })
+}
