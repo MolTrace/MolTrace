@@ -491,6 +491,65 @@ def test_a_signal_below_the_quantitation_floor_is_not_split() -> None:
     assert resolved == 1, f"a ~5 sigma signal was reported as {resolved} lines"
 
 
+def test_detection_and_quantitation_are_reported_as_different_claims() -> None:
+    """A three-sigma bump and a real carbon are not the same kind of row.
+
+    Measured on a real 13C acquisition: 47 of 55 signals stood between 1.8 and
+    6.3 times the baseline noise, and every one of the 27 sitting above 220 ppm —
+    outside the range carbon-13 shifts occupy at all — was among them. Presented
+    as one table, six sevenths of it was the detection floor and nothing said so.
+    """
+    from nmrcheck.local_science import _QUANTIFIABLE_SIGMA, open_spectrum
+
+    source = _one("instrument") or _one("moltrace")
+    if source is None:
+        pytest.skip("no acquisition in this checkout")
+
+    result = open_spectrum(source)
+    for signal in result["multiplets"]:
+        assert "snr" in signal and "quantifiable" in signal
+        assert signal["quantifiable"] is (signal["snr"] >= _QUANTIFIABLE_SIGMA), (
+            "a signal's quantifiable flag disagrees with its own signal-to-noise"
+        )
+    assert any("not quantifiable" in limit for limit in result["limits"]), (
+        "nothing tells the reader that some rows are below the limit of quantitation"
+    )
+
+
+def test_signal_to_noise_comes_from_the_observed_apex() -> None:
+    """One definition of SNR, used everywhere.
+
+    A fitted amplitude can exceed the apex it models when the fit is broad, and
+    mixing a fitted height with a noise estimate computed another way is how the
+    same peaks were once measured at 14-23 sigma and then, consistently, at 1.8.
+    """
+    import numpy as np
+
+    from moltrace.spectroscopy.peaks.gsd import _positive_peak_orientation
+    from nmrcheck.local_science import _baseline_sigma, open_spectrum
+
+    source = _one("instrument")
+    if source is None:
+        pytest.skip("no instrument-processed acquisition in this checkout")
+
+    from pathlib import Path
+
+    from moltrace.spectroscopy.io.fid_reader import read_processed_spectrum
+
+    spectrum = read_processed_spectrum(Path(source))
+    sigma = _baseline_sigma(spectrum)
+    axis = np.asarray(spectrum.ppm_axis, dtype=float)
+    oriented = _positive_peak_orientation(np.asarray(spectrum.data, dtype=float))
+    centred = oriented - float(np.median(oriented))
+
+    strongest = max(open_spectrum(source)["multiplets"], key=lambda m: m["snr"])
+    index = int(np.argmin(np.abs(axis - strongest["center_ppm"])))
+    observed = float(centred[index]) / sigma
+    assert strongest["snr"] == pytest.approx(observed, rel=0.25), (
+        f"reported {strongest['snr']:.0f} sigma against an observed apex of {observed:.0f}"
+    )
+
+
 @pytest.mark.slow
 def test_every_acquisition_opens_end_to_end() -> None:
     """The exhaustive pass. ~4.4s each, so it is opt-in."""

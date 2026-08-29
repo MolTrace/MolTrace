@@ -114,6 +114,16 @@ class MultipletSummary:
     multiplicity: str
     j_couplings_hz: list[float]
     line_count: int
+    #: Apex height over the baseline noise width. The measure a chemist needs to
+    #: decide whether a row is worth reading numbers off, and the one thing a
+    #: peak table almost never shows.
+    snr: float
+    #: Whether this signal clears the limit of QUANTITATION, not merely detection.
+    #: Detection and quantitation are different claims and this platform draws
+    #: that line everywhere else; a peak table that does not draw it presents
+    #: three-sigma bumps beside real carbons as if they were the same kind of
+    #: thing.
+    quantifiable: bool
     #: How many lines a deconvolution finds in this signal's window.
     #:
     #: The detector reports one maximum per resolvable feature, so two lines
@@ -142,6 +152,8 @@ class MultipletSummary:
             "range_ppm": list(self.range_ppm),
             "multiplicity": self.multiplicity,
             "j_couplings_hz": self.j_couplings_hz,
+            "snr": self.snr,
+            "quantifiable": self.quantifiable,
             "line_count": self.line_count,
             "resolved_lines": self.resolved_lines,
             "width_hz": self.width_hz,
@@ -198,6 +210,32 @@ def _baseline_sigma(spectrum: NMRSpectrum) -> float:
         if np.isfinite(estimate) and estimate > 0:
             return estimate
     return float(_robust_noise(signal))
+
+
+def _signal_to_noise(spectrum: NMRSpectrum, multiplet, baseline_sigma: float) -> float:
+    """How far this signal stands above the baseline, in noise widths.
+
+    Measured from the OBSERVED apex rather than a fitted amplitude. A fitted
+    amplitude can exceed the apex it models when the fit is broad, and mixing a
+    fitted height with a noise estimate computed another way is how the same
+    peaks were once measured at 14-23 sigma and then, on one consistent
+    definition, at 1.8. One definition, used everywhere.
+    """
+    from moltrace.spectroscopy.peaks.gsd import _positive_peak_orientation
+
+    if baseline_sigma <= 0:
+        return 0.0
+    axis = np.asarray(spectrum.ppm_axis, dtype=float)
+    low, high = min(multiplet.range_ppm), max(multiplet.range_ppm)
+    # Padded, because a single-line multiplet has a zero-width range and an
+    # unpadded window holds no points at all.
+    pad = max((high - low) * 1.5, 0.02)
+    window = (axis >= low - pad) & (axis <= high + pad)
+    if not np.any(window):
+        return 0.0
+    oriented = _positive_peak_orientation(np.asarray(spectrum.data, dtype=float))
+    centred = oriented - float(np.median(oriented))
+    return float(np.max(centred[window]) / baseline_sigma)
 
 
 def _resolved_line_count(spectrum: NMRSpectrum, multiplet, baseline_sigma: float) -> int:
@@ -424,6 +462,10 @@ def open_spectrum(path: str) -> dict:
             line_count=len(m.peaks),
             width_hz=float(max((p.width_hz for p in m.peaks), default=0.0)),
             resolved_lines=_resolved_line_count(spectrum, m, baseline_sigma),
+            snr=_signal_to_noise(spectrum, m, baseline_sigma),
+            quantifiable=(
+                _signal_to_noise(spectrum, m, baseline_sigma) >= _QUANTIFIABLE_SIGMA
+            ),
             relative_area=float(sum(abs(p.area) for p in m.peaks) / total_area),
         )
         for m in multiplets
@@ -468,6 +510,11 @@ def open_spectrum(path: str) -> dict:
             "assigning protons needs a structure this analysis was not given.",
             "Multiplicity and coupling assignment is a fit. A crowded or overlapping region can "
             "be grouped more than one way.",
+            f"{sum(1 for m in summaries if m.quantifiable)} of {len(summaries)} signals stand "
+            f"at or above {_QUANTIFIABLE_SIGMA:.0f} times the baseline noise. The rest are "
+            "detected but "
+            "not quantifiable: they are real enough to see and not strong enough to read numbers "
+            "off, and a shift or an integral taken from one of them is not a measurement.",
             f"Signals closer together than about {resolution_hz:.1f} Hz are reported as one. "
             "A wider-than-usual signal in the table may be two lines this analysis could not "
             "separate.",
