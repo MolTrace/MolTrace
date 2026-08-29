@@ -87,9 +87,12 @@ def test_compute_green_metrics_solvent_override():
 
 
 def test_score_outcome_green_objectives():
-    assert _score_outcome({"atom_economy_percent": 81.0}, "maximize_atom_economy", {}) == 81.0
-    assert _score_outcome({"green_score": 64.0}, "maximize_green_score", {}) == 64.0
-    assert _score_outcome({"e_factor": 1.0}, "minimize_e_factor", {}) == 50.0
+    # _score_outcome returns a _ScoredOutcome (score + coverage + missing fields) so a
+    # partially-recorded experiment can be scored on what it measured without being
+    # penalised for what it did not. The scores themselves are unchanged.
+    assert _score_outcome({"atom_economy_percent": 81.0}, "maximize_atom_economy", {}).score == 81.0
+    assert _score_outcome({"green_score": 64.0}, "maximize_green_score", {}).score == 64.0
+    assert _score_outcome({"e_factor": 1.0}, "minimize_e_factor", {}).score == 50.0
     # missing field -> None (dropped from training)
     assert _score_outcome({}, "maximize_green_score", {}) is None
 
@@ -104,7 +107,7 @@ def test_score_outcome_multi_objective_unchanged_without_green_weights():
         "conversion_percent": 95.0,
     }
     expected = 80.0 * 0.45 + 90.0 * 0.25 + (100.0 - 5.0) * 0.20 + 95.0 * 0.10
-    assert _score_outcome(outcome, "multi_objective", {}) == pytest.approx(expected)
+    assert _score_outcome(outcome, "multi_objective", {}).score == pytest.approx(expected)
     # Same outcome + green fields present but unweighted -> still unchanged.
     outcome_with_green = {
         **outcome,
@@ -112,16 +115,38 @@ def test_score_outcome_multi_objective_unchanged_without_green_weights():
         "green_score": 40.0,
         "atom_economy_percent": 70.0,
     }
-    assert _score_outcome(outcome_with_green, "multi_objective", {}) == pytest.approx(expected)
+    assert _score_outcome(outcome_with_green, "multi_objective", {}).score == pytest.approx(expected)
 
 
 def test_score_outcome_multi_objective_with_green_weight_adds_term():
+    """Re-baselined 2026-08-29: the scalarization is a weighted MEAN, not a weighted sum.
+
+    This asserted `with_green == base + 80.0 * 0.5`, i.e. that adding a weighted green term
+    ADDS to the score. It did, and that was the defect: with yield_weight 1.0 and
+    green_score_weight 0.5 the weights sum to 1.5, so two perfect components scored 150 --
+    a scalarized objective outside the 0-100 range its own components live on, which the GP
+    then trains on and `y_best` inherits.
+
+    Renormalising by the weights present bounds the result to its components' range: the
+    green term still moves the score (50.0 -> 60.0 here, because 80 is better than the 50 it
+    is averaged with), it simply no longer inflates the scale.
+    """
+
     outcome = {"yield_percent": 50.0, "green_score": 80.0}
     base = _score_outcome({"yield_percent": 50.0}, "multi_objective", {"yield_weight": 1.0})
     with_green = _score_outcome(
         outcome, "multi_objective", {"yield_weight": 1.0, "green_score_weight": 0.5}
     )
-    assert with_green == pytest.approx(base + 80.0 * 0.5)
+    # (50 * 1.0 + 80 * 0.5) / 1.5
+    assert with_green.score == pytest.approx(60.0)
+    assert with_green.score > base.score, "a better green score must still raise the objective"
+    # And the scale is bounded by its components, which the summed form was not.
+    perfect = _score_outcome(
+        {"yield_percent": 100.0, "green_score": 100.0},
+        "multi_objective",
+        {"yield_weight": 1.0, "green_score_weight": 0.5},
+    )
+    assert perfect.score == pytest.approx(100.0), "two perfect components must not exceed 100"
 
 
 # --------------------------------------------------------------------------- #

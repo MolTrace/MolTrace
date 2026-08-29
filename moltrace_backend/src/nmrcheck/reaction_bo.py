@@ -619,6 +619,11 @@ def run_bayesian_optimization(
                     "bo_run_id": run.id,
                     "model_type": model_type,
                     "algorithm": payload.algorithm,
+                    # Which scale `uncertainty` on this row is measured in. The ORM column is
+                    # a bare nullable Float shared by four predictor branches emitting two
+                    # different quantities; without this nothing reading the row back can
+                    # tell a 0-1 value from a standard deviation in percentage points.
+                    "uncertainty_scale": item.get("uncertainty_scale"),
                 }
             )
             candidate = ReactionAcquisitionCandidateORM(
@@ -653,6 +658,12 @@ def run_bayesian_optimization(
                 uncertainty_json=_json_dump(
                     {
                         "uncertainty": candidate.uncertainty,
+                        # Persisted beside the number so a later reader cannot re-conflate the
+                        # two scales the four predictor branches emit. A bare float here was
+                        # read by the frontend under a column headed "model uncertainty" with
+                        # nothing saying whether it was a 0-1 quantity or a posterior standard
+                        # deviation in percentage points.
+                        "uncertainty_scale": item.get("uncertainty_scale"),
                         "confidence_label": metadata.get("confidence_label", "requires_review"),
                     }
                 ),
@@ -1191,6 +1202,7 @@ def _sklearn_gp_predictions(
                 "predicted_score": round(mean_f, 6),
                 "expected_improvement": round(ei, 6),
                 "uncertainty": round(std_f, 6),
+                "uncertainty_scale": _SCALE_OBJECTIVE_UNITS,
                 "acquisition_score": round(float(acquisition), 6),
                 "metadata_json": {"model_branch": "gaussian_process"},
             }
@@ -1289,6 +1301,7 @@ def _sklearn_forest_predictions(
                 "predicted_score": round(mean, 6),
                 "expected_improvement": round(ei, 6),
                 "uncertainty": round(std, 6),
+                "uncertainty_scale": _SCALE_OBJECTIVE_UNITS,
                 "acquisition_score": round(ei, 6),
                 "metadata_json": {"model_branch": "random_forest"},
             }
@@ -1319,6 +1332,7 @@ def _fallback_predictions(
                 "predicted_score": round(predicted, 6) if predicted is not None else None,
                 "expected_improvement": round(ei, 6) if ei is not None else None,
                 "uncertainty": 1.0 if low_data else 0.5,
+                "uncertainty_scale": _SCALE_UNIT_INTERVAL,
                 "acquisition_score": round(acquisition, 6),
                 "metadata_json": {
                     "model_branch": "rule_based_fallback",
@@ -1351,6 +1365,7 @@ def _tpe_like_predictions(
                 "predicted_score": round(predicted, 6),
                 "expected_improvement": round(ei, 6),
                 "uncertainty": round(uncertainty, 6),
+                "uncertainty_scale": _SCALE_UNIT_INTERVAL,
                 "acquisition_score": round(ei + predicted * 0.02, 6),
                 "metadata_json": {"model_branch": "tpe_like", "top_affinity": round(affinity, 6)},
             }
@@ -1369,7 +1384,19 @@ def _training_examples(
     warnings: list[str] = []
     for row in experiments:
         if row.status == "completed":
-            score = _score_outcome(_json_dict(row.outcome_json), objective_type, weights)
+            scored = _score_outcome(_json_dict(row.outcome_json), objective_type, weights)
+            score = None if scored is None else scored.score
+            if scored is not None and scored.missing_fields:
+                # Named, per experiment. The score is now renormalised over the fields that
+                # were recorded, so an incomplete record is no longer penalised for what it
+                # did not measure -- but it IS estimated from less evidence, and a run that
+                # cannot see which experiments those were cannot judge its own surrogate.
+                warnings.append(
+                    f"Experiment {row.experiment_code} was scored on "
+                    f"{scored.coverage:.0%} of the objective weight; not recorded: "
+                    + ", ".join(scored.missing_fields)
+                    + "."
+                )
         elif include_negative and row.status in {"failed", "excluded"}:
             score = 0.0
         else:
@@ -1400,27 +1427,51 @@ def _e_factor_to_score(e_factor: float) -> float:
     return 100.0 / (1.0 + max(0.0, e_factor))
 
 
-def _score_outcome(outcome: dict[str, Any], objective_type: str, weights: dict[str, Any]) -> float | None:
+@dataclass(frozen=True)
+class _ScoredOutcome:
+    """A scalarized objective plus how much of the objective it was actually scored on.
+
+    ``coverage`` is the share of the campaign's weight budget the present fields carry, so
+    1.0 means every weighted field was recorded. A score at 0.45 coverage is the same
+    quantity estimated from less evidence, not a worse result -- which is precisely the
+    distinction the old zero-imputation destroyed.
+    """
+
+    score: float
+    coverage: float
+    missing_fields: tuple[str, ...]
+
+
+def _score_outcome(
+    outcome: dict[str, Any], objective_type: str, weights: dict[str, Any]
+) -> _ScoredOutcome | None:
+    # Single-objective campaigns score on exactly the one field they name, so coverage is
+    # 1.0 when that field is present and the record is unscorable when it is not. There is
+    # no partial case to disclose here -- the coverage question only arises once several
+    # weighted fields are being combined.
+    def _single(value: float | None) -> _ScoredOutcome | None:
+        return None if value is None else _ScoredOutcome(value, 1.0, ())
+
     if objective_type == "maximize_yield":
-        return _float_or_none(outcome.get("yield_percent"))
+        return _single(_float_or_none(outcome.get("yield_percent")))
     if objective_type == "maximize_selectivity":
-        return _float_or_none(outcome.get("selectivity_percent"))
+        return _single(_float_or_none(outcome.get("selectivity_percent")))
     if objective_type == "maximize_conversion":
-        return _float_or_none(outcome.get("conversion_percent"))
+        return _single(_float_or_none(outcome.get("conversion_percent")))
     if objective_type == "minimize_impurity":
         impurity = _float_or_none(outcome.get("impurity_percent"))
-        return 100.0 - impurity if impurity is not None else None
+        return _single(None if impurity is None else 100.0 - impurity)
     if objective_type == "maximize_atom_economy":
-        return _float_or_none(outcome.get("atom_economy_percent"))
+        return _single(_float_or_none(outcome.get("atom_economy_percent")))
     if objective_type == "maximize_green_score":
-        return _float_or_none(outcome.get("green_score"))
+        return _single(_float_or_none(outcome.get("green_score")))
     if objective_type == "minimize_e_factor":
         e_factor = _float_or_none(outcome.get("e_factor"))
-        return _e_factor_to_score(e_factor) if e_factor is not None else None
+        return _single(None if e_factor is None else _e_factor_to_score(e_factor))
     if objective_type == "custom":
         custom = _float_or_none(outcome.get("objective_value"))
         if custom is not None:
-            return custom
+            return _single(custom)
     yield_weight = _float_or_default(weights.get("yield_weight", weights.get("yield", 0.45)), 0.45)
     selectivity_weight = _float_or_default(
         weights.get("selectivity_weight", weights.get("selectivity", 0.25)),
@@ -1455,14 +1506,59 @@ def _score_outcome(outcome: dict[str, Any], objective_type: str, weights: dict[s
     available = [value for value in (yield_value, selectivity, impurity, conversion) if value is not None]
     if not available:
         return None
-    return (
-        (yield_value or 0.0) * yield_weight
-        + (selectivity or 0.0) * selectivity_weight
-        + (100.0 - (impurity or 100.0)) * impurity_weight
-        + (conversion or 0.0) * conversion_weight
-        + (_e_factor_to_score(e_factor_value) if e_factor_value is not None else 0.0) * e_factor_weight
-        + (atom_economy or 0.0) * atom_economy_weight
-        + (green_score or 0.0) * green_score_weight
+
+    # One term per weighted field: (field name, weight, score contribution when present).
+    # Scored over the fields ACTUALLY PRESENT and renormalised by their weights, rather than
+    # imputing a missing value as zero.
+    #
+    # The old form summed every term with a missing value as 0.0 -- and impurity as
+    # `100.0 - (impurity or 100.0)`, so an UNMEASURED impurity scored as the worst possible
+    # one -- without renormalising, so the score fell purely because fewer fields were
+    # recorded. On the default weights a run recording only a 90 % yield scored 40.5 while a
+    # mediocre fully-recorded run (60/70/5/65) scored 70.0. The surrogate trains on these
+    # numbers and `y_best` inherits them, so it was being taught that fewer analytical
+    # fields means worse chemistry.
+    #
+    # Renormalising rather than dropping the row, which is what the Pareto path does
+    # ("an incomplete objective vector cannot be placed on the front"). Those are different
+    # questions: dominance needs every dimension to compare two vectors, while a weighted
+    # mean over the fields present estimates the same quantity with more variance -- and a
+    # BO campaign has too few experiments to discard rows. The variance is disclosed instead
+    # of hidden: `coverage` and `missing_fields` ride with the score.
+    terms: list[tuple[str, float, float | None]] = [
+        ("yield_percent", yield_weight, yield_value),
+        ("selectivity_percent", selectivity_weight, selectivity),
+        ("impurity_percent", impurity_weight, None if impurity is None else 100.0 - impurity),
+        ("conversion_percent", conversion_weight, conversion),
+        (
+            "e_factor",
+            e_factor_weight,
+            None if e_factor_value is None else _e_factor_to_score(e_factor_value),
+        ),
+        ("atom_economy_percent", atom_economy_weight, atom_economy),
+        ("green_score", green_score_weight, green_score),
+    ]
+
+    weighted = 0.0
+    present_weight = 0.0
+    total_weight = 0.0
+    missing: list[str] = []
+    for field, weight, contribution in terms:
+        if weight <= 0.0:
+            continue  # not part of this campaign's objective at all
+        total_weight += weight
+        if contribution is None:
+            missing.append(field)
+            continue
+        weighted += contribution * weight
+        present_weight += weight
+
+    if present_weight <= 0.0:
+        return None
+    return _ScoredOutcome(
+        score=weighted / present_weight,
+        coverage=(present_weight / total_weight) if total_weight > 0 else 0.0,
+        missing_fields=tuple(missing),
     )
 
 
@@ -1716,7 +1812,14 @@ def _candidate_label(
         return "cost_efficient_candidate"
     if (item.get("expected_improvement") or 0.0) > 0:
         return "high_expected_improvement"
-    if (item.get("uncertainty") or 0.0) >= 0.5:
+    # Same value, same scale problem: every measured GP std exceeded 0.5, so a model-backed
+    # candidate with no expected improvement was always "exploratory" and
+    # requires_human_review was unreachable by merit. Banded only for the branches the
+    # threshold was written for; fixing only _confidence_label would leave this half-applied.
+    if (
+        item.get("uncertainty_scale") == _SCALE_UNIT_INTERVAL
+        and (item.get("uncertainty") or 0.0) >= 0.5
+    ):
         return "exploratory_candidate"
     return "requires_human_review"
 
@@ -2361,11 +2464,42 @@ def _required_controls(value: Any, conditions: dict[str, Any]) -> list[str]:
     return controls
 
 
+#: What an ``uncertainty`` value is measured in. The four predictor branches do not agree,
+#: and nothing downstream could tell them apart.
+#:
+#:   unit_interval    a unit-free 0-1 quantity -- the fallback's constants, and the
+#:                    TPE-like branch's ``max(0.05, 1.0 - affinity)``
+#:   objective_units  a posterior standard deviation in the objective's own units, which
+#:                    ``_score_outcome`` returns as percentages
+_SCALE_UNIT_INTERVAL = "unit_interval"
+_SCALE_OBJECTIVE_UNITS = "objective_units"
+
+
 def _confidence_label(prediction: dict[str, Any], training_count: int) -> str:
+    """Band an uncertainty, but only one that is on the scale the bands were written for.
+
+    The 0.75 / 0.35 bands suit a 0-1 quantity. Applied to a posterior std in percentage
+    points they are not a judgement about confidence, they are a judgement about units:
+    measured by running the real models over a 36-candidate grid, the GP std ran 0.89-13.57
+    and this returned ``high_uncertainty`` 36/36 at every training size from 5 to 60 --
+    indistinguishable from a run with no model at all. The same data expressed on a 0-1
+    scale gave 0.110 and ``lower_uncertainty`` 36/36: same model, same posterior, opposite
+    label.
+
+    So a std is reported UNLABELLED rather than mislabelled. ``"uncertain"`` is the value
+    this function already returns when there is no number to band, which is the right
+    neighbour for a number that cannot be banded. No threshold in objective units is
+    invented: there is no measured distribution of posterior stds across real campaigns to
+    place one on, and this file's own precedent is that "a limit is better reported as
+    unmeasured than compared against a value that was never a measurement".
+    """
+
     if training_count < 5:
         return "low_data"
     uncertainty = prediction.get("uncertainty")
     if uncertainty is None:
+        return "uncertain"
+    if prediction.get("uncertainty_scale") != _SCALE_UNIT_INTERVAL:
         return "uncertain"
     if uncertainty >= 0.75:
         return "high_uncertainty"
