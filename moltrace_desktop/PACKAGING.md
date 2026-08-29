@@ -70,9 +70,24 @@ Two things the script will not do:
 
 ## What a tester does on first launch
 
-macOS will refuse an unsigned app: **right-click the app, choose Open, then Open
-again** in the dialog. Gatekeeper remembers the choice. That warning is about the
-absence of a signature, not about the contents.
+macOS will refuse an unsigned app: open **System Settings > Privacy & Security**,
+find the blocked app near the bottom of that pane, and choose **Open Anyway**.
+macOS remembers the choice. That refusal is about the absence of a *trusted*
+signature, not about the contents.
+
+This used to say "right-click, choose Open". That instruction did not work, and
+the reason is worth recording. `@electron/packager` renames the `Electron` binary
+and rewrites `Info.plist` after the prebuilt binary was linker-signed, which
+invalidates the signature the bundle inherited: it shipped with
+`Identifier=Electron`, no `Contents/_CodeSignature` at all, and `codesign -v`
+answering *"code has no resources but signature indicates they must be present"* —
+an error, not a policy verdict. macOS reads that as a damaged app, and the
+right-click route never reaches a dialog with an Open button in it. Packaging now
+re-seals each bundle ad-hoc (`signAdHoc` in `scripts/package.js`), which restores
+a valid seal and moves the refusal back to the ordinary untrusted-developer case
+the step above clears. Ad-hoc is **not** distribution signing and does not make
+macOS trust the build; `osxSign` stays `false`, so switching on real signing
+remains a visible change to that one line.
 
 The window says **"Preview build. Entitlement has not been verified"** and shows
 one capability available and one locked. That is correct: a preview build
