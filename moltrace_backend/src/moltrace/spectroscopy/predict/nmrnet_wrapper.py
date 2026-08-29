@@ -203,6 +203,25 @@ class ShiftPrediction:
         are 0.185 ppm (¹H) and 2.306 ppm (¹³C). A median σ far above those means
         the prediction cannot discriminate between candidates, however confident
         the surrounding pipeline looks.
+
+        What a given σ is worth, measured on held-out NMRShiftDB2 (reproduce with
+        ``scripts/measure_kb_match_quality.py``). σ is strictly monotone in the error it
+        predicts, on both nuclei, which is what makes it the gate to use:
+
+            ¹³C   σ ≤ 0.5 → MAE 0.780    ≤ 1.5 → 1.373    ≤ 3.0 → 2.405
+                  σ ≤ 6.0 → MAE 3.931    > 6.0 → 8.801 ppm   (11.3x span)
+            ¹H    σ ≤ 0.05 → MAE 0.075   ≤ 0.15 → 0.119   ≤ 0.3 → 0.216
+                  σ ≤ 0.6 → MAE 0.389    > 0.6 → 0.952 ppm   (12.7x span)
+
+        **Bucket size is not a substitute and was measured and rejected.** A HOSE bucket's
+        reference count runs the wrong way once pooled over spheres -- ¹³C MAE 2.170 ppm at
+        3-4 references against 5.802 at 100+, ¹H 0.216 against 0.566 -- because a large
+        bucket means a generic environment matched at a shallow sphere, which
+        :attr:`shallow_match_fraction` already catches. A gate on low reference counts would
+        misfire in both directions: ibuprofen has 12 of 18 protons matched from ≤ 4
+        references at a median σ of 0.051 ppm (excellent, and it would flag them), while
+        paracetamol's worst protons include three matched from 19 references at σ 2.215
+        (bad, and it would miss them). σ separates those cases; the count does not.
         """
 
         out: dict[str, float] = {}
