@@ -98,3 +98,36 @@ def test_screen_reaction_empty_fails_safe():
 def test_disclaimer_is_always_present():
     assert "PHA" in rs.screen_smiles("CCO")["disclaimer"]
     assert "decision" in rs.screen_reaction(reactant_smiles=["CCO"])["disclaimer"].lower()
+
+
+def test_a_clean_screen_says_it_found_no_listed_motif_not_that_it_is_safe() -> None:
+    """"low" here is the ABSENCE of a match, never a measured low risk.
+
+    Every severity the SMARTS table can emit is medium, high or critical, so ``low`` is
+    produced by exactly one thing: ``_worst([])`` -- no listed motif matched. Reported as a
+    bare risk level it reads as an assessment, and it is not one: the screen knows a finite
+    list of energetic groups, and a hazard outside that list looks identical to no hazard.
+
+    The verdict vocabulary is deliberately left alone -- ``reaction_forward`` documents the
+    frozen engine as the thing overlays strengthen rather than edit, and ``_RANK`` and the
+    frontend both order on it -- so this adds what the value MEANS beside it rather than
+    changing what it says.
+    """
+
+    from nmrcheck.reaction_safety import screen_smiles
+
+    clean = screen_smiles("CC")
+    assert clean["parsed"] is True
+    assert clean["flagged_groups"] == []
+    assert clean["overall_risk"] == "low"
+    assert clean["risk_basis"] == "no_listed_motifs"
+
+    flagged = screen_smiles("CN=[N+]=[N-]")
+    assert flagged["flagged_groups"], "expected the azide motif to match"
+    assert flagged["risk_basis"] == "matched_listed_motifs"
+
+    # An unparseable structure already fails safe and must keep saying so.
+    unknown = screen_smiles("not_a_smiles")
+    assert unknown["overall_risk"] == "unknown"
+    assert unknown["requires_expert_review"] is True
+    assert unknown["risk_basis"] == "not_screened"
