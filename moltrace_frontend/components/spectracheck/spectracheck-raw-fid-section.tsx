@@ -73,6 +73,7 @@ import {
   displayedDatasetName,
   extractPeaksFromPayload,
   extractReferenceReadout,
+  extractBaselineNoiseSigma,
   extractRawFidArchiveFacts,
   extractSpectrumXY,
   isRecord,
@@ -1497,6 +1498,7 @@ export function SpectraCheckRawFidSection({
   const [integralRegions, setIntegralRegions] = useState<RegionIntegrationResult[]>([])
   const { integrals, multipletBrackets, expansions } = useSpectrumAnalysisOverlays(gsdResult, integralRegions)
   const archiveFacts = extractRawFidArchiveFacts(displayPayload)
+  const baselineNoiseSigma = extractBaselineNoiseSigma(displayPayload)
   const referencing = extractReferenceReadout(displayPayload)
   const sha = archiveFacts.sha
   const vendorDetected =
@@ -2418,6 +2420,7 @@ export function SpectraCheckRawFidSection({
                   integrals={integrals}
                   multipletBrackets={multipletBrackets}
                   expansions={expansions}
+                  baselineNoiseSigma={baselineNoiseSigma}
                   nucleus={resolvedNucleus}
                 />
               ) : processLoading || previewLoading || previewSpectrumLoading ? (
