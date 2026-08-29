@@ -420,20 +420,38 @@ def _compute_green_metrics(
     if solvents:
         weighted_sum = 0.0
         weight_total = 0.0
+        mass_total = 0.0
         for c in solvents:
+            weight = float(c.mass_g) if c.mass_g is not None and c.mass_g > 0 else 1.0
+            mass_total += weight
             greenness = _solvent_greenness(c.name, solvent_overrides)
             if greenness is None:
                 warnings.append(
                     f"Solvent '{c.name}' not in greenness table; excluded from green_score."
                 )
                 continue
-            weight = float(c.mass_g) if c.mass_g is not None and c.mass_g > 0 else 1.0
             weighted_sum += greenness * weight
             weight_total += weight
         if weight_total > 0:
             green_score = weighted_sum / weight_total
             metrics["green_score"] = _round(green_score, 2)
             metrics["solvent_greenness_score"] = _round(green_score, 2)
+            # How much of the solvent mass the average was actually taken over. An
+            # unrecognised solvent leaves both the numerator and the denominator, so the
+            # score describes only the recognised fraction -- 500 g of an unlisted solvent
+            # plus 50 g of water scores 100.0, the greenest value available, from 9 % of the
+            # material, while 500 g toluene + 50 g water scores an honest 54.88 from 100 %.
+            #
+            # The score is persisted onto the outcome and then scalarized and Pareto'd, so
+            # without this a run is steered toward conditions nobody could assess. Reported
+            # rather than gated: no measured distribution of coverage across real campaigns
+            # exists to place a floor on, and a round number in a scoring path is the error
+            # this program keeps correcting. The number is here for a maintainer to set one
+            # from data. NOTE the residual: `_score_outcome` still reads `green_score`
+            # without reading this, so the steering is disclosed, not yet stopped.
+            metrics["green_score_mass_coverage"] = (
+                (weight_total / mass_total) if mass_total > 0 else 0.0
+            )
         else:
             warnings.append("green_score not computed: no recognized solvents.")
     else:

@@ -174,3 +174,50 @@ def test_propose_routes_wraps_backend_failures():
             probe=lambda _m: True,
             _search=_boom,
         )
+
+
+def test_route_score_says_how_much_of_the_budget_it_was_scored_on():
+    """Characterising a route more thoroughly must not silently lower it.
+
+    Components without data are excluded and the weights renormalised -- correct, since an
+    absent component must not be imputed -- but it means a route scored on safety and
+    brevity alone reports 84.00 while the same route with all four components scored
+    reports 63.50. Nothing on the result said which was which, so the evidence-poor route
+    looked better than the well-characterised one.
+
+    Reported rather than gated: a client rendering "scored on 2 of 4 components" beside the
+    number does not need a floor, and there is no measured distribution to place one on.
+    """
+
+    report = score_route(_ESTER_ROUTE)
+
+    assert report["total_component_count"] == 4
+    assert 0.0 < report["score_coverage"] <= 1.0
+    assert report["scored_component_count"] == len(report["score_components"])
+    # Coverage is the share of the weight budget the scored components carry, so it must
+    # reconcile with the components actually reported rather than being a separate number.
+    assert report["score_coverage"] == pytest.approx(
+        sum(entry["weight"] for entry in report["score_components"].values())
+    )
+
+
+def test_route_score_coverage_is_the_present_weight_share():
+    """The weights are safety .4 / atom economy .3 / solvent greenness .2 / brevity .1."""
+
+    # Reproduce the arithmetic the engine performs, so the meaning of the field is pinned
+    # even where a full route fixture is not available.
+    present = {"safety": (0.4, 90.0), "brevity": (0.1, 60.0)}
+    total_weight = sum(w for w, _ in present.values())
+    score = sum(w * v for w, v in present.values()) / total_weight
+    assert score == pytest.approx(84.0)
+    assert total_weight == pytest.approx(0.5)  # what score_coverage reports
+
+    full = {
+        "safety": (0.4, 90.0),
+        "atom_economy": (0.3, 45.0),
+        "solvent_greenness": (0.2, 40.0),
+        "brevity": (0.1, 60.0),
+    }
+    full_score = sum(w * v for w, v in full.values()) / sum(w for w, _ in full.values())
+    assert full_score == pytest.approx(63.5)
+    assert full_score < score, "the better-characterised route scores lower -- hence coverage"

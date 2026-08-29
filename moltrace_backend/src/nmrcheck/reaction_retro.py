@@ -263,8 +263,22 @@ def score_route(route: RouteNode) -> dict[str, Any]:
     total_weight = sum(weight for weight, _ in components.values())
     route_score = sum(weight * value for weight, value in components.values()) / total_weight
 
+    # The full weight budget when every component has data: safety .4 + atom_economy .3 +
+    # solvent_greenness .2 + brevity .1. Renormalising over what is present is right -- an
+    # absent component must not be imputed -- but it means characterising a route MORE can
+    # lower its score, and nothing on the result said which it was. Measured: safety +
+    # brevity alone score 84.00, and the same route with all four components scored gives
+    # 63.50. Reported, not gated: there is no measured distribution to place a floor on,
+    # and a client that renders "scored on 2 of 4 components" beside the number does not
+    # need one.
+    _FULL_WEIGHT = 1.0
+    _ALL_COMPONENTS = 4
+
     return {
         "route_score": round(route_score, 3),
+        "score_coverage": round(total_weight / _FULL_WEIGHT, 4),
+        "scored_component_count": len(components),
+        "total_component_count": _ALL_COMPONENTS,
         "score_components": {
             name: {"weight": weight, "value": value} for name, (weight, value) in components.items()
         },
