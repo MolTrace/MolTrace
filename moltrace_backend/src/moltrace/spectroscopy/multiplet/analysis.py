@@ -362,10 +362,21 @@ def _intensities_fit_a_multiplet(peaks: list[Peak]) -> bool:
     expected for coupling to three spin-1 deuterons. The pattern is there when
     the multiplet is real.
 
-    Both families are accepted, because both occur: spin-1/2 neighbours give
-    binomial coefficients, and DEUTERIUM IS SPIN-1 and gives trinomial ones. A
-    binomial-only check would reject that septet, which is the most confidently
-    correct assignment on the page.
+    THREE families are accepted, because all three occur, and getting this wrong
+    rejects real chemistry:
+
+      * n EQUIVALENT spin-1/2 neighbours -> binomial (1:1, 1:2:1, 1:3:3:1).
+      * n equivalent spin-1 neighbours -> trinomial. DEUTERIUM IS SPIN-1: a
+        binomial-only check rejects the DMSO-d6 septet, the most confidently
+        correct assignment on the page.
+      * n DIFFERENT couplings -> all lines EQUAL. A dd is 1:1:1:1 and a ddd is
+        eight equal lines, nothing like the 1:7:21:35:35:21:7:1 binomial for
+        seven equivalent neighbours. Measured: omitting this reclassified
+        quinine's H10 vinyl ddd as `m` and threw away its couplings — caught by
+        the reference test, which is what that test is for.
+
+    Adding the uniform family does not reopen the hole this check exists to
+    close: two lines 186:1 apart are not equal either.
 
     Returns True when the observed pattern matches either family, and True for
     anything this cannot judge — the caller's other checks still apply, and a
@@ -381,7 +392,7 @@ def _intensities_fit_a_multiplet(peaks: list[Peak]) -> bool:
         return True
     observed = [v / peak_max for v in intensities]
 
-    for expected in (_binomial_pattern(n), _trinomial_pattern(n)):
+    for expected in (_binomial_pattern(n), _trinomial_pattern(n), _uniform_pattern(n)):
         if expected is None:
             continue
         top = max(expected)
@@ -395,6 +406,13 @@ def _intensities_fit_a_multiplet(peaks: list[Peak]) -> bool:
         ):
             return True
     return False
+
+
+def _uniform_pattern(n: int) -> list[float] | None:
+    """n lines of equal height: n DIFFERENT couplings, as in dd, ddd, dt."""
+    if n < 2:
+        return None
+    return [1.0] * n
 
 
 def _binomial_pattern(n: int) -> list[float] | None:
@@ -485,10 +503,17 @@ def _build_multiplet_for_cluster(
     # --- Step 2: first-order Pascal-triangle match ---------------------------
     mean_spacing = sum(spacings_hz) / len(spacings_hz)
     eq_tol = max(0.6, mean_spacing * 0.18)
+    # Judged ONCE, and it gates every route to a coupling below. Gating only the
+    # first-order label left the other two routes open: step 3 could still hand
+    # these lines a confident `dd`, and step 4 still reported their spacings in a
+    # column headed "couplings". The label was corrected and the number beside it
+    # was not, which is the same claim in a different cell.
+    pattern_fits = _intensities_fit_a_multiplet(cluster_peaks)
+
     if (
         all(abs(s - mean_spacing) <= eq_tol for s in spacings_hz)
         and n <= 7
-        and _intensities_fit_a_multiplet(cluster_peaks)
+        and pattern_fits
     ):
         label = _SIMPLE_LABEL[n]
         return Multiplet(
@@ -502,7 +527,7 @@ def _build_multiplet_for_cluster(
         )
 
     # --- Step 3: complex multiplet hypotheses --------------------------------
-    if field_mhz > 0:
+    if field_mhz > 0 and pattern_fits:
         complex_hit = _try_complex_multiplet(
             centres_hz=centres_hz,
             n=n,
@@ -522,12 +547,18 @@ def _build_multiplet_for_cluster(
             )
 
     # --- Step 4: fallback ----------------------------------------------------
+    #
+    # NO COUPLINGS when the intensity pattern says these lines are not one
+    # signal. A spacing between two independent carbons is a shift difference,
+    # and reporting it under "couplings" is the same false claim the label was
+    # just corrected for — measured, four signals kept 9.5 to 28.9 Hz "couplings"
+    # after their doublet labels were withdrawn.
     return Multiplet(
         name=placeholder_name,
         center_ppm=centre_ppm,
         range_ppm=range_ppm,
         multiplicity_label="m",
-        j_couplings_hz=_distinct_spacings(spacings_hz),
+        j_couplings_hz=_distinct_spacings(spacings_hz) if pattern_fits else [],
         num_nuclides=0,
         peaks=cluster_peaks,
     )
