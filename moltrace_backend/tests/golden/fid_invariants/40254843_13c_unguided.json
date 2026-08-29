@@ -9,67 +9,67 @@
     {
       "integration_h": 2.5,
       "multiplicity": "s",
-      "shift_ppm": 78.069
+      "shift_ppm": 78.085
     },
     {
       "integration_h": 1.5,
       "multiplicity": "s",
-      "shift_ppm": 77.948
+      "shift_ppm": 77.963
     },
     {
-      "integration_h": 87.0,
+      "integration_h": 101.5,
       "multiplicity": "br s",
       "shift_ppm": 77.702
     },
     {
       "integration_h": 3.5,
       "multiplicity": "s",
-      "shift_ppm": 76.05
+      "shift_ppm": 76.065
     },
     {
       "integration_h": 4.5,
       "multiplicity": "br s",
-      "shift_ppm": 75.832
+      "shift_ppm": 75.847
     },
     {
       "integration_h": 7.0,
       "multiplicity": "s",
-      "shift_ppm": 75.35
+      "shift_ppm": 75.366
     },
     {
       "integration_h": 49.5,
       "multiplicity": "br s",
-      "shift_ppm": 53.483
+      "shift_ppm": 53.499
     },
     {
       "integration_h": 56.5,
       "multiplicity": "br s",
-      "shift_ppm": 46.877
+      "shift_ppm": 46.892
     },
     {
       "integration_h": 59.5,
       "multiplicity": "br s",
-      "shift_ppm": 25.539
+      "shift_ppm": 25.555
     },
     {
       "integration_h": 1.0,
       "multiplicity": "s",
-      "shift_ppm": 10.569
+      "shift_ppm": 10.585
     },
     {
       "integration_h": 74.5,
       "multiplicity": "br s",
-      "shift_ppm": 9.793
+      "shift_ppm": 9.809
     },
     {
       "integration_h": 4.0,
       "multiplicity": "s",
-      "shift_ppm": 9.526
+      "shift_ppm": 9.541
     },
     {
       "integration_h": 6.5,
       "multiplicity": "s",
-      "shift_ppm": 9.357
+      "shift_ppm": 9.372
     }
   ],
   "phase": {
@@ -81,7 +81,7 @@
   "point_count": 98304,
   "preview": {
     "n": 3811,
-    "x_at_y_max": 77.14458079948147,
+    "x_at_y_max": 77.16,
     "y_max": 20012770.87251066,
     "y_sum": 548832472.4692765
   }
