@@ -57,7 +57,11 @@ import { QnmrPurityPanel } from "@/components/spectracheck/qnmr-purity-panel"
 import { SpectrumReasonPanel } from "@/components/spectracheck/spectrum-reason-panel"
 import { AlertCard } from "@/components/dashboard/alert-card"
 import { ModuleCard } from "@/components/dashboard/module-card"
-import { SpectraCheckAnalysisPanels } from "@/components/spectracheck/spectracheck-analysis-panels"
+import {
+  SpectraCheckAnalysisPanels,
+  useSpectrumAnalysisOverlays,
+} from "@/components/spectracheck/spectracheck-analysis-panels"
+import type { RegionIntegrationResult } from "@/components/spectracheck/gsd-integration-panel"
 import { SpectraCheckRunTile } from "@/components/spectracheck/spectracheck-run-tile"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -130,6 +134,8 @@ function payloadMatchesFilename(payload: unknown, filename: string | null | unde
   if (!selected) return false
   return payloadFilename(payload) === selected
 }
+
+
 
 export function SpectraCheckProcessedSpectrumSection({
   sampleId,
@@ -728,6 +734,8 @@ export function SpectraCheckProcessedSpectrumSection({
     [displayPayload],
   )
   const warnings = useMemo(() => extractWarnings(displayPayload ?? {}), [displayPayload])
+  const [integralRegions, setIntegralRegions] = useState<RegionIntegrationResult[]>([])
+  const { integrals, multipletBrackets } = useSpectrumAnalysisOverlays(gsdResult, integralRegions)
   const notes = useMemo(() => extractNotes(displayPayload ?? {}), [displayPayload])
   // Set when no structure grounded the proton budget, so `integration_h` below
   // holds multiples of the smallest resolved signal rather than proton counts.
@@ -1337,6 +1345,8 @@ export function SpectraCheckProcessedSpectrumSection({
                   y={xy.y}
                   peaks={peaks}
                   overlays={overlays}
+                  integrals={integrals}
+                  multipletBrackets={multipletBrackets}
                   nucleus={nucleus}
                 />
               ) : foregroundActionLoading ? (
@@ -1594,6 +1604,7 @@ export function SpectraCheckProcessedSpectrumSection({
         compoundClass={compoundClassForRequest(compoundClass) || undefined}
         displayPayload={displayPayload}
         testIdPrefix="processed"
+        onIntegralRegionsChange={setIntegralRegions}
         resultsExtras={
           <>
             {/* Purity is what an analyst computes FROM the integrals just

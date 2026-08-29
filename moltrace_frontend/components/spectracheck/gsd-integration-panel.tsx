@@ -168,6 +168,15 @@ export type GsdIntegrationPanelProps = {
   fieldMhz?: number
   toleranceHz?: number
   testId?: string
+  /**
+   * Reports the regions this panel computed, so the spectrum can draw them.
+   *
+   * A callback rather than a second `useIntegration` in the section: the method
+   * and region source are this panel's own state, so re-running the hook
+   * elsewhere would both duplicate the POST per run AND risk drawing a
+   * different method than the table below shows.
+   */
+  onRegionsChange?: (regions: RegionIntegrationResult[]) => void
 }
 
 export function GsdIntegrationPanel({
@@ -178,6 +187,7 @@ export function GsdIntegrationPanel({
   fieldMhz = 500,
   toleranceHz = 0.5,
   testId = "gsd-integration-results-surface",
+  onRegionsChange,
 }: GsdIntegrationPanelProps) {
   const [method, setMethod] = useState<IntegrationMethod>("edited_sum")
   const [regionSource, setRegionSource] = useState<RegionSource>("multiplets")
@@ -199,6 +209,13 @@ export function GsdIntegrationPanel({
   )
   const effectiveRegions = regionSource === "multiplets" ? multipletRegions : parsedCustomRegions
   const state = useIntegration(gsdResult, trace, effectiveRegions, method, nucleus, solvent, fieldMhz)
+
+  // Publish upward whenever the computed regions change, so the chart overlay
+  // and this table are always the same numbers from the same request.
+  const publishedRegions = state.status === "ready" ? state.result.regions : null
+  useEffect(() => {
+    onRegionsChange?.(publishedRegions ?? [])
+  }, [publishedRegions, onRegionsChange])
 
   if (gsdResult == null) return null
 

@@ -34,6 +34,7 @@ type CapturedPlotProps = {
     }
     shapes?: Array<{
       type?: string
+      path?: string
       x0?: number
       x1?: number
       y0?: number
@@ -495,6 +496,68 @@ describe("SpectrumViewer — hover chemical shift mapping", () => {
 
     expect(point?.ppm).toBe(49)
     expect(Number.isNaN(point?.intensity)).toBe(true)
+  })
+})
+
+describe("SpectrumViewer — analysis overlays", () => {
+  /**
+   * The integral curve must NOT be routed through `overlays.predicted`: that
+   * array feeds the y-range computation, and an integral has units of
+   * intensity x ppm — orders of magnitude above peak intensity — so it would
+   * drag the frame off the spectrum entirely. These overlays are layout shapes
+   * in data coordinates, exactly like the apex ticks, so yMin/yMax are inputs
+   * to them and never outputs.
+   */
+  it("draws integral steps and multiplet brackets without moving the frame", () => {
+    const x = [8, 7.5, 7, 6.5, 6]
+    const y = [0, 1, 0.2, 1, 0]
+
+    freshRender(<SpectrumViewer x={x} y={y} />)
+    const before = capturedPlotProps?.layout?.yaxis?.range
+
+    freshRender(
+      <SpectrumViewer
+        x={x}
+        y={y}
+        integrals={[{ from: 7.6, to: 7.4, relative: 2 }, { from: 6.6, to: 6.4, relative: 1 }]}
+        multipletBrackets={[{ from: 7.6, to: 7.4, label: "d, J = 7.2 Hz" }]}
+      />,
+    )
+    const after = capturedPlotProps?.layout?.yaxis?.range
+
+    // The overlays are drawn...
+    const shapes = capturedPlotProps?.layout?.shapes ?? []
+    expect(shapes.filter((sh) => sh.type === "path").length).toBeGreaterThanOrEqual(3)
+    // ...and the y-axis is byte-for-byte what it was without them.
+    expect(after).toEqual(before)
+  })
+
+  it("labels integrals as ratios, never as proton counts", () => {
+    // Nothing on this route carries a structure, so no proton budget is
+    // grounded. "2.00 H" would be a fabrication; "2.00 rel." is the truth.
+    freshRender(
+      <SpectrumViewer
+        x={[8, 7, 6]}
+        y={[0, 1, 0]}
+        integrals={[{ from: 7.4, to: 6.6, relative: 2 }]}
+      />,
+    )
+    const annotations = capturedPlotProps?.layout?.annotations ?? []
+    const texts = annotations.map((a) => String(a.text ?? ""))
+    expect(texts.some((t) => t.includes("2.00 rel."))).toBe(true)
+    expect(texts.some((t) => /\bH\b/.test(t))).toBe(false)
+  })
+
+  it("carries the multiplet pattern and J value onto the chart", () => {
+    freshRender(
+      <SpectrumViewer
+        x={[8, 7, 6]}
+        y={[0, 1, 0]}
+        multipletBrackets={[{ from: 7.4, to: 6.6, label: "dd, J = 8.1, 2.0 Hz" }]}
+      />,
+    )
+    const annotations = capturedPlotProps?.layout?.annotations ?? []
+    expect(annotations.map((a) => String(a.text ?? ""))).toContain("dd, J = 8.1, 2.0 Hz")
   })
 })
 
