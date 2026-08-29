@@ -421,18 +421,39 @@ def fuse_candidates(
     breakdown: dict[str, dict[str, float]] = {}
     for cid in ids:
         present: dict[str, float] = {}
+        extras: dict[str, float] = {}
         if dp4 is not None and cid in dp4:
             present["nmr_dp4"] = float(dp4[cid])
         if cid in msms_norm:
             present["msms"] = float(msms_norm[cid])
+            # The absolute score the relative one was computed from. Min-max maps the best
+            # candidate to 1.0 whatever it scored, so a run whose CSI scores are two orders
+            # of magnitude worse fuses identically -- measured, {0.95, 0.60, 0.20} and
+            # {0.0095, 0.0060, 0.0020} both gave msms 1.0 and a leader at 0.5921. Relative
+            # is right for the BLEND, because the raw scale is not comparable across runs;
+            # it is wrong as the only thing that survives, because then nothing downstream
+            # can tell that the MS evidence was weak. Carried rather than compared against
+            # a reference constant: this module has no measured reference to offer, and
+            # inventing one would put a round number in a scoring path.
+            extras["msms_raw"] = float((msms or {})[cid])
         wsum = sum(sig_weights.get(s, 0.0) for s in present) or 1.0
         base = sum(sig_weights.get(s, 0.0) * val for s, val in present.items()) / wsum
         rt_w = float(rt_weights.get(cid, 1.0)) if rt_weights else 1.0
         raw[cid] = base * rt_w
-        breakdown[cid] = {**present, "rt_corroboration": rt_w}
+        breakdown[cid] = {**present, **extras, "rt_corroboration": rt_w}
 
     total = sum(raw.values())
     ranked = sorted(ids, key=lambda c: raw[c], reverse=True)
+    # An absent signal and a signal that found nothing are different claims, and `signals`
+    # cannot tell them apart: it carries a key only for what was present, so a consumer
+    # reading `signals.get("msms", 0.0)` gets 0.0 for a run where MS was never performed.
+    # Said once per candidate, in words, rather than left to be inferred from a hole.
+    fusion_notes: tuple[str, ...] = ()
+    if not msms:
+        fusion_notes += (
+            "No MS/MS evidence was supplied, so this ranking rests on the NMR signal alone. "
+            "That is not the same as MS/MS having been run and supported nothing.",
+        )
     out: list[RankedCandidate] = []
     for i, cid in enumerate(ranked):
         combined = (raw[cid] / total) if total > 0 else 0.0
@@ -443,6 +464,7 @@ def fuse_candidates(
                 combined_score=combined,
                 signals=breakdown[cid],
                 rank=i + 1,
+                notes=fusion_notes,
             )
         )
     return out
