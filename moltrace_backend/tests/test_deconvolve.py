@@ -214,3 +214,53 @@ def test_it_refuses_rather_than_guesses_on_input_it_cannot_use() -> None:
     assert resolve_region(ppm, y, field_mhz=0.0, noise_sigma=1.0) == []
     assert resolve_region(ppm, y, field_mhz=_FIELD_MHZ, noise_sigma=0.0) == []
     assert resolve_region(ppm[:4], y[:4], field_mhz=_FIELD_MHZ, noise_sigma=1.0) == []
+
+
+def test_two_components_on_top_of_each_other_are_one_line() -> None:
+    """The false positive a SYMMETRIC Voigt could not show.
+
+    A real line is slightly asymmetric — shimming is never perfect — and least
+    squares will model that asymmetry with a second component sitting almost on
+    top of the first. Measured on a real acquisition: three strong carbons came
+    back as two components separated by 0.2 to 0.8 Hz against linewidths of 1 to
+    3 Hz, a fourteenth to a quarter of a linewidth. Nothing is resolvable there.
+
+    Found by opening the app and reading the table, not by the corpus.
+    """
+    from moltrace.spectroscopy.peaks.deconvolve import _components_overlap
+
+    class _C:
+        def __init__(self, ppm: float, fwhm: float) -> None:
+            self.position_ppm = ppm
+            self.fwhm_hz = fwhm
+            self.height = 1.0
+
+    field = 100.66
+    # A 1.09 Hz line with a 0.44 Hz companion 0.25 Hz away — the real case.
+    main = _C(125.2954, 1.09)
+    companion = _C(125.2954 - 0.25 / field, 0.44)
+    assert _components_overlap([main, companion], 0.05, field), (
+        "two components a quarter of a Hz apart were accepted as separate lines"
+    )
+
+    # THE BROADEST COMPONENT SETS THE SCALE. Against the narrow companion this
+    # pair scores 0.56 linewidths and survives a 0.50 floor; against the real
+    # line it is 0.23 and does not. Using the minimum lets an artefact define the
+    # floor meant to catch it.
+    separated = _C(125.2954 - 2.0 / field, 1.09)
+    assert not _components_overlap([main, separated], 0.05, field), (
+        "two components 2 Hz apart, well over half a linewidth, were rejected"
+    )
+
+
+def test_the_overlap_rule_does_not_cost_the_capability() -> None:
+    """Rejecting overlaps must not reject the pairs this exists to recover."""
+    for separation in (1.0, 2.0, 3.0):
+        found = 0
+        for seed in range(6):
+            ppm, y, centres = _region(separation, 7800 + seed)
+            if len(resolve_region(ppm, y, field_mhz=_FIELD_MHZ, noise_sigma=1.0)) == len(centres):
+                found += 1
+        assert found >= 5, (
+            f"only {found}/6 pairs at {separation} linewidths survived the overlap rule"
+        )

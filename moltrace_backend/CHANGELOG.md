@@ -14,6 +14,36 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.74.2 — Two components on top of each other are one line (2026-08-29)
+
+Found by opening the app and reading the table, not by the corpus.
+
+Three strong carbons were reported as fitting into more than one line. Their
+extra components sat **0.2 to 0.8 Hz** from the main line against linewidths of 1
+to 3 Hz — a fourteenth to a quarter of a linewidth. Nothing is resolvable at that
+separation. A real line is slightly asymmetric, shimming is never perfect, and
+least squares models that asymmetry with a second component almost on top of the
+first.
+
+The earlier Voigt guard could not see it: **a Voigt is symmetric**, and asymmetry
+is what buys the second component.
+
+Components closer than **half a linewidth** are now rejected — chosen from the
+measured gap between what this recovers (validated pairs from 1.0 linewidth
+apart) and what it invents (0.07 to 0.27).
+
+**And the broadest component sets that scale, not the narrowest.** Using the
+minimum let an artefact define the floor meant to catch it: a 0.44 Hz component
+beside a 1.09 Hz line at 0.25 Hz separation scored 0.56 linewidths against a 0.50
+floor and survived. Against the real line it is 0.23 and does not.
+
+Across six acquisitions, signals fitting as more than one line fall from **10 of
+173 to 3**, the survivors all on 1H where close lines are genuine. The capability
+is intact: pairs recovered 11-12 of 12 at every separation from 1.0 to 4.0
+linewidths, single lines kept as one 11 of 12.
+
+---
+
 ## v0.74.1 — A withdrawn label must take its coupling with it (2026-08-29)
 
 v0.74.0 gated only the first-order label. Two routes to a coupling stayed open:
