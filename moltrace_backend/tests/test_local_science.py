@@ -659,3 +659,77 @@ def test_a_signal_below_the_quantitation_floor_claims_no_structure() -> None:
         f"{len(offenders)} of {below_floor} signals below the quantitation floor still "
         "claim a pattern or a coupling:\n  " + "\n  ".join(offenders[:10])
     )
+
+
+@pytest.mark.slow
+def test_a_signals_reported_noise_ratio_is_its_own_apex_not_a_neighbours() -> None:
+    """The number must describe the row it is printed on.
+
+    `_signal_to_noise` pads the window by 1.5x the multiplet's span on each side,
+    so it spans up to 4x the signal's own extent, and then takes `np.max` over it
+    with no requirement that the maximum belong to THIS signal. A strong
+    neighbour inside the pad is therefore reported as this row's height.
+
+    Measured before the fix: on one acquisition a multiplet reported 509.0
+    against its own 14.6 -- 34.8x -- and six rows across the corpus printed an
+    S/N identical to another row's, which is the signature of two rows reading
+    the same apex.
+
+    Checked against the row's OWN PUBLISHED EXTENT rather than by recomputing the
+    function's window, so this cannot pass by agreeing with the implementation it
+    is testing. `range_ppm` and `width_hz` are both fields the row already
+    carries; a signal is allowed one of its own linewidths beyond its stated
+    range to absorb discretisation, and nothing beyond that.
+
+    The pre-existing guard cannot see this: it checks `max(multiplets, key=snr)`,
+    which by definition is the row that owns the spectrum's apex.
+    """
+    import numpy as np
+
+    from moltrace.spectroscopy.io.fid_reader import read_fid, read_processed_spectrum
+    from moltrace.spectroscopy.peaks.gsd import _positive_peak_orientation
+    from nmrcheck.local_science import _baseline_sigma, open_spectrum
+
+    sources = _acquisitions()
+    if not sources:
+        pytest.skip("no acquisition in this checkout")
+
+    checked = 0
+    offenders: list[str] = []
+    for source in sources:
+        try:
+            result = open_spectrum(source)
+            try:
+                spectrum = read_processed_spectrum(source)
+            except Exception:  # noqa: BLE001 - the reader this acquisition needs is the other one
+                spectrum = read_fid(source)
+        except Exception:  # noqa: BLE001 - unreadable acquisitions are a different test's business
+            continue
+
+        sigma = _baseline_sigma(spectrum)
+        if sigma <= 0:
+            continue
+        axis = np.asarray(spectrum.ppm_axis, dtype=float)
+        centred = _positive_peak_orientation(np.asarray(spectrum.data, dtype=float))
+        centred = centred - float(np.median(centred))
+
+        for signal in result["multiplets"]:
+            low, high = min(signal["range_ppm"]), max(signal["range_ppm"])
+            allowance = float(signal["width_hz"]) / max(float(spectrum.field_mhz), 1e-9)
+            own = (axis >= low - allowance) & (axis <= high + allowance)
+            if not np.any(own):
+                continue
+            checked += 1
+            own_snr = float(np.max(centred[own]) / sigma)
+            if signal["snr"] > own_snr:
+                offenders.append(
+                    f"{os.path.basename(source)} {signal['name']} "
+                    f"reports {signal['snr']:.1f} but its own extent holds {own_snr:.1f} "
+                    f"({signal['snr'] / max(own_snr, 1e-9):.1f}x)"
+                )
+
+    assert checked, "no signal was actually examined, so this proves nothing"
+    assert not offenders, (
+        f"{len(offenders)} of {checked} signals report a height they do not own:\n  "
+        + "\n  ".join(offenders[:8])
+    )
