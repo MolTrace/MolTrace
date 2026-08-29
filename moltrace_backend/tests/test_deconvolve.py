@@ -73,6 +73,49 @@ def test_recovered_positions_are_where_the_lines_actually_are() -> None:
         assert nearest < _FWHM_HZ / 2, f"a recovered line sits {nearest:.2f} Hz from any real one"
 
 
+@pytest.mark.parametrize("gaussian_fraction", [0.0, 0.3, 0.6, 0.8])
+def test_a_real_lineshape_is_not_split_into_two(gaussian_fraction: float) -> None:
+    """The false positive a Lorentzian-only corpus cannot see.
+
+    A real NMR line is a Voigt — Lorentzian broadened by a Gaussian from
+    shimming — and two Lorentzians fit a Voigt better than one does. If the
+    selection rule cannot tell that apart from a genuine pair, every well-shimmed
+    peak in a spectrum becomes two lines and the feature is worse than useless.
+
+    Suspected after real acquisitions split NARROW signals while leaving wide ones
+    alone, which is the opposite of what a merged pair looks like. Measured here
+    across the full range of Gaussian character: one line, every time — so
+    lineshape is not that mechanism, and those splits may be real.
+
+    HONEST LIMIT OF THIS GUARD: no weakening tried so far turns it red. The other
+    checks reach the same case first, so it is not demonstrated to discriminate;
+    it is not vacuous either, since the tests above require two components for a
+    genuine pair. Treat it as a regression guard against a future rule that
+    splits more eagerly, not as evidence the current one is safe.
+    """
+    from scipy.special import wofz
+
+    centre = 60.0
+    half_window_hz = _FWHM_HZ * 8
+    hz = np.linspace(
+        centre * _FIELD_MHZ - half_window_hz, centre * _FIELD_MHZ + half_window_hz, 400
+    )
+    ppm = hz / _FIELD_MHZ
+    y = np.random.default_rng(9600).normal(0.0, 1.0, 400)
+
+    sigma = (gaussian_fraction * _FWHM_HZ) / (2 * np.sqrt(2 * np.log(2))) or 1e-9
+    gamma = ((1.0 - gaussian_fraction) * _FWHM_HZ) / 2
+    z = ((hz - centre * _FIELD_MHZ) + 1j * gamma) / (sigma * np.sqrt(2))
+    profile = np.real(wofz(z))
+    y += 200.0 * profile / profile.max()
+
+    components = resolve_region(ppm, y, field_mhz=_FIELD_MHZ, noise_sigma=1.0)
+    assert len(components) == 1, (
+        f"a single line with {gaussian_fraction:.0%} Gaussian character was reported as "
+        f"{len(components)} lines — every well-shimmed peak would become two"
+    )
+
+
 def test_a_partner_below_the_noise_is_not_reported() -> None:
     """The height floor, made visible.
 
