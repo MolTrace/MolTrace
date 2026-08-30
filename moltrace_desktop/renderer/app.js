@@ -549,6 +549,17 @@
       table.append(tb)
       c.append(table)
 
+      // MEASURED, not cautious. On the ethylene glycol acquisition in the test
+      // corpus this same path scored ethanol 0.623 against ethylene glycol's
+      // 0.556 -- the wrong molecule above the right one. So the number is honest
+      // about ONE structure and must never be used to rank two, which is also
+      // why this build offers no candidate list.
+      if (v.comparable_between_candidates === false) {
+        c.append(alert('warn', 'Do not compare this number between structures',
+          'It says how well ONE candidate fits, given a prediction that is weak on this '
+          + 'computer. Checked against a known spectrum, a wrong structure scored higher than '
+          + 'the right one. Use it to find contradictions, never to pick a winner.'))
+      }
       if (v.human_review_required) {
         c.append(node('p', 'tablenote',
           'This is a measurement combined by a stated model, not a decision. A chemist has to '

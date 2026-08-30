@@ -985,3 +985,32 @@ def test_a_solvent_the_peaks_disagree_with_is_said_not_resolved() -> None:
         "no acquisition in the corpus disagrees with its own recorded solvent, so this "
         "guard never fired -- it would pass just as well if the disclosure were deleted"
     )
+
+
+@pytest.mark.slow
+def test_a_structure_confidence_says_it_cannot_rank_candidates() -> None:
+    """Measured, not cautious.
+
+    On the ethylene glycol acquisition in this repository, this same path scored
+    ethanol 0.623 against ethylene glycol's own 0.556, with aspirin at 0.542 --
+    the WRONG molecule above the right one. The engine is not at fault: it
+    returned "inconclusive" for every candidate, which is the correct answer. What
+    cannot carry the weight is the prediction underneath, at a 35 ppm median
+    uncertainty on a seed knowledge base.
+
+    So the result says so, and this build offers no ranked candidate list. A list
+    would have put ethanol first and looked exactly like a list that had put the
+    right molecule first.
+    """
+    from nmrcheck.local_science import verify_candidate
+
+    source = _one("instrument") or _one("moltrace")
+    if source is None:
+        pytest.skip("no acquisition in this checkout")
+
+    result = verify_candidate(source, "CCO")
+    assert result["comparable_between_candidates"] is False, (
+        "the result no longer says its confidence cannot rank candidates. If the "
+        "prediction has genuinely improved, re-measure the ethanol-beats-glycol case "
+        "before flipping this -- do not flip it because it looks pessimistic."
+    )
