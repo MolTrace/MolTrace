@@ -10973,6 +10973,21 @@ export function ReactionProjectDetail() {
                                       <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                                         loop metrics
                                       </p>
+                                      {/* A cycle metered before the proposal path passed its scores
+                                          carries zero experiments and no best objective, which renders
+                                          identically to a cycle that genuinely has none. Saying which
+                                          costs one line and stops a dash reading as "no progress". */}
+                                      {readNum(loopMetrics.total_experiments) === 0 &&
+                                      readNum(loopMetrics.best_objective) == null ? (
+                                        <p
+                                          data-testid="loop-metrics-unmetered"
+                                          className="text-[11px] text-muted-foreground"
+                                        >
+                                          No scored experiments are recorded against this cycle. Cycles
+                                          proposed before the loop metering received its scores show this
+                                          even where the campaign has results — later cycles carry them.
+                                        </p>
+                                      ) : null}
                                       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
                                         {[
                                           { label: "total experiments", value: readNum(loopMetrics.total_experiments) },

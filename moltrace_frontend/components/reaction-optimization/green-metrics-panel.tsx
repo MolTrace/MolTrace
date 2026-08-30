@@ -97,8 +97,35 @@ function MetricGrid({ metrics }: { metrics: Record<string, unknown> }) {
             <InfoTooltip label={m.label} content={m.help} />
           </div>
           <div className="mt-0.5 font-mono text-sm">{formatGreenMetric(readGreenMetric(metrics, m.key), m.digits, m.unit)}</div>
+          {m.key === "green_score" ? <GreenScoreCoverage metrics={metrics} /> : null}
         </div>
       ))}
+    </div>
+  )
+}
+
+/** What share of the solvent mass the green score was actually computed over.
+ *
+ *  An unrecognised solvent leaves both the numerator and the denominator, so the average
+ *  describes only the recognised fraction: 500 g of an unlisted solvent plus 50 g of water
+ *  scores 100.0 -- the greenest value available -- from 9 % of the material, while 500 g
+ *  toluene + 50 g water scores an honest 54.88 from 100 %. The score is persisted onto the
+ *  outcome and then scalarized, so a reader has to be able to tell those apart.
+ */
+function GreenScoreCoverage({ metrics }: { metrics: Record<string, unknown> }) {
+  if (readGreenMetric(metrics, "green_score") == null) return null
+  const coverage = readGreenMetric(metrics, "green_score_mass_coverage")
+  if (coverage == null) {
+    // Assessments computed before the coverage was emitted. Not "fully covered".
+    return <div className="mt-0.5 text-[10px] text-muted-foreground">coverage not reported</div>
+  }
+  const complete = coverage >= 0.999
+  return (
+    <div
+      data-testid="green-score-coverage"
+      className={`mt-0.5 text-[10px] ${complete ? "text-muted-foreground" : "text-warning"}`}
+    >
+      scored on {(coverage * 100).toFixed(0)}% of solvent mass
     </div>
   )
 }

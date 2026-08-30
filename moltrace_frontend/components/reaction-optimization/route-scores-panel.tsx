@@ -120,6 +120,27 @@ function RouteScoreResult({ view }: { view: RouteScoreView }) {
         <Badge variant="outline" className="font-mono tabular-nums text-xs">
           Route score {view.routeScore != null ? view.routeScore.toFixed(3) : "—"}
         </Badge>
+        {/* What the score was computed over. Components without data are excluded and the
+            weights renormalised, so a route scored on two of four components reports a
+            HIGHER number than the same route fully characterised -- 84.00 against 63.50 on
+            the measured example. The figure alone cannot say which it is. */}
+        {view.scoredComponentCount != null && view.totalComponentCount != null ? (
+          <Badge
+            variant="outline"
+            data-testid="route-score-coverage"
+            className={
+              view.scoredComponentCount < view.totalComponentCount
+                ? "border-warning/50 text-xs font-normal text-warning"
+                : "text-xs font-normal text-muted-foreground"
+            }
+          >
+            scored on {view.scoredComponentCount} of {view.totalComponentCount} components
+          </Badge>
+        ) : view.routeScore != null ? (
+          <Badge variant="outline" className="text-xs font-normal text-muted-foreground">
+            coverage not reported
+          </Badge>
+        ) : null}
         {/* unknown renders as the WORST tier (unreviewable), never neutral */}
         <Badge className={`text-xs ${routeRiskBadgeClass(view.worstRisk)}`}>
           risk: {routeRiskLabel(view.worstRisk)}

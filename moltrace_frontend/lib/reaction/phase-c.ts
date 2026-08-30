@@ -185,6 +185,14 @@ export interface RouteScoreView {
   label: string | null
   route: Record<string, unknown>
   routeScore: number | null
+  /** Share of the scoring weight budget the present components carry, or null if the record
+   *  predates it. Components without data are excluded and the weights renormalised, so a
+   *  route scored on two of four components reports a HIGHER number than the same route
+   *  fully characterised — 84.00 against 63.50 on the measured example. A null is "not
+   *  reported", never "fully covered". */
+  scoreCoverage: number | null
+  scoredComponentCount: number | null
+  totalComponentCount: number | null
   scoreComponents: RouteScoreComponent[]
   worstRisk: string
   requiresExpertReview: boolean
@@ -213,6 +221,9 @@ export function parseRouteScoreRecord(resp: unknown): RouteScoreView | null {
     label: typeof resp.label === "string" && resp.label ? resp.label : null,
     route: isRecord(resp.route) ? resp.route : {},
     routeScore: readNum(score.route_score),
+    scoreCoverage: readNum(score.score_coverage),
+    scoredComponentCount: readNum(score.scored_component_count),
+    totalComponentCount: readNum(score.total_component_count),
     // Components arrive as {name: {value, weight}} — unpack so the UI never stringifies an object.
     scoreComponents: isRecord(score.score_components)
       ? Object.entries(score.score_components).map(([name, v]) => ({

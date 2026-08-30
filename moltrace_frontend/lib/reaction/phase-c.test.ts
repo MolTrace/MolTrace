@@ -217,3 +217,38 @@ describe("Phase C forward checks (R14)", () => {
     expect(parseForwardCheckRecord(null)).toBeNull()
   })
 })
+
+
+describe("route score coverage", () => {
+  it("carries how much of the weight budget the score was computed over", () => {
+    // Components without data are excluded and the weights renormalised, so a route scored
+    // on safety and brevity alone reports 84.00 while the same route fully characterised
+    // reports 63.50. Without coverage the evidence-poor route simply looks better.
+    const v = parseRouteScoreRecord({
+      id: 1,
+      score: {
+        route_score: 84.0,
+        score_coverage: 0.5,
+        scored_component_count: 2,
+        total_component_count: 4,
+        score_components: {
+          safety: { value: 90.0, weight: 0.4 },
+          brevity: { value: 60.0, weight: 0.1 },
+        },
+      },
+    })
+    expect(v?.routeScore).toBe(84.0)
+    expect(v?.scoreCoverage).toBe(0.5)
+    expect(v?.scoredComponentCount).toBe(2)
+    expect(v?.totalComponentCount).toBe(4)
+  })
+
+  it("reports nulls for a record written before coverage was emitted", () => {
+    const v = parseRouteScoreRecord({ id: 2, score: { route_score: 71.0 } })
+    expect(v?.routeScore).toBe(71.0)
+    expect(v?.scoreCoverage).toBeNull()
+    expect(v?.scoredComponentCount).toBeNull()
+    // A missing coverage is not full coverage -- the UI must be able to tell them apart.
+    expect(v?.totalComponentCount).toBeNull()
+  })
+})
