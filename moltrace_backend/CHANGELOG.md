@@ -14,6 +14,44 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.74.7 — The same guard, on the reader that actually takes uploads (2026-08-30)
+
+`22d7b8c` stopped the desktop reader from reading a cut-short Bruker parameter file
+forever. **It was applied to one of the two readers.** `nmrcheck.fid`, the one behind
+the upload routes, still called `ng.bruker.read` unguarded at two places — and both
+sit inside `try/except Exception`, which is exactly what made them look safe.
+nmrglue's `parse_jcamp_line` reads an array parameter with `while len(value) < num`;
+at EOF `readline()` returns `''` and `''.split()` is `[]`, so the loop cannot
+advance. **A `try` cannot catch a loop.**
+
+Measured through `process_bruker_1d_zip` itself, the entry point
+`raw_fid_archive_preview` and `raw_fid_archive_process` call: an archive whose
+`acqus` was truncated to 90% **never returned**, while 40/50/60/70/100% completed in
+about six seconds.
+
+Severity, stated exactly rather than alarmingly: those handlers are `def`, not
+`async def`, so FastAPI runs them in the threadpool. Unlike the desktop service —
+where the same read sat on the event loop and one bad file wedged everything while
+the status box stayed green — this does not stop the process. It permanently
+consumes one threadpool worker per bad upload, against a bounded pool.
+
+The check is **imported, not reimplemented**: it belongs to nmrglue's file format
+rather than to either reader, and a duplicate would drift on a defect whose whole
+character is that it is data-dependent. It runs BEFORE the call and OUTSIDE the
+surrounding `except`, which would otherwise have turned a named refusal into a
+silent fallback to the in-house parser.
+
+The guard test constructs its truncation rather than sampling one. Cutting at a
+fraction only hangs when the cut lands inside an array parameter's values — 90% hung
+on one fixture while the same 90% was fine on another, which is how this defect was
+once called refuted on the strength of a single offset that happened to work.
+Cutting immediately after an array parameter's `(0..N)` header removes every value
+it declares, so the count can never be satisfied: verified to hang on **5 of 5**
+Bruker acquisitions in this repository before the guard. A control case pins that an
+untouched archive still processes, so a guard that refused everything would fail.
+
+---
+
 ## v0.74.6 — An assumed route may not decide a pass (2026-08-30)
 
 Two ICH Q3D route defects in the elemental-impurity assessment, both ending in a
