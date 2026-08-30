@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import glob
 import os
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -1147,7 +1148,7 @@ def test_similar_spectra_is_a_lookup_that_states_its_own_hit_rate() -> None:
 
 @pytest.mark.slow
 def test_a_ranking_says_when_it_does_not_separate_the_top_two() -> None:
-    """Read the MARGIN, not the winner's identity.
+    """Read the MARGIN *and* the winner's identity -- each misses what the other catches.
 
     The first version of this check asked whether the leading candidate changed
     under resampling. It is blind to the case it exists for: two identical
@@ -1158,6 +1159,14 @@ def test_a_ranking_says_when_it_does_not_separate_the_top_two() -> None:
     So the margin between the top two is resampled within the acquisition's own
     digital resolution -- conservative, since line fitting and referencing add
     more -- and an ordering whose gap ever closes to nothing is not one.
+
+    THE MARGIN ALONE IS NOT ENOUGH EITHER, which is the half this test did not
+    cover when it was first written. Sorting the shares to take the top two throws
+    away WHICH candidate holds each place, so two candidates trading first and
+    second leave the margin exactly where it was while the answer on screen
+    changes underneath it. Both halves are asserted below, and each was proven red
+    on its own: reverting the argmax tracking leaves the tie case passing, and
+    reverting the margin check leaves the swap case passing.
     """
     from nmrcheck.local_science import SpectrumUnreadable, rank_candidates
 
@@ -1189,3 +1198,84 @@ def test_a_ranking_says_when_it_does_not_separate_the_top_two() -> None:
         pytest.skip("this acquisition cannot rank the distinct-candidate case")
     if real["separated"]:
         assert real["narrowest_margin"] > 0.0
+        assert real["leader_changed"] is False, (
+            "an ordering was reported as separated while the leading candidate changed "
+            "between re-measurements"
+        )
+
+    # THE SWAP HALF. Somewhere in this corpus is a ranking whose leader changes
+    # under resampling while the top-two margin never reaches zero -- measured,
+    # three of nineteen. Whichever one this build finds, it must NOT be called
+    # separated, because a margin-only check calls it exactly that.
+    swapped = None
+    for candidate in _acquisitions():
+        try:
+            sep = rank_candidates(candidate, ["OCCO", "CCO", "CC(=O)Oc1ccccc1C(=O)O"])["separation"]
+        except SpectrumUnreadable:
+            continue
+        if sep.get("leader_changed") and (sep.get("narrowest_margin") or 0.0) > 0.0:
+            swapped = sep
+            break
+    if swapped is None:
+        pytest.skip("no acquisition here produces a leader change at a positive margin")
+    assert swapped["separated"] is False, (
+        "the leading candidate changed between re-measurements and the ordering was still "
+        "reported as separated, which means the check is reading the sorted margin alone "
+        f"(narrowest margin {swapped['narrowest_margin']:.4f} never reached zero)"
+    )
+
+
+@pytest.mark.slow
+def test_a_rejected_processed_spectrum_does_not_put_its_path_on_screen(tmp_path: Path) -> None:
+    """A filename carries a compound name into a screenshot.
+
+    No path is shown anywhere in this interface, and every refusal goes through
+    `_readable_refusal` for that reason. The fallback disclosure added later did
+    not: it took the reader's exception verbatim, and the reader names the
+    directory it failed on. A corrupt `1r` under a folder named after the
+    compound therefore rendered the ABSOLUTE PATH, folder name and all, inside the
+    caveat block a chemist is most likely to screenshot -- and named the parsing
+    library to them while it was there.
+
+    The round-trip's own "no filesystem path is rendered" assertion cannot see
+    this: it opens an acquisition that reads cleanly, so the fallback branch never
+    runs. A guard that never enters the branch is not a guard on it.
+    """
+    import shutil
+
+    from nmrcheck.local_science import open_spectrum
+
+    sources = sorted(Path("tests/fixtures").glob("**/pdata/*/1r"))
+    if not sources:
+        pytest.skip("no processed acquisition in this checkout")
+    dataset = sources[0].parent.parent.parent
+
+    # The folder name is the point: it stands in for a compound code.
+    case = tmp_path / "Ciprofloxacin_batch_XR7"
+    shutil.copytree(dataset, case)
+    for processed in case.glob("pdata/*/1r"):
+        processed.write_bytes(b"\x00" * 7)   # readable file, unreadable spectrum
+
+    try:
+        result = open_spectrum(case)
+    except Exception:  # noqa: BLE001 - refusing outright is also acceptable here
+        return
+
+    # `file_name` is EXCLUDED on purpose: the acquisition's name is what the
+    # scientist chose and is meant to be shown. The rule is no PATH, not no name,
+    # and asserting otherwise would fail on correct behaviour.
+    prose = list(result.get("limits") or [])
+    prose.append(str(result.get("processed_spectrum_rejected") or ""))
+    blob = "\n".join(prose)
+
+    assert str(tmp_path) not in blob, f"an absolute path reached the screen:\n{blob[:400]}"
+    assert case.name not in blob, (
+        f"the acquisition's directory name reached the caveat text:\n{blob[:400]}"
+    )
+    assert "nmrglue" not in blob, f"the parsing library was named to a chemist:\n{blob[:400]}"
+
+    # Non-vacuous: the fallback must actually have been taken, or this asserts
+    # nothing about the branch it exists for.
+    assert result.get("processed_spectrum_rejected"), (
+        "the processed read did not fail, so the branch under test never ran"
+    )

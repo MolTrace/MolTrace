@@ -677,13 +677,20 @@
     if (sep.checked && !sep.separated) {
       c.append(alert('warn', 'This ranking does not separate the top two',
         'Re-measured ' + sep.resamples + ' times within this spectrum\u2019s own resolution ('
-        + Number(sep.shift_uncertainty_ppm).toFixed(3) + ' ppm), the gap between the leading two '
-        + 'candidates closes to nothing. The order below is not evidence for one over the other.'))
+        + Number(sep.shift_uncertainty_ppm).toFixed(3) + ' ppm), '
+        + (sep.leader_changed
+          ? 'a different candidate comes out on top depending on the measurement. '
+          : 'the gap between the leading two candidates closes to nothing. ')
+        + 'The order below is not evidence for one over the other.'))
     } else if (sep.checked && sep.separated) {
+      // A margin under 0.05 points prints as "0.0", so the sentence would read
+      // "stayed ahead by at least 0.0 points" -- a contradiction the reader has
+      // to resolve. Say "less than 0.1" instead of a rounded zero.
+      const pts = Number(sep.narrowest_margin) * 100
       c.append(node('p', 'tablenote',
-        'The leader stayed ahead by at least ' + (Number(sep.narrowest_margin) * 100).toFixed(1)
-        + ' points across ' + sep.resamples + ' re-measurements within this spectrum\u2019s own '
-        + 'resolution.'))
+        'The same candidate led every one of ' + sep.resamples + ' re-measurements within this '
+        + 'spectrum\u2019s own resolution, by '
+        + (pts < 0.05 ? 'less than 0.1 points' : 'at least ' + pts.toFixed(1) + ' points') + '.'))
     }
 
     const table = node('table', 'peaks rank__table')
@@ -757,11 +764,12 @@
     const a = r.accuracy || {}
     c.append(alert('info', 'What this is, and how often it has been right',
       'The closest of ' + r.library_size.toLocaleString() + ' reference ' + r.nucleus
-      + ' spectra shipped with this build. Measured leave-one-out on that library: when the '
-      + 'compound is present it came back first ' + Math.round(100 * (a.first || 0) / (a.of || 1))
-      + '% of the time and inside the top five ' + Math.round(100 * (a.top5 || 0) / (a.of || 1))
-      + '%. A lead to follow, not an identification \u2014 and a compound absent from the '
-      + 'library will still return its five nearest neighbours.'))
+      + ' spectra shipped with this build. Measured the way you are using it \u2014 a real '
+      + 'acquisition\u2019s measured signals against this library, counting only cases where the '
+      + 'compound is in it \u2014 the right compound came back first in ' + (a.first || 0) + ' of '
+      + (a.of || 0) + ' and was inside the top five in ' + (a.top5 || 0) + ' of ' + (a.of || 0)
+      + '. So most of the time it is not here. A lead to follow, never an identification, and a '
+      + 'compound absent from the library still gets its five nearest neighbours back.'))
 
     const table = node('table', 'peaks similar__table')
     const thead = node('thead'); const hr = node('tr')

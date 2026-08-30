@@ -546,38 +546,56 @@ def rank_candidates(path: str | Path, smiles_list: Sequence[str]) -> dict:
     # watch the MARGIN between the top two shares. If it ever reaches zero, the
     # ordering is not robust to the measurement and must not be read as one.
     #
-    # The margin, NOT the winner's identity. A first attempt asked "does the
-    # leader change", which is blind to the case it exists for: with two
+    # BOTH THE MARGIN AND THE WINNER'S IDENTITY, because each one alone is blind
+    # to a case the other catches, and this check has now been wrong in both
+    # directions.
+    #
+    # Asking only "does the leader change" misses a perfect tie: with two
     # identical candidates DP4 returns exactly 50/50, `argmax` breaks the tie
-    # deterministically at index 0, the leader never moves, and the check reports
-    # 50/50 held -- STABLE -- on a perfect tie. Measured, and that is why this
-    # reads margins. Validated at both ends: a perfect tie gives a margin of
-    # 0.0000 throughout, a clear winner 0.3311 at its narrowest.
+    # deterministically at index 0, the leader never moves, and a dead heat is
+    # reported STABLE. Asking only "does the margin reach zero" misses the
+    # opposite: sorting the shares throws away WHICH candidate holds each place,
+    # so two candidates trading first and second leave the margin untouched while
+    # the answer on screen changes. Measured, three of nineteen corpus cases do
+    # exactly that.
+    #
+    # Validated at both ends: a perfect tie gives a margin of 0.0000 throughout,
+    # a clear winner 0.3311 at its narrowest.
     import numpy as _np
 
     _resamples = 50
     _sigma_ppm = float(summary.get("resolution_hz") or 0.0) / max(float(summary["field_mhz"]), 1e-9)
     _margins: list[float] = []
+    _leaders: list[int] = []
     if _sigma_ppm > 0:
         _rng = _np.random.default_rng(20260830)
         for _ in range(_resamples):
             _jittered = [v + float(_rng.normal(0.0, _sigma_ppm)) for v in observed]
-            _shares = sorted(
-                (
-                    x.probability
-                    for x in dp4_probabilities(
-                        observed_shifts_ppm=_jittered,
-                        candidate_predicted_shifts_ppm=predicted,
-                        nucleus=nucleus,  # type: ignore[arg-type]
-                    )
-                ),
-                reverse=True,
-            )
-            _margins.append(float(_shares[0] - _shares[1]) if len(_shares) > 1 else 1.0)
+            _shares_in_order = [
+                x.probability
+                for x in dp4_probabilities(
+                    observed_shifts_ppm=_jittered,
+                    candidate_predicted_shifts_ppm=predicted,
+                    nucleus=nucleus,  # type: ignore[arg-type]
+                )
+            ]
+            # BOTH FAILURES, because each fix so far was blind to the other.
+            # Reading argmax alone missed a perfect tie: ties break deterministically
+            # at index 0, so the leader never moved. Reading the sorted margin alone
+            # missed the opposite case: sorting discards WHICH candidate holds each
+            # position, so two candidates swapping places leaves the margin
+            # untouched and the ordering is reported as stable while the winner
+            # changes. Measured: three of nineteen corpus cases change leader while
+            # the margin stays positive.
+            _leaders.append(int(_np.argmax(_shares_in_order)))
+            _ordered = sorted(_shares_in_order, reverse=True)
+            _margins.append(float(_ordered[0] - _ordered[1]) if len(_ordered) > 1 else 1.0)
 
+    _leader_changed = bool(_leaders) and len(set(_leaders)) > 1
     separation = {
         "checked": bool(_margins),
-        "separated": bool(_margins) and min(_margins) > 0.0,
+        "separated": bool(_margins) and min(_margins) > 0.0 and not _leader_changed,
+        "leader_changed": _leader_changed,
         "narrowest_margin": min(_margins) if _margins else None,
         "resamples": _resamples if _margins else 0,
         "shift_uncertainty_ppm": _sigma_ppm if _margins else None,
@@ -626,24 +644,54 @@ def rank_candidates(path: str | Path, smiles_list: Sequence[str]) -> dict:
 
 
 
-#: Measured retrieval on the shipped library, nucleus-matched: leave-one-out over
-#: 400 records whose compound appears more than once with the same nucleus
-#: coverage. Reported to the reader, because a lookup whose hit rate is unstated
-#: is a lookup a chemist cannot weigh.
+#: Measured retrieval on the shipped library, reported to the reader, because a
+#: lookup whose hit rate is unstated is a lookup a chemist cannot weigh.
 #:
-#: Two corrections behind these numbers, both from harnesses that were measuring
-#: the wrong thing. Counting every record gave 30%, because a 1H-only record and a
-#: 13C-only record of the same compound occupy different halves of the vector and
-#: can never retrieve each other. And an earlier run over a 99-record subset read
-#: 16% because most of its compounds appeared ONCE, which leave-one-out cannot
-#: retrieve by construction.
+#: FOUR harnesses stand behind this number and the first three were each measuring
+#: something other than the task. In order:
+#:
+#:   30%  counted every record, including a 1H-only record and a 13C-only record of
+#:        the same compound -- they occupy different halves of the vector and can
+#:        never retrieve each other, so those pairs were unretrievable by
+#:        construction.
+#:   16%  ran over a 99-record subset in which most compounds appeared ONCE, and
+#:        leave-one-out cannot retrieve a compound that is no longer in the pool.
+#:   48%/63%  fixed both of those and measured 400 records cleanly -- but
+#:        record-against-record, a curated shift list querying the library. That is
+#:        not what this function does.
+#:   20%/27%  what this function actually does: query with the detected multiplet
+#:        centres of a real acquisition. See the constant below.
+#:
+#: The first two were wrong in the reader's favour. The third was RIGHT about its
+#: own task and wrong about this one, which is the harder mistake to see -- a clean
+#: measurement of the wrong operating point still reads as evidence. What separates
+#: them is not rigour, it is whether the query the harness sends is the query the
+#: app sends.
 _SIMILARITY_ACCURACY: dict[str, object] = {
-    "first": 192,
-    "top5": 253,
-    "of": 400,
+    # MEASURED AT THE OPERATING POINT THIS FUNCTION ACTUALLY RUNS AT, which is not
+    # the one the first figure described.
+    #
+    # The first number here was 192/400 and 253/400 -- 48% and 63% -- from a
+    # record-vs-record leave-one-out, where a library record's own curated shift
+    # list queries the library. This function queries with something else
+    # entirely: the detected multiplet centres of a real acquisition, filtered to
+    # quantifiable and attributable to the compound. That query is sparser and
+    # noisier than a curated record -- median 4 peaks against 5 -- and one
+    # acquisition's 31 detected multiplets collapse to 7 query peaks.
+    #
+    # Re-measured the way the app runs, over every acquisition whose structure the
+    # corpus states AND whose compound is present in the searched pool:
+    #
+    #     same compound first   3/15 (20%)      inside the top five   4/15 (27%)
+    #
+    # So the honest figure is less than half what was on screen. n=15 is small and
+    # is reported as the count rather than dressed as a percentage alone.
+    "first": 3,
+    "top5": 4,
+    "of": 15,
     "note": (
-        "Leave-one-out over records whose compound appears more than once with the same "
-        "nucleus, on the library shipped with this build."
+        "Measured the way this lookup is actually used: a real acquisition's measured signals "
+        "queried against the shipped library, counting only cases where the compound is in it."
     ),
 }
 
@@ -1046,7 +1094,14 @@ def open_spectrum(path: str) -> dict:
         spectrum = read_processed_spectrum(source)
     except (FIDReaderError, OSError, ValueError) as refused:
         if _has_processed_spectrum(source):
-            rejected = str(refused)
+            # THROUGH THE SAME SANITISER AS EVERY OTHER REFUSAL. This took
+            # `str(refused)` raw and put it on screen, and the reader's own error
+            # names the directory it failed on: a corrupt `1r` under a folder
+            # called after the compound rendered the absolute path, folder name
+            # and all, inside the caveat block. A filename carries a compound name
+            # into a screenshot, which is the whole reason no path is shown
+            # anywhere else -- and the same string named `nmrglue` to a chemist.
+            rejected = _readable_refusal(refused, source)
         try:
             spectrum = read_fid(source)
             processing = "moltrace"
