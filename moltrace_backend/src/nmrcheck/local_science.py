@@ -604,7 +604,21 @@ def open_spectrum(path: str) -> dict:
     return {
         "trace": trace,
         "nucleus": spectrum.nucleus,
+        # PARSED ON EVERY READER PATH AND THEN DROPPED HERE. A chemical shift is
+        # not interpretable without the solvent it was referenced in -- CDCl3 and
+        # DMSO-d6 move the same proton by more than a ppm -- and every reader
+        # already extracts it into `NMRSpectrum.solvent`. It reached this function
+        # and stopped. Empty string when the file does not say, which is honest:
+        # the reader never guesses one.
+        "solvent": spectrum.solvent,
         "field_mhz": float(spectrum.field_mhz),
+        # The date the instrument recorded it. A reviewer reading a peak table
+        # needs to know which run it came from, and the readers all carry it.
+        "acquired_at": (
+            spectrum.acquisition_time.isoformat()
+            if spectrum.acquisition_time is not None
+            else None
+        ),
         "points": int(len(spectrum.data)),
         "file_name": _readable_name(source),
         "processing": processing,
