@@ -60,6 +60,22 @@ check('GREEN: a freeze newer than every commit is NOT reported stale', () => {
   assert.deepStrictEqual(r.dirty, [], 'files reported as newer than a freeze stamped tomorrow')
 })
 
+check('a commit made AFTER the freeze, of code already IN it, is not stale', () => {
+  // The natural order is freeze, verify, commit -- so the commit is always dated
+  // after the freeze it describes. Deciding on commit DATE reported a freeze as
+  // three minutes behind code it already contained, every single time. A gate
+  // that cries wolf gets bypassed, so the verdict is the file mtimes.
+  //
+  // Stamped one hour in the FUTURE: newer than every commit and newer than every
+  // file, which is exactly the freeze-then-commit case.
+  const future = stamp(Math.floor(Date.now() / 1000) + 3600)
+  const verdict = scienceNewerThanFreeze(future)
+  assert.ok(verdict.checked, 'the gate could not read the repository')
+  assert.deepStrictEqual(verdict.changed, [],
+    'a freeze newer than every source file was still reported stale, so committing '
+    + 'after freezing would refuse a build that is actually current')
+})
+
 check('an unreadable freeze fails CLOSED rather than reporting fresh', () => {
   let threw = false
   try { scienceNewerThanFreeze(path.join(scratch, 'does-not-exist')) } catch { threw = true }

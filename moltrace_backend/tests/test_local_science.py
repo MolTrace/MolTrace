@@ -811,3 +811,215 @@ def test_the_area_caveat_names_the_denominator_it_actually_used() -> None:
     assert not any("relative to the whole spectrum" in x for x in area_caveat), (
         "the caveat still claims the whole spectrum as its basis: " + area_caveat[0]
     )
+
+
+def test_the_summary_carries_what_a_shift_cannot_be_read_without() -> None:
+    """Solvent was parsed on every reader path and dropped at this boundary.
+
+    A chemical shift is not interpretable without the solvent it was referenced
+    in: the same proton moves by more than a ppm between CDCl3 and DMSO-d6. Every
+    reader already extracts it into `NMRSpectrum.solvent`; it reached
+    `open_spectrum` and went no further, so the window could never show it and a
+    reviewer had to take the number on trust.
+
+    The acquisition date is here for the same reason -- a peak table a reviewer
+    cannot tie to a run is a peak table they cannot sign off.
+    """
+    from nmrcheck.local_science import open_spectrum
+
+    source = _one("instrument") or _one("moltrace")
+    if source is None:
+        pytest.skip("no acquisition in this checkout")
+
+    result = open_spectrum(source)
+    for key in ("solvent", "acquired_at", "nucleus", "field_mhz"):
+        assert key in result, f"{key} does not cross the boundary, so nothing can show it"
+
+    # Non-vacuous: at least one acquisition in the corpus must actually name a
+    # solvent, or this passes on a key that is always empty.
+    named = 0
+    for candidate in _acquisitions():
+        try:
+            if open_spectrum(candidate).get("solvent"):
+                named += 1
+                break
+        except Exception:  # noqa: BLE001 - unreadable acquisitions are another test's business
+            continue
+    assert named, "no acquisition reported a solvent, so this asserts nothing"
+
+
+@pytest.mark.slow
+def test_a_structure_check_carries_the_caveat_that_makes_it_readable() -> None:
+    """The verifier runs offline in full. Its PREDICTION does not.
+
+    `verify_structure` is the platform's arbiter and needs no server: it takes the
+    spectrum already on this computer and a structure the chemist typed. What it
+    consumes is a shift prediction, and with no NMRNet installed that falls back
+    to HOSE codes over a seed knowledge base.
+
+    Measured on a real 13C acquisition: half the atoms matched no environment at
+    all and the median 13C uncertainty was 35 ppm -- most of the useful range. A
+    posterior confidence read without that is a number a chemist could act on and
+    should not, so it is lifted out of the warning list rather than left ninth of
+    nine.
+    """
+    from nmrcheck.local_science import _TEST_LABELS, verify_candidate
+
+    source = _one("instrument") or _one("moltrace")
+    if source is None:
+        pytest.skip("no acquisition in this checkout")
+
+    # Ethanol: readable by RDKit, and small enough that the check is quick.
+    result = verify_candidate(source, "CCO")
+
+    assert result["verdict"], "no verdict came back"
+    assert 0.0 <= result["confidence"] <= 1.0, result["confidence"]
+    assert result["human_review_required"] is True, (
+        "a structure verdict is exactly the kind of result that must not read as a decision"
+    )
+
+    # The engine names its own tests; a person must not be shown those names.
+    unlabelled = [t["name"] for t in result["tests"] if t["name"] not in _TEST_LABELS]
+    assert not unlabelled, f"tests reach the screen with no readable label: {unlabelled}"
+
+    # Non-vacuous: the offline path MUST report reduced prediction quality,
+    # because that is the whole reason this result needs reading carefully. If
+    # this ever stops firing, either NMRNet arrived or the warning was dropped --
+    # and the second is a silent loss of the caveat.
+    assert result["prediction_coverage"] or result["predictor_note"], (
+        "no prediction-quality caveat came back, so the confidence is being "
+        "presented as though the prediction behind it were fully covered"
+    )
+
+
+def test_a_structure_that_cannot_be_read_is_refused_not_crashed() -> None:
+    """A typo in a structure is the chemist's input, not a fault in the service."""
+    from nmrcheck.local_science import SpectrumUnreadable, verify_candidate
+
+    source = _one("instrument") or _one("moltrace")
+    if source is None:
+        pytest.skip("no acquisition in this checkout")
+
+    with pytest.raises(SpectrumUnreadable) as excinfo:
+        verify_candidate(source, "this is not a molecule")
+    assert "structure" in str(excinfo.value).lower(), str(excinfo.value)
+
+    with pytest.raises(SpectrumUnreadable):
+        verify_candidate(source, "   ")
+
+
+@pytest.mark.slow
+def test_every_signal_says_what_it_appears_to_be() -> None:
+    """The engine has always known; nothing ever asked it.
+
+    `classify_peaks` separates the compound from the solvent, its residual proton,
+    impurities, 13C satellites and artifacts. On one public 1H acquisition that is
+    ten impurity lines and two satellites a chemist would otherwise pick out by
+    eye, every single time they read the spectrum.
+
+    Non-vacuous by construction: a corpus where every signal came back "compound"
+    would pass a mere presence check while telling the reader nothing, so this
+    requires the corpus to contain at least one NON-compound call.
+    """
+    from nmrcheck.local_science import open_spectrum
+
+    sources = _acquisitions()
+    if not sources:
+        pytest.skip("no acquisition in this checkout")
+
+    seen: set[str] = set()
+    rows = 0
+    for source in sources:
+        try:
+            result = open_spectrum(source)
+        except Exception:  # noqa: BLE001 - unreadable acquisitions are another test's business
+            continue
+        for signal in result["multiplets"]:
+            rows += 1
+            assert "category" in signal, "a signal reached the boundary with no category field"
+            assert 0.0 <= signal["category_confidence"] <= 1.0, signal["category_confidence"]
+            if signal["category"]:
+                seen.add(signal["category"])
+
+    assert rows, "no signal was examined"
+    assert seen, "nothing was classified at all"
+    assert seen - {"compound"}, (
+        "every signal in the corpus came back as the compound, so this asserts nothing "
+        f"about the classifier actually separating anything: {seen}"
+    )
+
+
+@pytest.mark.slow
+def test_a_solvent_the_peaks_disagree_with_is_said_not_resolved() -> None:
+    """Two answers, and the reader is told there are two.
+
+    The file records a solvent and the peaks imply one. Where they differ the
+    result keeps the FILE's answer -- the instrument's record is the fact -- and
+    states the disagreement, because it can mean a mislabelled sample or an axis
+    referenced to the wrong peak, and both change what every shift means.
+    """
+    from nmrcheck.local_science import open_spectrum
+
+    sources = _acquisitions()
+    if not sources:
+        pytest.skip("no acquisition in this checkout")
+
+    disagreements = 0
+    for source in sources:
+        try:
+            result = open_spectrum(source)
+        except Exception:  # noqa: BLE001
+            continue
+        recorded, detected = result.get("solvent"), result.get("solvent_detected")
+        if not (recorded and detected) or recorded.lower() == detected.lower():
+            continue
+        disagreements += 1
+        said = [line for line in result["limits"] if "look more like" in line]
+        assert said, (
+            f"{os.path.basename(source)} records {recorded} but reads as {detected}, "
+            "and nothing on the result says so"
+        )
+        assert detected in said[0] and recorded in said[0], said[0]
+
+    assert disagreements, (
+        "no acquisition in the corpus disagrees with its own recorded solvent, so this "
+        "guard never fired -- it would pass just as well if the disclosure were deleted"
+    )
+
+
+@pytest.mark.slow
+def test_a_structure_confidence_says_it_cannot_rank_candidates() -> None:
+    """Measured, not cautious.
+
+    On the ethylene glycol acquisition in this repository, this same path scored
+    ethanol 0.623 against ethylene glycol's own 0.556, with aspirin at 0.542 --
+    the WRONG molecule above the right one. The engine is not at fault: it
+    returned "inconclusive" for every candidate, which is the correct answer. What
+    cannot carry the weight is the prediction underneath, at a 35 ppm median
+    uncertainty on a seed knowledge base.
+
+    So the result says so, and this build offers no ranked candidate list. A list
+    would have put ethanol first and looked exactly like a list that had put the
+    right molecule first.
+    """
+    from nmrcheck.local_science import verify_candidate
+
+    source = _one("instrument") or _one("moltrace")
+    if source is None:
+        pytest.skip("no acquisition in this checkout")
+
+    result = verify_candidate(source, "CCO")
+    knowledge = result["knowledge_base"]
+    assert knowledge["source"], "the result does not say which table answered"
+    assert knowledge["reference_count"] >= 0
+
+    # THE CLAIM TRACKS THE TABLE, and is asserted in both directions rather than
+    # pinned to one answer. A build on the seed must not claim it can rank; a
+    # build on the real table must not pretend it cannot. Re-measured when the
+    # nmrshiftdb2 table was wired in: ethylene glycol went 0.556 -> 0.939 and
+    # ethanol 0.623 -> 0.242, so the ordering inverted and became correct.
+    expected = knowledge["source"] == "nmrshiftdb2"
+    assert result["comparable_between_candidates"] is expected, (
+        f"answering from {knowledge['source']!r} with {knowledge['reference_count']} "
+        f"reference atoms, but claiming comparable={result['comparable_between_candidates']}"
+    )

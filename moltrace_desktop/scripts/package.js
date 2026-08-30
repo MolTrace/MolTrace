@@ -29,10 +29,32 @@ const FROZEN_SERVICE = path.join(ROOT, '..', 'moltrace_backend', 'dist', 'moltra
 
 // Named once because two refusals below quote it, and a runbook that drifts from
 // the command it documents is worse than no runbook.
+// THE SHIFT-PREDICTION TABLE RIDES WITH THE SERVICE. Without it the predictor
+// answers from a bundled 16-molecule seed, and the difference decides whether the
+// product works: median 13C uncertainty ~35 ppm against ~1.9 ppm. Measured on one
+// acquisition with four candidate structures, the seed ranked the WRONG molecule
+// first (ethanol 0.623 over ethylene glycol's 0.556); with the table the right one
+// wins at 0.939 and aspirin is called inconsistent at 0.166.
+//
+// 14 MB gzipped against a 185 MB artifact, loaded lazily in 1.3 s on the first
+// structure check rather than at startup.
+const KNOWLEDGE_BASE = path.join(
+  require('node:os').homedir(), '.cache', 'moltrace', 'nmrnet', 'hose_index.json.gz',
+)
+
 const REFREEZE_COMMAND =
   '    uv run --with pyinstaller pyinstaller --noconfirm --onedir --name moltrace-local-service \\\n'
   + '      --distpath dist --workpath build/pyi --specpath build/pyi \\\n'
   + '      --collect-submodules nmrcheck --collect-submodules moltrace \\\n'
+  + '      --add-data "' + KNOWLEDGE_BASE + ':." \\\n'
+  // The licence travels WITH the data it covers. A CC BY-SA table redistributed
+  // without its attribution is the obligation broken, and a NOTICE that lives
+  // only in the source repository does not reach whoever holds the artifact.
+  //
+  // ABSOLUTE, because PyInstaller resolves a relative --add-data source against
+  // the --specpath, not the working directory. A bare 'NOTICE' looked for it in
+  // build/pyi/ and logged one ERROR line in a long build that still exited 0.
+  + '      --add-data "' + path.join(ROOT, '..', 'moltrace_backend', 'NOTICE') + ':." \\\n'
   + '      --hidden-import uvicorn.protocols.http.h11_impl \\\n'
   + '      --hidden-import uvicorn.lifespan.on --hidden-import uvicorn.loops.asyncio \\\n'
   + '      --console packaging/moltrace_local_service.py'
@@ -78,11 +100,44 @@ function scienceNewerThanFreeze(frozenBinary) {
   const repo = path.join(ROOT, '..')
   const frozenAt = Math.floor(fs.statSync(frozenBinary).mtimeMs / 1000)
   const git = (args) => execFileSync('git', args, { cwd: repo, encoding: 'utf8' })
-  let commits
+  // WHAT MAKES A FREEZE STALE IS THE SOURCE ON DISK, NOT WHEN SOMEONE TYPED
+  // `git commit`. This asked git for commits DATED after the freeze, which meant
+  // the natural order -- freeze, verify, commit -- always tripped it: the freeze
+  // built at 11:42 from the tree that became a commit at 11:45 was reported as
+  // three minutes behind code it already contained. That is a gate that cries
+  // wolf, and a gate that cries wolf gets bypassed.
+  //
+  // So the verdict is now the file mtimes, which is the question that was always
+  // being asked. Commits are still listed, but only the ones whose files are
+  // ACTUALLY newer on disk, so the refusal names something real.
+  const changed = []
+  const walk = (rel) => {
+    const abs = path.join(repo, rel)
+    let stat
+    try { stat = fs.statSync(abs) } catch { return }
+    if (stat.isDirectory()) {
+      for (const entry of fs.readdirSync(abs)) {
+        if (entry === '__pycache__' || entry.startsWith('.')) continue
+        walk(path.join(rel, entry))
+      }
+      return
+    }
+    if (!/\.(py|json|gz)$/.test(rel)) return
+    if (stat.mtimeMs / 1000 > frozenAt) changed.push(rel)
+  }
+  for (const rel of FROZEN_SCIENCE_SURFACE) walk(rel)
+
+  let commits = []
   try {
-    commits = git(['log', `--since=@${frozenAt}`, '--format=%h %ad %s',
-      '--date=format-local:%Y-%m-%d %H:%M', '--', ...FROZEN_SCIENCE_SURFACE])
-      .split('\n').map((l) => l.trim()).filter(Boolean)
+    if (changed.length) {
+      commits = git(['log', `--since=@${frozenAt}`, '--format=%h %ad %s',
+        '--date=format-local:%Y-%m-%d %H:%M', '--', ...FROZEN_SCIENCE_SURFACE])
+        .split('\n').map((l) => l.trim()).filter(Boolean)
+    } else {
+      // Proves git answers here, so an unreadable repository still fails closed
+      // rather than reporting a fresh freeze it never checked.
+      git(['rev-parse', 'HEAD'])
+    }
   } catch (err) {
     return { checked: false, why: String(err.message).trim().split('\n')[0] }
   }
@@ -96,7 +151,7 @@ function scienceNewerThanFreeze(frozenBinary) {
         try { return fs.statSync(path.join(repo, rel)).mtimeMs / 1000 > frozenAt } catch { return false }
       })
   } catch { /* the commit query already proved git answers here */ }
-  return { checked: true, frozenAt, commits, dirty }
+  return { checked: true, frozenAt, commits, dirty, changed }
 }
 
 // AD-HOC SIGNING IS NOT DISTRIBUTION SIGNING, and `osxSign` below stays false:
@@ -164,6 +219,54 @@ function archiveApp(appPath, outDir, config) {
   return zipPath
 }
 
+// THE ICON IS BUILT, NOT COMMITTED. It is derived from the product's own masked
+// mark in the frontend, so the desktop and the web wear the same face and cannot
+// drift into two: a checked-in .icns is a 1.6 MB binary that nothing regenerates
+// when the mark changes, and the first person to update the brand would not know
+// this file existed.
+//
+// 512 is the largest MASKED source that exists. The 1024 slot is interpolated
+// from it and macOS only reaches it on a Retina 512pt draw. The unmasked 1024
+// render is deliberately not used: deriving the hexagon from it leaves the dark
+// facets transparent, which is why the repo's own generator constructs the mask
+// rather than detecting it.
+const ICON_SOURCE = path.join(
+  ROOT, '..', 'moltrace_frontend', 'public', 'icons', 'moltrace-mark-3d-hex-512.png',
+)
+const ICONSET_SIZES = [
+  [16, '16x16'], [32, '16x16@2x'], [32, '32x32'], [64, '32x32@2x'],
+  [128, '128x128'], [256, '128x128@2x'], [256, '256x256'], [512, '256x256@2x'],
+  [512, '512x512'], [1024, '512x512@2x'],
+]
+
+function buildIcon() {
+  if (process.platform !== 'darwin') return null
+  if (!fs.existsSync(ICON_SOURCE)) {
+    console.log('  no icon source at ' + ICON_SOURCE + ' — packaging without an icon')
+    return null
+  }
+  const buildDir = path.join(ROOT, 'build')
+  const iconset = path.join(buildDir, 'MolTrace.iconset')
+  const icns = path.join(buildDir, 'icon.icns')
+  // Returned WITHOUT the extension: @electron/packager appends the per-platform
+  // one itself, and handing it a path that already ends in .icns made it look for
+  // 'icon.icns.icon' and skip the icon with only a warning.
+  fs.rmSync(iconset, { recursive: true, force: true })
+  fs.mkdirSync(iconset, { recursive: true })
+  for (const [px, name] of ICONSET_SIZES) {
+    execFileSync('sips', ['-z', String(px), String(px), ICON_SOURCE,
+      '--out', path.join(iconset, `icon_${name}.png`)], { stdio: 'pipe' })
+  }
+  // iconutil refuses the whole set if one required name is missing, so the count
+  // is checked here rather than discovered as an opaque "Failed to generate ICNS".
+  const written = fs.readdirSync(iconset).filter((n) => n.endsWith('.png')).length
+  if (written !== ICONSET_SIZES.length) {
+    throw new Error(`icon set has ${written} of ${ICONSET_SIZES.length} sizes`)
+  }
+  execFileSync('iconutil', ['-c', 'icns', iconset, '-o', icns], { stdio: 'pipe' })
+  return path.join(buildDir, 'icon')
+}
+
 async function main() {
   const overlayPath = process.argv.find((a) => a.startsWith('--config='))
   const config = overlayPath
@@ -190,6 +293,36 @@ async function main() {
     )
   }
 
+  // A FREEZE WITHOUT THE TABLE IS NOT A SMALLER BUILD, IT IS A DIFFERENT PRODUCT.
+  // The predictor falls back to a 16-molecule seed and says so only in a warning
+  // most readers will not reach, while every structure verdict quietly loses the
+  // ability to tell a right answer from a wrong one. Refusing here is the same
+  // judgement as refusing a stale freeze: the artifact must not be able to look
+  // finished while answering from the wrong table.
+  const frozenKb = ['hose_index.json.gz', 'hose_index.json']
+    .map((n) => path.join(FROZEN_SERVICE, '_internal', n))
+    .find((p) => fs.existsSync(p))
+  if (!frozenKb) {
+    refuse(
+      'the frozen service carries no shift-prediction table, so it would answer every\n'
+      + '  structure check from the 16-molecule seed -- which ranked a WRONG molecule first\n'
+      + '  on the one acquisition we can check against. Re-freeze with the table:\n'
+      + REFREEZE_COMMAND,
+    )
+  }
+
+  // The attribution must be inside the artifact, not only in the repository: the
+  // table is CC BY-SA and the person holding the build is the one who needs the
+  // licence terms.
+  if (frozenKb && !fs.existsSync(path.join(FROZEN_SERVICE, '_internal', 'NOTICE'))) {
+    refuse(
+      'the frozen service carries the NMRShiftDB2-derived prediction table but not the\n'
+      + '  NOTICE that licenses it. That table is CC BY-SA and redistributing it without\n'
+      + '  its attribution breaks the obligation. Re-freeze with the NOTICE:\n'
+      + REFREEZE_COMMAND,
+    )
+  }
+
   // A freeze that exists is not a freeze that is current. Presence was the only test
   // here, which is how a zip went out carrying peak fitting two commits behind the
   // source beside it — undetectable from inside the artifact, because nothing in the
@@ -207,7 +340,7 @@ async function main() {
       )
     }
     console.log('WARNING: freeze vintage unverified (' + freshness.why + ') — proceeding as instructed')
-  } else if (freshness.commits.length || freshness.dirty.length) {
+  } else if (freshness.changed.length) {
     // Local, to match git's format-local above. Printing the freeze in UTC beside
     // commit times in local time made this refusal read as though the commits came
     // BEFORE the freeze — the gate looked broken at exactly the moment it was right.
@@ -237,6 +370,9 @@ async function main() {
     )
   }
 
+  const iconPath = buildIcon()
+  if (iconPath) console.log('  icon: built from the product mark')
+
   console.log(`Packaging ${config.productName}${isPreview ? ' (PREVIEW — unsigned, unentitled)' : ''}`)
 
   const appPaths = await packager({
@@ -247,6 +383,17 @@ async function main() {
     // is a visible change to this line and not a silent one.
     osxSign: false,
     osxNotarize: false,
+    // THE APP HAD NO ICON AT ALL, so macOS drew the generic Electron document in
+    // the Dock, in Finder and in the switcher -- the first thing a tester sees,
+    // and it says "someone's prototype" before the window even opens.
+    //
+    // Built from the product's own masked mark
+    // (moltrace_frontend/public/icons/moltrace-mark-3d-hex-512.png) rather than a
+    // redraw, so the desktop and the web wear the same face. 512 is the largest
+    // masked source that exists; the 1024 slot is interpolated from it, which
+    // macOS only reaches on a Retina 512pt draw. Regenerate with the recipe in
+    // PACKAGING.md if the mark ever changes.
+    icon: iconPath || undefined,
     name: config.productName,
     appVersion: require('../package.json').version,
     // The frozen service rides in Resources/service/; local-service.js looks for

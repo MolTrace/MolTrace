@@ -193,6 +193,12 @@ ipcMain.handle('moltrace:open-spectrum', async () => {
 
   try {
     const summary = await requestFromService('/fid/open', { path: picked.filePaths[0] })
+    // REMEMBERED HERE, not returned. Checking a structure needs the same file
+    // again, and the renderer must not be the thing that names it: a page that
+    // could pass a path could ask this service to read anything the user can
+    // read. It supplies the structure, which is its own input; the path stays on
+    // this side of the bridge exactly as it does for the picker.
+    lastOpenedPath = picked.filePaths[0]
     return { ok: true, summary }
   } catch (err) {
     // TWO DIFFERENT FAILURES, and they were being told as one. `describeFailure`
@@ -204,6 +210,27 @@ ipcMain.handle('moltrace:open-spectrum', async () => {
     // the second half of a sentence that had already misdiagnosed the app to
     // itself. A reader who is told the service is down restarts it and gets the
     // same result.
+    return { ok: false, reason: localService.readFailureReason(err) }
+  }
+})
+
+/** The acquisition most recently opened, held so the renderer never names one. */
+let lastOpenedPath = null
+
+ipcMain.handle('moltrace:verify-structure', async (_event, smiles) => {
+  if (typeof smiles !== 'string' || !smiles.trim()) {
+    return { ok: false, reason: 'Type a structure to check it against this spectrum.' }
+  }
+  if (!lastOpenedPath) {
+    return { ok: false, reason: 'Open a spectrum first, then check a structure against it.' }
+  }
+  try {
+    const result = await requestFromService('/structure/verify', {
+      path: lastOpenedPath,
+      smiles: smiles.trim(),
+    })
+    return { ok: true, result }
+  } catch (err) {
     return { ok: false, reason: localService.readFailureReason(err) }
   }
 })

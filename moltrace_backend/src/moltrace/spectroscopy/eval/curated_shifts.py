@@ -126,3 +126,40 @@ def recall_against_curated(
         and not any(low <= float(lines[j]) <= high for low, high in SOLVENT_WINDOWS)
     )
     return found, len(truth), extras
+
+#: A curated carbon whose own position carries less than this, in units of the
+#: spectrum's MAD noise, is not something any detector could report. Set at the
+#: conventional limit of detection rather than the 10x limit of quantitation, so
+#: the denominator below is generous to the detector rather than flattering.
+DETECTABLE_SNR = 3.0
+
+
+def local_snr_at(
+    positions_ppm: list[float],
+    *,
+    ppm_axis: np.ndarray,
+    signal: np.ndarray,
+    half_window_ppm: float,
+) -> list[float]:
+    """Peak height within +/-``half_window_ppm`` of each position, over MAD noise.
+
+    **Recall against a curated list is not a detector score until this is asked.**
+    On this corpus the carbons the platform does not report have a median local SNR
+    of 0.7 and NONE of the 37 reaches 10 -- they are quaternary carbons with no NOE
+    and too few scans, and there is nothing at their positions to find. A recall
+    figure that counts them scores the acquisition, not the detector, and it was
+    twice called under-detection before anyone measured it.
+
+    Report recall over the carbons that ARE present alongside the raw figure, and
+    say which is which.
+    """
+
+    centred = signal - float(np.median(signal))
+    mad = 1.4826 * float(np.median(np.abs(centred - float(np.median(centred)))))
+    if not np.isfinite(mad) or mad <= 0.0:
+        return [float("nan")] * len(positions_ppm)
+    out: list[float] = []
+    for position in positions_ppm:
+        mask = np.abs(ppm_axis - position) <= half_window_ppm
+        out.append(float(np.max(centred[mask])) / mad if mask.any() else float("nan"))
+    return out

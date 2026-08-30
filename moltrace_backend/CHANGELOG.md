@@ -272,6 +272,91 @@ untouched.
 
 ---
 
+## v0.74.7 — The same guard, on the reader that actually takes uploads (2026-08-30)
+
+`22d7b8c` stopped the desktop reader from reading a cut-short Bruker parameter file
+forever. **It was applied to one of the two readers.** `nmrcheck.fid`, the one behind
+the upload routes, still called `ng.bruker.read` unguarded at two places — and both
+sit inside `try/except Exception`, which is exactly what made them look safe.
+nmrglue's `parse_jcamp_line` reads an array parameter with `while len(value) < num`;
+at EOF `readline()` returns `''` and `''.split()` is `[]`, so the loop cannot
+advance. **A `try` cannot catch a loop.**
+
+Measured through `process_bruker_1d_zip` itself, the entry point
+`raw_fid_archive_preview` and `raw_fid_archive_process` call: an archive whose
+`acqus` was truncated to 90% **never returned**, while 40/50/60/70/100% completed in
+about six seconds.
+
+Severity, stated exactly rather than alarmingly: those handlers are `def`, not
+`async def`, so FastAPI runs them in the threadpool. Unlike the desktop service —
+where the same read sat on the event loop and one bad file wedged everything while
+the status box stayed green — this does not stop the process. It permanently
+consumes one threadpool worker per bad upload, against a bounded pool.
+
+The check is **imported, not reimplemented**: it belongs to nmrglue's file format
+rather than to either reader, and a duplicate would drift on a defect whose whole
+character is that it is data-dependent. It runs BEFORE the call and OUTSIDE the
+surrounding `except`, which would otherwise have turned a named refusal into a
+silent fallback to the in-house parser.
+
+The guard test constructs its truncation rather than sampling one. Cutting at a
+fraction only hangs when the cut lands inside an array parameter's values — 90% hung
+on one fixture while the same 90% was fine on another, which is how this defect was
+once called refuted on the strength of a single offset that happened to work.
+Cutting immediately after an array parameter's `(0..N)` header removes every value
+it declares, so the count can never be satisfied: verified to hang on **5 of 5**
+Bruker acquisitions in this repository before the guard. A control case pins that an
+untouched archive still processes, so a guard that refused everything would fail.
+
+---
+
+## v0.74.6 — An assumed route may not decide a pass (2026-08-30)
+
+Two ICH Q3D route defects in the elemental-impurity assessment, both ending in a
+record that said "within limits" where the guidance supports no such conclusion.
+Found by following up the Q3C route work in v0.74.5 into its sibling engine.
+
+**An undeclared route silently took the most permissive limit.** `route =
+dossier.route or "oral"` defaulted the route and wrote it onto the assessment, so
+an undeclared route was indistinguishable from a declared one. Measured across the
+encoded table: oral is the most permissive route for **all 24** elements, and the
+PDE differs across routes for **22** of them — nickel 200 µg/day oral against 5
+inhalation, mercury 30 against 1.
+
+The default is kept; withholding the assessment outright would be worse than
+performing it. What changed is that the record now says the route was assumed, and
+no verdict is asserted where the assumption could have produced it.
+
+Only a *pass* can be decided by the assumption. Oral being the maximum PDE and
+permitted concentration monotonic in it, a level at or above the oral limit is at or
+above every other route's limit, so an exceedance holds whatever the real route is.
+An earlier draft withheld the verdict on observation alone and so downgraded a
+confirmed exceedance to "undetermined" — the safety direction inverted, and neither
+of its two tests caught it because both used levels that pass under oral. That case
+is now pinned by its own test.
+
+Whether the assumption is load-bearing is read from the guidance table rather than
+applied as one blanket policy: lead is 5 µg/day on all three encoded routes and
+thallium 8, so for those two the verdict still stands.
+
+**A declared route with no encoded limit reported a pass.** Pre-existing, same
+class, and the worse of the two. Q3D(R2)'s cutaneous appendix is deliberately not
+encoded, so `get_element_pde` returns `route_data_available = False` with no PDE.
+With a dose recorded, the permitted-concentration branch was skipped for want of
+route data and the missing-dose branch could not fire — no warning, and
+`threshold_triggered` kept its initialiser. Measured before the fix: **10,000 ppm
+nickel on a cutaneous dossier was stored as within limits.** A measured level with
+no limit to measure it against is now undetermined, never a pass.
+
+Both withheld verdicts set `review_required`, because existing readers flag a row on
+`threshold_triggered is True OR review_required is True` and a withheld verdict
+leaving both unset would render as nothing to see.
+
+The inverted safety direction was caught by an adversarial review of the first
+version of this fix, not by the tests written for it.
+
+---
+
 ## v0.74.5 — Three regulatory residuals: two were real, one was not the one claimed (2026-08-30)
 
 Three items carried over from the Prompt 5 audit. Each was put through an

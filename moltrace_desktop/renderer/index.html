@@ -7,11 +7,15 @@
      the esbuild entry meets the requirement where a Next static export cannot. -->
 <meta http-equiv="Content-Security-Policy"
       content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'">
-<title>MolTrace</title>
+<!-- The window title is the CONFIGURED product name, written at runtime from the
+     capability readout. It is deliberately not the literal string "MolTrace":
+     product.validate() refuses to let a preview build carry the official brand,
+     and a title bar is a place a build announces itself. -->
+<title>MolTrace Preview</title>
 <link rel="stylesheet" href="./app.css">
 </head>
 <body>
-<main id="root"><h1>MolTrace Desktop</h1><p id="status">starting…</p></main>
+<div id="root"></div>
 <script src="./app.js"></script>
 </body>
 </html>

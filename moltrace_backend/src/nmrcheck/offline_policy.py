@@ -57,6 +57,14 @@ POLICY: dict[str, str] = {
     # fid.process and for the same reason: the bytes are already here, the
     # computation is deterministic, and nothing about it needs a server.
     "fid.open": "offline-compute",
+    # Checking a proposed structure against the spectrum already on this computer.
+    # Same class as `fid.open` and for the same reasons: the bytes are here, the
+    # user types the candidate, and `verify_structure` is deterministic -- it is
+    # the platform's stated sole arbiter of correctness, not a model call. What it
+    # is NOT offline is well-predicted: with no NMRNet it falls back to HOSE codes
+    # against a seed knowledge base, and says so in its own warnings. That is a
+    # quality caveat the result carries, not a reason to withhold the operation.
+    "structure.verify": "offline-compute",
     # Signing is server-authoritative — identity, step-up and record binding all
     # live there, and §6.5 refuses offline signing in every profile.
     "signature.create": "online-only",
