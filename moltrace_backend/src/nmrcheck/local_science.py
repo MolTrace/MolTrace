@@ -184,6 +184,171 @@ _DEVELOPER_WORDS = re.compile(
 )
 
 
+def _library_reference(raw: str) -> str:
+    """The library record's own locator, as a citation rather than a field dump.
+
+    Measured over the shipped library: 97% of records carry a DOI and 3% a
+    database id, both written the way the NMReDATA block stores them --
+    "Doi=10.18716/nmrshiftdb2/2151", "DB_ID=76532". Rendered raw under a column
+    headed "Reference" that reads as noise, which is the complaint the column was
+    already supposed to have fixed; the earlier fix moved SMILES into its own
+    column and left this one exactly as it was.
+
+    Both forms ARE useful -- a DOI resolves and a record id is looked up. The
+    problem was the presentation, so nothing is dropped and nothing is invented.
+    """
+    text = (raw or "").rstrip(chr(92)).strip()
+    if not text:
+        return "no reference recorded"
+    lowered = text.lower()
+    if lowered.startswith("doi="):
+        return "doi:" + text[4:].strip()
+    if lowered.startswith("db_id="):
+        return "NMRShiftDB2 record " + text[6:].strip()
+    return text
+
+
+def _test_finding(name: str, applicable: bool, score: float, significance: float) -> str:
+    """What one test found, for a chemist, from the structured fields.
+
+    The engine's `diagnostic` is written for whoever is debugging the engine:
+    "Assigned 3/3 predicted 1H resonances (merit 0.44, multiplicity consistency
+    0.83); unexplained integral 63% -> significance 0.0 (low); scaled by flat
+    prior." Rendered unedited in a column headed "What it found", it asks a
+    chemist to read `merit`, a significance on an unstated scale, and an arrow.
+
+    Structured-first with the raw text kept as an escape hatch, which is the
+    pattern this platform already uses for machine-written prose.
+
+    `score` IS A SIGNED FIT QUALITY IN -1..+1, NOT A FRACTION OF SIGNALS
+    (`scorer.py:320`). The first version of this function read it as a fraction
+    because `prediction_bounds` returned 0.667 on the acquisition it was written
+    against and the diagnostic beside it said "2/3" -- a coincidence. On the very
+    same verdict `assignments` scores **-0.129**, which that reading rendered as
+    "0% of the measured signals could be assigned to an atom" while the engine's
+    own line said it had assigned 3 of 3. A negative number clamped into a
+    percentage is not a rounding error, it is a different claim. So this reports
+    DIRECTION and STRENGTH, which is what the field holds.
+    """
+    if not applicable:
+        needs = {
+            "hsqc_2d_ranges": "This needs a 2-D spectrum, and none was supplied.",
+            "ms_molecule_match": "This needs mass-spectrometry peaks, and none were supplied.",
+        }
+        return needs.get(name, "This test had no data to work with, so it did not run.")
+
+    value = max(-1.0, min(1.0, float(score)))
+    if value >= 0.5:
+        direction = "agrees closely with that structure"
+    elif value >= 0.15:
+        direction = "agrees with that structure"
+    elif value > -0.15:
+        direction = "neither agrees nor disagrees"
+    elif value > -0.5:
+        direction = "disagrees with that structure"
+    else:
+        direction = "disagrees strongly with that structure"
+
+    # Significance is the weight this test carried into the verdict. A test can
+    # point one way and still move nothing, and saying so is the difference
+    # between a reader trusting the arrow and trusting the verdict.
+    if significance <= 0.0:
+        return f"What this measures {direction}, but on evidence too weak to move the verdict."
+    weight = "strong" if significance >= 3.0 else "moderate" if significance >= 1.0 else "weak"
+    return f"What this measures {direction} ({weight} evidence)."
+
+
+def _verdict_summary(verdict: str, tests: list[dict], nucleus: str) -> str:
+    """The verdict in a sentence, replacing the engine's diagnostic line.
+
+    Was "INCONCLUSIVE: posterior confidence 0.66 from prior 0.50 using 2/4
+    applicable test(s) on the 1H spectrum." -- `posterior`, `prior`, and a count
+    of "applicable test(s)". The confidence and its starting point are already
+    rendered directly above this line, so the only thing it added was how many
+    tests had data, which is worth saying in words.
+    """
+    ran = sum(1 for t in tests if t.get("applicable"))
+    total = len(tests)
+    word = {
+        "CONSISTENT": "This spectrum is consistent with that structure",
+        "INCONCLUSIVE": "This spectrum neither supports nor rules out that structure",
+        "INCONSISTENT": "This spectrum is not consistent with that structure",
+    }.get(str(verdict).upper(), f"Result: {str(verdict).replace('_', ' ').lower()}")
+    if ran == 0:
+        return f"{word}. None of the {total} checks had the data they need to run."
+    tail = (
+        f"{ran} of the {total} checks had the data to run"
+        if ran < total
+        else f"all {total} checks had the data to run"
+    )
+    return f"{word}, on its {nucleus} signals. {tail[0].upper()}{tail[1:]}."
+
+
+def _predictor_note(warnings: list[str], knowledge: dict) -> str | None:
+    """How the shifts were predicted, in terms of prediction QUALITY.
+
+    The engine's own warning is a Python packaging fact -- "NMRNet unavailable
+    (PyTorch is not installed (No module named 'torch')); using HOSE-code
+    fallback." -- and it was rendered verbatim under a heading that promises to
+    say something about prediction quality. It says nothing of the kind: it names
+    a module the reader cannot install, a model they have never heard of, and an
+    algorithm, and on a full-coverage prediction it is the ENTIRE body of the
+    alert because the coverage line is only emitted when some atoms fall back to
+    the element prior.
+
+    It also fires on EVERY check in a packaged build -- the frozen service does
+    not carry PyTorch and never will -- so as written it is an amber block that
+    is always on, which is the one thing this interface says caveats must not be.
+
+    So: say what was actually used and how much evidence stands behind it. That
+    is a fact about prediction quality, it varies with the build, and it is
+    checkable by the reader against the knowledge-base line beside it.
+    """
+    if not any("NMRNet unavailable" in w for w in warnings):
+        return None
+    count = int(knowledge.get("reference_count") or 0)
+    if knowledge.get("source") == "nmrshiftdb2" and count:
+        return (
+            "Shifts here were predicted by matching each atom's local environment against "
+            f"{count:,} measured reference shifts, rather than by this platform's neural "
+            "predictor, which is not part of an offline build. Environments with close "
+            "matches predict well; unusual ones fall back to a broad element average."
+        )
+    return (
+        "Shifts here were predicted from a small built-in reference table rather than this "
+        "platform's neural predictor, which is not part of an offline build. Treat the "
+        "predicted shifts as indicative only."
+    )
+
+
+def _rejected_processed_reason(error: Exception) -> str:
+    """Why the STORED spectrum was passed over, as one sentence a chemist can read.
+
+    Not `_readable_refusal`. That one answers "why could this acquisition not be
+    opened at all", and its fallback sentence says the acquisition holds neither a
+    processed spectrum nor a readable FID. Reached from here that is FALSE and
+    self-contradicting: this branch runs only when the FID *did* read, and the
+    sentence it lands in already says a spectrum was computed from it. Shipped
+    that way in the commit that fixed the path leak -- the sanitiser was correct
+    and the caller was wrong, which is the half-applied-guard shape again.
+
+    ENGINE PROSE IS NEVER PASSED THROUGH HERE, on purpose. The reader builds these
+    messages for a developer: they embed the pdata directory, the array shape and
+    the parsing library, and none of that is actionable to a chemist. Sanitising
+    such a string is also weaker than it looks -- the path guard replaces the
+    acquisition's own path, but the reader names a SUBpath (`<source>/pdata/1`)
+    that never equals it, so what actually caught the leak was the developer-word
+    filter, and `nmrglue` is not one of its words. Classifying on the reader's
+    stable phrasing and writing our own sentence cannot leak by construction.
+    """
+    text = str(error).lower()
+    if "2d processed data" in text or "does not hold a 1d" in text:
+        return "The spectrum stored with it is two-dimensional, which this cannot use."
+    if "too few points" in text or "truncated" in text or "incomplete" in text:
+        return "The spectrum stored with it is incomplete."
+    return "The spectrum stored with it could not be read."
+
+
 def _readable_refusal(error: Exception, source: Path) -> str:
     """Why it could not be opened, without naming the machinery or the path."""
     text = str(error).replace(str(source), source.name)
@@ -354,14 +519,20 @@ def verify_candidate(path: str | Path, smiles: str) -> dict:
     # The coverage line is the one that decides whether any of this is worth
     # reading, so it is pulled out rather than left as the last of nine.
     coverage = next((w for w in warnings if w.startswith("Coverage:")), None)
-    predictor = next((w for w in warnings if "NMRNet unavailable" in w), None)
+    predictor = _predictor_note(warnings, knowledge)
 
     return {
         "smiles": candidate,
         "verdict": str(result.verdict),
         "confidence": float(result.posterior_confidence),
         "prior": float(result.prior_confidence),
-        "summary": str(result.diagnostic),
+        "summary": _verdict_summary(
+            str(result.verdict),
+            [{"applicable": bool(t.applicable)} for t in result.test_results],
+            str(spectrum.nucleus),
+        ),
+        # Same escape-hatch rule as each test's own line.
+        "summary_diagnostic": str(result.diagnostic),
         "tests": [
             {
                 "name": t.name,
@@ -370,6 +541,13 @@ def verify_candidate(path: str | Path, smiles: str) -> dict:
                 "score": float(t.score),
                 "significance": float(t.significance),
                 "quality": float(t.quality),
+                # What the reader sees, built from the fields above.
+                "finding": _test_finding(
+                    t.name, bool(t.applicable), float(t.score), float(t.significance)
+                ),
+                # The engine's own words, kept as the escape hatch behind a
+                # disclosure rather than deleted -- whoever wants them can have
+                # them, and nobody has to read `merit` to use the column.
                 "diagnostic": str(t.diagnostic),
             }
             for t in result.test_results
@@ -592,10 +770,43 @@ def rank_candidates(path: str | Path, smiles_list: Sequence[str]) -> dict:
             _margins.append(float(_ordered[0] - _ordered[1]) if len(_ordered) > 1 else 1.0)
 
     _leader_changed = bool(_leaders) and len(set(_leaders)) > 1
+
+    # A MARGIN OF 1.0 IS NOT A ROBUST ORDERING, it is the absence of a contest.
+    # DP4 gives a candidate that matched no observed peak a share of exactly 0,
+    # so when only one candidate matches anything the top-two margin is 1.0 at
+    # every resample -- perfectly "stable", and the screen turned that into
+    # "the leader stayed ahead by at least 100.0 points". Measured on this
+    # corpus: a winner matching ONE line of two, against two candidates matching
+    # none, reported as a maximal margin.
+    #
+    # Resampling cannot rescue this. It perturbs the observed shifts, and a
+    # candidate with no matching line has nothing to perturb, so the gap is
+    # structural rather than evidential. Counted here, and reported separately
+    # from a genuine near-tie because they call for opposite readings: a tie
+    # means the evidence does not choose, this means there was no comparison.
+    _scoreable = sum(1 for score in scores if int(score.matched_peaks) > 0)
+    _no_contest = _scoreable < 2
+
     separation = {
+        # WHY it could not be checked, so the renderer can say so. When the file
+        # states no frequency, `resolution_hz` and the ppm uncertainty derived
+        # from it are both 0, no resample runs, and `checked` is false -- and both
+        # render branches tested `checked`, so the page fell silent about the one
+        # thing this section exists to say. Silence after a ranking reads as "it
+        # held", which is the opposite of what is known.
         "checked": bool(_margins),
-        "separated": bool(_margins) and min(_margins) > 0.0 and not _leader_changed,
+        "unchecked_reason": (
+            None
+            if _margins
+            else "this acquisition does not state its frequency, so the shift uncertainty "
+            "that the check resamples within cannot be derived from it"
+        ),
+        "separated": (
+            bool(_margins) and min(_margins) > 0.0 and not _leader_changed and not _no_contest
+        ),
         "leader_changed": _leader_changed,
+        "comparable_candidates": _scoreable,
+        "no_contest": _no_contest,
         "narrowest_margin": min(_margins) if _margins else None,
         "resamples": _resamples if _margins else 0,
         "shift_uncertainty_ppm": _sigma_ppm if _margins else None,
@@ -798,9 +1009,8 @@ def find_similar_spectra(path: str | Path, limit: int = 5) -> dict:
         "matches": [
             {
                 "smiles": pool[i].get("s") or "",
-                # The library's own record id, trimmed: the raw field carries a
-                # trailing escape from the NMReDATA block and reads as noise.
-                "name": (pool[i].get("n") or "").rstrip(chr(92)).strip(),
+                # A citation the reader can follow, not the raw NMReDATA field.
+                "name": _library_reference(pool[i].get("n") or ""),
                 # L2 DISTANCE, and named as one. `exact_knn` and the platform's
                 # own `vector_similarity` both return a distance where LOWER is
                 # closer, so calling it "similarity" would read backwards to
@@ -1101,7 +1311,7 @@ def open_spectrum(path: str) -> dict:
             # and all, inside the caveat block. A filename carries a compound name
             # into a screenshot, which is the whole reason no path is shown
             # anywhere else -- and the same string named `nmrglue` to a chemist.
-            rejected = _readable_refusal(refused, source)
+            rejected = _rejected_processed_reason(refused)
         try:
             spectrum = read_fid(source)
             processing = "moltrace"
@@ -1246,8 +1456,16 @@ def open_spectrum(path: str) -> dict:
         # the numbers without them. §7.1's readout rule in miniature: the limits
         # travel with the result.
         "limits": [
-            "Shifts, multiplicities and couplings are measured from this spectrum alone. "
-            "Nothing here has been checked against a proposed structure.",
+            # SCOPED TO THIS TABLE, because "nothing here" stopped being true.
+            # This line was written when the desktop only measured a spectrum, and
+            # it is rendered at the foot of a page that now also checks structures
+            # and ranks them -- so read literally it told a chemist no structure
+            # had been checked immediately after they had checked two. The claim
+            # itself is still correct about the numbers it travels with; only its
+            # scope was wrong, so it names them instead of the page.
+            "Shifts, multiplicities and couplings in this table are measured from this "
+            "spectrum alone, with no structure assumed \u2014 they do not change when a "
+            "structure is checked above.",
             # NAMES WHAT WAS ACTUALLY DIVIDED BY. This said "relative to the whole
             # spectrum", which is not the denominator: `total_area` is the sum of the
             # fitted peak areas, measured across the 22 acquisitions at 0.042x to
