@@ -13,7 +13,7 @@ from dataclasses import dataclass, field, replace
 from typing import Any, Literal
 
 import numpy as np
-from scipy.signal import find_peaks, peak_widths
+from scipy.signal import find_peaks, peak_prominences, peak_widths
 
 from moltrace.spectroscopy.io.fid_reader import NMRSpectrum
 
@@ -584,7 +584,37 @@ def _initial_peak_indices(
         )
     if indices.size == 0:
         return indices, np.asarray([], dtype=float), properties
-    widths = peak_widths(smoothed, indices, rel_height=0.5)[0]
+    # HALF OF ITS OWN HEIGHT, which is what a half-height width means.
+    #
+    # `peak_widths(rel_height=0.5)` measures at `height - 0.5 * prominence`,
+    # and
+    # scipy computes prominence by walking outward to the lowest point before a
+    # higher peak -- unbounded, so on a trace with negative excursions it reaches a
+    # trough far away and far below the baseline. Measured over this corpus: the
+    # prominence EXCEEDS the peak's own height above the baseline for 734 of 856
+    # peaks (85.7%), so the contour being measured at sits below the baseline and
+    # the walk runs until the trace happens to fall that low.
+    #
+    # One 13C peak of height 1.94e8 carried a prominence of 9.59e8 -- 4.9x its own
+    # height -- and seeded a width of 8871.9 Hz, a quarter of the sweep. That seed
+    # then sizes the fit window (`_local_fit_bounds` is ~4x it), so a broad seed
+    # buys a broad window and a broad fit is legal inside it. This is upstream of
+    # the fitted linewidth, which is why bounding the fit did not move it.
+    #
+    # Clamping the prominence to the height above the baseline makes rel_height
+    # 0.5 evaluate at `baseline + 0.5 * (height - baseline)` -- the definition.
+    # Corpus seed widths: p50 1.0 -> 0.8 Hz, p90 9.1 -> 4.2, p99 840.9 -> 85.2,
+    # max 8871.9 -> 182.3. The median barely moves; only the tail collapses.
+    baseline = float(np.nanmedian(smoothed))
+    prominences, left_bases, right_bases = peak_prominences(smoothed, indices)
+    height_above_baseline = np.maximum(smoothed[indices] - baseline, 1e-12)
+    prominences = np.minimum(prominences, height_above_baseline)
+    widths = peak_widths(
+        smoothed,
+        indices,
+        rel_height=0.5,
+        prominence_data=(prominences, left_bases, right_bases),
+    )[0]
     return indices.astype(int), np.asarray(widths, dtype=float), properties
 
 
