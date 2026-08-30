@@ -341,6 +341,18 @@ def verify_candidate(path: str | Path, smiles: str) -> dict:
             }
             for t in result.test_results
         ],
+        # NOT A SCORE TO COMPARE CANDIDATES WITH, and this is measured rather than
+        # cautious. On the ethylene glycol acquisition in this repository, checked
+        # against four structures: ethylene glycol itself came back 0.556 and
+        # ETHANOL came back 0.623 -- the wrong molecule outranked the right one,
+        # with aspirin at 0.542 close behind. The engine is not at fault; it
+        # returns "inconclusive" for all four, which is correct. What cannot carry
+        # the weight is the prediction underneath, at a 35 ppm median uncertainty.
+        #
+        # So the desktop states this on every result rather than offering a ranked
+        # candidate list. A list would put the wrong molecule first and look
+        # exactly like a list that had put the right one first.
+        "comparable_between_candidates": False,
         "prediction_coverage": coverage,
         "predictor_note": predictor,
         "warnings": warnings,
