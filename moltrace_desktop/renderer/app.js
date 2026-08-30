@@ -139,6 +139,9 @@
     candidate: '',
     verdicts: [],
     ranking: null,
+    similar: null,
+    similarError: null,
+    similarBusy: false,
     ranking_error: null,
     rankingBusy: false,
     verdictError: null,
@@ -459,8 +462,9 @@
     page.append(results)
 
     page.append(structureSection())
-    const ranking = rankingSection()
-    if (ranking) page.append(ranking)
+    page.append(rankingSection())
+    const similar = similarSection()
+    if (similar) page.append(similar)
 
     if (quantifiable.length) {
       const c = card(null, null, 'var(--mt-teal)')
@@ -617,9 +621,25 @@
   // under Smith & Goodman's error model. Two methods agreeing is worth more than
   // either alone, and two disagreeing is worth knowing.
   function rankingSection() {
-    if (state.verdicts.length < 2) return null
     const c = card('Rank these candidates by shift agreement', null, 'var(--mt-teal)')
     c.insertBefore(eyebrow('Step 4 \u00b7 Candidate ranking'), c.firstChild)
+
+    // SHOWN EVEN WHEN IT CANNOT RUN, because hiding it made the page jump from
+    // Step 3 to Step 5 and a numbered sequence with a hole in it reads as broken
+    // -- the first question it drew was "what happened to 4?", which is a
+    // question the page should have answered itself.
+    //
+    // The explanation is the real one: DP4 normalises across the candidates
+    // supplied and its shares sum to one, so a ranking of one structure is 100%
+    // and says nothing.
+    if (state.verdicts.length < 2) {
+      c.append(node('p', 'card__desc',
+        'Ranking compares candidates against each other, so it needs at least two. '
+        + (state.verdicts.length === 1
+          ? 'Check a second structure above and this will rank them.'
+          : 'Check two or more structures above and this will rank them.')))
+      return c
+    }
 
     const go = node('button', 'btn btn--secondary rank__run')
     go.type = 'button'
@@ -649,15 +669,19 @@
     const tb = node('tbody')
     r.rows.forEach((row, i) => {
       const tr = node('tr')
+      const structure = node('td', 'rank__smiles', row.smiles)
+      structure.title = row.smiles
       const cells = [
         String(i + 1),
-        row.smiles,
+        structure,
         (row.probability * 100).toFixed(1) + '%',
         row.matched_peaks + ' of ' + row.observed_peaks + (row.low_coverage ? ' \u00b7 low' : ''),
         row.mean_abs_error_ppm.toFixed(2),
         row.rms_error_ppm.toFixed(2),
       ]
-      for (const cell of cells) tr.append(node('td', null, cell))
+      for (const cell of cells) {
+        tr.append(typeof cell === 'string' ? node('td', null, cell) : cell)
+      }
       tb.append(tr)
     })
     table.append(tb)
@@ -680,6 +704,81 @@
       state.ranking_error = (e && e.message) || 'these could not be ranked'
     } finally {
       state.rankingBusy = false; render()
+    }
+  }
+
+  // A LOOKUP, NEVER AN IDENTIFICATION. Measured on the shipped library with the
+  // compound present and the nucleus matched: first 48% of the time, inside the
+  // top five 63%. That is a lead worth following and is not an answer, so the
+  // rate is printed with the results rather than kept in a docstring.
+  function similarSection() {
+    if (!state.spectrum) return null
+    const c = card('Reference spectra that look like this one', null, 'var(--mt-cyan)')
+    c.insertBefore(eyebrow('Step 5 \u00b7 Library lookup'), c.firstChild)
+
+    const go = node('button', 'btn btn--secondary similar__run')
+    go.type = 'button'
+    go.append(document.createTextNode(state.similarBusy ? 'Searching\u2026' : 'Find similar spectra'))
+    go.disabled = state.similarBusy || !(state.service && state.service.running)
+    go.addEventListener('click', findSimilar)
+    c.append(go)
+
+    if (state.similarError) c.append(alert('warn', 'No lookup was made', state.similarError))
+
+    const r = state.similar
+    if (!r) return c
+
+    const a = r.accuracy || {}
+    c.append(alert('info', 'What this is, and how often it has been right',
+      'The closest of ' + r.library_size.toLocaleString() + ' reference ' + r.nucleus
+      + ' spectra shipped with this build. Measured leave-one-out on that library: when the '
+      + 'compound is present it came back first ' + Math.round(100 * (a.first || 0) / (a.of || 1))
+      + '% of the time and inside the top five ' + Math.round(100 * (a.top5 || 0) / (a.of || 1))
+      + '%. A lead to follow, not an identification \u2014 and a compound absent from the '
+      + 'library will still return its five nearest neighbours.'))
+
+    const table = node('table', 'peaks similar__table')
+    const thead = node('thead'); const hr = node('tr')
+    for (const label of ['#', 'Structure', 'Reference', 'Distance', 'Lines'])
+      hr.append(node('th', null, label))
+    thead.append(hr); table.append(thead)
+    const tb = node('tbody')
+    r.matches.forEach((m, i) => {
+      const tr = node('tr')
+      // THE STRUCTURE FIRST. This showed the library's own record id -- reading
+      // "DB_ID=20181476" to a chemist tells them nothing about what was matched.
+      // The SMILES carry explicit hydrogens and run long, so the cell is clipped
+      // and the whole string is on the element for a reader who wants it.
+      const structure = node('td', 'similar__smiles', m.smiles)
+      structure.title = m.smiles
+      tr.append(node('td', null, String(i + 1)))
+      tr.append(structure)
+      tr.append(node('td', null, m.name || '\u2014'))
+      // DISTANCE, and the header says so: L2 in the encoding, where lower is
+      // closer. Printing it as a similarity would read backwards.
+      tr.append(node('td', null, m.distance.toFixed(3)))
+      tr.append(node('td', null, String(m.reference_peaks)))
+      tb.append(tr)
+    })
+    table.append(tb)
+    c.append(table)
+    c.append(node('p', 'tablenote',
+      'Lower distance is closer. Reference spectra from ' + (r.library_source || 'the shipped library')
+      + (r.library_license ? ', ' + r.library_license : '') + '.'))
+    return c
+  }
+
+  async function findSimilar() {
+    state.similarBusy = true; state.similarError = null; render()
+    try {
+      const out = await window.moltrace.analysis.findSimilar()
+      if (out && out.ok) { state.similar = out.result }
+      else { state.similar = null; state.similarError = (out && out.reason) || 'no lookup could be made' }
+    } catch (e) {
+      state.similar = null
+      state.similarError = (e && e.message) || 'no lookup could be made'
+    } finally {
+      state.similarBusy = false; render()
     }
   }
 
@@ -716,7 +815,7 @@
       if (out && out.ok) {
         state.spectrum = out.summary
         // A verdict belongs to the spectrum it was computed against.
-        state.verdicts = []; state.verdictError = null; state.ranking = null
+        state.verdicts = []; state.verdictError = null; state.ranking = null; state.similar = null
       }
       else if (out && !out.cancelled) { state.error = out.reason || 'that spectrum could not be read' }
     } catch (e) {

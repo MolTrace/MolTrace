@@ -42,11 +42,21 @@ const KNOWLEDGE_BASE = path.join(
   require('node:os').homedir(), '.cache', 'moltrace', 'nmrnet', 'hose_index.json.gz',
 )
 
+// The reference spectra the library lookup searches. 1.5 MB gzipped for 43,516
+// records, shipped as SHIFT LISTS rather than encoded vectors: 45 MB of float32
+// would be thirty times the size, and an index cannot detect that the encoder
+// changed underneath it while source shifts re-encode correctly whatever it does
+// next. Encoded lazily at first lookup, in about a second.
+const SPECTRUM_LIBRARY = path.join(
+  require('node:os').homedir(), '.cache', 'moltrace', 'nmrnet', 'spectrum_library.json.gz',
+)
+
 const REFREEZE_COMMAND =
   '    uv run --with pyinstaller pyinstaller --noconfirm --onedir --name moltrace-local-service \\\n'
   + '      --distpath dist --workpath build/pyi --specpath build/pyi \\\n'
   + '      --collect-submodules nmrcheck --collect-submodules moltrace \\\n'
   + '      --add-data "' + KNOWLEDGE_BASE + ':." \\\n'
+  + '      --add-data "' + SPECTRUM_LIBRARY + ':." \\\n'
   // The licence travels WITH the data it covers. A CC BY-SA table redistributed
   // without its attribution is the obligation broken, and a NOTICE that lives
   // only in the source repository does not reach whoever holds the artifact.
@@ -314,9 +324,11 @@ async function main() {
   // The attribution must be inside the artifact, not only in the repository: the
   // table is CC BY-SA and the person holding the build is the one who needs the
   // licence terms.
-  if (frozenKb && !fs.existsSync(path.join(FROZEN_SERVICE, '_internal', 'NOTICE'))) {
+  const frozenLibrary = fs.existsSync(path.join(FROZEN_SERVICE, '_internal', 'spectrum_library.json.gz'))
+  if ((frozenKb || frozenLibrary) && !fs.existsSync(path.join(FROZEN_SERVICE, '_internal', 'NOTICE'))) {
     refuse(
-      'the frozen service carries the NMRShiftDB2-derived prediction table but not the\n'
+      'the frozen service carries NMRShiftDB2-derived data -- the prediction table, the\n'
+      + '  reference spectrum library, or both -- but not the\n'
       + '  NOTICE that licenses it. That table is CC BY-SA and redistributing it without\n'
       + '  its attribution breaks the obligation. Re-freeze with the NOTICE:\n'
       + REFREEZE_COMMAND,
