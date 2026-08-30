@@ -28,14 +28,24 @@ from moltrace.spectroscopy.eval.curated_shifts import (
 from moltrace.spectroscopy.io.fid_reader import read_fid, read_processed_spectrum
 from moltrace.spectroscopy.peaks.gsd import gsd_peak_pick
 
-#: Measured. Before the fit-drift fix this corpus scored 50 of 92 assigned carbons
-#: with 254 unassigned lines; after it, 53 of 92 with 252. Pinned at the measured
-#: value so a regression is a failure and an improvement is a visible re-baseline.
-EXPECTED_CARBONS_FOUND = 53
+#: Measured, and re-baselined twice, both times visibly:
+#:
+#:     baseline                       carbons  lines  unassigned
+#:     before the fit-drift fix        50/92     348         254
+#:     after it                        53/92     348         252
+#:     after the sqrt(2 ln N) floor    52/92     184          96
+#:
+#: THE FLOOR COSTS ONE CARBON AND REMOVES 156 UNASSIGNED LINES. The carbon is
+#: 130.3 ppm of 60000006, and its apex there stands at 3.6x MAD -- below the 10x
+#: quantitation floor this platform draws everywhere else, and below the 4.71
+#: sigma at which noise is EXPECTED to win somewhere in a 65,536-point spectrum.
+#: Reporting it was luck rather than detection, and a line that cannot be read as
+#: a number is not one a chemist loses anything by not seeing.
+EXPECTED_CARBONS_FOUND = 52
 TOTAL_ASSIGNED_CARBONS = 92
-#: Unassigned lines may not grow. The detector over-picks on this corpus already
-#: (348 lines for 92 carbons plus solvent); this pins that it does not get worse.
-MAX_UNASSIGNED_LINES = 252
+#: Unassigned lines may not grow. The detector still over-picks on this corpus
+#: (184 lines for 92 carbons plus solvent); this pins that it does not get worse.
+MAX_UNASSIGNED_LINES = 96
 
 
 def _acquisitions() -> list[tuple[str, Path, list[float]]]:

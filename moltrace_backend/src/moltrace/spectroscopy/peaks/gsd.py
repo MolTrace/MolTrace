@@ -533,6 +533,29 @@ def _initial_peak_indices(
     detection_noise = _detection_noise(smoothed, noise, normalised_nucleus)
 
     sensitivity = {1: 6.0, 2: 4.5, 3: 3.5, 4: 3.0, 5: 2.5}[level]
+    # THE NUMBER OF CHANCES NOISE HAD. A threshold in units of sigma is a
+    # PER-POINT statement, and it was being applied at every one of up to 524,288
+    # points without accounting for how many opportunities that gives noise to
+    # clear it. The largest excursion in N samples of Gaussian noise sits near
+    # sqrt(2 ln N), so anything below that is a level at which noise is EXPECTED
+    # to win somewhere in the spectrum.
+    #
+    # Measured on pure noise containing no peaks at all, apexes returned by level:
+    #
+    #     N         sqrt(2 ln N)   L2    L3    L4    L5
+    #     65,536        4.71       19   292   300   305
+    #     262,144       5.00       71  1036  1091  1159
+    #
+    # and with this floor: 8/5/5/5 and 11/4/4/4. The deep levels were reporting
+    # over a thousand lines from a spectrum with nothing in it.
+    #
+    # It costs them nothing they were for. Levels 4-5 are documented as "lower
+    # detection thresholds AND wider group windows", and on planted multiplets the
+    # recall ladder is byte-identical with the floor in place -- 100% at 0.93
+    # linewidths for level 5 either way. Their resolving power comes from the
+    # deconvolution, not from a threshold sitting under the noise; lowering it
+    # bought noise and nothing else.
+    sensitivity = max(sensitivity, math.sqrt(2.0 * math.log(max(smoothed.size, 2))))
     prominence = max(
         detection_noise * sensitivity,
         dynamic * _dynamic_prominence_fraction(level, normalised_nucleus),

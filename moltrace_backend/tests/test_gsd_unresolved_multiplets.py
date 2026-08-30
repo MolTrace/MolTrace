@@ -31,6 +31,11 @@ already had, duplicated, priced in the one place every caller pays.
 The 1/3 at 0.31 linewidths is not a defect at any level. Three lines a third of a
 linewidth apart ARE one feature, and every level agreeing on that is the correct
 answer rather than a shared limitation.
+
+The broad-line cases at the foot of this file were the other direction -- a guard
+against manufacturing a splitting -- and one of them was red at level 5 until the
+detection threshold was floored at sqrt(2 ln N). The note there records what that
+turned out to be, which was not what it looked like.
 """
 
 from __future__ import annotations
@@ -149,31 +154,22 @@ def _one_broad_line(width_hz: float, field_mhz: float = 100.0) -> NMRSpectrum:
     return NMRSpectrum(data=y, ppm_axis=x, nucleus="13C", field_mhz=field_mhz)
 
 
-def _broad_line_case(width_hz: float, level: int) -> pytest.param:
-    #: LIVE DEFECT, and it is DETECTION rather than deconvolution. On a 400 Hz line
-    #: level 2 detects 1 apex and level 5 detects 8: the deep levels drop the
-    #: sensitivity from 4.5 to 2.5 sigma, which picks noise off a broad feature's
-    #: flat top, and the deconvolver then faithfully fits what it was handed. The
-    #: result is 6 lines spanning 92.5-107.5 ppm, and 15 ppm apart is not a
-    #: coupling. Reported rather than fixed here: it is a different defect from the
-    #: level ladder this file measures, and the acquisitions in this repository
-    #: carry fitted widths up to 8871 Hz, so it is reachable on real data.
-    if level == 5 and width_hz == 400.0:
-        return pytest.param(
-            width_hz, level, marks=pytest.mark.xfail(strict=True, reason="deep-level over-picking on a broad feature")
-        )
-    return pytest.param(width_hz, level)
-
+#: WHAT THIS USED TO SAY WAS WRONG, and the correction is the whole finding. It was
+#: recorded as "deep-level over-picking on a broad feature" because a 400 Hz line
+#: came back as six lines at level 5. Measuring where the picks actually sat refuted
+#: that: density ON the broad feature was 0.12 apexes per ppm against 0.69 per ppm
+#: off it -- level 5 picked FEWER peaks on the pedestal than in the flat noise
+#: beside it. The six lines were the ordinary level-5 noise density passing through
+#: that window, and the broad line had nothing to do with it.
+#:
+#: The real defect was general: a threshold in units of sigma is a per-point
+#: statement, and it was applied at every one of up to 524,288 points. On pure noise
+#: with no peaks at all, level 5 returned 1,159 apexes. Flooring the multiplier at
+#: sqrt(2 ln N) took that to 4 and left the recall ladder byte-identical.
 
 @pytest.mark.slow
-@pytest.mark.parametrize(
-    ("width_hz", "level"),
-    [
-        _broad_line_case(width_hz, level)
-        for width_hz in (12.0, 60.0, 400.0)
-        for level in (2, 5)
-    ],
-)
+@pytest.mark.parametrize("width_hz", [12.0, 60.0, 400.0])
+@pytest.mark.parametrize("level", [2, 5])
 def test_a_single_broad_line_is_not_shattered_into_a_multiplet(
     width_hz: float, level: int
 ) -> None:
