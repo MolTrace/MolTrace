@@ -272,6 +272,97 @@ untouched.
 
 ---
 
+## v0.74.8 — The desktop's offline science told a chemist things that were not so (2026-08-30)
+
+Three features had just landed on the desktop's one offline surface — a structure check, a DP4
+candidate ranking, and a reference-library lookup — and an audit of what they put on screen
+returned eighteen defects. They share one shape: the numbers were computed correctly and then
+described wrongly.
+
+**A hit rate measured on a different task.** `_SIMILARITY_ACCURACY` told the reader the lookup
+returned the true compound first "48% of the time". That figure came from a clean leave-one-out
+— but **record against record**, a curated shift list querying the library. `find_similar_spectra`
+queries with the detected multiplet centres of a real acquisition: sparser and noisier, median 4
+peaks against 5, and one acquisition's 31 detected multiplets collapse to 7 query peaks.
+Re-measured at the operating point the function actually runs at, over every acquisition whose
+compound is in the searched pool: **3 of 15 first, 4 of 15 inside the top five**. The screen said
+roughly double. The old measurement was not sloppy — it was rigorous about the wrong operating
+point, which is the harder error to see, because a clean number still reads as evidence. The
+tell was in the constant's own note, which said "leave-one-out over *records*" beside a function
+that takes a path.
+
+The sibling constant was checked for the same defect and **survives**: measured through
+`rank_candidates` itself on real acquisitions, ¹³C 6/6 and ¹H 1/3 against a claimed 9/12 and 3/8,
+consistent at n=9. The first run of that harness said 1/6 and 0/3 — it mapped winners by position
+in a list `rank_candidates` **sorts before returning**.
+
+**A ranking that reported a stable order while the winner changed.** The separation check
+resampled the observed shifts and watched the margin between the top two. Sorting the shares
+discards *which* candidate holds each place, so two candidates trading first and second leave the
+margin untouched — **3 of 19 corpus cases do exactly that**. Reading `argmax` instead is not the
+fix; that was the previous version, and it called a perfect 50/50 tie stable, because ties break
+deterministically at index 0 and the leader never moves. Both are read now, and each half is
+proven red on its own.
+
+**And a maximal margin printed on no evidence.** DP4 scores a candidate that matched no observed
+peak at exactly zero, so when only one candidate matches anything the top-two margin is 1.0 at
+every resample and the interface read "the leader stayed ahead by at least 100.0 points".
+Measured here: a winner matching **one line of two**, against two candidates matching none. That
+is the absence of a contest, not a robust ordering, and `no_contest` now says so.
+
+**A refusal that printed the chemist's own filesystem path.** Every other refusal goes through
+the sanitiser; the processed-spectrum fallback took the reader's exception verbatim, and that
+exception names the directory it failed on. A corrupt `1r` under a folder named for the compound
+rendered the absolute path — folder name and all — inside the caveat block, and named nmrglue
+while it was there.
+
+**The commit that fixed that leak shipped a false sentence** — the third time here that a fix has
+carried the next defect. It routed the branch through `_readable_refusal`, whose safe fallback
+says the acquisition holds neither a processed spectrum nor a readable FID. That branch runs only
+when the FID *did* read, inside a sentence that already says a spectrum was computed from it. The
+sanitiser was right; the caller did not satisfy its precondition. Two things fell out of the
+repair: the path guard had only worked **by accident** (it replaces the acquisition's path, but
+the reader names a sub-path that never equals it, so what caught the leak was a developer-word
+filter that does not list `nmrglue`), and `read_processed_spectrum` raised **one message for two
+faults** — `ndim != 1 or size < 2` — so a 4-byte file, which squeezes to 0-d, was about to be
+described to a chemist as "two-dimensional". Those are now separate errors, so the reason a
+reader sees can be true.
+
+**Caveats that described the previous product.** Three places said "nothing here is checked
+against a proposed structure" on a page whose middle third does exactly that; a fourth said
+"every number below is a measurement, not an interpretation" above a confidence and a DP4 share.
+All were true when the desktop only measured a spectrum, and none was re-read when three
+model-backed steps were added between them. Worse, on a seed knowledge base the page warned that
+its confidence must never pick a winner between two structures — then **sorted the list by that
+number** and offered a ranked table below it, because the ranking card never read the knowledge
+base the service already returns beside its rows.
+
+Also: a raw `ImportError` was the entire body of the prediction-quality caveat on every check,
+since a frozen build never carries PyTorch; engine diagnostics (`merit 0.44`, `posterior
+confidence 0.66 from prior 0.50`) were rendered verbatim and are now structured-first with the
+engine's own words behind a disclosure; a refusal computed against one sample survived opening
+another and was attributed to it; keyboard focus was lost permanently because the restore read
+`activeElement` while the rebuilt button was `disabled`; "at 0.00 MHz" printed three rows above a
+field reading "not stated"; the stability check vanished silently when a file states no
+frequency; raw NMReDATA identifiers sat under a column headed *Reference*; "Applied: yes"
+described a test of exactly zero weight; three candidates produced nine caveat blocks; the trace
+marker measured **1.99:1** against the light plot surface — and since no single value clears 3:1
+in both themes, it is themed rather than re-picked; and the peak table's identifying column had
+an empty `<th>` with no table setting `scope`.
+
+One correction caught before it shipped: humanising the verdict, `TestResult.score` was read as a
+fraction of signals matched. It is a **signed fit quality in −1..+1** (`scorer.py:320`). That
+reading rendered "0% of the measured signals could be assigned" beside the engine's own
+"Assigned 3/3" — a negative number clamped into a percentage is a different claim, not a
+rounding error.
+
+`b29e004`, `a47c1cf`. Backend 42/42 including the slow guards; desktop 10 stages and 15
+round-trip assertions; all twelve behaviours re-verified against the **frozen artifact** over the
+fd-passed socket, because a byte grep on a PyInstaller bundle finds neither the new string nor
+the old one and proves nothing.
+
+---
+
 ## v0.74.7 — The same guard, on the reader that actually takes uploads (2026-08-30)
 
 `22d7b8c` stopped the desktop reader from reading a cut-short Bruker parameter file
