@@ -14,6 +14,62 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.74.5 — Three regulatory residuals: two were real, one was not the one claimed (2026-08-30)
+
+Three items carried over from the Prompt 5 audit. Each was put through an
+independent investigation and two adversarial refutation passes before any code
+changed, because roughly half of this program's audited items had already turned
+out to be true observations attached to conclusions their own adjacent rationale
+refuted. One of the three survived intact, one was refuted and replaced by the
+real defect sitting next to it, and one had a fix that would have been a
+regression.
+
+**The spectral Q3C limit did not say which limit it was.**
+`resolve_observed_impurity` reported `concentration_limit_ppm` unlabelled. That is
+the ICH Q3C **Option 1** constant (`PDE * 100`) — the limit at a 10 g/day
+*reference* dose, not the product's. Option 2 scales to the real dose
+(`PDE * 1000 / dose`), so the two differ by `dose / 10`: five times too permissive
+at 50 g/day, five times too strict at 2 g/day. The module's existing refusals are
+scoped to the numerator (no measured amount, therefore no verdict) and each one
+affirmatively warrants the limit as sound — the docstring reports "the applicable
+limit". The sibling dossier path had already fixed this and named the failure mode
+in a comment; this surface never inherited it.
+
+Labelled, never recomputed: no dose is reachable in this chain, and defaulting one
+would be exactly the guessed limit the module exists to refuse. `limit_basis` is
+derived from the persisted Q3C class so it cannot drift from it, and Class 1 is
+labelled separately — a fixed Appendix limit has no PDE to scale, so calling it
+Option 1 would be its own false statement.
+
+**A route the guideline does not cover was still given its limits.**
+`/regulatory/impurities/assess` declines a non-Q3C route and says so; the dossier
+path reached the same engine with no gate. Measured before the fix: acetonitrile on
+a *cutaneous* dossier returned `concentration_limit` 410.0 with the threshold
+triggered — a limit the sibling endpoint refuses for the same product.
+
+The claim this started from ("`_q3c_default` ignores `dossier.route`") was wrong
+about the mechanism. The encoded Q3C table is one PDE per solvent with no route
+dimension, so the route changes no number. Passing it through — the obvious fix —
+would have regressed: `_validate_route` raises outside the Q3C set,
+`_q3c_default` swallows exceptions, and the dossier vocabulary admits "cutaneous",
+so every cutaneous dossier would have silently lost its classification instead of
+being told why. A dossier with no declared route is deliberately not gated.
+
+**Knowledge search matched letters inside unrelated words.** `_matches` used a raw
+`token in text` substring test. Searching the regulatory corpus for "ICH" matched
+"wh**ich**", "enr**ich**ment" and "d**ich**loromethane" alongside the genuine
+citation. Tokens are now anchored to a word *start* rather than a whole word,
+because full word-boundary matching does not find "Q3A" when searching "Q3" — '3'
+and 'a' are both word characters — which would have stopped reviewers finding
+Q3A/Q3B/Q3C/Q3D at all. Stated cost: "chlor" no longer finds "dichloromethane";
+the leading stem still does.
+
+Every new test was proven red first, and the Q3 → Q3A guard was proven to go red
+under the naive word-boundary implementation so it pins the regression rather than
+passing by construction. Full suite green.
+
+---
+
 ## v0.74.4 — Broad is a comparison, and it had nothing to compare against (2026-08-29)
 
 `_classify_multiplicity` decided "s" vs "br s" by testing the cluster EXTENT
