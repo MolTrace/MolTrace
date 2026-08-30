@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 
+import { PUBLIC_ERROR_CODE_SET } from "@/lib/api/public-error-codes.generated"
+
 // Browser -> Vercel -> backend proxy. Every authed/app request goes through
 // here as a same-origin call to `/api/backend/*`, which this catch-all forwards
 // to the FastAPI backend. It MUST deploy as a dynamic Node serverless function
@@ -13,23 +15,19 @@ import { NextRequest, NextResponse } from "next/server"
 // --force`). Vercel reuses `.next/cache` across deploys keyed on file content,
 // so a folder move can leave a stale/missing function output that normal pushes
 // will not refresh until this file's content changes.
-/**
- * Mirrors `error_codes.PUBLIC_CODES` in the backend — the codes deemed safe to
- * survive 401/403 sanitization. Anything not listed here is stripped, so adding a
- * public code on the backend without adding it here fails CLOSED (the client sees
- * a generic denial) rather than leaking.
- */
-const PUBLIC_ERROR_CODES: ReadonlySet<string> = new Set([
-  "module_not_licensed",
-  "step_up_required",
-  "token_expired",
-  "token_invalid",
-  "token_reuse_detected",
-  "product_not_in_plan",
-  "product_not_enabled",
-  "product_not_provisioned",
-  "role_required",
-])
+// The codes safe to survive 401/403 sanitization. Generated from `error_codes.PUBLIC_CODES`
+// rather than hand-written here, because this was the third hand-maintained copy of one list
+// and the drift is silent in both directions.
+//
+// Still an allowlist, and still fails CLOSED: a code the backend added but that has not been
+// regenerated here is stripped, so the client degrades to a generic denial. That direction is
+// acceptable; the other one — forwarding something the backend never marked public — is
+// impossible by construction. Do not "fix" this by inverting it into a denylist.
+//
+// This stays even though the backend now guarantees the same output on its own. It is
+// redundant only while the backend is correct, which is the exact condition a
+// defence-in-depth layer exists to survive, and it costs one Set that already existed.
+const PUBLIC_ERROR_CODES: ReadonlySet<string> = PUBLIC_ERROR_CODE_SET
 
 export const dynamic = "force-dynamic"
 

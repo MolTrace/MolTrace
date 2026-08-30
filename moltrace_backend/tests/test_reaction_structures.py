@@ -636,7 +636,7 @@ def test_validation_is_reachable_on_a_deployment_that_only_licenses_regentry(
             json={"name": "x", "objective": "maximize_yield", "status": "active"},
         )
         assert gated.status_code == 403
-        assert gated.json()["detail"] == "module_not_licensed"
+        assert gated.json()["code"] == "module_not_licensed"
     finally:
         if previous is None:
             delattr(app.state, "enabled_modules")

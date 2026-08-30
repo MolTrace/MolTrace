@@ -5,6 +5,7 @@ from typing import Literal
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from pydantic import BaseModel, Field
 
+from . import error_codes
 from .database import get_nmr2d_run_by_id, save_nmr2d_run, update_nmr2d_run_review_status
 from .compound_classes import normalize_compound_class
 from .dept import DeptAptParseError, analyze_dept_apt_preview, parse_dept_apt_table
@@ -37,12 +38,32 @@ def require_nmr2d_enabled(request: Request) -> None:
         raise HTTPException(status_code=404, detail="2D NMR evidence engine is disabled by feature flag.")
 
 
+def _feature_off(setting_name: str) -> HTTPException:
+    """A refusal that tells the client the situation and the operator the switch.
+
+    The flag's name is an environment-variable name — deployment configuration, and backend
+    jargon in a position a person reads: ``web.py`` renders a 403 ``detail`` straight into the
+    page it serves, so it was reaching a screen. It rides in ``log_context``, which goes to the
+    operator log with the correlation id and is never serialised. Clients branch on
+    ``feature_not_enabled``.
+
+    Not the ``X-MolTrace-Module`` precedent, which puts a value in a header: a module key is a
+    product concept a client acts on, an environment-variable name is not.
+    """
+
+    from .api import CodedHTTPException  # local: api imports this module inside create_app
+
+    return CodedHTTPException(
+        status_code=403,
+        detail="This feature is not switched on for this deployment.",
+        code=error_codes.FEATURE_NOT_ENABLED,
+        log_context={"feature_flag": setting_name},
+    )
+
+
 def _require_contour_preview_if_requested(request: Request, include_contour_preview: bool) -> None:
     if include_contour_preview and not _contour_preview_enabled(request):
-        raise HTTPException(
-            status_code=403,
-            detail="2D contour preview is disabled by feature flag ENABLE_2D_CONTOUR_PREVIEW.",
-        )
+        raise _feature_off("ENABLE_2D_CONTOUR_PREVIEW")
 
 
 @router.get("/status")
@@ -266,10 +287,7 @@ def nmr2d_raw_preview_stub(
     context=Depends(__import__("nmrcheck.api", fromlist=["require_access_context"]).require_access_context),
 ) -> dict[str, object]:
     if not _raw_2d_fid_beta_enabled(request):
-        raise HTTPException(
-            status_code=403,
-            detail="Raw 2D FID/SER beta is disabled by feature flag ENABLE_RAW_2D_FID_BETA.",
-        )
+        raise _feature_off("ENABLE_RAW_2D_FID_BETA")
     return {
         "implemented": False,
         "detail": "Raw 2D FID/SER processing is intentionally deferred; upload processed COSY/HSQC/HMQC/HMBC peak tables for this guarded release.",

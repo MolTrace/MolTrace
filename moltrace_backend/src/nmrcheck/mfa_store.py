@@ -19,7 +19,7 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session, sessionmaker
 
-from . import mfa_totp, mfa_webauthn, session_store
+from . import error_codes, mfa_totp, mfa_webauthn, session_store
 from .database import (
     authenticate_user,
     get_user_by_token,
@@ -311,7 +311,9 @@ def complete_login_totp(
         secret = mfa_totp.decrypt_secret(cred.secret_encrypted, settings.mfa_encryption_key)
         step = mfa_totp.verify(secret, code, last_used_step=cred.last_used_step, for_time=for_time)
         if step is None:
-            raise MFAError("Invalid authentication code.", 401)
+            raise MFAError(
+                "Invalid authentication code.", 401, code=error_codes.MFA_FACTOR_INVALID
+            )
         cred.last_used_step = step
     return _mint(session_factory, settings, user_id, ["totp"])
 
@@ -349,7 +351,9 @@ def complete_login_recovery(
     user_id, _ = _burn_login_challenge(session_factory, mfa_token, now)
     with session_scope(session_factory) as session:
         if not _consume_recovery_code(session, user_id, code, now):
-            raise MFAError("Invalid recovery code.", 401)
+            raise MFAError(
+                "Invalid recovery code.", 401, code=error_codes.MFA_FACTOR_INVALID
+            )
     return _mint(session_factory, settings, user_id, ["backup"])
 
 
@@ -380,7 +384,9 @@ def _stamp_step_up(
 ) -> None:
     row = _read_session(session, raw_token)
     if row is None:
-        raise MFAError("No active session to step up.", 401)
+        # Not a live session — which is exactly what token_invalid already says, so reuse
+        # it rather than minting a near-duplicate code the client would treat identically.
+        raise MFAError("No active session to step up.", 401, code=error_codes.TOKEN_INVALID)
     row.stepped_up_at = now
     row.step_up_factor = factor
     row.step_up_aal = aal
@@ -423,7 +429,9 @@ def complete_step_up_totp(
         secret = mfa_totp.decrypt_secret(cred.secret_encrypted, settings.mfa_encryption_key)
         step = mfa_totp.verify(secret, code, last_used_step=cred.last_used_step, for_time=for_time)
         if step is None:
-            raise MFAError("Invalid authentication code.", 401)
+            raise MFAError(
+                "Invalid authentication code.", 401, code=error_codes.MFA_FACTOR_INVALID
+            )
         cred.last_used_step = step
         _stamp_step_up(session, raw_token, factor="totp", aal="aal1", now=now)
     return {"stepped_up": True, "factor": "totp", "aal": "aal1",
@@ -477,7 +485,7 @@ def complete_step_up_password(
         )
         is None
     ):
-        raise MFAError("Incorrect password.", 401)
+        raise MFAError("Incorrect password.", 401, code=error_codes.MFA_FACTOR_INVALID)
     with session_scope(session_factory) as session:
         _stamp_step_up(session, raw_token, factor="pwd", aal="aal1", now=now)
     return {"stepped_up": True, "factor": "pwd", "aal": "aal1",
@@ -541,7 +549,9 @@ def totp_confirm(
         secret = mfa_totp.decrypt_secret(pending.secret_encrypted, settings.mfa_encryption_key)
         step = mfa_totp.verify(secret, code, last_used_step=None, for_time=for_time)
         if step is None:
-            raise MFAError("Invalid authentication code.", 401)
+            raise MFAError(
+                "Invalid authentication code.", 401, code=error_codes.MFA_FACTOR_INVALID
+            )
         pending.confirmed_at = now
         pending.last_used_step = step
         had_passkey = bool(

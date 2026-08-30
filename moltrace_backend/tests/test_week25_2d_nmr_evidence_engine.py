@@ -355,7 +355,13 @@ def test_2d_contour_preview_flag_blocks_requested_contours(tmp_path) -> None:
     assert status.json()["contour_preview_enabled"] is False
     assert status.json()["contour_preview_feature_flag"] == "ENABLE_2D_CONTOUR_PREVIEW"
     assert blocked.status_code == 403
-    assert "ENABLE_2D_CONTOUR_PREVIEW" in blocked.json()["detail"]
+    # Re-baselined: this asserted the flag NAME was in the refusal body. An environment
+    # variable is deployment configuration, and web.py renders a 403 detail into the page it
+    # serves, so the name was reaching a screen. The client branches on the code; the name
+    # goes to the operator log. /nmr2d/status still publishes it as a declared 200 field,
+    # which is where a caller that legitimately wants it should read it.
+    assert "ENABLE_2D_CONTOUR_PREVIEW" not in blocked.text
+    assert blocked.json()["code"] == "feature_not_enabled"
 
 
 def test_2d_feature_flag_enabled_preview_analyze_and_run_lookup(tmp_path) -> None:
@@ -499,7 +505,9 @@ def test_2d_raw_fid_beta_flag_blocks_raw_route_by_default(tmp_path) -> None:
     assert status.json()["raw_2d_fid_beta_feature_flag"] == "ENABLE_RAW_2D_FID_BETA"
     assert status.json()["raw_2d_fid_processing"] == "disabled"
     assert raw_stub.status_code == 403
-    assert "ENABLE_RAW_2D_FID_BETA" in raw_stub.json()["detail"]
+    # Re-baselined for the same reason as the contour-preview flag above.
+    assert "ENABLE_RAW_2D_FID_BETA" not in raw_stub.text
+    assert raw_stub.json()["code"] == "feature_not_enabled"
 
 
 def test_2d_raw_fid_beta_flag_enabled_returns_guarded_stub(tmp_path) -> None:
