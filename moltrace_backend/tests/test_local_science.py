@@ -846,3 +846,63 @@ def test_the_summary_carries_what_a_shift_cannot_be_read_without() -> None:
         except Exception:  # noqa: BLE001 - unreadable acquisitions are another test's business
             continue
     assert named, "no acquisition reported a solvent, so this asserts nothing"
+
+
+@pytest.mark.slow
+def test_a_structure_check_carries_the_caveat_that_makes_it_readable() -> None:
+    """The verifier runs offline in full. Its PREDICTION does not.
+
+    `verify_structure` is the platform's arbiter and needs no server: it takes the
+    spectrum already on this computer and a structure the chemist typed. What it
+    consumes is a shift prediction, and with no NMRNet installed that falls back
+    to HOSE codes over a seed knowledge base.
+
+    Measured on a real 13C acquisition: half the atoms matched no environment at
+    all and the median 13C uncertainty was 35 ppm -- most of the useful range. A
+    posterior confidence read without that is a number a chemist could act on and
+    should not, so it is lifted out of the warning list rather than left ninth of
+    nine.
+    """
+    from nmrcheck.local_science import _TEST_LABELS, verify_candidate
+
+    source = _one("instrument") or _one("moltrace")
+    if source is None:
+        pytest.skip("no acquisition in this checkout")
+
+    # Ethanol: readable by RDKit, and small enough that the check is quick.
+    result = verify_candidate(source, "CCO")
+
+    assert result["verdict"], "no verdict came back"
+    assert 0.0 <= result["confidence"] <= 1.0, result["confidence"]
+    assert result["human_review_required"] is True, (
+        "a structure verdict is exactly the kind of result that must not read as a decision"
+    )
+
+    # The engine names its own tests; a person must not be shown those names.
+    unlabelled = [t["name"] for t in result["tests"] if t["name"] not in _TEST_LABELS]
+    assert not unlabelled, f"tests reach the screen with no readable label: {unlabelled}"
+
+    # Non-vacuous: the offline path MUST report reduced prediction quality,
+    # because that is the whole reason this result needs reading carefully. If
+    # this ever stops firing, either NMRNet arrived or the warning was dropped --
+    # and the second is a silent loss of the caveat.
+    assert result["prediction_coverage"] or result["predictor_note"], (
+        "no prediction-quality caveat came back, so the confidence is being "
+        "presented as though the prediction behind it were fully covered"
+    )
+
+
+def test_a_structure_that_cannot_be_read_is_refused_not_crashed() -> None:
+    """A typo in a structure is the chemist's input, not a fault in the service."""
+    from nmrcheck.local_science import SpectrumUnreadable, verify_candidate
+
+    source = _one("instrument") or _one("moltrace")
+    if source is None:
+        pytest.skip("no acquisition in this checkout")
+
+    with pytest.raises(SpectrumUnreadable) as excinfo:
+        verify_candidate(source, "this is not a molecule")
+    assert "structure" in str(excinfo.value).lower(), str(excinfo.value)
+
+    with pytest.raises(SpectrumUnreadable):
+        verify_candidate(source, "   ")
