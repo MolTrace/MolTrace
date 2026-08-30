@@ -235,6 +235,105 @@ def _summarise_multiplet(
     )
 
 
+
+#: How the four verification tests are named to a chemist. The wire keys stay as
+#: the engine emits them -- a display name is not a rename -- but `dp4_ranking` is
+#: not what a person calls the thing it does.
+_TEST_LABELS: dict[str, str] = {
+    "prediction_bounds": "Predicted shifts against the observed ones",
+    "assignments": "Every observed signal assigned to an atom",
+    "hsqc_2d_ranges": "HSQC correlations (needs a 2-D spectrum)",
+    "ms_molecule_match": "Mass-spectrometry evidence (needs MS peaks)",
+}
+
+
+def verify_candidate(path: str | Path, smiles: str) -> dict:
+    """Check a proposed structure against an acquisition on this computer.
+
+    THE VERIFIER IS THE ARBITER, and it runs here in full: `verify_structure` is
+    the same deterministic function the platform uses everywhere, combining its
+    tests through a Bayesian log-odds update whose whole arithmetic comes back on
+    the result. Nothing about it needs a server.
+
+    WHAT IS DIFFERENT OFFLINE IS THE PREDICTION IT IS FED. Without NMRNet the
+    engine falls back to HOSE codes against a seed knowledge base, and on a real
+    acquisition that meant half the atoms matched no environment at all and the
+    median 13C uncertainty was 35 ppm -- which is most of the useful range. The
+    engine says so in its own warnings. Those warnings are lifted to the front of
+    this result rather than left at the end of a list, because a confidence read
+    without them is a number a chemist could act on and should not.
+    """
+    source = Path(path)
+    if not source.exists():
+        raise SpectrumUnreadable("that file is no longer where it was")
+    candidate = (smiles or "").strip()
+    if not candidate:
+        raise SpectrumUnreadable("no structure was given to check")
+
+    from moltrace.spectroscopy.verification import verify_structure
+
+    try:
+        spectrum = read_processed_spectrum(source)
+    except (FIDReaderError, OSError, ValueError):
+        try:
+            spectrum = read_fid(source)
+        except FIDReaderError as unreadable:
+            raise SpectrumUnreadable(_readable_refusal(unreadable, source)) from None
+
+    try:
+        result = verify_structure(spectrum, candidate)
+    except ValueError as bad:
+        # A structure the chemist typed that RDKit cannot read is their input, not
+        # a fault: say which part failed rather than reporting a dead service.
+        raise SpectrumUnreadable(
+            f"that structure could not be read as a molecule ({bad})"
+        ) from None
+
+    warnings = list(result.warnings or [])
+
+    # A TYPO IS NOT AN ANSWER. The engine handles an unreadable structure
+    # honestly -- it warns `invalid_smiles`, abstains from every test, and returns
+    # the prior back unchanged as `inconclusive` at 0.50. That is correct FOR THE
+    # ENGINE and wrong to put in front of a person: a verdict and a confidence
+    # rendered for a mistyped structure look exactly like a verdict and a
+    # confidence for a real one, and the reader has no way to tell which they got.
+    if any(w == "invalid_smiles" for w in warnings):
+        raise SpectrumUnreadable(
+            "that structure could not be read as a molecule. Check the SMILES \u2014 "
+            "ethanol is CCO, benzene is c1ccccc1."
+        )
+    # The coverage line is the one that decides whether any of this is worth
+    # reading, so it is pulled out rather than left as the last of nine.
+    coverage = next((w for w in warnings if w.startswith("Coverage:")), None)
+    predictor = next((w for w in warnings if "NMRNet unavailable" in w), None)
+
+    return {
+        "smiles": candidate,
+        "verdict": str(result.verdict),
+        "confidence": float(result.posterior_confidence),
+        "prior": float(result.prior_confidence),
+        "summary": str(result.diagnostic),
+        "tests": [
+            {
+                "name": t.name,
+                "label": _TEST_LABELS.get(t.name, t.name.replace("_", " ")),
+                "applicable": bool(t.applicable),
+                "score": float(t.score),
+                "significance": float(t.significance),
+                "quality": float(t.quality),
+                "diagnostic": str(t.diagnostic),
+            }
+            for t in result.test_results
+        ],
+        "prediction_coverage": coverage,
+        "predictor_note": predictor,
+        "warnings": warnings,
+        # Every regulated result carries this, and a structure verdict is exactly
+        # the kind of thing that must not be read as a decision.
+        "human_review_required": True,
+    }
+
+
 def _has_processed_spectrum(source: Path) -> bool:
     """Did the instrument write one at all?
 

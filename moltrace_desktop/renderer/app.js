@@ -136,6 +136,10 @@
     error: null,
     busy: false,
     everRan: false,
+    candidate: '',
+    verdict: null,
+    verdictError: null,
+    checking: false,
   }
 
   // ---- small builders ------------------------------------------------------
@@ -443,6 +447,8 @@
     results.append(spectrumView(s))
     page.append(results)
 
+    page.append(structureSection())
+
     if (quantifiable.length) {
       const c = card(null, null, 'var(--mt-teal)')
       c.append(peakTable(quantifiable, s, 'Signals you can measure', null))
@@ -471,11 +477,111 @@
     return page
   }
 
+  // ---- structure check ------------------------------------------------------
+  // The deterministic verifier, run locally. It is the platform's stated sole
+  // arbiter of correctness and it needs no server -- but the shift PREDICTION it
+  // consumes is much weaker offline, and that caveat leads here rather than
+  // trailing a list, because a confidence read without it is a number a chemist
+  // could act on and should not.
+  function structureSection() {
+    const c = card('Check a structure against this spectrum', null, 'var(--mt-teal)')
+    c.insertBefore(eyebrow('Step 3 \u00b7 Structure'), c.firstChild)
+    c.append(node('p', 'card__desc',
+      'Type a candidate as SMILES. It is checked against the measurements above by the same '
+      + 'deterministic tests the platform uses everywhere \u2014 on this computer, and the '
+      + 'structure never leaves it.'))
+
+    const row = node('div', 'formrow')
+    const input = node('input', 'input')
+    input.type = 'text'
+    input.placeholder = 'CCO'
+    input.value = state.candidate
+    input.setAttribute('aria-label', 'Candidate structure as SMILES')
+    input.addEventListener('input', (e) => { state.candidate = e.target.value })
+    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') checkStructure() })
+
+    const go = node('button', 'btn')
+    go.type = 'button'
+    go.append(document.createTextNode(state.checking ? 'Checking\u2026' : 'Check structure'))
+    go.disabled = state.checking || !(state.service && state.service.running)
+    go.addEventListener('click', checkStructure)
+
+    row.append(input, go)
+    c.append(row)
+
+    if (state.verdictError) c.append(alert('warn', 'That structure was not checked', state.verdictError))
+
+    const v = state.verdict
+    if (v) {
+      // THE CAVEAT FIRST. Without NMRNet the prediction falls back to HOSE codes
+      // over a seed knowledge base; on a real acquisition that left half the atoms
+      // with no matched environment and a 35 ppm median uncertainty.
+      if (v.prediction_coverage || v.predictor_note) {
+        c.append(alert('warn', 'Read this confidence with its prediction quality',
+          [v.predictor_note, v.prediction_coverage].filter(Boolean).join(' ')))
+      }
+
+      const verdict = node('div', 'verdict')
+      verdict.append(node('div', 'verdict__word', String(v.verdict).replace(/_/g, ' ')))
+      verdict.append(node('div', 'verdict__conf',
+        (v.confidence * 100).toFixed(0) + '% confidence, from a starting point of '
+        + (v.prior * 100).toFixed(0) + '%'))
+      c.append(verdict)
+      c.append(node('p', 'card__desc', v.summary))
+
+      const table = node('table', 'peaks')
+      const thead = node('thead'); const hr = node('tr')
+      for (const label of ['Test', 'Applied', 'What it found']) hr.append(node('th', null, label))
+      thead.append(hr); table.append(thead)
+      const tb = node('tbody')
+      for (const t of v.tests) {
+        const tr = node('tr')
+        tr.append(node('td', null, t.label))
+        // "Not applicable" is not a failure and must not read as one: a test that
+        // abstained had no data, and it did not move the confidence either way.
+        tr.append(node('td', null, t.applicable ? 'yes' : 'no data'))
+        tr.append(node('td', null, t.diagnostic))
+        tb.append(tr)
+      }
+      table.append(tb)
+      c.append(table)
+
+      if (v.human_review_required) {
+        c.append(node('p', 'tablenote',
+          'This is a measurement combined by a stated model, not a decision. A chemist has to '
+          + 'read it before it goes into a report.'))
+      }
+    }
+    return c
+  }
+
+  async function checkStructure() {
+    if (!state.candidate.trim()) {
+      state.verdictError = 'Type a structure to check it against this spectrum.'
+      return render()
+    }
+    state.checking = true; state.verdictError = null; render()
+    try {
+      const out = await window.moltrace.analysis.verifyStructure(state.candidate)
+      if (out && out.ok) { state.verdict = out.result }
+      else { state.verdict = null; state.verdictError = (out && out.reason) || 'that structure could not be checked' }
+    } catch (e) {
+      state.verdict = null
+      state.verdictError = (e && e.message) || 'that structure could not be checked'
+    } finally {
+      state.checking = false; render()
+    }
+  }
+
   async function openSpectrum() {
     state.busy = true; state.error = null; render()
     try {
       const out = await window.moltrace.analysis.openSpectrum()
-      if (out && out.ok) { state.spectrum = out.summary }
+      if (out && out.ok) {
+        state.spectrum = out.summary
+        // A verdict belongs to the spectrum it was computed against.
+        state.verdict = null; state.verdictError = null
+      }
       else if (out && !out.cancelled) { state.error = out.reason || 'that spectrum could not be read' }
     } catch (e) {
       state.error = (e && e.message) || 'that spectrum could not be read'
