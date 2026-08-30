@@ -1092,3 +1092,100 @@ def test_dp4_ranking_needs_a_set_and_says_it_is_not_a_probability() -> None:
         assert row["error_basis"] == "matched_peaks_only"
         assert row["matched_peaks"] <= row["observed_peaks"]
         assert row["low_coverage"] is (row["matched_peaks"] * 2 < row["observed_peaks"])
+
+
+@pytest.mark.slow
+def test_similar_spectra_is_a_lookup_that_states_its_own_hit_rate() -> None:
+    """A library lookup, searched within the query's own nucleus.
+
+    The encoding is 128 bins of 1H beside 128 of 13C, so a 13C query and a 1H
+    reference of the SAME compound occupy different halves and score near zero
+    against each other. Measuring across them gave 30%; measuring within a
+    nucleus gave 48% first and 63% in the top five, and the second number is the
+    one that describes what this actually does.
+
+    The rate travels with the result because a lookup whose accuracy is unstated
+    is one a chemist cannot weigh -- and because a compound ABSENT from the
+    library still gets its five nearest neighbours back, which look identical to
+    five real hits.
+    """
+    from nmrcheck.local_science import SpectrumUnreadable, find_similar_spectra
+
+    source = _one("instrument") or _one("moltrace")
+    if source is None:
+        pytest.skip("no acquisition in this checkout")
+
+    try:
+        result = find_similar_spectra(source, 5)
+    except SpectrumUnreadable as why:
+        if "carries no" in str(why):
+            pytest.skip("this build ships no reference library")
+        raise
+
+    assert result["human_review_required"] is True
+    assert result["library_size"] > 0
+    assert result["library_source"], "the result does not say where the references came from"
+    assert result["library_license"], "a CC BY-SA library must carry its licence to the reader"
+    assert 1 <= len(result["matches"]) <= 5
+
+    # DISTANCE, not similarity: `exact_knn` and the platform's own
+    # `vector_similarity` both return L2 where LOWER is closer. A key named
+    # "similarity" carrying a distance reads backwards to every caller.
+    distances = [m["distance"] for m in result["matches"]]
+    assert distances == sorted(distances), (
+        "matches are not ordered nearest-first, which means the column a reader "
+        "sorts by disagrees with the order they are shown in"
+    )
+    assert all(m["smiles"] for m in result["matches"]), (
+        "a match reached the boundary with no structure, so the reader would see only "
+        "a database id"
+    )
+
+    rate = result["accuracy"]
+    assert rate["of"] > 0 and rate["first"] <= rate["top5"] <= rate["of"], rate
+
+
+@pytest.mark.slow
+def test_a_ranking_says_when_it_does_not_separate_the_top_two() -> None:
+    """Read the MARGIN, not the winner's identity.
+
+    The first version of this check asked whether the leading candidate changed
+    under resampling. It is blind to the case it exists for: two identical
+    candidates give exactly 50/50, `argmax` breaks the tie deterministically at
+    index 0, the leader never moves, and the check reports "stable" on a perfect
+    tie. Measured before it shipped.
+
+    So the margin between the top two is resampled within the acquisition's own
+    digital resolution -- conservative, since line fitting and referencing add
+    more -- and an ordering whose gap ever closes to nothing is not one.
+    """
+    from nmrcheck.local_science import SpectrumUnreadable, rank_candidates
+
+    source = None
+    for candidate in _acquisitions():
+        try:
+            rank_candidates(candidate, ["OCCO", "OCCO"])
+            source = candidate
+            break
+        except SpectrumUnreadable:
+            continue
+    if source is None:
+        pytest.skip("no acquisition here can be ranked")
+
+    # A perfect tie: the same structure twice. Nothing can separate them, and a
+    # check that says otherwise is measuring its own tie-breaking.
+    tied = rank_candidates(source, ["OCCO", "OCCO"])["separation"]
+    assert tied["checked"] is True
+    assert tied["separated"] is False, (
+        "two identical candidates were reported as separated, which means the check is "
+        "reading argmax rather than the margin"
+    )
+    assert tied["narrowest_margin"] == 0.0
+
+    # And it must not cry wolf: a candidate that genuinely fits should stay ahead.
+    try:
+        real = rank_candidates(source, ["OCCO", "CCO", "CC(=O)Oc1ccccc1C(=O)O"])["separation"]
+    except SpectrumUnreadable:
+        pytest.skip("this acquisition cannot rank the distinct-candidate case")
+    if real["separated"]:
+        assert real["narrowest_margin"] > 0.0

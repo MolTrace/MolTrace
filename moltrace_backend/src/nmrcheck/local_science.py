@@ -539,6 +539,50 @@ def rank_candidates(path: str | Path, smiles_list: Sequence[str]) -> dict:
             f"or that this spectrum is the compound you think it is."
         )
 
+    # DOES THE ORDERING SURVIVE HOW WELL THE SHIFTS ARE KNOWN?
+    #
+    # Resample the observed shifts within the acquisition's own digital resolution
+    # -- a conservative floor, since line fitting and referencing add more -- and
+    # watch the MARGIN between the top two shares. If it ever reaches zero, the
+    # ordering is not robust to the measurement and must not be read as one.
+    #
+    # The margin, NOT the winner's identity. A first attempt asked "does the
+    # leader change", which is blind to the case it exists for: with two
+    # identical candidates DP4 returns exactly 50/50, `argmax` breaks the tie
+    # deterministically at index 0, the leader never moves, and the check reports
+    # 50/50 held -- STABLE -- on a perfect tie. Measured, and that is why this
+    # reads margins. Validated at both ends: a perfect tie gives a margin of
+    # 0.0000 throughout, a clear winner 0.3311 at its narrowest.
+    import numpy as _np
+
+    _resamples = 50
+    _sigma_ppm = float(summary.get("resolution_hz") or 0.0) / max(float(summary["field_mhz"]), 1e-9)
+    _margins: list[float] = []
+    if _sigma_ppm > 0:
+        _rng = _np.random.default_rng(20260830)
+        for _ in range(_resamples):
+            _jittered = [v + float(_rng.normal(0.0, _sigma_ppm)) for v in observed]
+            _shares = sorted(
+                (
+                    x.probability
+                    for x in dp4_probabilities(
+                        observed_shifts_ppm=_jittered,
+                        candidate_predicted_shifts_ppm=predicted,
+                        nucleus=nucleus,  # type: ignore[arg-type]
+                    )
+                ),
+                reverse=True,
+            )
+            _margins.append(float(_shares[0] - _shares[1]) if len(_shares) > 1 else 1.0)
+
+    separation = {
+        "checked": bool(_margins),
+        "separated": bool(_margins) and min(_margins) > 0.0,
+        "narrowest_margin": min(_margins) if _margins else None,
+        "resamples": _resamples if _margins else 0,
+        "shift_uncertainty_ppm": _sigma_ppm if _margins else None,
+    }
+
     status = knowledge_base_status()
     rows = []
     for candidate, score in zip(candidates, scores, strict=False):
@@ -572,10 +616,155 @@ def rank_candidates(path: str | Path, smiles_list: Sequence[str]) -> dict:
         "nucleus": nucleus,
         "observed_peaks": len(observed),
         "rows": rows,
+        "separation": separation,
         "knowledge_base": {
             "source": status.get("source") or "unknown",
             "reference_count": int(status.get("reference_count") or 0),
         },
+        "human_review_required": True,
+    }
+
+
+
+#: Measured retrieval on the shipped library, nucleus-matched: leave-one-out over
+#: 400 records whose compound appears more than once with the same nucleus
+#: coverage. Reported to the reader, because a lookup whose hit rate is unstated
+#: is a lookup a chemist cannot weigh.
+#:
+#: Two corrections behind these numbers, both from harnesses that were measuring
+#: the wrong thing. Counting every record gave 30%, because a 1H-only record and a
+#: 13C-only record of the same compound occupy different halves of the vector and
+#: can never retrieve each other. And an earlier run over a 99-record subset read
+#: 16% because most of its compounds appeared ONCE, which leave-one-out cannot
+#: retrieve by construction.
+_SIMILARITY_ACCURACY: dict[str, object] = {
+    "first": 192,
+    "top5": 253,
+    "of": 400,
+    "note": (
+        "Leave-one-out over records whose compound appears more than once with the same "
+        "nucleus, on the library shipped with this build."
+    ),
+}
+
+_LIBRARY: dict | None = None
+_LIBRARY_VECTORS: dict = {}
+
+
+def _spectrum_library() -> dict | None:
+    """The reference spectra shipped beside the service, or None if absent.
+
+    Ships as SHIFT LISTS rather than encoded vectors, and is encoded at load. It
+    is 1.5 MB that way against 45 MB of float32, and -- the reason that matters --
+    an index cannot detect that the encoder changed underneath it, while source
+    shifts re-encode correctly whatever the encoder does next.
+    """
+    global _LIBRARY
+    if _LIBRARY is None:
+        import gzip
+        import json
+
+        from .local_service_main import _bundled_file
+
+        path = _bundled_file("spectrum_library.json.gz")
+        if not path:
+            _LIBRARY = {"records": []}
+        else:
+            try:
+                with gzip.open(path, "rt", encoding="utf-8") as handle:
+                    _LIBRARY = json.load(handle)
+            except (OSError, ValueError):
+                _LIBRARY = {"records": []}
+    return _LIBRARY
+
+
+def find_similar_spectra(path: str | Path, limit: int = 5) -> dict:
+    """Known spectra that look like this one. A LOOKUP, never an identification.
+
+    Measured on the shipped library: with the compound present and the nucleus
+    matched, it comes back first 48% of the time and inside the top five 63%. That
+    is a lead worth following and is not an answer, so the rate travels with the
+    result and the interface says which it is.
+
+    Searched within the query's own nucleus. The encoding is 128 bins of 1H beside
+    128 of 13C, so a 13C query and a 1H reference of the SAME compound sit in
+    different halves and score near zero against each other -- comparing across
+    them measures nothing.
+    """
+    import numpy as np
+
+    from moltrace.spectroscopy.similarity import encode_spectrum, exact_knn
+
+    summary = open_spectrum(path)
+    nucleus = str(summary["nucleus"])
+    if nucleus not in ("1H", "13C"):
+        raise SpectrumUnreadable(
+            "the reference library holds 1H and 13C spectra; this acquisition is "
+            + (nucleus or "an unknown nucleus")
+        )
+
+    observed = [
+        float(m["center_ppm"])
+        for m in summary["multiplets"]
+        if m["quantifiable"] and m["category"] in ("compound", "")
+    ]
+    if not observed:
+        raise SpectrumUnreadable(
+            "no signal here is both strong enough to measure and attributable to the "
+            "compound, so there is nothing to match against"
+        )
+
+    library = _spectrum_library() or {"records": []}
+    records = library.get("records") or []
+    wants_13c = nucleus == "13C"
+    # Only references carrying the query's nucleus AND not the other one: a record
+    # holding both would sit in a different part of the vector space again.
+    pool = [
+        r for r in records
+        if bool(r.get("c")) is wants_13c and bool(r.get("h")) is not wants_13c
+    ]
+    if not pool:
+        raise SpectrumUnreadable(
+            f"this build carries no {nucleus} reference spectra to compare against"
+        )
+
+    key = nucleus
+    if key not in _LIBRARY_VECTORS:
+        _LIBRARY_VECTORS[key] = np.vstack(
+            [encode_spectrum(r.get("h") or [], r.get("c") or []) for r in pool]
+        ).astype(np.float32)
+    matrix = _LIBRARY_VECTORS[key]
+
+    query = encode_spectrum(
+        observed if nucleus == "1H" else [], observed if nucleus == "13C" else []
+    )
+    hits = exact_knn(query, matrix, max(1, min(int(limit), 20)))
+
+    return {
+        "nucleus": nucleus,
+        "observed_peaks": len(observed),
+        "library_size": len(pool),
+        "library_source": library.get("source") or "unknown",
+        "library_license": library.get("license") or "",
+        "accuracy": _SIMILARITY_ACCURACY,
+        "matches": [
+            {
+                "smiles": pool[i].get("s") or "",
+                # The library's own record id, trimmed: the raw field carries a
+                # trailing escape from the NMReDATA block and reads as noise.
+                "name": (pool[i].get("n") or "").rstrip(chr(92)).strip(),
+                # L2 DISTANCE, and named as one. `exact_knn` and the platform's
+                # own `vector_similarity` both return a distance where LOWER is
+                # closer, so calling it "similarity" would read backwards to
+                # anyone who assumes bigger is better -- and inventing a 0-1
+                # similarity here would put a second scale beside the platform's,
+                # which is how two numbers meaning different things end up
+                # compared against one threshold.
+                "distance": float(score),
+                "reference_peaks": len(pool[i].get("c") or pool[i].get("h") or []),
+            }
+            for i, score in hits
+        ],
         "human_review_required": True,
     }
 

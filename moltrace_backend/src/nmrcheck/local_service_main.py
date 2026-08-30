@@ -71,42 +71,62 @@ def _require_socket(fd: int = SOCKET_FD) -> int:
 _BUNDLED_KB_NAMES = ("hose_index.json.gz", "hose_index.json")
 
 
-def _bundled_knowledge_base() -> str | None:
-    """The table shipped with this build, if there is one.
+def _bundled_file(name: str) -> str | None:
+    """A data file shipped beside the service, by name, or None."""
+    for root in _bundled_roots():
+        candidate = root / name
+        if candidate.is_file():
+            return str(candidate)
+    return None
 
-    Looked for beside the executable (PyInstaller lays data down in `_internal`
-    next to it) and beside this module for a source checkout. Returns None when
-    there is none, which is a legitimate configuration -- a dev checkout without
-    the table -- and the predictor then says so through `knowledge_base_status`.
+
+def _bundled_roots() -> list[Path]:
+    """Where a data file shipped with this build could be.
+
+    PyInstaller's onedir layout puts data in `_internal` BESIDE the executable,
+    not next to it, so the executable's own directory is not enough. `sys._MEIPASS`
+    is the documented answer and is checked first; the explicit `_internal` costs
+    nothing and removes an inference about a build tool's internals from the
+    lookup that decides which product the user gets.
+
+    A SOURCE CHECKOUT LOOKS WHERE THE BUILDERS WRITE, so a developer who followed
+    the documented build steps does not test one product and package another.
+    That cannot hide a missing file in a BUILD: packaging checks the freeze
+    itself, not the running process.
     """
-    roots = []
+    roots: list[Path] = []
     if getattr(sys, "frozen", False):
         here = Path(sys.executable).resolve().parent
-        roots.append(here)
-        # onedir lays data in `_internal` BESIDE the executable, not next to it,
-        # so the executable's own directory is not enough. `sys._MEIPASS` is the
-        # documented answer and is checked first, but the explicit path costs
-        # nothing and removes an inference about a build tool's internals from
-        # the one lookup that decides which product the user gets.
-        roots.append(here / "_internal")
         internal = getattr(sys, "_MEIPASS", None)
         if internal:
-            roots.insert(-2, Path(internal))
+            roots.append(Path(internal))
+        roots.append(here / "_internal")
+        roots.append(here)
     roots.append(Path(__file__).resolve().parent)
-    # A SOURCE CHECKOUT LOOKS WHERE THE BUILDER WRITES. `scripts/build_hose_kb.py`
-    # documents this exact path and the predictor's docstring tells you to point
-    # MOLTRACE_HOSE_KB at it, so a developer who followed either would otherwise
-    # get a different product from the one they are packaging -- the seed here and
-    # the real table in the artifact, which is the worst way round.
-    #
-    # This cannot hide a missing table in a BUILD: packaging checks the freeze
-    # itself, not the running process.
     roots.append(Path.home() / ".cache" / "moltrace" / "nmrnet")
-    for root in roots:
-        for name in _BUNDLED_KB_NAMES:
-            candidate = root / name
-            if candidate.is_file():
-                return str(candidate)
+    return roots
+
+
+def _bundled_file(name: str) -> str | None:
+    """A data file shipped beside the service, by name, or None if absent."""
+    for root in _bundled_roots():
+        candidate = root / name
+        if candidate.is_file():
+            return str(candidate)
+    return None
+
+
+def _bundled_knowledge_base() -> str | None:
+    """The shift-prediction table shipped with this build, if there is one.
+
+    Returns None when there is none, which is a legitimate configuration -- a dev
+    checkout without the table -- and the predictor then says so through
+    `knowledge_base_status` rather than pretending.
+    """
+    for name in _BUNDLED_KB_NAMES:
+        found = _bundled_file(name)
+        if found:
+            return found
     return None
 
 

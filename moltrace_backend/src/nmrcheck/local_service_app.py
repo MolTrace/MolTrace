@@ -30,6 +30,7 @@ from .desktop_transport import DesktopTransportGuard, TransportRefusal
 from .device_journal import ClockState, JournalEntry, append
 from .local_science import (
     SpectrumUnreadable,
+    find_similar_spectra,
     open_spectrum,
     process_spectrum,
     rank_candidates,
@@ -52,6 +53,7 @@ ROUTES: dict[str, tuple[str, str]] = {
     "fid.open": ("POST", "/fid/open"),
     "structure.verify": ("POST", "/structure/verify"),
     "structure.rank": ("POST", "/structure/rank"),
+    "spectrum.similar": ("POST", "/spectrum/similar"),
 }
 
 #: Kept as a name because tests and callers read it, derived so it cannot drift.
@@ -290,6 +292,34 @@ def _structure_rank(payload: dict = _BODY) -> dict[str, Any]:
     return result
 
 
+def _spectrum_similar(payload: dict = _BODY) -> dict[str, Any]:
+    """Reference spectra that look like this one. A lookup, never an identification."""
+    HANDLER_CALLS.append("spectrum.similar")
+    path = str(payload.get("path") or "")
+    if not path:
+        _journal("spectrum.similar", refused=True, cause="no file was named")
+        raise HTTPException(status_code=400, detail="no file was named")
+    try:
+        limit = int(payload.get("limit") or 5)
+    except (TypeError, ValueError):
+        limit = 5
+    try:
+        result = find_similar_spectra(path, limit)
+    except SpectrumUnreadable as unreadable:
+        _journal("spectrum.similar", refused=True, cause=str(unreadable))
+        raise HTTPException(status_code=400, detail=str(unreadable)) from None
+
+    # How many were searched and how many came back -- never WHICH, because the
+    # matches describe the chemist's sample.
+    _journal(
+        "spectrum.similar",
+        refused=False,
+        cause=f"{len(result['matches'])} of {result['library_size']} references",
+    )
+    return result
+
+
+
 
 
 class TransportGuardMiddleware:
@@ -363,6 +393,7 @@ def create_local_app(
         "fid.open": _fid_open,
         "structure.verify": _structure_verify,
         "structure.rank": _structure_rank,
+        "spectrum.similar": _spectrum_similar,
     }
     for operation, (method, path) in ROUTES.items():
         handler = handlers.get(operation)
