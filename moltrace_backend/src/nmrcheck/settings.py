@@ -150,6 +150,38 @@ class Settings:
     #: verifying under whichever scheme sealed them.
     audit_anchor_private_key: str | None = None
     audit_anchor_interval: int = 1000
+    #: Hex-encoded 32-byte Ed25519 seed — this deployment's OWN entitlement issuing sub-key,
+    #: generated here by ``python -m nmrcheck.entitlement_provision --generate`` and never
+    #: leaving. The private half then never travels, so there is no transport to compromise and
+    #: no copy at MolTrace to leak; only the public key and the identifiers are certified.
+    entitlement_issuing_private_key: str | None = None
+    #: base64url (unpadded) of the canonical certificate bytes MolTrace signed. Configuration
+    #: rather than a database row on purpose: a restore from before a withdrawal would
+    #: otherwise resurrect a withdrawn certificate.
+    entitlement_certificate_b64: str | None = None
+    #: The MolTrace root's signature over those bytes.
+    entitlement_certificate_signature: str | None = None
+    #: The pinned MolTrace root PUBLIC key, so a deployment can self-check its own certificate
+    #: at startup. Public material; it cannot sign.
+    entitlement_root_public_key: str | None = None
+    #: The published period an installation may work offline. NO DEFAULT, deliberately: it is a
+    #: commercial term that has not been measured, and shipping a plausible-looking round number
+    #: nobody chose is exactly the failure the bounds rule exists to prevent. Unset means this
+    #: deployment cannot issue, and says so.
+    entitlement_offline_period_days: int | None = None
+    #: Statement lifetime, short relative to the offline window. NO DEFAULT, same reason. No
+    #: relation between the two is enforced beyond both being at least one: there is no evidence
+    #: for one, and an unevidenced constraint is the same failure in a different place.
+    entitlement_statement_validity_hours: int | None = None
+    #: Which commercial class this deployment issues under. NO DEFAULT: it is a commercial fact
+    #: nobody has stated, and picking one would put an unchosen word inside a signature. When
+    #: the certificate permits exactly one class the answer is unambiguous and that one is used;
+    #: otherwise the deployment declines to issue and says so.
+    entitlement_licence_class: str | None = None
+    #: How this workspace is named to a person reading a licence screen. Descriptive, not
+    #: authority-bearing — the certificate binds the tenant KEY, which is what the chain checks.
+    #: Falls back to the certificate's tenant key rather than inventing a name.
+    entitlement_tenant_display_name: str | None = None
     email_from: str = "noreply@nmrcheck.local"
     email_backend: str = "database"
 
@@ -330,6 +362,18 @@ def get_settings() -> Settings:
         audit_signing_key=resolve_secret("AUDIT_SIGNING_KEY"),
         audit_anchor_private_key=resolve_secret("AUDIT_ANCHOR_PRIVATE_KEY"),
         audit_anchor_interval=_parse_int(os.getenv("AUDIT_ANCHOR_INTERVAL"), 1000),
+        entitlement_issuing_private_key=resolve_secret("ENTITLEMENT_ISSUING_PRIVATE_KEY"),
+        entitlement_certificate_b64=resolve_secret("ENTITLEMENT_CERTIFICATE"),
+        entitlement_certificate_signature=resolve_secret("ENTITLEMENT_CERTIFICATE_SIGNATURE"),
+        entitlement_root_public_key=resolve_secret("ENTITLEMENT_ROOT_PUBLIC_KEY"),
+        entitlement_offline_period_days=(
+            _parse_int(os.getenv("ENTITLEMENT_OFFLINE_PERIOD_DAYS"), 0) or None
+        ),
+        entitlement_statement_validity_hours=(
+            _parse_int(os.getenv("ENTITLEMENT_STATEMENT_VALIDITY_HOURS"), 0) or None
+        ),
+        entitlement_licence_class=os.getenv("ENTITLEMENT_LICENCE_CLASS") or None,
+        entitlement_tenant_display_name=os.getenv("ENTITLEMENT_TENANT_DISPLAY_NAME") or None,
         email_from=os.getenv("EMAIL_FROM", "noreply@nmrcheck.local"),
         email_backend=(
             os.getenv("EMAIL_BACKEND", "database").strip().lower() or "database"
@@ -519,6 +563,35 @@ def webauthn_origin_issues(settings: Settings) -> list[str]:
                 "in production."
             )
     return issues
+def _entitlement_issues(settings: Settings) -> list[str]:
+    """A half-provisioned offline-licence issuer is a configuration error, not something to
+    discover from a refused licence hours later.
+
+    Conditional on the deployment declaring itself an issuer at all: one that licenses no
+    offline installations must still start, and silence is a valid answer for it.
+    """
+    from .entitlement_store import (
+        ISSUER_SETTINGS,
+        AuthorityUnavailable,
+        declares_itself_an_issuer,
+        resolve_authority,
+    )
+
+    if not declares_itself_an_issuer(settings):
+        return []
+    missing = [name for name in ISSUER_SETTINGS if not getattr(settings, name, None)]
+    if missing:
+        return [
+            "This deployment is set up to license offline installations but the setup is "
+            "incomplete: its signing key, its authorisation from MolTrace, that "
+            "authorisation's signature and the published offline working period must all be "
+            "present together, or none of them."
+        ]
+    try:
+        resolve_authority(settings)
+    except AuthorityUnavailable as unavailable:
+        return [unavailable.detail]
+    return []
 
 
 def validate_startup_settings(settings: Settings) -> list[str]:
@@ -564,6 +637,7 @@ def validate_startup_settings(settings: Settings) -> list[str]:
                 f"WEBAUTHN_ORIGIN {settings.webauthn_origin!r} {primary_reason}; passkeys cannot "
                 "work in production against it."
             )
+    issues.extend(_entitlement_issues(settings))
     # A missing knowledge base does not stop the service — it silently answers from a
     # 16-molecule seed table (~35 ppm median 13C uncertainty vs ~1.88 ppm with the full
     # NMRShiftDB2 index), which is why it must be a startup issue rather than something

@@ -92,6 +92,11 @@ class MobileActor:
     user_id: int | None = None
     email: str | None = None
     system_api_key: bool = False
+    #: Whether this caller may set an installation's status to "revoked" on a device session
+    #: they do not own. A CAPABILITY, not a role: it is resolved by the policy engine at the
+    #: request boundary and is consulted only on that one transition, so nothing else on this
+    #: surface widens. Never set it from a role read at a call site.
+    may_revoke_any_device: bool = False
 
 
 DEFAULT_MOBILE_PROGRAM_ORDER = ["spectracheck", "regulatory_hub", "reaction_optimization"]
@@ -289,8 +294,34 @@ def update_device_session(
         _assert_safe_mobile_json(payload.metadata_json, path="metadata_json")
     with session_scope(session_factory) as session:
         row = _require_device_session(session, device_session_id)
-        _assert_session_visible(row, actor=actor)
         updates = payload.model_dump(exclude_unset=True)
+        revoking_only = set(updates) == {"status"} and updates.get("status") == "revoked"
+        # An administrator may withdraw offline use from an installation they do not own —
+        # revocation that required the compromised user's own cooperation would not be much of
+        # a control. The capability is scoped to THIS ONE TRANSITION and is resolved by the
+        # policy engine, never by reading a role here.
+        #
+        # Scoped to the transition rather than to the resource on purpose. Relaxing
+        # ``_assert_session_visible`` instead would hand an administrator EVERY write on any
+        # installation — relabelling it, re-pointing whose it is, rewriting its metadata,
+        # putting a withdrawn one back into service — when the problem being solved is
+        # withdrawal alone. Granting a set of authorities to fix one of them is how a bug fix
+        # becomes an authority expansion nobody reviewed.
+        #
+        # (The predicate guards this write and only this write. Listing scopes itself in the
+        # query above, so an administrator's own listing is unaffected either way; the
+        # over-grant here would have been on the write side, not the read side.)
+        #
+        # Owner scope is asked FIRST and the capability is consulted only where it refused, so
+        # there is exactly one notion of who owns an installation. Deriving a second one here
+        # would be two rules for one question, which is how they drift apart.
+        try:
+            _assert_session_visible(row, actor=actor)
+            outside_owner_scope = False
+        except MobileExperienceNotFoundError:
+            if not (revoking_only and actor.may_revoke_any_device):
+                raise
+            outside_owner_scope = True
         for field in ("device_label", "device_type", "platform", "browser", "status"):
             if field in updates:
                 setattr(row, field, _clean_optional(updates[field]) if field != "status" else updates[field])
@@ -298,6 +329,8 @@ def update_device_session(
             row.user_email = str(payload.user_email).lower()
         if payload.metadata_json is not None:
             row.metadata_json = _json_dump(payload.metadata_json)
+        if payload.identity_public_key is not None:
+            _apply_identity_key(row, payload.identity_public_key)
         row.last_seen_at = utcnow()
         _audit(
             session,
@@ -306,9 +339,32 @@ def update_device_session(
             message="Mobile device session updated.",
             entity_type="mobile_device_session",
             entity_id=row.id,
-            metadata={"status": row.status},
+            # A withdrawal performed by someone the owner scope would have refused is exactly
+            # the event an inspector asks about, so the row says so — and the actor is already
+            # named on it. The field says what happened rather than guessing at a role: an
+            # owner who happens to be an administrator did not act outside their own scope,
+            # and neither name would have described the operator key.
+            metadata={"status": row.status, "revoked_outside_owner_scope": outside_owner_scope},
         )
         return _device_session_to_record(row)
+
+
+def _apply_identity_key(row: MobileDeviceSessionORM, offered: str) -> None:
+    """Write-once. The same key again is the normal desktop re-enrolment path.
+
+    A different key is refused: a signed offline entitlement statement binds to this key, so
+    re-pointing it would silently move an installation's entitlement to other hardware.
+    Clearing it is what decommissioning means here, and that is a withdrawal, not a patch.
+    """
+    if row.identity_public_key and row.identity_public_key != offered:
+        raise MobileExperienceError(
+            "This installation already registered a different identity for offline use. "
+            "Withdraw offline use for it before registering another."
+        )
+    if row.identity_public_key == offered:
+        return
+    row.identity_public_key = offered
+    row.identity_key_enrolled_at = utcnow()
 
 
 def dashboard_summary(session_factory: sessionmaker[Session]) -> MobileDashboardResponse:
@@ -1775,6 +1831,8 @@ def _device_session_to_record(row: MobileDeviceSessionORM) -> MobileDeviceSessio
         status=row.status,  # type: ignore[arg-type]
         created_at=row.created_at,
         metadata_json=_json_dict(row.metadata_json),
+        identity_public_key=row.identity_public_key,
+        identity_key_enrolled_at=row.identity_key_enrolled_at,
     )
 
 
@@ -1889,6 +1947,16 @@ def _audit(
     session.add(row)
     session.flush()
     return int(row.id)
+
+
+def assert_device_session_visible(row: MobileDeviceSessionORM, *, actor: MobileActor) -> None:
+    """The device-session owner scope, for callers outside this module.
+
+    One rule in one place. ``entitlement_store`` has to answer "is this the caller's own
+    installation?" exactly the way this surface answers it — a second copy of an authorization
+    rule drifts, and the half that drifts becomes either a leak or a lockout.
+    """
+    _assert_session_visible(row, actor=actor)
 
 
 def _assert_session_visible(row: MobileDeviceSessionORM, *, actor: MobileActor) -> None:
