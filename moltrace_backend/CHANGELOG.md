@@ -14,7 +14,7 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
-## v0.69.13 — An installation could not tell whether its science matched the workspace's (2026-08-22)
+## v0.78.0 — An installation could not tell whether its science matched the workspace's (2026-08-22)
 
 A desktop installation keeps its own copy of the deterministic rule sets. Nothing on the wire
 said which ones this workspace had adopted: `/system/version` returns build metadata,
@@ -58,7 +58,7 @@ structurally: no function other than the catalogue's own route may consult it.
 
 ---
 
-## v0.70.0 — A deployment can license its own offline installations, without ever calling home (2026-08-22)
+## v0.77.0 — A deployment can license its own offline installations, without ever calling home (2026-08-22)
 
 An offline installation cannot ask the server whether the customer is still entitled, and a
 licence that requires a callback gets rejected by pharmaceutical IT before the science is
@@ -171,7 +171,7 @@ sign a certificate on a machine with a network route unless told to.
 
 ---
 
-## v0.69.11 — A 401 or 403 said more to a direct caller than to a browser (2026-08-22)
+## v0.76.0 — A 401 or 403 said more to a direct caller than to a browser (2026-08-22)
 
 The `/api/backend` proxy replaces `detail` on every 401 and 403, so a browser never sees
 the backend's prose on those statuses. A client that talks to the API directly — a desktop
@@ -237,7 +237,7 @@ No migration; no ORM object is touched.
 
 ---
 
-## v0.69.10 — One `rp_id`, several exact origins (2026-08-21)
+## v0.75.0 — One `rp_id`, several exact origins (2026-08-21)
 
 Hardware-backed step-up pinned exactly one expected origin, server-side. That is where its
 phishing resistance comes from, and it is also why a deployment whose users legitimately arrive
