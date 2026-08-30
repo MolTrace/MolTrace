@@ -712,6 +712,7 @@ from .models import (
     ReactionStructureScheme,
     ReactionStructureSchemeCreate,
     ReactionStructureSchemeDeleteRequest,
+    ReactionSurrogateModelRecord,
     ReactionVariable,
     ReactionVariableCreate,
     ReactionVariableUpdate,
@@ -5591,6 +5592,37 @@ def get_reaction_bayesian_optimization_run_route(
     )
     if record is None:
         raise HTTPException(status_code=404, detail="Reaction Bayesian optimization run not found.")
+    return record
+
+
+@router.get(
+    "/reaction-optimization/bo-runs/{bo_run_id}/surrogate",
+    response_model=ReactionSurrogateModelRecord,
+    dependencies=[Depends(require_access_context), Depends(require_reaction_access)],
+)
+def get_reaction_bo_surrogate_route(
+    bo_run_id: int,
+    request: Request,
+) -> ReactionSurrogateModelRecord:
+    """The surrogate a BO run fitted: version, feature encoding, fit metrics, its warnings.
+
+    Every run wrote this record and nothing could read it -- no caller, no route -- so the one
+    artifact saying whether the model behind a recommendation was any good was invisible.
+
+    Sits under ``/reaction-optimization/bo-runs/`` deliberately: ``reaction_access`` resolves
+    that prefix's ``bo_run_id`` to the owning project by ``startswith``, so this nested path
+    inherits the same owner scoping as its sibling rather than needing a new resolver. A run
+    that does not exist and one owned by someone else return the same 404.
+    """
+
+    record = reaction_bo.get_surrogate_record_for_run(
+        _state(request).session_factory,
+        bo_run_id,
+    )
+    if record is None:
+        raise HTTPException(
+            status_code=404, detail="Reaction surrogate model record not found."
+        )
     return record
 
 
