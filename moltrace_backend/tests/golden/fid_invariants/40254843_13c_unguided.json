@@ -18,7 +18,7 @@
     },
     {
       "integration_h": 101.5,
-      "multiplicity": "br s",
+      "multiplicity": "s",
       "shift_ppm": 77.702
     },
     {
@@ -28,7 +28,7 @@
     },
     {
       "integration_h": 4.5,
-      "multiplicity": "br s",
+      "multiplicity": "s",
       "shift_ppm": 75.847
     },
     {
@@ -38,17 +38,17 @@
     },
     {
       "integration_h": 49.5,
-      "multiplicity": "br s",
+      "multiplicity": "s",
       "shift_ppm": 53.499
     },
     {
       "integration_h": 56.5,
-      "multiplicity": "br s",
+      "multiplicity": "s",
       "shift_ppm": 46.892
     },
     {
       "integration_h": 59.5,
-      "multiplicity": "br s",
+      "multiplicity": "s",
       "shift_ppm": 25.555
     },
     {
@@ -58,7 +58,7 @@
     },
     {
       "integration_h": 74.5,
-      "multiplicity": "br s",
+      "multiplicity": "s",
       "shift_ppm": 9.809
     },
     {

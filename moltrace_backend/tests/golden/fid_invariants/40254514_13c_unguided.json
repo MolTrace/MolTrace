@@ -8,12 +8,12 @@
   "peaks": [
     {
       "integration_h": 11.0,
-      "multiplicity": "br s",
+      "multiplicity": "s",
       "shift_ppm": 77.958
     },
     {
       "integration_h": 103.5,
-      "multiplicity": "br s",
+      "multiplicity": "s",
       "shift_ppm": 77.701
     },
     {
@@ -28,7 +28,7 @@
     },
     {
       "integration_h": 54.0,
-      "multiplicity": "br s",
+      "multiplicity": "s",
       "shift_ppm": 42.694
     },
     {
@@ -38,7 +38,7 @@
     },
     {
       "integration_h": 61.0,
-      "multiplicity": "br s",
+      "multiplicity": "s",
       "shift_ppm": 35.01
     },
     {
@@ -53,7 +53,7 @@
     },
     {
       "integration_h": 61.5,
-      "multiplicity": "br s",
+      "multiplicity": "s",
       "shift_ppm": 30.028
     },
     {
