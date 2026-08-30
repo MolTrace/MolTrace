@@ -84,8 +84,14 @@ REDISTRIBUTION IN THE DESKTOP APPLICATION. From 2026-08-30 the packaged MolTrace
 desktop build SHIPS the precomputed index (hose_index.json.gz) inside the frozen
 local service, because without it the predictor answers from the 16-molecule seed
 and a structure check cannot tell a right answer from a wrong one -- measured, it
-ranked ethanol above ethylene glycol on ethylene glycol's own spectrum. That
-artifact is therefore a CC BY-SA redistribution: this NOTICE travels inside it
+ranked ethanol above ethylene glycol on ethylene glycol's own spectrum.
+
+From the same date it also ships the reference spectrum library
+(spectrum_library.json.gz -- 43,516 assigned spectra as shift lists) that the
+similarity lookup searches. That is a second derivative of the same source and
+carries the same obligation.
+
+The artifact is therefore a CC BY-SA redistribution: this NOTICE travels inside it
 beside the table, and the application states the source and the licence on screen
 wherever a predicted shift is shown. Anyone redistributing that build inherits the
 same ShareAlike and attribution obligation. The small literature seed table embedded
