@@ -668,6 +668,24 @@
         + 'coverage beside it.'))
     }
 
+    // WHEN THE ORDERING DOES NOT SURVIVE THE MEASUREMENT, say so above it. The
+    // shares are resampled within the spectrum's own resolution; if the gap
+    // between the top two ever closes to nothing, the order is an artefact of
+    // how precisely the shifts happen to be known and must not be read as a
+    // result.
+    const sep = r.separation || {}
+    if (sep.checked && !sep.separated) {
+      c.append(alert('warn', 'This ranking does not separate the top two',
+        'Re-measured ' + sep.resamples + ' times within this spectrum\u2019s own resolution ('
+        + Number(sep.shift_uncertainty_ppm).toFixed(3) + ' ppm), the gap between the leading two '
+        + 'candidates closes to nothing. The order below is not evidence for one over the other.'))
+    } else if (sep.checked && sep.separated) {
+      c.append(node('p', 'tablenote',
+        'The leader stayed ahead by at least ' + (Number(sep.narrowest_margin) * 100).toFixed(1)
+        + ' points across ' + sep.resamples + ' re-measurements within this spectrum\u2019s own '
+        + 'resolution.'))
+    }
+
     const table = node('table', 'peaks rank__table')
     const thead = node('thead'); const hr = node('tr')
     for (const label of ['#', 'Structure', 'Share', 'Matched', 'Mean error (ppm)', 'RMS (ppm)'])
