@@ -32,6 +32,7 @@ from .local_science import (
     SpectrumUnreadable,
     open_spectrum,
     process_spectrum,
+    rank_candidates,
     verify_candidate,
 )
 from .offline_policy import is_served_locally
@@ -50,6 +51,7 @@ ROUTES: dict[str, tuple[str, str]] = {
     "fid.process": ("POST", "/fid/process"),
     "fid.open": ("POST", "/fid/open"),
     "structure.verify": ("POST", "/structure/verify"),
+    "structure.rank": ("POST", "/structure/rank"),
 }
 
 #: Kept as a name because tests and callers read it, derived so it cannot drift.
@@ -250,6 +252,45 @@ def _structure_verify(payload: dict = _BODY) -> dict[str, Any]:
     return result
 
 
+def _structure_rank(payload: dict = _BODY) -> dict[str, Any]:
+    """Order candidate structures by shift agreement, over this acquisition.
+
+    Not `async`, for the reason `fid.open` is not: blocking numerical work with no
+    await in it, and a coroutine would run it on the event loop.
+
+    DP4 normalises over the candidates supplied, so this takes a list and refuses
+    a single one -- a DP4 figure for one structure is 1.0 and means nothing.
+    """
+    HANDLER_CALLS.append("structure.rank")
+    path = str(payload.get("path") or "")
+    raw = payload.get("smiles")
+    smiles = [str(s) for s in raw] if isinstance(raw, list) else []
+    if not path:
+        _journal("structure.rank", refused=True, cause="no file was named")
+        raise HTTPException(status_code=400, detail="no file was named")
+    if len([s for s in smiles if s.strip()]) < 2:
+        _journal("structure.rank", refused=True, cause="fewer than two candidates")
+        raise HTTPException(
+            status_code=400,
+            detail="ranking compares candidates against each other, so it needs at least two",
+        )
+    try:
+        result = rank_candidates(path, smiles)
+    except SpectrumUnreadable as unreadable:
+        _journal("structure.rank", refused=True, cause=str(unreadable))
+        raise HTTPException(status_code=400, detail=str(unreadable)) from None
+
+    # How many were ordered, not what they were: the candidates are the chemist's
+    # unpublished thinking and the journal is not the place for it.
+    _journal(
+        "structure.rank",
+        refused=False,
+        cause=f"{len(result['rows'])} candidates over {result['observed_peaks']} peaks",
+    )
+    return result
+
+
+
 
 class TransportGuardMiddleware:
     """Runs before routing, before the body, before any handler."""
@@ -321,6 +362,7 @@ def create_local_app(
         "fid.process": _fid_process,
         "fid.open": _fid_open,
         "structure.verify": _structure_verify,
+        "structure.rank": _structure_rank,
     }
     for operation, (method, path) in ROUTES.items():
         handler = handlers.get(operation)

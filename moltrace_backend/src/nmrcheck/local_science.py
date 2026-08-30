@@ -437,6 +437,149 @@ def _multiplet_category(multiplet: object, categories: dict[int, tuple[str, floa
     return {"category": str(best[0]), "category_confidence": float(best[1])}
 
 
+
+#: What a DP4 number IS, in the words the web module already uses. Emitted from
+#: here rather than written in the interface so the two surfaces cannot drift into
+#: describing the same figure differently.
+_DP4_BASIS = (
+    "A relative ranking across the candidates supplied, not a calibrated probability that "
+    "the structure is correct. The DP4 error model was fitted to DFT-computed shifts; the "
+    "shifts ranked here come from an empirical predictor with a wider measured error."
+)
+
+
+def rank_candidates(path: str | Path, smiles_list: Sequence[str]) -> dict:
+    """Order candidate structures by how well their predicted shifts fit this spectrum.
+
+    DP4 IS ONLY MEANINGFUL ACROSS A SET. Its probabilities are normalised over the
+    candidates supplied and sum to one, so a DP4 figure for a single structure is
+    1.0 and says nothing. That is why this takes a list and why the interface
+    offers it only from the second candidate on.
+
+    It is a SECOND, INDEPENDENT reading beside `verify_candidate`: the verifier
+    combines four tests through a Bayesian update, DP4 asks one narrower question
+    -- how well do these predicted shifts agree -- under Smith & Goodman's error
+    model. Two methods agreeing is worth more than either alone; two disagreeing
+    is worth knowing.
+
+    The number is NOT a calibrated probability and is labelled as such at every
+    layer, because the error model was fitted to DFT shifts and these come from an
+    empirical predictor with a wider measured error.
+    """
+    source = Path(path)
+    if not source.exists():
+        raise SpectrumUnreadable("that file is no longer where it was")
+    candidates = [str(c or "").strip() for c in smiles_list]
+    candidates = [c for c in candidates if c]
+    if len(candidates) < 2:
+        raise SpectrumUnreadable(
+            "ranking compares candidates against each other, so it needs at least two"
+        )
+
+    from moltrace.spectroscopy.predict.nmrnet_wrapper import knowledge_base_status, predict_shifts
+
+    from .dp4_scoring import dp4_probabilities
+
+    summary = open_spectrum(source)
+    nucleus = str(summary["nucleus"])
+    if nucleus not in ("1H", "13C"):
+        raise SpectrumUnreadable(
+            "ranking is defined for 1H and 13C; this acquisition is "
+            + (nucleus or "an unknown nucleus")
+        )
+
+    # THE COMPOUND'S OWN LINES, not everything detected. Solvent, its residual
+    # proton, satellites and impurities are not part of the structure being
+    # proposed, and scoring a candidate against them would penalise a correct
+    # structure for the sample being real.
+    observed = [
+        float(m["center_ppm"])
+        for m in summary["multiplets"]
+        if m["quantifiable"] and m["category"] in ("compound", "")
+    ]
+    if not observed:
+        raise SpectrumUnreadable(
+            "no signal in this spectrum is both strong enough to measure and attributable "
+            "to the compound, so there is nothing to rank a structure against"
+        )
+
+    predicted: list[list[float]] = []
+    for candidate in candidates:
+        try:
+            prediction = predict_shifts(candidate, n_conformers=8)
+        except Exception as bad:  # noqa: BLE001 - the chemist's input, not a fault
+            raise SpectrumUnreadable(
+                f"{candidate!r} could not be read as a molecule ({bad})"
+            ) from None
+        predicted.append([s.predicted_ppm for s in prediction.shifts if s.nucleus == nucleus])
+
+    empty = [c for c, p in zip(candidates, predicted, strict=False) if not p]
+    if empty:
+        raise SpectrumUnreadable(
+            f"no {nucleus} shifts could be predicted for {empty[0]!r}, so it cannot be ranked "
+            f"against a {nucleus} spectrum"
+        )
+
+    scores = dp4_probabilities(
+        observed_shifts_ppm=observed,
+        candidate_predicted_shifts_ppm=predicted,
+        nucleus=nucleus,  # type: ignore[arg-type]
+    )
+
+    # NOTHING MATCHED IS NOT A RANKING. When no candidate pairs with any observed
+    # peak, DP4 gives every one of them a share of zero and the set sums to zero
+    # instead of one. That is correct arithmetic on no evidence -- and rendered to
+    # a person it is three rows of "0.0%" that look exactly like a ranking in
+    # which every candidate did badly, rather than one that could not be made.
+    # Measured across this corpus it happens on 2 of the first 6 acquisitions.
+    if all(int(score.matched_peaks) == 0 for score in scores):
+        raise SpectrumUnreadable(
+            f"none of these structures matched any of the {len(observed)} measured "
+            f"{nucleus} signals, so there is nothing to rank them on. Check the structures, "
+            f"or that this spectrum is the compound you think it is."
+        )
+
+    status = knowledge_base_status()
+    rows = []
+    for candidate, score in zip(candidates, scores, strict=False):
+        matched = int(score.matched_peaks)
+        rows.append(
+            {
+                "smiles": candidate,
+                "probability": float(score.probability),
+                # Never true today. The flag exists so the claim tracks a future
+                # calibration instead of a comment promising one.
+                "probability_is_calibrated": False,
+                "probability_basis": _DP4_BASIS,
+                "matched_peaks": matched,
+                "observed_peaks": len(observed),
+                "mean_abs_error_ppm": float(score.mean_abs_error_ppm),
+                "rms_error_ppm": float(score.rms_error_ppm),
+                # Errors are computed over MATCHED peaks only, so a candidate that
+                # matched one line of eight can post a flattering error. The
+                # coverage travels with the error for exactly that reason.
+                "error_basis": "matched_peaks_only",
+                "coverage": matched / len(observed) if observed else 0.0,
+                # Structural, not tuned: fewer than half the compound's own lines
+                # matched means the error figures describe a minority of the
+                # evidence.
+                "low_coverage": matched * 2 < len(observed),
+            }
+        )
+    rows.sort(key=lambda r: -r["probability"])
+
+    return {
+        "nucleus": nucleus,
+        "observed_peaks": len(observed),
+        "rows": rows,
+        "knowledge_base": {
+            "source": status.get("source") or "unknown",
+            "reference_count": int(status.get("reference_count") or 0),
+        },
+        "human_review_required": True,
+    }
+
+
 def _has_processed_spectrum(source: Path) -> bool:
     """Did the instrument write one at all?
 
