@@ -164,6 +164,51 @@ function archiveApp(appPath, outDir, config) {
   return zipPath
 }
 
+// THE ICON IS BUILT, NOT COMMITTED. It is derived from the product's own masked
+// mark in the frontend, so the desktop and the web wear the same face and cannot
+// drift into two: a checked-in .icns is a 1.6 MB binary that nothing regenerates
+// when the mark changes, and the first person to update the brand would not know
+// this file existed.
+//
+// 512 is the largest MASKED source that exists. The 1024 slot is interpolated
+// from it and macOS only reaches it on a Retina 512pt draw. The unmasked 1024
+// render is deliberately not used: deriving the hexagon from it leaves the dark
+// facets transparent, which is why the repo's own generator constructs the mask
+// rather than detecting it.
+const ICON_SOURCE = path.join(
+  ROOT, '..', 'moltrace_frontend', 'public', 'icons', 'moltrace-mark-3d-hex-512.png',
+)
+const ICONSET_SIZES = [
+  [16, '16x16'], [32, '16x16@2x'], [32, '32x32'], [64, '32x32@2x'],
+  [128, '128x128'], [256, '128x128@2x'], [256, '256x256'], [512, '256x256@2x'],
+  [512, '512x512'], [1024, '512x512@2x'],
+]
+
+function buildIcon() {
+  if (process.platform !== 'darwin') return null
+  if (!fs.existsSync(ICON_SOURCE)) {
+    console.log('  no icon source at ' + ICON_SOURCE + ' — packaging without an icon')
+    return null
+  }
+  const buildDir = path.join(ROOT, 'build')
+  const iconset = path.join(buildDir, 'MolTrace.iconset')
+  const icns = path.join(buildDir, 'icon.icns')
+  fs.rmSync(iconset, { recursive: true, force: true })
+  fs.mkdirSync(iconset, { recursive: true })
+  for (const [px, name] of ICONSET_SIZES) {
+    execFileSync('sips', ['-z', String(px), String(px), ICON_SOURCE,
+      '--out', path.join(iconset, `icon_${name}.png`)], { stdio: 'pipe' })
+  }
+  // iconutil refuses the whole set if one required name is missing, so the count
+  // is checked here rather than discovered as an opaque "Failed to generate ICNS".
+  const written = fs.readdirSync(iconset).filter((n) => n.endsWith('.png')).length
+  if (written !== ICONSET_SIZES.length) {
+    throw new Error(`icon set has ${written} of ${ICONSET_SIZES.length} sizes`)
+  }
+  execFileSync('iconutil', ['-c', 'icns', iconset, '-o', icns], { stdio: 'pipe' })
+  return icns
+}
+
 async function main() {
   const overlayPath = process.argv.find((a) => a.startsWith('--config='))
   const config = overlayPath
@@ -237,6 +282,9 @@ async function main() {
     )
   }
 
+  const iconPath = buildIcon()
+  if (iconPath) console.log('  icon: built from the product mark')
+
   console.log(`Packaging ${config.productName}${isPreview ? ' (PREVIEW — unsigned, unentitled)' : ''}`)
 
   const appPaths = await packager({
@@ -247,6 +295,17 @@ async function main() {
     // is a visible change to this line and not a silent one.
     osxSign: false,
     osxNotarize: false,
+    // THE APP HAD NO ICON AT ALL, so macOS drew the generic Electron document in
+    // the Dock, in Finder and in the switcher -- the first thing a tester sees,
+    // and it says "someone's prototype" before the window even opens.
+    //
+    // Built from the product's own masked mark
+    // (moltrace_frontend/public/icons/moltrace-mark-3d-hex-512.png) rather than a
+    // redraw, so the desktop and the web wear the same face. 512 is the largest
+    // masked source that exists; the 1024 slot is interpolated from it, which
+    // macOS only reaches on a Retina 512pt draw. Regenerate with the recipe in
+    // PACKAGING.md if the mark ever changes.
+    icon: iconPath || undefined,
     name: config.productName,
     appVersion: require('../package.json').version,
     // The frozen service rides in Resources/service/; local-service.js looks for

@@ -29,3 +29,9 @@ product.private.json
 
 # Local overlays a developer points MOLTRACE_PRODUCT_CONFIG at
 product.local.json
+
+# The app icon is DERIVED from the product mark at package time (scripts/package.js
+# builds it from moltrace_frontend/public/icons/), so it is generated output, not
+# source. Committing the .icns would be a 1.6 MB binary that nothing regenerates
+# when the brand changes.
+build/
