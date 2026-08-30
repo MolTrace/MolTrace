@@ -1092,3 +1092,54 @@ def test_dp4_ranking_needs_a_set_and_says_it_is_not_a_probability() -> None:
         assert row["error_basis"] == "matched_peaks_only"
         assert row["matched_peaks"] <= row["observed_peaks"]
         assert row["low_coverage"] is (row["matched_peaks"] * 2 < row["observed_peaks"])
+
+
+@pytest.mark.slow
+def test_similar_spectra_is_a_lookup_that_states_its_own_hit_rate() -> None:
+    """A library lookup, searched within the query's own nucleus.
+
+    The encoding is 128 bins of 1H beside 128 of 13C, so a 13C query and a 1H
+    reference of the SAME compound occupy different halves and score near zero
+    against each other. Measuring across them gave 30%; measuring within a
+    nucleus gave 48% first and 63% in the top five, and the second number is the
+    one that describes what this actually does.
+
+    The rate travels with the result because a lookup whose accuracy is unstated
+    is one a chemist cannot weigh -- and because a compound ABSENT from the
+    library still gets its five nearest neighbours back, which look identical to
+    five real hits.
+    """
+    from nmrcheck.local_science import SpectrumUnreadable, find_similar_spectra
+
+    source = _one("instrument") or _one("moltrace")
+    if source is None:
+        pytest.skip("no acquisition in this checkout")
+
+    try:
+        result = find_similar_spectra(source, 5)
+    except SpectrumUnreadable as why:
+        if "carries no" in str(why):
+            pytest.skip("this build ships no reference library")
+        raise
+
+    assert result["human_review_required"] is True
+    assert result["library_size"] > 0
+    assert result["library_source"], "the result does not say where the references came from"
+    assert result["library_license"], "a CC BY-SA library must carry its licence to the reader"
+    assert 1 <= len(result["matches"]) <= 5
+
+    # DISTANCE, not similarity: `exact_knn` and the platform's own
+    # `vector_similarity` both return L2 where LOWER is closer. A key named
+    # "similarity" carrying a distance reads backwards to every caller.
+    distances = [m["distance"] for m in result["matches"]]
+    assert distances == sorted(distances), (
+        "matches are not ordered nearest-first, which means the column a reader "
+        "sorts by disagrees with the order they are shown in"
+    )
+    assert all(m["smiles"] for m in result["matches"]), (
+        "a match reached the boundary with no structure, so the reader would see only "
+        "a database id"
+    )
+
+    rate = result["accuracy"]
+    assert rate["of"] > 0 and rate["first"] <= rate["top5"] <= rate["of"], rate

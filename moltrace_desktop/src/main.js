@@ -251,6 +251,18 @@ ipcMain.handle('moltrace:rank-structures', async (_event, smilesList) => {
   }
 })
 
+ipcMain.handle('moltrace:find-similar', async () => {
+  if (!lastOpenedPath) {
+    return { ok: false, reason: 'Open a spectrum first, then look for similar reference spectra.' }
+  }
+  try {
+    const result = await requestFromService('/spectrum/similar', { path: lastOpenedPath, limit: 5 })
+    return { ok: true, result }
+  } catch (err) {
+    return { ok: false, reason: localService.readFailureReason(err) }
+  }
+})
+
 /** A request to the local service, carrying the credential the renderer cannot see. */
 function requestFromService(path, body) {
   return new Promise((resolve, reject) => {

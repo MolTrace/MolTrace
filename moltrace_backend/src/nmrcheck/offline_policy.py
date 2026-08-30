@@ -70,6 +70,10 @@ POLICY: dict[str, str] = {
     # local bytes and the chemist's own candidates, with no record and no
     # authorization involved.
     "structure.rank": "offline-compute",
+    # Looking a spectrum up against the reference library shipped with the build.
+    # Same class again: local bytes, local library, deterministic arithmetic, no
+    # record and no authorization.
+    "spectrum.similar": "offline-compute",
     # Signing is server-authoritative — identity, step-up and record binding all
     # live there, and §6.5 refuses offline signing in every profile.
     "signature.create": "online-only",

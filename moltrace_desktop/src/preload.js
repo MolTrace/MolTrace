@@ -68,6 +68,9 @@ contextBridge.exposeInMainWorld('moltrace', {
     // A LIST of structures and still no path. DP4 normalises across the set, so
     // this is the one call that has to see them together.
     rankStructures: async (smilesList) => ipcRenderer.invoke('moltrace:rank-structures', smilesList),
+    // No arguments at all: the acquisition is the one already open, and the
+    // library is the one shipped with the build.
+    findSimilar: async () => ipcRenderer.invoke('moltrace:find-similar'),
   },
   // A callback, not an event emitter: the renderer is told THAT something
   // changed and asks again, so nothing crosses the bridge except the invitation.

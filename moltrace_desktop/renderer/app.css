@@ -222,7 +222,14 @@ body {
 .statusdot[data-state="down"] { background: var(--mt-red); }
 @keyframes pulse { 0%, 100% { opacity: 1 } 50% { opacity: 0.35 } }
 
-.page { padding: 22px 24px 56px; max-width: 1180px; }
+/* PROSE IS CAPPED; TABLES ARE NOT. A single max-width on the page capped both,
+ * which left a wide window half empty AND squeezed the numbers: a candidate's
+ * SMILES wrapped to four lines while share, coverage and error were crushed into
+ * the last third. Reading measure is a property of running text, not of a table,
+ * so the cap moved onto the text. */
+.page { padding: 22px 24px 56px; }
+.page > .card, .page > .alert, .page > .previewbanner { max-width: 1400px; }
+.page__head, .card__desc, .alert__body, .tablenote { max-width: 92ch; }
 .page__head { margin-bottom: 18px; }
 .page__title { font-family: var(--mono); font-size: 24px; font-weight: 700; letter-spacing: -0.02em; margin: 0; }
 .page__sub { color: var(--muted-foreground); margin: 6px 0 0; max-width: 68ch; }
@@ -390,4 +397,17 @@ table.peaks tbody tr:hover { background: var(--muted); }
   border-bottom: 1px solid var(--border);
   color: var(--mt-amber-ink);
   font-family: var(--mono); font-size: 12px; font-weight: 600;
+}
+
+.similar__smiles {
+  max-width: 30ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+
+/* A typed SMILES with explicit stereochemistry runs to hundreds of characters.
+ * Wrapped it becomes four lines of the table; clipped it stays one row and the
+ * whole string is on the element for anyone who wants it. The reader typed it,
+ * so they already know which candidate this is. */
+.rank__smiles, .similar__smiles {
+  max-width: 46ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
