@@ -640,3 +640,184 @@ def test_a_cutaneous_dossier_is_not_given_q3c_solvent_limits(client, api_headers
         assert match.get("threshold_triggered") is not True
         # And the refusal must name its cause rather than going quiet.
         assert any("cutaneous" in w for w in body["warnings_json"]), body["warnings_json"]
+
+
+def test_an_undeclared_route_is_not_silently_recorded_as_the_most_permissive_one(client, api_headers):
+    """ICH Q3D PDEs are route-dependent, and `dossier.route or "oral"` picked the most permissive
+    route for every element in the table when a dossier declared none — nickel is 200 ug/day oral
+    against 5 inhalation, mercury 30 against 1. The assumed route was then written onto the record
+    as `"route": "oral"`, so a reviewer could not tell an assumed route from a declared one.
+
+    The sibling gap in this same function already behaves correctly: a missing dose warns and
+    withholds the permitted concentration. A missing route did neither.
+
+    Nickel at 50 ppm with a 1 g/day dose passes under the assumed oral limit (200 ppm) and fails
+    under inhalation (5 ppm), so the assumption is load-bearing here and no verdict may be asserted.
+    """
+    headers = api_headers
+    with client:
+        juris = _jurisdiction(client, headers, "Q3D noroute US", "US")
+        res = client.post(
+            "/regulatory/dossiers",
+            headers=headers,
+            json={
+                "title": "No-route dossier",
+                "product_name": "No-route product",
+                "compound_name": "No-route compound",
+                "jurisdiction_id": juris["id"],
+                "intended_use": "Research decision support",
+                "max_daily_dose_g": 1.0,
+            },
+        )
+        assert res.status_code == 201, res.text
+        dossier = res.json()
+        assert dossier["route"] is None
+
+        assessment = client.post(
+            f"/regulatory/dossiers/{dossier['id']}/elemental-impurity-assessment",
+            headers=headers,
+            json={"elements_json": [{"element": "Ni", "observed_ppm": 50.0}]},
+        )
+        assert assessment.status_code == 201, assessment.text
+        body = assessment.json()
+        ni = next(m for m in body["elemental_summary_json"]["assessed_elements"]
+                  if m["input_element"] == "Ni")
+
+        # The record must distinguish an assumed route from a declared one.
+        assert ni.get("route_assumed") is True, ni
+
+        # And must not assert a pass against a limit the assumption chose.
+        assert ni.get("threshold_triggered") is not False, (
+            "nickel at 50 ppm was reported as within limits using the assumed oral PDE, "
+            "when the inhalation limit for the same element is 5 ppm"
+        )
+
+        # A withheld verdict must still reach the reviewer: existing readers flag a row on
+        # `threshold_triggered is True OR review_required is True`, so a withheld verdict that
+        # left both unset would render as "nothing to see here".
+        assert ni.get("review_required") is True, ni
+
+        assert any("route" in w.lower() for w in body["warnings"]), body["warnings"]
+
+
+def test_an_undeclared_route_still_gives_a_verdict_when_the_route_cannot_change_it(client, api_headers):
+    """Lead's PDE is 5 ug/day on all three encoded routes, so an undeclared route cannot change the
+    answer and withholding the verdict would be destructive rather than careful. The rule reads the
+    actual Q3D table instead of applying one blanket policy to every element."""
+    headers = api_headers
+    with client:
+        juris = _jurisdiction(client, headers, "Q3D noroute Pb US", "US")
+        res = client.post(
+            "/regulatory/dossiers",
+            headers=headers,
+            json={
+                "title": "No-route Pb dossier",
+                "product_name": "Pb product",
+                "compound_name": "Pb compound",
+                "jurisdiction_id": juris["id"],
+                "intended_use": "Research decision support",
+                "max_daily_dose_g": 1.0,
+            },
+        )
+        assert res.status_code == 201, res.text
+        dossier = res.json()
+
+        assessment = client.post(
+            f"/regulatory/dossiers/{dossier['id']}/elemental-impurity-assessment",
+            headers=headers,
+            json={"elements_json": [{"element": "Pb", "observed_ppm": 10.0}]},
+        )
+        assert assessment.status_code == 201, assessment.text
+        pb = next(m for m in assessment.json()["elemental_summary_json"]["assessed_elements"]
+                  if m["input_element"] == "Pb")
+        assert pb.get("route_assumed") is True
+        assert pb["threshold_triggered"] is True  # 10 ppm > 5 ppm on every route
+
+
+def test_an_exceedance_that_holds_on_every_route_is_still_reported_as_one(client, api_headers):
+    """Withholding the verdict must not soften a failure that no route could rescue.
+
+    Oral is the most permissive route for all 24 encoded elements and permitted concentration is
+    monotonic in the PDE, so `observed >= oral limit` implies the exceedance holds on parenteral
+    and inhalation too. In that region the assumed route cannot decide the answer and a
+    determination IS available -- withholding it would downgrade a confirmed exceedance to
+    "undetermined", which is the safety direction inverted.
+
+    Nickel at 500 ppm with a 1 g/day dose is over the limit on oral (200 ppm), parenteral (20) and
+    inhalation (5) alike.
+    """
+    headers = api_headers
+    with client:
+        juris = _jurisdiction(client, headers, "Q3D noroute fail US", "US")
+        res = client.post(
+            "/regulatory/dossiers",
+            headers=headers,
+            json={
+                "title": "No-route exceedance dossier",
+                "product_name": "Exceedance product",
+                "compound_name": "Exceedance compound",
+                "jurisdiction_id": juris["id"],
+                "intended_use": "Research decision support",
+                "max_daily_dose_g": 1.0,
+            },
+        )
+        assert res.status_code == 201, res.text
+        dossier = res.json()
+
+        assessment = client.post(
+            f"/regulatory/dossiers/{dossier['id']}/elemental-impurity-assessment",
+            headers=headers,
+            json={"elements_json": [{"element": "Ni", "observed_ppm": 500.0}]},
+        )
+        assert assessment.status_code == 201, assessment.text
+        ni = next(m for m in assessment.json()["elemental_summary_json"]["assessed_elements"]
+                  if m["input_element"] == "Ni")
+        assert ni.get("route_assumed") is True
+        assert ni["threshold_triggered"] is True, (
+            "a nickel level over the limit on every encoded route was reported as undetermined"
+        )
+
+
+def test_a_route_with_no_encoded_limit_does_not_report_a_pass(client, api_headers):
+    """ICH Q3D(R2)'s cutaneous appendix is deliberately not encoded: `get_element_pde` returns
+    `route_data_available = False` with no PDE, an explicit "not encoded" rather than a guess.
+
+    The assessment did not act on that. With a dose recorded, the permitted-concentration branch
+    was skipped for want of route data and the missing-dose branch did not fire either, so no
+    warning was raised and `threshold_triggered` kept its initial False -- a measured exceedance
+    on a cutaneous product was stored as being within limits.
+    """
+    headers = api_headers
+    with client:
+        juris = _jurisdiction(client, headers, "Q3D cutaneous US", "US")
+        res = client.post(
+            "/regulatory/dossiers",
+            headers=headers,
+            json={
+                "title": "Cutaneous Q3D dossier",
+                "product_name": "Topical product",
+                "compound_name": "Topical compound",
+                "jurisdiction_id": juris["id"],
+                "intended_use": "Research decision support",
+                "max_daily_dose_g": 1.0,
+                "route": "cutaneous",
+            },
+        )
+        assert res.status_code == 201, res.text
+        dossier = res.json()
+
+        assessment = client.post(
+            f"/regulatory/dossiers/{dossier['id']}/elemental-impurity-assessment",
+            headers=headers,
+            json={"elements_json": [{"element": "Ni", "observed_ppm": 10000.0}]},
+        )
+        assert assessment.status_code == 201, assessment.text
+        body = assessment.json()
+        ni = next(m for m in body["elemental_summary_json"]["assessed_elements"]
+                  if m["input_element"] == "Ni")
+
+        assert ni["threshold_triggered"] is not False, (
+            "10,000 ppm nickel on a route with no encoded limit was recorded as within limits"
+        )
+        assert ni.get("review_required") is True
+        assert any("cutaneous" in w.lower() for w in body["warnings"]), body["warnings"]

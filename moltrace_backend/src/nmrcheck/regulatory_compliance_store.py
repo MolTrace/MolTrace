@@ -1009,6 +1009,28 @@ def _q3c_default(name: str, daily_dose_g: float | None = None) -> dict[str, Any]
     }
 
 
+def _q3d_pde_varies_by_route(element: str) -> bool:
+    """True when this element's ICH Q3D PDE differs across the encoded routes.
+
+    Whether an assumed route is load-bearing is a property of the guidance table, not a policy
+    to apply uniformly: lead is 5 ug/day on oral, parenteral and inhalation alike, so assuming a
+    route cannot change its answer, while nickel is 200 ug/day oral against 5 inhalation and
+    mercury 30 against 1. An element we cannot resolve is treated as load-bearing.
+    """
+
+    from moltrace.regulatory.impurities import get_element_pde
+    from moltrace.regulatory.infra.validation import DataValidationError
+
+    try:
+        values = {
+            get_element_pde(element, candidate).pde_ug_per_day
+            for candidate in ("oral", "parenteral", "inhalation")
+        }
+    except DataValidationError:
+        return True
+    return len(values) > 1
+
+
 def create_residual_solvent_assessment(
     session_factory: sessionmaker[Session],
     dossier_id: int,
@@ -1166,11 +1188,17 @@ def create_elemental_impurity_assessment(
         dossier = _require_dossier(session, dossier_id)
         _require_batch(session, payload.batch_id)
         _require_compound(session, payload.compound_id)
+        # ICH Q3D PDEs are route-dependent and oral is the most permissive route for every
+        # element in the table, so defaulting to it silently picks the loosest limit. The default
+        # stays -- withholding the whole assessment would be worse -- but the record now says the
+        # route was assumed, and no verdict is asserted where the assumption could decide it.
+        route_declared = dossier.route is not None
         route = dossier.route or "oral"
         dose = dossier.max_daily_dose_g
         matches: list[dict[str, Any]] = []
         action_ids: list[int] = []
         warnings: list[str] = []
+        route_withheld: list[str] = []
         for element in payload.elements_json:
             name = str(element.get("element") or element.get("name") or "")
             observed = element.get("observed_ppm") or element.get("measured_ppm")
@@ -1184,6 +1212,10 @@ def create_elemental_impurity_assessment(
                 "route": route,
                 "threshold_triggered": False,
             }
+            if not route_declared:
+                # Set before the lookup, which can `continue` past an unlisted element: every row
+                # of an assessment should carry the flag when the route was assumed.
+                match["route_assumed"] = True
             try:
                 pde = get_element_pde(name, route)
             except DataValidationError:
@@ -1220,8 +1252,37 @@ def create_elemental_impurity_assessment(
                     f"concentration could be calculated for {pde.element}. Record the daily "
                     "dose to obtain the ICH Q3D concentration limit."
                 )
-            if observed_value is not None and permitted_ppm is not None:
-                match["threshold_triggered"] = observed_value >= permitted_ppm
+            elif not pde.route_data_available:
+                # The guidance encodes no limit for this route, so there is nothing to measure
+                # against. Saying so is the only honest answer; the branch above cannot run and
+                # without this one the row kept its initial "within limits".
+                warnings.append(
+                    f"ICH Q3D does not encode a {route} limit for {pde.element}, so no permitted "
+                    "concentration could be calculated and no pass or fail is reported for it. "
+                    "Assess it against the ICH Q3D(R2) appendix for this route."
+                )
+            # Only a PASS can have been decided by the assumed route. Oral is the most permissive
+            # route for every encoded element and permitted concentration is monotonic in the PDE,
+            # so a level at or above the oral limit is at or above every other route's limit too --
+            # withholding there would downgrade a confirmed exceedance to "undetermined".
+            route_could_decide = not route_declared and _q3d_pde_varies_by_route(name)
+            if observed_value is not None and permitted_ppm is None:
+                # A measured level with no limit to measure it against is undetermined, never a
+                # pass: the initialiser would otherwise stand as one.
+                match["threshold_triggered"] = None
+                match["review_required"] = True
+            elif observed_value is not None and permitted_ppm is not None:
+                exceeds = observed_value >= permitted_ppm
+                if exceeds or not route_could_decide:
+                    match["threshold_triggered"] = exceeds
+                else:
+                    # Not False: a "within limits" chosen by an assumption is the reading to
+                    # prevent. Existing readers flag a row on `threshold_triggered is True OR
+                    # review_required is True`, so without the second key a withheld verdict
+                    # would render as "nothing to see here".
+                    match["threshold_triggered"] = None
+                    match["review_required"] = True
+                    route_withheld.append(pde.element)
             if pde.element_class == "1":
                 match["review_required"] = True
             if match.get("threshold_triggered") or match.get("review_required"):
@@ -1243,6 +1304,16 @@ def create_elemental_impurity_assessment(
                 )
                 action_ids.append(action.id)
             matches.append(match)
+        if route_withheld:
+            # One warning naming every affected element, not one paragraph per element: a full
+            # 24-element panel would otherwise repeat the same sentence 22 times.
+            named = ", ".join(sorted(route_withheld))
+            warnings.append(
+                "No route of administration is recorded for this dossier, so these elements were "
+                f"measured against the oral limit -- the most permissive route: {named}. Their "
+                "limits change with the route, so no pass or fail is reported for them. Record "
+                "the route of administration to obtain a determination."
+            )
         status = "action_required" if action_ids else "ready_for_review"
         row = BatchRegulatoryAssessmentORM(
             dossier_id=dossier_id,
@@ -1250,7 +1321,14 @@ def create_elemental_impurity_assessment(
             compound_id=payload.compound_id,
             overall_status=status,
             elemental_summary_json=_json_dump(
-                {"assessed_elements": matches, "route": route, "action_required": bool(action_ids)}
+                {
+                    "assessed_elements": matches,
+                    "route": route,
+                    # The header renders this route string; without the flag beside it an assumed
+                    # "oral" is indistinguishable from a declared one.
+                    "route_assumed": not route_declared,
+                    "action_required": bool(action_ids),
+                }
             ),
             action_item_ids_json=_json_dump(action_ids),
             warnings_json=_json_dump(warnings),
