@@ -140,6 +140,14 @@ class MultipletSummary:
     #: broad features or poor fits rather than merged pairs, so a flag would cry
     #: wolf. The number is shown; the chemist judges.
     width_hz: float
+    #: What this signal appears to BE: the compound, the solvent, its residual
+    #: proton, an impurity, a 13C satellite, or an artifact. A chemist otherwise
+    #: identifies these by eye every time they read a spectrum, and the engine
+    #: already knows: `classify_peaks` was computed nowhere and shown never.
+    category: str
+    #: How sure that call is, 0-1. Shown beside the category rather than used as
+    #: a filter: a low number is information, not a reason to hide a row.
+    category_confidence: float
     #: Area as a FRACTION OF THE TOTAL, never a proton count. Without an assigned
     #: structure there is nothing to normalise against, so a proton count would be
     #: an invention. The wire key says what it is; the display must not relabel it.
@@ -157,6 +165,8 @@ class MultipletSummary:
             "line_count": self.line_count,
             "resolved_lines": self.resolved_lines,
             "width_hz": self.width_hz,
+            "category": self.category,
+            "category_confidence": self.category_confidence,
             "relative_area": self.relative_area,
         }
 
@@ -198,6 +208,7 @@ def _summarise_multiplet(
     baseline_sigma: float,
     total_area: float,
     snr: float,
+    categories: dict[int, tuple[str, float]],
 ) -> MultipletSummary:
     """One signal, with every claim held to the floor this module declares.
 
@@ -228,6 +239,11 @@ def _summarise_multiplet(
         ),
         line_count=len(multiplet.peaks),
         width_hz=float(max((p.width_hz for p in multiplet.peaks), default=0.0)),
+        # THE STRONGEST LINE DECIDES. A multiplet is one signal, so it gets one
+        # answer, and the tallest line in it is the one the call was most
+        # confident about -- averaging categories across lines would invent a
+        # category nothing measured.
+        **_multiplet_category(multiplet, categories),
         resolved_lines=_resolved_line_count(spectrum, multiplet, baseline_sigma),
         snr=snr,
         quantifiable=quantifiable,
@@ -332,6 +348,25 @@ def verify_candidate(path: str | Path, smiles: str) -> dict:
         # the kind of thing that must not be read as a decision.
         "human_review_required": True,
     }
+
+
+
+def _multiplet_category(multiplet: object, categories: dict[int, tuple[str, float]]) -> dict:
+    """What this signal appears to be, taken from its strongest line."""
+    best: tuple[str, float] | None = None
+    best_intensity = -1.0
+    for peak in multiplet.peaks:
+        found = categories.get(id(peak))
+        if found is None:
+            continue
+        if float(peak.intensity) > best_intensity:
+            best_intensity = float(peak.intensity)
+            best = found
+    if best is None:
+        # Unclassified is a state, not a guess. An empty string renders as an em
+        # dash and says nothing, which is the truth.
+        return {"category": "", "category_confidence": 0.0}
+    return {"category": str(best[0]), "category_confidence": float(best[1])}
 
 
 def _has_processed_spectrum(source: Path) -> bool:
@@ -664,6 +699,29 @@ def open_spectrum(path: str) -> dict:
     # Definitional rather than a threshold: at or below the baseline there is
     # nothing to report. Dropped BEFORE `total_area` so they cannot set the scale
     # every other row is divided by either.
+    # WHAT EACH LINE APPEARS TO BE. The engine has always known -- `classify_peaks`
+    # separates the compound from the solvent, its residual proton, impurities,
+    # 13C satellites and artifacts -- and nothing has ever asked it. On one public
+    # acquisition that is 10 impurity lines and 2 satellites a chemist would
+    # otherwise pick out by eye, every time they read the spectrum.
+    #
+    # Classified against the solvent the FILE recorded, not the detected one: the
+    # instrument's record is the fact, and the detector's reading is a second
+    # opinion. Where they disagree that is said below rather than silently
+    # resolved -- a disagreement can mean a mislabelled sample or a mis-referenced
+    # axis, and both are things the chemist needs to know.
+    detected_solvent = ""
+    categories: dict[int, tuple[str, float]] = {}
+    try:
+        from moltrace.spectroscopy.classify import classify_peaks, detect_solvent
+
+        detected_solvent = str(detect_solvent(spectrum, peaks) or "")
+        assigned = classify_peaks(peaks, spectrum.solvent or detected_solvent)
+        categories = {id(peak): assigned[i] for i, peak in enumerate(peaks) if i < len(assigned)}
+    except Exception:  # noqa: BLE001 - a reading without categories beats no reading
+        detected_solvent = ""
+        categories = {}
+
     measured = [(m, _signal_to_noise(spectrum, m, baseline_sigma)) for m in multiplets]
     discarded = [m for m, snr in measured if snr <= 0.0]
     kept = [(m, snr) for m, snr in measured if snr > 0.0]
@@ -678,7 +736,7 @@ def open_spectrum(path: str) -> dict:
     # takes nothing away.
 
     summaries = [
-        _summarise_multiplet(spectrum, m, baseline_sigma, total_area, snr)
+        _summarise_multiplet(spectrum, m, baseline_sigma, total_area, snr, categories)
         for m, snr in kept
     ]
 
@@ -710,6 +768,9 @@ def open_spectrum(path: str) -> dict:
         # and stopped. Empty string when the file does not say, which is honest:
         # the reader never guesses one.
         "solvent": spectrum.solvent,
+        #: What the peaks themselves look like they were run in. A SECOND OPINION,
+        #: never a correction: the file's own record is the fact.
+        "solvent_detected": detected_solvent,
         "field_mhz": float(spectrum.field_mhz),
         # The date the instrument recorded it. A reviewer reading a peak table
         # needs to know which run it came from, and the readers all carry it.
@@ -740,6 +801,20 @@ def open_spectrum(path: str) -> dict:
             "Areas are shown as a share of the signals listed here, not of the whole "
             "spectrum. They are ratios, not proton counts: assigning protons needs a "
             "structure this analysis was not given.",
+            *(
+                []
+                if not (
+                    detected_solvent
+                    and spectrum.solvent
+                    and detected_solvent.lower() != spectrum.solvent.lower()
+                )
+                else [
+                    f"This acquisition records {spectrum.solvent} as its solvent, but the peaks "
+                    f"look more like {detected_solvent}. Signals were sorted using the recorded "
+                    f"one. A disagreement here can mean a mislabelled sample or a shift axis "
+                    f"referenced to the wrong peak, and both change what the numbers mean."
+                ]
+            ),
             *(
                 []
                 if not discarded

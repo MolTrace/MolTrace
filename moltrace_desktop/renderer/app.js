@@ -412,7 +412,9 @@
     const bits = [
       ['File', s.file_name],
       ['Nucleus', s.nucleus],
-      ['Solvent', s.solvent || 'not stated in the file'],
+      ['Solvent', (s.solvent || 'not stated in the file')
+        + (s.solvent_detected && s.solvent && s.solvent_detected.toLowerCase() !== s.solvent.toLowerCase()
+          ? ' (peaks look like ' + s.solvent_detected + ')' : '')],
       ['Field', Number.isFinite(s.field_mhz) && s.field_mhz > 0 ? s.field_mhz.toFixed(2) + ' MHz' : 'not stated'],
       ['Resolution', Number.isFinite(s.resolution_hz) ? s.resolution_hz.toFixed(2) + ' Hz/point' : '\u2014'],
       ['Acquired', s.acquired_at ? String(s.acquired_at).slice(0, 10) : 'not stated'],
@@ -434,7 +436,8 @@
       ['Signals', String(s.multiplets.length), 'grouped from ' + s.peak_count + ' fitted lines'],
       ['Measurable', String(quantifiable.length), 'at or above 10x the baseline noise'],
       ['Detected only', String(detectedOnly.length), 'seen, but not strong enough to measure'],
-      ['Points', Number(s.points).toLocaleString(), 'in the acquisition'],
+      ['From the compound', String(s.multiplets.filter((m) => m.category === 'compound').length),
+        'the rest are solvent, impurity or artifact'],
     ]
     for (const [label, value, sub] of tiles) {
       const k = node('div', 'kpi')
@@ -706,6 +709,18 @@
     return fig
   }
 
+  // The engine's own category names, humanised. `13C_satellite` and
+  // `residual_solvent` are exact and correct and are not what a person says.
+  const CATEGORY_WORDS = {
+    compound: 'compound',
+    solvent: 'solvent',
+    residual_solvent: 'residual solvent',
+    impurity: 'impurity',
+    '13C_satellite': '13C satellite',
+    artifact: 'artifact',
+  }
+  const readableCategory = (c) => CATEGORY_WORDS[c] || String(c).replace(/_/g, ' ')
+
   const fmtSnr = (v) => (v >= 100 ? Math.round(v).toLocaleString() : v.toFixed(1))
 
   function peakTable(rows, s, heading, note) {
@@ -736,7 +751,10 @@
     // would cry wolf. The number is shown next to the others; a chemist reads it.
     // Signal-to-noise is in the table because it is what decides whether a row
     // is worth reading, and a peak table almost never shows it.
-    for (const label of ['', 'Shift (ppm)', 'Pattern', 'Couplings (Hz)', 'Lines', 'Width (Hz)', 'S/N', 'Share of signal']) {
+    // "Looks like" is what the engine already knew and never said: the compound,
+    // the solvent, its residual proton, an impurity, a 13C satellite. A chemist
+    // picks these out by eye on every spectrum they read.
+    for (const label of ['', 'Shift (ppm)', 'Looks like', 'Pattern', 'Couplings (Hz)', 'Lines', 'Width (Hz)', 'S/N', 'Share of signal']) {
       const th = document.createElement('th')
       th.textContent = label
       hrow.append(th)
@@ -749,6 +767,13 @@
       const cells = [
         m.name,
         m.center_ppm.toFixed(3),
+        // The call and how sure it is, together. A bare label reads as certain,
+        // and these run from 0.38 to 0.79 on real data. An em dash means the
+        // engine did not place this line at all, which is a state, not a guess.
+        m.category
+          ? readableCategory(m.category) + (m.category_confidence
+              ? ' (' + Math.round(m.category_confidence * 100) + '%)' : '')
+          : '\u2014',
         // Empty below the limit of quantitation: the service withholds the
         // pattern and the couplings there rather than blanking them here, so an
         // em dash means "not claimed", not "not applicable".
