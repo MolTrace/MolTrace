@@ -1272,21 +1272,72 @@ def apply_processed_trace_baseline_conditions(
     return corrected, metadata, notes
 
 
-def _classify_multiplicity(component_count: int, width_ppm: float, ppm_step: float) -> str:
-    # A local-maximum picker cannot resolve overlapped lines, so it cannot
-    # distinguish a quartet from a doublet-of-doublets (both four lines) or any
-    # busier pattern. Only s / d / t are claimed geometrically; four-plus lines
-    # are reported honestly as "m" unless a reference text confirms the pattern
-    # (see _apply_reference_multiplicity).
-    broad_threshold = max(0.12, ppm_step * 24)
+#: A single line is called BROAD when it exceeds this multiple of the median
+#: line width of its own spectrum. The number is where the measured distribution
+#: separates, not a round figure: across 22 NMRShiftDB2 acquisitions the
+#: single-component signals run 0.52 to 1.98x the spectrum median for 13C and
+#: then jump 2.17x to the next value (3.25), while 1H -- which varies more,
+#: because unresolved coupling genuinely broadens lines -- has its widest gap in
+#: that region at 2.08 -> 2.58. 2.5 sits inside the gap for both nuclei, which is
+#: why one constant serves both. 13C is insensitive to any choice from 2.0 to
+#: 5.0 (12-13 signals either way); the insensitivity IS the evidence that a
+#: boundary belongs there.
+_BROAD_LINE_WIDTH_MULTIPLE = 2.5
+
+
+def _classify_multiplicity(
+    component_count: int, line_width_ppm: float, reference_line_width_ppm: float
+) -> str:
+    """Label a cluster from its component count. THE FALLBACK, not the main path.
+
+    A local-maximum picker cannot resolve overlapped lines, so it cannot
+    distinguish a quartet from a doublet-of-doublets (both four lines) or any
+    busier pattern. Only s / d / t are claimed geometrically; four-plus lines are
+    reported honestly as "m" unless a reference text confirms the pattern (see
+    ``_apply_reference_multiplicity``).
+
+    WHERE THIS SITS, because three separate attempts to characterise it went at the
+    wrong function first. ``_find_peaks_with_sensitivity_sweep`` runs the sweep with
+    ``deconvolve=False`` and then re-runs the WINNER with ``deconvolve=True``, so the
+    user-visible label normally comes from ``multiplicity_from_lines`` on the
+    resolved lines a few lines above the call to this. This runs only when
+    ``deconvolve_region`` returns nothing for a cluster -- which is not rare (it fired
+    on 30 of 68 single components across 10 acquisitions) but is not the main path
+    either. A probe that reproduces a label here has to confirm which branch produced
+    it; ours did not, twice.
+
+    BROADNESS IS RELATIVE, and this is what the comparison used to get wrong. It
+    tested the cluster EXTENT against a fixed 0.12 ppm. The extent comes from the
+    flank walk in ``_infer_peak_estimates`` (``while y[left] >= y[left - 1]``), so
+    once a pair separates enough to raise a saddle between the lines the walk stops
+    AT the saddle: the feature got wider while its measured extent got NARROWER,
+    and the label flipped on a quantity moving the wrong way. The fixed floor was
+    also nucleus-blind -- a 13C spectrum spans 200 ppm, so 0.12 ppm was nearly
+    always cleared, and **70% of 13C single components (76 of 109) were being
+    reported as broad**, against 12% under this rule.
+
+    A line is broad only relative to the other lines of its own spectrum, which is
+    also what makes the test self-normalising: the reference is measured on the
+    same grid, so sampling the same spectrum more finely no longer changes its
+    label. Where no width could be measured the answer is "s" -- calling a signal
+    broad is a claim, and it needs the measurement that supports it.
+
+    This does NOT make "br s" a merge detector, and must not be read as one. A
+    merged pair measures 1.12x a single line at 0.2 FWHM separation and 1.47x at
+    the 0.577 limit where two Lorentzians lose their dip, both well inside the
+    ordinary-line population. Nothing at any threshold separates those from a
+    genuinely broad resonance; see ``test_peak_line_width.py``.
+    """
     if component_count <= 1:
-        return "br s" if width_ppm >= broad_threshold else "s"
+        if line_width_ppm <= 0.0 or reference_line_width_ppm <= 0.0:
+            return "s"
+        broad_threshold = _BROAD_LINE_WIDTH_MULTIPLE * reference_line_width_ppm
+        return "br s" if line_width_ppm >= broad_threshold else "s"
     if component_count == 2:
         return "d"
     if component_count == 3:
         return "t"
     return "m"
-
 
 def _collapse_j_values_for_pattern(spacings_hz: list[float], multiplicity: str) -> tuple[float, ...]:
     if not spacings_hz:
@@ -1346,6 +1397,12 @@ def _cluster_peak_components(
     if not components:
         return []
     ppm_step = precomputed_ppm_step if precomputed_ppm_step is not None else _ppm_step(x_vals)
+    # The spectrum's own linewidth, against which one signal can be called broad.
+    # Taken over every component rather than per cluster: a cluster has too few
+    # lines to establish what normal looks like, and the question "is this signal
+    # wider than the lines in this spectrum" is a spectrum-level one.
+    _reference_widths = [c.fwhm_ppm for c in components if c.fwhm_ppm > 0.0]
+    reference_line_width_ppm = median(_reference_widths) if _reference_widths else 0.0
     gap_threshold = min(0.09, max(0.028, ppm_step * 18))
     index_gap_threshold = max(3, int(round(12 * ppm_step / max(ppm_step, 1e-6))))
 
@@ -1417,7 +1474,9 @@ def _cluster_peak_components(
                 [line[0] for line in resolved_lines], frequency_mhz=frequency_mhz
             )
         else:
-            multiplicity = _classify_multiplicity(len(cluster), width_ppm, ppm_step)
+            multiplicity = _classify_multiplicity(
+                len(cluster), line_width_ppm, reference_line_width_ppm
+            )
             j_values_hz = _estimate_cluster_j_values_hz(
                 cluster, frequency_mhz=frequency_mhz, multiplicity=multiplicity
             )

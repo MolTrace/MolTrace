@@ -14,6 +14,63 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.74.4 — Broad is a comparison, and it had nothing to compare against (2026-08-29)
+
+`_classify_multiplicity` decided "s" vs "br s" by testing the cluster EXTENT
+against a fixed **0.12 ppm**. Two things were wrong with that, and they compound.
+
+**The extent moves the wrong way.** It comes from the flank walk in
+`_infer_peak_estimates` (`while y[left] >= y[left - 1]`), so once two lines
+separate enough to raise a saddle between them the walk stops AT the saddle. Swept
+across a 4 Hz pair at 400 MHz the extent climbs to 0.577 FWHM, **collapses over
+0.65-0.85**, then recovers — the feature getting wider while its measured extent
+gets narrower. The label flipped on a quantity that is not monotonic in the thing
+it is supposed to measure.
+
+**And a fixed ppm floor is nucleus-blind.** A 13C spectrum spans 200 ppm, so 0.12
+ppm was nearly always cleared: **70% of 13C single components (76 of 109) were
+reported as broad.** Among them the CDCl3 solvent lines at 77.96 and 77.70 ppm —
+about the sharpest lines in the sample.
+
+Broadness is a comparison, so it is now made against something: a signal is broad
+when its FWHM reaches **2.5x the median line width of its own spectrum**, using
+the per-line width added in v0.74.3. The multiple is where the measured
+distribution separates — across 22 acquisitions the 13C single-component signals
+run 0.52 to 1.98x and then jump 2.17x to the next value at 3.25, while 1H, which
+varies more because unresolved coupling genuinely broadens lines, has its widest
+gap in that region at 2.08 -> 2.58. **13C is insensitive to any choice from 2.0 to
+5.0** (12-13 signals either way); that insensitivity is the evidence a boundary
+belongs there, and it is why one constant serves both nuclei.
+
+Measuring against the spectrum's own lines also makes the test self-normalising:
+the reference is measured on the same grid, so **the same spectrum sampled more
+finely no longer changes its own label** — an invariant the ppm-vs-ppm comparison
+could not satisfy, and one that is now pinned.
+
+Re-baselined visibly. Across the corpus, 296 signals: **104 labels move, and only
+between "s" and "br s"** — no `d`, `t` or `m` changed, and no peak list changed
+length. 13C loses 79 spurious `br s` and gains 5; 1H gains 14 and loses 6. Six FID
+goldens were patched **field by field** (15 lines, every one `"br s"` -> `"s"`,
+nothing else in those files touched); regenerating them wholesale on macOS would
+have baked this platform's multiplet labels into files CI compares on Linux.
+
+**This does NOT make `br s` a merge detector.** A merged pair measures 1.12x a
+single line at 0.2 FWHM separation and 1.47x at the 0.577 limit where two
+Lorentzians lose their dip — both inside the ordinary-line population. Nothing at
+any threshold separates those from a genuinely broad resonance, and the bare `s`
+reported in the 0.65-0.85 window is unchanged by this: what changed is that the
+label now tracks width monotonically instead of tracking an artefact of a flank
+walk.
+
+Blast radius, checked rather than assumed: `nmrcheck.spectrum` labels do not reach
+the qNMR purity ranking or the verifier's `obs_split`, which read
+`multiplicity_label` from `moltrace.spectroscopy.multiplet.analysis` — `moltrace`
+never imports `nmrcheck.spectrum`. DP4 cannot see a label at all (it pairs on
+shift alone). `normalize_multiplicity` passes both labels through as identity
+entries, so nothing downstream re-folds them.
+
+---
+
 ## v0.74.3 — The width of a line, not the width of the group it sits in (2026-08-29)
 
 A peak carried one width, `width_ppm`, and it is the EXTENT of the whole cluster:

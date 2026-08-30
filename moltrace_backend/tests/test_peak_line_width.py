@@ -140,3 +140,63 @@ def test_widths_are_index_aligned_with_the_reported_peaks() -> None:
     assert len(meta["line_widths_hz"]) == len(peaks)
     assert all(width > 0.0 for width in meta["line_widths_ppm"])
     assert all(width is not None for width in meta["line_widths_hz"])
+
+
+# ---------------------------------------------------------------------------
+# What the width is FOR: deciding whether one signal is broad.
+#
+# "Broad" is not an absolute width. A 13C line at 62 MHz and a 1H line at 600
+# MHz differ by an order of magnitude in ppm, so the only meaningful statement
+# is that a signal is wide RELATIVE TO THE OTHER LINES IN ITS OWN SPECTRUM.
+# ---------------------------------------------------------------------------
+
+
+def _mixed_trace(
+    broad_multiple: float, *, points: int = DENSE_POINTS
+) -> list[tuple[float, float]]:
+    """Four ordinary lines and one deliberately broadened one at 6.0 ppm."""
+    xs = [SPAN_PPM * (1.0 - index / (points - 1)) for index in range(points)]
+    narrow = [8.0, 4.0, 3.0, 2.0]
+    out = []
+    for x in xs:
+        y = sum(_lorentzian(x, c, TRUE_FWHM_PPM, 100.0) for c in narrow)
+        y += _lorentzian(x, 6.0, TRUE_FWHM_PPM * broad_multiple, 100.0)
+        out.append((x, y))
+    return out
+
+
+def _label_at_6ppm(trace) -> str | None:
+    estimate = _tallest_near(
+        _infer_peak_estimates(trace, frequency_mhz=FIELD_MHZ), 6.0, tolerance=0.3
+    )
+    return None if estimate is None else estimate.multiplicity
+
+
+def test_an_ordinary_line_is_a_plain_singlet() -> None:
+    """A line the same width as its neighbours carries no broadness claim."""
+    assert _label_at_6ppm(_mixed_trace(1.0)) == "s"
+
+
+def test_a_line_much_wider_than_its_neighbours_is_called_broad() -> None:
+    """The claim `br s` has to be earned by the width, and this one earns it."""
+    assert _label_at_6ppm(_mixed_trace(4.0)) == "br s"
+
+
+def test_the_broadness_call_does_not_depend_on_sampling_density() -> None:
+    """The invariant the extent rule could not satisfy.
+
+    The old test compared an extent in ppm against a floor in ppm, so the same
+    spectrum sampled more finely changed its own label. Measuring the line
+    against the OTHER LINES of the same spectrum is self-normalising: both
+    sides move together, so density cancels.
+    """
+    for multiple, expected in ((1.0, "s"), (4.0, "br s")):
+        labels = {
+            points: _label_at_6ppm(_mixed_trace(multiple, points=points))
+            for points in (9600, 19200, 38400)
+        }
+        assert set(labels.values()) == {expected}, (
+            f"a {multiple}x line was labelled {labels} at 9600/19200/38400 "
+            f"points: the same spectrum must not change its own label because "
+            f"it was sampled more finely."
+        )
