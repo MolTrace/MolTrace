@@ -591,3 +591,52 @@ def test_an_uncomputable_band_fails_closed() -> None:
     trigger, note = _q3ab_trigger(1.0, 0.12, "drug_substance")
     assert trigger == "qualification"
     assert note is None
+
+
+def test_a_cutaneous_dossier_is_not_given_q3c_solvent_limits(client, api_headers):
+    """ICH Q3C limits are defined for oral / parenteral / inhalation. `/regulatory/impurities/assess`
+    already refuses a route outside that set and says so ("residual-solvent limits are not defined
+    for the {route} route; residual solvents were not assessed"). The dossier path reached the same
+    engine with no route gate at all, so the same product got a limit from one endpoint and a
+    refusal from the other.
+
+    Note the route is numerically inert here — the encoded Q3C table is one PDE per solvent with no
+    route dimension, so this is a question of whether Q3C applies at all, not of scaling a number.
+    """
+    headers = api_headers
+    with client:
+        juris = _jurisdiction(client, headers, "Q3C route scope US", "US")
+        res = client.post(
+            "/regulatory/dossiers",
+            headers=headers,
+            json={
+                "title": "Cutaneous dossier",
+                "product_name": "Topical product",
+                "compound_name": "Topical compound",
+                "jurisdiction_id": juris["id"],
+                "intended_use": "Research decision support",
+                "route": "cutaneous",
+            },
+        )
+        assert res.status_code == 201, res.text
+        dossier = res.json()
+        assert dossier["route"] == "cutaneous"
+
+        assessment = client.post(
+            f"/regulatory/dossiers/{dossier['id']}/residual-solvent-assessment",
+            headers=headers,
+            json={"solvents_json": [{"solvent_name": "acetonitrile", "observed_ppm": 5000}]},
+        )
+        assert assessment.status_code == 201, assessment.text
+        body = assessment.json()
+        match = body["residual_solvent_summary_json"]["matched_solvents"][0]
+
+        # No Q3C limit may be asserted for a route Q3C does not cover.
+        assert match.get("concentration_limit") is None, (
+            "a cutaneous dossier was given an ICH Q3C limit that the sibling assess endpoint "
+            "refuses to give for the same route"
+        )
+        assert match.get("source") != "ich_q3c_engine"
+        assert match.get("threshold_triggered") is not True
+        # And the refusal must name its cause rather than going quiet.
+        assert any("cutaneous" in w for w in body["warnings_json"]), body["warnings_json"]
