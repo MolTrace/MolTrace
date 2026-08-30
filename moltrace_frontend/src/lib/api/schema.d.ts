@@ -14311,7 +14311,7 @@ export interface components {
             /** Split Recommendation */
             split_recommendation?: ("train" | "validation" | "test" | "holdout" | "unknown") | null;
             /** Leakage Risk Label */
-            leakage_risk_label?: ("high" | "medium" | "low" | "unknown") | null;
+            leakage_risk_label?: ("low" | "medium" | "high" | "unknown") | null;
             /** Quality Flags Json */
             quality_flags_json?: string[] | null;
             /** Metadata Json */
@@ -20125,6 +20125,35 @@ export interface components {
             metadata_json?: {
                 [key: string]: unknown;
             };
+        };
+        /**
+         * ErrorResponse
+         * @description The body of every sanitized 401 and 403. Two fields, and never a third.
+         *
+         *     Clients branch on ``code``. ``detail`` is one of two fixed sentences and is **not** an
+         *     API — it exists so an un-migrated client rendering ``String(data.detail)`` still shows a
+         *     person something readable. Nothing route-specific ever reaches either field: on these two
+         *     statuses the cause of the refusal is the thing being protected, so it goes to the operator
+         *     log with the correlation id instead of to the caller who was refused.
+         *
+         *     ``code`` is a plain ``str`` carrying an enumeration rather than a Python ``Enum``: an
+         *     ``Enum`` would be a fourth hand-maintained copy of a vocabulary that already exists in
+         *     ``error_codes``, which is the duplication that module was written to remove. The
+         *     ``json_schema_extra`` form derives the list from the registry at import time and still
+         *     generates a string-literal union in the frontend's generated types.
+         */
+        ErrorResponse: {
+            /**
+             * Code
+             * @description Stable machine-readable code. Branch on this, never on `detail`.
+             * @enum {string}
+             */
+            code: "credentials_invalid" | "feature_not_enabled" | "forbidden" | "mfa_enrollment_required" | "mfa_factor_invalid" | "mfa_required" | "module_not_licensed" | "product_not_enabled" | "product_not_in_plan" | "product_not_provisioned" | "role_required" | "step_up_required" | "token_expired" | "token_invalid" | "token_reuse_detected" | "unauthenticated";
+            /**
+             * Detail
+             * @description Generic copy for display. Not a stable interface.
+             */
+            detail: string;
         };
         /** EvidenceBundleItem */
         EvidenceBundleItem: {
@@ -43933,7 +43962,26 @@ export interface components {
             } | null;
         };
     };
-    responses: never;
+    responses: {
+        /** @description Authentication is required or must be repeated. */
+        AuthenticationRequired: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["ErrorResponse"];
+            };
+        };
+        /** @description The action is not available to this caller. */
+        AccessDenied: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["ErrorResponse"];
+            };
+        };
+    };
     parameters: never;
     requestBodies: never;
     headers: never;
@@ -43961,6 +44009,8 @@ export interface operations {
                     };
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
         };
     };
     queue_status_queue_status_get: {
@@ -43981,6 +44031,8 @@ export interface operations {
                     "application/json": components["schemas"]["QueueWorkerStatus"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
         };
     };
     system_health_route_system_health_get: {
@@ -44001,6 +44053,8 @@ export interface operations {
                     "application/json": components["schemas"]["SystemHealthResponse"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
         };
     };
     system_status_route_system_status_get: {
@@ -44025,6 +44079,8 @@ export interface operations {
                     "application/json": components["schemas"]["SystemStatusResponse"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -44056,6 +44112,8 @@ export interface operations {
                     };
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
         };
     };
     system_capabilities_route_system_capabilities_get: {
@@ -44080,6 +44138,8 @@ export interface operations {
                     "application/json": components["schemas"]["SystemCapabilities"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -44113,6 +44173,8 @@ export interface operations {
                     "application/json": components["schemas"]["DependencyCheck"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -44146,6 +44208,8 @@ export interface operations {
                     "application/json": components["schemas"]["EnvironmentCheckResponse"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -44179,6 +44243,8 @@ export interface operations {
                     "application/json": components["schemas"]["OperationalMetric"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -44214,6 +44280,8 @@ export interface operations {
                     };
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -44249,6 +44317,8 @@ export interface operations {
                     };
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -44286,6 +44356,8 @@ export interface operations {
                     "application/json": components["schemas"]["SecurityEvent"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -44323,6 +44395,8 @@ export interface operations {
                     "application/json": components["schemas"]["SecurityEvent"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -44356,6 +44430,8 @@ export interface operations {
                     "application/json": components["schemas"]["SecuritySummary"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -44389,6 +44465,8 @@ export interface operations {
                     "application/json": components["schemas"]["DetectionScanResult"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -44422,6 +44500,8 @@ export interface operations {
                     "application/json": components["schemas"]["DetectionScanResult"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -44461,6 +44541,8 @@ export interface operations {
                     "application/json": components["schemas"]["AuditEventRecord"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -44494,6 +44576,8 @@ export interface operations {
                     "application/json": components["schemas"]["AuditChainVerification"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -44530,6 +44614,8 @@ export interface operations {
                     "application/json": components["schemas"]["SubjectAuditChainVerification"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -44563,6 +44649,8 @@ export interface operations {
                     "application/json": components["schemas"]["AuditAnchorPublicKey"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -44599,6 +44687,8 @@ export interface operations {
                     "application/json": components["schemas"]["AuditChainEntry"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -44632,6 +44722,8 @@ export interface operations {
                     "application/json": components["schemas"]["AuditAnchorRecord"] | null;
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -44669,6 +44761,8 @@ export interface operations {
                     "application/json": components["schemas"]["DebugBundle"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -44704,6 +44798,8 @@ export interface operations {
                     "application/json": components["schemas"]["DebugBundle"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -44739,6 +44835,8 @@ export interface operations {
                     "application/json": unknown;
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -44777,6 +44875,8 @@ export interface operations {
                     "application/json": components["schemas"]["UsageEvent"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -44814,6 +44914,8 @@ export interface operations {
                     "application/json": components["schemas"]["UsageEvent"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -44847,6 +44949,8 @@ export interface operations {
                     "application/json": components["schemas"]["AnalyticsSummary"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -44884,6 +44988,8 @@ export interface operations {
                     "application/json": components["schemas"]["RoiSnapshot"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -44919,6 +45025,8 @@ export interface operations {
                     "application/json": components["schemas"]["AutomationTaskDefinition"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -44956,6 +45064,8 @@ export interface operations {
                     "application/json": components["schemas"]["AutomationTaskDefinition"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -44995,6 +45105,8 @@ export interface operations {
                     "application/json": components["schemas"]["AutomationTaskDefinition"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -45032,6 +45144,8 @@ export interface operations {
                     "application/json": components["schemas"]["RoiSnapshot"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -45069,6 +45183,8 @@ export interface operations {
                     "application/json": components["schemas"]["RoiSnapshot"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -45102,6 +45218,8 @@ export interface operations {
                     "application/json": components["schemas"]["WorkflowAnalyticsSummary"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -45139,6 +45257,8 @@ export interface operations {
                     "application/json": components["schemas"]["UserFeedbackEvent"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -45176,6 +45296,8 @@ export interface operations {
                     "application/json": components["schemas"]["UserFeedbackEvent"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -45213,6 +45335,8 @@ export interface operations {
                     "application/json": components["schemas"]["RenewalValueReport"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -45248,6 +45372,8 @@ export interface operations {
                     "application/json": components["schemas"]["RenewalValueReport"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -45283,6 +45409,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReactionProject"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -45320,6 +45448,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReactionProject"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -45355,6 +45485,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReactionProject"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -45394,6 +45526,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReactionProject"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -45429,6 +45563,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReactionDesignSpace"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -45468,6 +45604,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReactionDesignSpace"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -45507,6 +45645,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReactionDesignSpace"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -45542,6 +45682,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReactionObjectiveProfile"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -45581,6 +45723,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReactionObjectiveProfile"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -45620,6 +45764,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReactionObjectiveProfile"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -45655,6 +45801,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReactionCostProfile"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -45694,6 +45842,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReactionCostProfile"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -45733,6 +45883,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReactionCostProfile"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -45768,6 +45920,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReactionSafetyConstraintProfile"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -45807,6 +45961,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReactionSafetyConstraintProfile"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -45846,6 +46002,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReactionSafetyConstraintProfile"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -45881,6 +46039,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReactionGreenProfile"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -45920,6 +46080,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReactionGreenProfile"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -45959,6 +46121,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReactionGreenProfile"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -45995,6 +46159,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReactionGreenAssessment"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -46035,6 +46201,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReactionGreenAssessment"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -46074,6 +46242,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReactionGreenCompareResult"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -46109,6 +46279,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReactionPlateDesign"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -46148,6 +46320,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReactionPlateDesign"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -46184,6 +46358,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReactionPlateDesign"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -46223,6 +46399,8 @@ export interface operations {
                     };
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -46258,6 +46436,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReactionSafetyScreening"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -46297,6 +46477,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReactionSafetyScreening"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -46332,6 +46514,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReactionSafetyGateStatus"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -46368,6 +46552,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReactionSafetyScreening"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -46408,6 +46594,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReactionSafetyScreening"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -46445,6 +46633,8 @@ export interface operations {
                     "application/json": components["schemas"]["StructureValidateResponse"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -46482,6 +46672,8 @@ export interface operations {
                     "application/json": components["schemas"]["StructureSmartsMatchResponse"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -46518,6 +46710,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReactionStructureScheme"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -46557,6 +46751,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReactionStructureScheme"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -46594,6 +46790,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReactionStructureScheme"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -46634,6 +46832,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReactionStructureScheme"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -46669,6 +46869,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReactionFeedbackRecord"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -46708,6 +46910,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReactionFeedbackRecord"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -46743,6 +46947,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReactionPreferenceRanking"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -46782,6 +46988,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReactionABPromotionVerdict"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -46817,6 +47025,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReactionWarmStartPriorRecord"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -46856,6 +47066,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReactionWarmStartPriorRecord"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -46891,6 +47103,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReactionWarmStartRanking"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -46926,6 +47140,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReactionYieldPredictionRun"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -46965,6 +47181,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReactionYieldPredictionRun"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -47001,6 +47219,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReactionYieldPredictionRun"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -47036,6 +47256,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReactionRouteScoreRecord"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -47075,6 +47297,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReactionRouteScoreRecord"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -47111,6 +47335,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReactionRouteScoreRecord"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -47146,6 +47372,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReactionForwardCheckRecord"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -47185,6 +47413,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReactionForwardCheckRecord"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -47221,6 +47451,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReactionForwardCheckRecord"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -47254,6 +47486,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReactionCapabilityReadout"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -47287,6 +47521,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReactionSdlSiteStatus"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -47322,6 +47558,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReactionVariable"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -47361,6 +47599,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReactionVariable"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -47400,6 +47640,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReactionVariable"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -47436,6 +47678,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReactionExperiment"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -47475,6 +47719,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReactionExperiment"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -47510,6 +47756,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReactionExperiment"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -47549,6 +47797,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReactionExperiment"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -47588,6 +47838,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReactionOptimizationRun"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -47623,6 +47875,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReactionOptimizationRun"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -47658,6 +47912,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReactionOptimizationRun"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -47697,6 +47953,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReactionBayesianOptimizationRun"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -47732,6 +47990,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReactionBayesianOptimizationRun"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -47767,6 +48027,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReactionBayesianOptimizationRun"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -47841,6 +48103,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReactionOptimizationAdvisorRun"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -47876,6 +48140,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReactionOptimizationAdvisorRun"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -47911,6 +48177,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReactionOptimizationAdvisorRun"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -47950,6 +48218,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReactionOptimizationAdvisorRun"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -47986,6 +48256,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReactionRecommendation"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -48025,6 +48297,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReactionRecommendation"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -48060,6 +48334,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReactionConditionCritique"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -48099,6 +48375,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReactionConditionCritique"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -48134,6 +48412,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReactionRecommendationBatch"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -48173,6 +48453,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReactionRecommendationBatch"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -48208,6 +48490,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReactionRecommendationBatch"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -48243,6 +48527,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReactionMechanisticHypothesis"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -48282,6 +48568,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReactionMechanisticHypothesis"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -48321,6 +48609,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReactionMechanisticHypothesis"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -48356,6 +48646,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReactionLiteraturePrior"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -48395,6 +48687,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReactionLiteraturePrior"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -48434,6 +48728,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReactionOptimizationDebate"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -48469,6 +48765,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReactionOptimizationDebate"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -48508,6 +48806,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReactionRecommendation"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -48547,6 +48847,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReactionRecommendation"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -48582,6 +48884,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReactionExecutionBatch"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -48621,6 +48925,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReactionExecutionBatch"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -48656,6 +48962,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReactionExecutionBatch"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -48695,6 +49003,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReactionExecutionBatch"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -48730,6 +49040,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReactionExecutionItem"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -48769,6 +49081,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReactionExecutionItem"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -48808,6 +49122,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReactionExecutionItem"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -48847,6 +49163,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReactionRecommendationConvertResponse"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -48886,6 +49204,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReactionExecutionItem"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -48925,6 +49245,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReactionExecutionItem"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -48964,6 +49286,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReactionExecutionItem"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -48999,6 +49323,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReactionAnalyticalResult"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -49038,6 +49364,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReactionAnalyticalResult"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -49077,6 +49405,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReactionOutcomeExtractionRun"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -49112,6 +49442,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReactionOutcomeExtractionRun"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -49151,6 +49483,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReactionExperiment"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -49186,6 +49520,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReactionOptimizationCycle"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -49225,6 +49561,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReactionOptimizationCycle"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -49260,6 +49598,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReactionOptimizationCycle"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -49299,6 +49639,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReactionCycleDecisionRecord"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -49338,6 +49680,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReactionOptimizationCycle"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -49377,6 +49721,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReactionExperiment"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -49412,6 +49758,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReactionExperimentEvidence"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -49451,6 +49799,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReactionOptimizationBenchmarkRun"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -49486,6 +49836,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReactionOptimizationBenchmarkRun"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -49519,6 +49871,8 @@ export interface operations {
                     "application/json": components["schemas"]["UserPublic"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -49552,6 +49906,8 @@ export interface operations {
                     "application/json": components["schemas"]["AuthPageResponse"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -49585,6 +49941,8 @@ export interface operations {
                     "application/json": components["schemas"]["AccessTokenResponse"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -49618,6 +49976,8 @@ export interface operations {
                     "application/json": components["schemas"]["AuthPageResponse"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -49651,6 +50011,8 @@ export interface operations {
                     "application/json": components["schemas"]["AccessTokenResponse"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -49684,6 +50046,8 @@ export interface operations {
                     "application/json": components["schemas"]["UserPublic"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -49717,6 +50081,8 @@ export interface operations {
                     "application/json": components["schemas"]["MessageResponse"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -49750,6 +50116,8 @@ export interface operations {
                     "application/json": components["schemas"]["AccessTokenResponse"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -49783,6 +50151,8 @@ export interface operations {
                     "application/json": components["schemas"]["MessageResponse"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -49817,6 +50187,8 @@ export interface operations {
                     "application/json": components["schemas"]["SSOConnectionList"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -49854,6 +50226,8 @@ export interface operations {
                     "application/json": components["schemas"]["SSOConnectionOut"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -49889,6 +50263,8 @@ export interface operations {
                     "application/json": components["schemas"]["SSOConnectionOut"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -49924,6 +50300,8 @@ export interface operations {
                     "application/json": components["schemas"]["MessageResponse"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -49963,6 +50341,8 @@ export interface operations {
                     "application/json": components["schemas"]["SSOConnectionOut"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -49998,6 +50378,8 @@ export interface operations {
                     "application/json": components["schemas"]["ScimTokenInfo"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -50033,6 +50415,8 @@ export interface operations {
                     "application/json": components["schemas"]["ScimTokenIssueResponse"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -50068,6 +50452,8 @@ export interface operations {
                     "application/json": components["schemas"]["MessageResponse"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -50099,6 +50485,8 @@ export interface operations {
                     "application/json": unknown;
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -50132,6 +50520,8 @@ export interface operations {
                     "application/json": unknown;
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -50165,6 +50555,8 @@ export interface operations {
                     "application/json": components["schemas"]["AccessTokenResponse"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -50198,6 +50590,8 @@ export interface operations {
                     "application/json": components["schemas"]["TotpEnrollResponse"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -50235,6 +50629,8 @@ export interface operations {
                     "application/json": components["schemas"]["TotpConfirmResponse"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -50268,6 +50664,8 @@ export interface operations {
                     "application/json": components["schemas"]["MessageResponse"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -50301,6 +50699,8 @@ export interface operations {
                     "application/json": unknown;
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -50338,6 +50738,8 @@ export interface operations {
                     "application/json": components["schemas"]["WebAuthnRegisterResponse"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -50371,6 +50773,8 @@ export interface operations {
                     "application/json": components["schemas"]["WebAuthnCredentialList"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -50406,6 +50810,8 @@ export interface operations {
                     "application/json": components["schemas"]["MessageResponse"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -50445,6 +50851,8 @@ export interface operations {
                     "application/json": components["schemas"]["MessageResponse"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -50478,6 +50886,8 @@ export interface operations {
                     "application/json": components["schemas"]["RecoveryRegenerateResponse"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -50511,6 +50921,8 @@ export interface operations {
                     "application/json": components["schemas"]["MfaStatusResponse"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -50544,6 +50956,8 @@ export interface operations {
                     "application/json": components["schemas"]["AccessTokenResponse"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -50577,6 +50991,8 @@ export interface operations {
                     "application/json": components["schemas"]["AccessTokenResponse"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -50610,6 +51026,8 @@ export interface operations {
                     "application/json": components["schemas"]["AccessTokenResponse"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -50643,6 +51061,8 @@ export interface operations {
                     "application/json": components["schemas"]["StepUpOptionsResponse"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -50680,6 +51100,8 @@ export interface operations {
                     "application/json": components["schemas"]["StepUpResult"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -50717,6 +51139,8 @@ export interface operations {
                     "application/json": components["schemas"]["StepUpResult"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -50754,6 +51178,8 @@ export interface operations {
                     "application/json": components["schemas"]["StepUpResult"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -50789,6 +51215,8 @@ export interface operations {
                     "application/json": components["schemas"]["MfaPolicyResponse"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -50828,6 +51256,8 @@ export interface operations {
                     "application/json": components["schemas"]["MfaPolicyResponse"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -50861,6 +51291,8 @@ export interface operations {
                     "application/json": components["schemas"]["TokenActionPreview"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -50892,6 +51324,8 @@ export interface operations {
                     "application/json": components["schemas"]["MessageResponse"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -50925,6 +51359,8 @@ export interface operations {
                     "application/json": components["schemas"]["TokenActionPreview"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -50958,6 +51394,8 @@ export interface operations {
                     "application/json": components["schemas"]["MessageResponse"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -50992,6 +51430,8 @@ export interface operations {
                     "application/json": components["schemas"]["EmailOutboxRecord"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -51029,6 +51469,8 @@ export interface operations {
                     "application/json": components["schemas"]["ValidationReport"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -51066,6 +51508,8 @@ export interface operations {
                     "application/json": components["schemas"]["AnalysisReport"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -51103,6 +51547,8 @@ export interface operations {
                     "application/json": components["schemas"]["BatchAnalysisReport"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -51140,6 +51586,8 @@ export interface operations {
                     "application/json": components["schemas"]["BatchAnalysisReport"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -51177,6 +51625,8 @@ export interface operations {
                     "application/json": components["schemas"]["SpectrumPreviewReport"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -51214,6 +51664,8 @@ export interface operations {
                     "application/json": components["schemas"]["SpectrumAnalyzeResult"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -51251,6 +51703,8 @@ export interface operations {
                     "application/json": components["schemas"]["SpectrumGSDAnalyzeResult"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -51288,6 +51742,8 @@ export interface operations {
                     "application/json": components["schemas"]["SpectrumMultipletAnalyzeResult"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -51325,6 +51781,8 @@ export interface operations {
                     "application/json": components["schemas"]["SpectrumIntegrationAnalyzeResult"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -51362,6 +51820,8 @@ export interface operations {
                     "application/json": components["schemas"]["QnmrPurityResult"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -51399,6 +51859,8 @@ export interface operations {
                     "application/json": components["schemas"]["QnmrPurityResult"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -51436,6 +51898,8 @@ export interface operations {
                     "application/json": components["schemas"]["SpectrumPredictShiftsResult"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -51473,6 +51937,8 @@ export interface operations {
                     "application/json": components["schemas"]["SpectrumRetrieveResult"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -51510,6 +51976,8 @@ export interface operations {
                     "application/json": components["schemas"]["ImpurityAssessResult"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -51547,6 +52015,8 @@ export interface operations {
                     "application/json": components["schemas"]["SPCAnalyzeResult"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -51584,6 +52054,8 @@ export interface operations {
                     "application/json": components["schemas"]["SpectrumReasonResult"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -51617,6 +52089,8 @@ export interface operations {
                     "application/json": components["schemas"]["SpectrumSolventCatalog"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -51653,6 +52127,8 @@ export interface operations {
                     "application/json": components["schemas"]["RouteTelemetrySummary"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -51688,6 +52164,8 @@ export interface operations {
                     "application/json": components["schemas"]["SpectrumGSDTelemetrySummary"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -51725,6 +52203,8 @@ export interface operations {
                     "application/json": components["schemas"]["NMRProcessedPreviewResponse"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -51762,6 +52242,8 @@ export interface operations {
                     "application/json": components["schemas"]["NMRProcessedAnalyzeResponse"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -51799,6 +52281,8 @@ export interface operations {
                     "application/json": components["schemas"]["NMRRawFIDPreviewResponse"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -51836,6 +52320,8 @@ export interface operations {
                     "application/json": components["schemas"]["NMRRawFIDProcessResponse"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -51873,6 +52359,8 @@ export interface operations {
                     "application/json": components["schemas"]["BenchmarkRunResponse"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -51902,6 +52390,8 @@ export interface operations {
                     "application/json": components["schemas"]["FIDProcessingPreset"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
         };
     };
     raw_fid_upload_raw_fid_upload_post: {
@@ -51930,6 +52420,8 @@ export interface operations {
                     "application/json": components["schemas"]["RawArchiveRecord"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -51967,6 +52459,8 @@ export interface operations {
                     };
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -52002,6 +52496,8 @@ export interface operations {
                     "application/json": unknown;
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -52041,6 +52537,8 @@ export interface operations {
                     "application/json": components["schemas"]["FIDPreviewReport"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -52080,6 +52578,8 @@ export interface operations {
                     "application/json": components["schemas"]["FIDProcessResult"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -52116,6 +52616,8 @@ export interface operations {
                     "application/json": components["schemas"]["FIDRunRecord"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -52151,6 +52653,8 @@ export interface operations {
                     "application/json": unknown;
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -52188,6 +52692,8 @@ export interface operations {
                     "application/json": components["schemas"]["FIDPreviewReport"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -52225,6 +52731,8 @@ export interface operations {
                     "application/json": components["schemas"]["FIDProcessResult"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -52259,6 +52767,8 @@ export interface operations {
                     "application/json": components["schemas"]["FIDRunRecord"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -52294,6 +52804,8 @@ export interface operations {
                     "application/json": components["schemas"]["FIDRunRecord"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -52329,6 +52841,8 @@ export interface operations {
                     "application/json": components["schemas"]["FIDRunReviewDecisionRecord"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -52368,6 +52882,8 @@ export interface operations {
                     "application/json": components["schemas"]["FIDRunReviewDecisionRecord"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -52407,6 +52923,8 @@ export interface operations {
                     "application/json": components["schemas"]["FIDRunReviewDecisionRecord"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -52446,6 +52964,8 @@ export interface operations {
                     "application/json": components["schemas"]["FIDRunReviewDecisionRecord"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -52485,6 +53005,8 @@ export interface operations {
                     "application/json": components["schemas"]["FIDRunReviewDecisionRecord"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -52520,6 +53042,8 @@ export interface operations {
                     "application/json": components["schemas"]["FIDRunReport"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -52553,6 +53077,24 @@ export interface operations {
                 };
                 content: {
                     "text/html": string;
+                };
+            };
+            /** @description Authentication is required or must be repeated. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/html": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The action is not available to this caller. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/html": components["schemas"]["ErrorResponse"];
                 };
             };
             /** @description Validation Error */
@@ -52590,6 +53132,8 @@ export interface operations {
                     "application/json": unknown;
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -52628,6 +53172,8 @@ export interface operations {
                     "application/json": components["schemas"]["AsyncJobAccepted"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -52665,6 +53211,8 @@ export interface operations {
                     "application/json": components["schemas"]["AsyncJobAccepted"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -52699,6 +53247,8 @@ export interface operations {
                     "application/json": components["schemas"]["SpectraCheckProjectRecord"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -52736,6 +53286,8 @@ export interface operations {
                     "application/json": components["schemas"]["SpectraCheckProjectRecord"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -52771,6 +53323,8 @@ export interface operations {
                     "application/json": components["schemas"]["SpectraCheckProjectRecord"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -52810,6 +53364,8 @@ export interface operations {
                     "application/json": components["schemas"]["SpectraCheckProjectRecord"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -52846,6 +53402,8 @@ export interface operations {
                     "application/json": components["schemas"]["SpectraCheckSampleRecord"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -52885,6 +53443,8 @@ export interface operations {
                     "application/json": components["schemas"]["SpectraCheckSampleRecord"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -52920,6 +53480,8 @@ export interface operations {
                     "application/json": components["schemas"]["SampleDetailRecord"] | components["schemas"]["SpectraCheckSampleRecord"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -52959,6 +53521,8 @@ export interface operations {
                     "application/json": components["schemas"]["SpectraCheckSampleRecord"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -52995,6 +53559,8 @@ export interface operations {
                     "application/json": components["schemas"]["SpectraCheckSessionRecord"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -53032,6 +53598,8 @@ export interface operations {
                     "application/json": components["schemas"]["SpectraCheckSessionRecord"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -53067,6 +53635,8 @@ export interface operations {
                     "application/json": components["schemas"]["SpectraCheckSessionRecord"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -53102,6 +53672,8 @@ export interface operations {
                     "application/json": components["schemas"]["MessageResponse"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -53141,6 +53713,8 @@ export interface operations {
                     "application/json": components["schemas"]["SpectraCheckSessionRecord"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -53177,6 +53751,8 @@ export interface operations {
                     "application/json": components["schemas"]["SpectraCheckEvidenceRecord"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -53216,6 +53792,8 @@ export interface operations {
                     "application/json": components["schemas"]["SpectraCheckEvidenceRecord"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -53252,6 +53830,8 @@ export interface operations {
                     "application/json": components["schemas"]["MessageResponse"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -53292,6 +53872,8 @@ export interface operations {
                     "application/json": components["schemas"]["SpectraCheckEvidenceRecord"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -53327,6 +53909,8 @@ export interface operations {
                     "application/json": components["schemas"]["SpectraCheckUnifiedEvidenceRecord"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -53366,6 +53950,8 @@ export interface operations {
                     "application/json": components["schemas"]["SpectraCheckUnifiedEvidenceRecord"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -53402,6 +53988,8 @@ export interface operations {
                     "application/json": components["schemas"]["SpectraCheckReviewDecisionRecord"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -53441,6 +54029,8 @@ export interface operations {
                     "application/json": components["schemas"]["SpectraCheckReviewDecisionRecord"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -53477,6 +54067,8 @@ export interface operations {
                     "application/json": components["schemas"]["SpectraCheckAuditEventRecord"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -53513,6 +54105,8 @@ export interface operations {
                     "application/json": components["schemas"]["SpectraCheckReportRecord"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -53552,6 +54146,8 @@ export interface operations {
                     "application/json": components["schemas"]["SpectraCheckReportRecord"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -53589,6 +54185,8 @@ export interface operations {
                     "application/json": components["schemas"]["FileRecord"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -53624,6 +54222,8 @@ export interface operations {
                     "application/json": components["schemas"]["FileRecord"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -53659,6 +54259,8 @@ export interface operations {
                     "application/json": components["schemas"]["FileRecord"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -53694,6 +54296,8 @@ export interface operations {
                     "application/json": components["schemas"]["MessageResponse"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -53729,6 +54333,8 @@ export interface operations {
                     "application/json": unknown;
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -53765,6 +54371,8 @@ export interface operations {
                     "application/json": components["schemas"]["ConnectorRegistry"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -53802,6 +54410,8 @@ export interface operations {
                     "application/json": components["schemas"]["ConnectorRegistry"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -53837,6 +54447,8 @@ export interface operations {
                     "application/json": components["schemas"]["ConnectorRegistry"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -53876,6 +54488,8 @@ export interface operations {
                     "application/json": components["schemas"]["ConnectorRegistry"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -53915,6 +54529,8 @@ export interface operations {
                     "application/json": components["schemas"]["ConnectorHealthCheck"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -53951,6 +54567,8 @@ export interface operations {
                     "application/json": components["schemas"]["ConnectorHealthCheck"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -53987,6 +54605,8 @@ export interface operations {
                     "application/json": components["schemas"]["ConnectorCredentialReference"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -54026,6 +54646,8 @@ export interface operations {
                     "application/json": components["schemas"]["ConnectorCredentialReference"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -54061,6 +54683,8 @@ export interface operations {
                     "application/json": components["schemas"]["InstrumentWatchFolder"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -54098,6 +54722,8 @@ export interface operations {
                     "application/json": components["schemas"]["InstrumentWatchFolder"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -54133,6 +54759,8 @@ export interface operations {
                     "application/json": components["schemas"]["InstrumentWatchFolder"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -54172,6 +54800,8 @@ export interface operations {
                     "application/json": components["schemas"]["InstrumentWatchFolder"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -54211,6 +54841,8 @@ export interface operations {
                     "application/json": components["schemas"]["IngestionRun"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -54246,6 +54878,8 @@ export interface operations {
                     "application/json": components["schemas"]["IngestionRun"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -54283,6 +54917,8 @@ export interface operations {
                     "application/json": components["schemas"]["IngestionRun"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -54318,6 +54954,8 @@ export interface operations {
                     "application/json": components["schemas"]["IngestionRun"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -54357,6 +54995,8 @@ export interface operations {
                     "application/json": components["schemas"]["FileNormalizationRun"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -54393,6 +55033,8 @@ export interface operations {
                     "application/json": components["schemas"]["FileNormalizationRun"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -54428,6 +55070,8 @@ export interface operations {
                     "application/json": components["schemas"]["FileNormalizationRun"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -54463,6 +55107,8 @@ export interface operations {
                     "application/json": components["schemas"]["ExternalSystemRecord"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -54500,6 +55146,8 @@ export interface operations {
                     "application/json": components["schemas"]["ExternalSystemRecord"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -54535,6 +55183,8 @@ export interface operations {
                     "application/json": components["schemas"]["ExternalSystemRecord"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -54570,6 +55220,8 @@ export interface operations {
                     "application/json": components["schemas"]["ExternalObjectLink"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -54607,6 +55259,8 @@ export interface operations {
                     "application/json": components["schemas"]["ExternalObjectLink"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -54642,6 +55296,8 @@ export interface operations {
                     "application/json": components["schemas"]["MappingTemplate"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -54679,6 +55335,8 @@ export interface operations {
                     "application/json": components["schemas"]["MappingTemplate"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -54714,6 +55372,8 @@ export interface operations {
                     "application/json": components["schemas"]["MappingTemplate"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -54753,6 +55413,8 @@ export interface operations {
                     "application/json": components["schemas"]["MappingTemplate"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -54788,6 +55450,8 @@ export interface operations {
                     "application/json": components["schemas"]["OutboundSyncJob"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -54825,6 +55489,8 @@ export interface operations {
                     "application/json": components["schemas"]["OutboundSyncJob"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -54860,6 +55526,8 @@ export interface operations {
                     "application/json": components["schemas"]["OutboundSyncJob"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -54894,6 +55562,8 @@ export interface operations {
                     "application/json": components["schemas"]["WebhookSubscription"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -54931,6 +55601,8 @@ export interface operations {
                     "application/json": components["schemas"]["WebhookSubscription"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -54970,6 +55642,8 @@ export interface operations {
                     "application/json": components["schemas"]["WebhookSubscription"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -55006,6 +55680,8 @@ export interface operations {
                     "application/json": components["schemas"]["RegulatorySubmissionPackage"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -55045,6 +55721,8 @@ export interface operations {
                     "application/json": components["schemas"]["RegulatorySubmissionPackage"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -55080,6 +55758,8 @@ export interface operations {
                     "application/json": components["schemas"]["RegulatorySubmissionPackage"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -55117,6 +55797,8 @@ export interface operations {
                     "application/json": components["schemas"]["IntegrationImportResponse"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -55154,6 +55836,8 @@ export interface operations {
                     "application/json": components["schemas"]["IntegrationImportResponse"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -55191,6 +55875,8 @@ export interface operations {
                     "application/json": components["schemas"]["IntegrationImportResponse"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -55228,6 +55914,8 @@ export interface operations {
                     "application/json": components["schemas"]["IntegrationImportResponse"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -55264,6 +55952,8 @@ export interface operations {
                     "application/json": components["schemas"]["ValidationProject"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -55301,6 +55991,8 @@ export interface operations {
                     "application/json": components["schemas"]["ValidationProject"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -55336,6 +56028,8 @@ export interface operations {
                     "application/json": components["schemas"]["ValidationProject"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -55375,6 +56069,8 @@ export interface operations {
                     "application/json": components["schemas"]["ValidationProject"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -55411,6 +56107,8 @@ export interface operations {
                     "application/json": components["schemas"]["UserRequirementSpecification"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -55450,6 +56148,8 @@ export interface operations {
                     "application/json": components["schemas"]["UserRequirementSpecification"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -55486,6 +56186,8 @@ export interface operations {
                     "application/json": components["schemas"]["FunctionalSpecification"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -55525,6 +56227,8 @@ export interface operations {
                     "application/json": components["schemas"]["FunctionalSpecification"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -55561,6 +56265,8 @@ export interface operations {
                     "application/json": components["schemas"]["ValidationRiskAssessment"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -55600,6 +56306,8 @@ export interface operations {
                     "application/json": components["schemas"]["ValidationRiskAssessment"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -55636,6 +56344,8 @@ export interface operations {
                     "application/json": components["schemas"]["ValidationTestProtocol"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -55675,6 +56385,8 @@ export interface operations {
                     "application/json": components["schemas"]["ValidationTestProtocol"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -55710,6 +56422,8 @@ export interface operations {
                     "application/json": components["schemas"]["ValidationTestProtocol"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -55746,6 +56460,8 @@ export interface operations {
                     "application/json": components["schemas"]["ValidationTestCase"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -55785,6 +56501,8 @@ export interface operations {
                     "application/json": components["schemas"]["ValidationTestCase"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -55824,6 +56542,8 @@ export interface operations {
                     "application/json": components["schemas"]["ValidationTestExecution"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -55859,6 +56579,8 @@ export interface operations {
                     "application/json": components["schemas"]["ValidationTestExecution"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -55894,6 +56616,8 @@ export interface operations {
                     "application/json": components["schemas"]["ValidationTestExecution"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -55929,6 +56653,8 @@ export interface operations {
                     "application/json": components["schemas"]["TraceabilityMatrix"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -55964,6 +56690,8 @@ export interface operations {
                     "application/json": components["schemas"]["TraceabilityMatrix"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -56000,6 +56728,8 @@ export interface operations {
                     "application/json": components["schemas"]["ElectronicSignatureRecord"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -56037,6 +56767,8 @@ export interface operations {
                     "application/json": components["schemas"]["ElectronicSignatureRecord"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -56072,6 +56804,8 @@ export interface operations {
                     "application/json": components["schemas"]["ElectronicSignatureRecord"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -56108,6 +56842,8 @@ export interface operations {
                     "application/json": components["schemas"]["ESignatureVerification"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -56144,6 +56880,8 @@ export interface operations {
                     "application/json": components["schemas"]["ESignatureManifestation"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -56181,6 +56919,8 @@ export interface operations {
                     "application/json": components["schemas"]["ControlledRecord"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -56218,6 +56958,8 @@ export interface operations {
                     "application/json": components["schemas"]["ControlledRecord"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -56253,6 +56995,8 @@ export interface operations {
                     "application/json": components["schemas"]["ControlledRecord"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -56292,6 +57036,8 @@ export interface operations {
                     "application/json": components["schemas"]["ControlledRecord"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -56331,6 +57077,8 @@ export interface operations {
                     "application/json": components["schemas"]["ControlledRecord"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -56370,6 +57118,8 @@ export interface operations {
                     "application/json": components["schemas"]["ControlledRecord"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -56404,6 +57154,8 @@ export interface operations {
                     "application/json": components["schemas"]["RecordRetentionPolicy"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -56441,6 +57193,8 @@ export interface operations {
                     "application/json": components["schemas"]["RecordRetentionPolicy"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -56476,6 +57230,8 @@ export interface operations {
                     "application/json": components["schemas"]["DataIntegrityAssessment"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -56513,6 +57269,8 @@ export interface operations {
                     "application/json": components["schemas"]["DataIntegrityAssessment"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -56548,6 +57306,8 @@ export interface operations {
                     "application/json": components["schemas"]["DataIntegrityAssessment"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -56582,6 +57342,8 @@ export interface operations {
                     "application/json": components["schemas"]["InspectionReadinessPackage"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -56619,6 +57381,8 @@ export interface operations {
                     "application/json": components["schemas"]["InspectionReadinessPackage"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -56654,6 +57418,8 @@ export interface operations {
                     "application/json": components["schemas"]["InspectionReadinessPackage"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -56689,6 +57455,8 @@ export interface operations {
                     "application/json": unknown;
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -56723,6 +57491,8 @@ export interface operations {
                     "application/json": components["schemas"]["SystemReleaseRecord"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -56760,6 +57530,8 @@ export interface operations {
                     "application/json": components["schemas"]["SystemReleaseRecord"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -56795,6 +57567,8 @@ export interface operations {
                     "application/json": components["schemas"]["SystemReleaseRecord"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -56834,6 +57608,8 @@ export interface operations {
                     "application/json": components["schemas"]["SystemReleaseRecord"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -56873,6 +57649,8 @@ export interface operations {
                     "application/json": components["schemas"]["SystemReleaseRecord"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -56908,6 +57686,8 @@ export interface operations {
                     "application/json": components["schemas"]["ValidationPackage"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -56943,6 +57723,8 @@ export interface operations {
                     "application/json": components["schemas"]["DeviationRecord"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -56980,6 +57762,8 @@ export interface operations {
                     "application/json": components["schemas"]["DeviationRecord"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -57019,6 +57803,8 @@ export interface operations {
                     "application/json": components["schemas"]["DeviationRecord"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -57054,6 +57840,8 @@ export interface operations {
                     "application/json": components["schemas"]["CAPARecord"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -57091,6 +57879,8 @@ export interface operations {
                     "application/json": components["schemas"]["CAPARecord"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -57130,6 +57920,8 @@ export interface operations {
                     "application/json": components["schemas"]["CAPARecord"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -57165,6 +57957,8 @@ export interface operations {
                     "application/json": components["schemas"]["Tenant"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -57202,6 +57996,8 @@ export interface operations {
                     "application/json": components["schemas"]["Tenant"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -57238,6 +58034,8 @@ export interface operations {
                     "application/json": components["schemas"]["Tenant"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -57278,6 +58076,8 @@ export interface operations {
                     "application/json": components["schemas"]["Tenant"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -57314,6 +58114,8 @@ export interface operations {
                     "application/json": components["schemas"]["TenantEnvironment"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -57354,6 +58156,8 @@ export interface operations {
                     "application/json": components["schemas"]["TenantEnvironment"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -57394,6 +58198,8 @@ export interface operations {
                     "application/json": components["schemas"]["TenantEnvironment"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -57428,6 +58234,8 @@ export interface operations {
                     "application/json": components["schemas"]["SubscriptionPlan"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -57465,6 +58273,8 @@ export interface operations {
                     "application/json": components["schemas"]["SubscriptionPlan"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -57500,6 +58310,8 @@ export interface operations {
                     "application/json": components["schemas"]["SubscriptionPlan"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -57536,6 +58348,8 @@ export interface operations {
                     "application/json": components["schemas"]["TenantEntitlement"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -57576,6 +58390,8 @@ export interface operations {
                     "application/json": components["schemas"]["TenantEntitlement"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -57616,6 +58432,8 @@ export interface operations {
                     "application/json": components["schemas"]["TenantEntitlement"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -57650,6 +58468,8 @@ export interface operations {
                     "application/json": components["schemas"]["FeatureFlag"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -57687,6 +58507,8 @@ export interface operations {
                     "application/json": components["schemas"]["FeatureFlag"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -57722,6 +58544,8 @@ export interface operations {
                     "application/json": components["schemas"]["FeatureFlag"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -57761,6 +58585,8 @@ export interface operations {
                     "application/json": components["schemas"]["FeatureFlag"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -57797,6 +58623,8 @@ export interface operations {
                     "application/json": components["schemas"]["PilotProgram"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -57837,6 +58665,8 @@ export interface operations {
                     "application/json": components["schemas"]["PilotProgram"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -57873,6 +58703,8 @@ export interface operations {
                     "application/json": components["schemas"]["PilotProgram"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -57913,6 +58745,8 @@ export interface operations {
                     "application/json": components["schemas"]["PilotProgram"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -57949,6 +58783,8 @@ export interface operations {
                     "application/json": components["schemas"]["CustomerOnboardingProject"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -57989,6 +58825,8 @@ export interface operations {
                     "application/json": components["schemas"]["CustomerOnboardingProject"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -58025,6 +58863,8 @@ export interface operations {
                     "application/json": components["schemas"]["CustomerOnboardingProject"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -58065,6 +58905,8 @@ export interface operations {
                     "application/json": components["schemas"]["CustomerOnboardingProject"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -58101,6 +58943,8 @@ export interface operations {
                     "application/json": components["schemas"]["ImplementationTask"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -58141,6 +58985,8 @@ export interface operations {
                     "application/json": components["schemas"]["ImplementationTask"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -58181,6 +59027,8 @@ export interface operations {
                     "application/json": components["schemas"]["ImplementationTask"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -58217,6 +59065,8 @@ export interface operations {
                     "application/json": components["schemas"]["TenantDataBoundary"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -58257,6 +59107,8 @@ export interface operations {
                     "application/json": components["schemas"]["TenantDataBoundary"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -58297,6 +59149,8 @@ export interface operations {
                     "application/json": components["schemas"]["TenantDataBoundary"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -58333,6 +59187,8 @@ export interface operations {
                     "application/json": components["schemas"]["TenantSecurityProfile"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -58373,6 +59229,8 @@ export interface operations {
                     "application/json": components["schemas"]["TenantSecurityProfile"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -58413,6 +59271,8 @@ export interface operations {
                     "application/json": components["schemas"]["TenantSecurityProfile"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -58449,6 +59309,8 @@ export interface operations {
                     "application/json": components["schemas"]["TenantValidationProfile"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -58489,6 +59351,8 @@ export interface operations {
                     "application/json": components["schemas"]["TenantValidationProfile"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -58529,6 +59393,8 @@ export interface operations {
                     "application/json": components["schemas"]["TenantValidationProfile"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -58565,6 +59431,8 @@ export interface operations {
                     "application/json": components["schemas"]["TenantUsageSummary"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -58601,6 +59469,8 @@ export interface operations {
                     "application/json": components["schemas"]["TenantRoiSnapshot"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -58637,6 +59507,8 @@ export interface operations {
                     "application/json": components["schemas"]["CustomerSuccessHealthScore"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -58677,6 +59549,8 @@ export interface operations {
                     "application/json": components["schemas"]["ProcurementEvidencePackage"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -58713,6 +59587,8 @@ export interface operations {
                     "application/json": components["schemas"]["ProcurementEvidencePackage"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -58749,6 +59625,8 @@ export interface operations {
                     "application/json": components["schemas"]["ProcurementEvidencePackage"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -58789,6 +59667,8 @@ export interface operations {
                     "application/json": components["schemas"]["TenantAuditExport"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -58825,6 +59705,8 @@ export interface operations {
                     "application/json": components["schemas"]["TenantAuditExport"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -58861,6 +59743,8 @@ export interface operations {
                     "application/json": components["schemas"]["TenantModuleReadiness"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -58897,6 +59781,8 @@ export interface operations {
                     "application/json": components["schemas"]["TenantGoLiveReadiness"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -58934,6 +59820,8 @@ export interface operations {
                     "application/json": components["schemas"]["GoldenDataset"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -58971,6 +59859,8 @@ export interface operations {
                     "application/json": components["schemas"]["GoldenDataset"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -59006,6 +59896,8 @@ export interface operations {
                     "application/json": components["schemas"]["GoldenDataset"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -59045,6 +59937,8 @@ export interface operations {
                     "application/json": components["schemas"]["GoldenDataset"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -59081,6 +59975,8 @@ export interface operations {
                     "application/json": components["schemas"]["GoldenPilotScenario"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -59118,6 +60014,8 @@ export interface operations {
                     "application/json": components["schemas"]["GoldenPilotScenario"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -59153,6 +60051,8 @@ export interface operations {
                     "application/json": components["schemas"]["GoldenPilotScenario"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -59192,6 +60092,8 @@ export interface operations {
                     "application/json": components["schemas"]["GoldenPilotScenario"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -59227,6 +60129,8 @@ export interface operations {
                     "application/json": components["schemas"]["GoldenWorkflowCase"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -59266,6 +60170,8 @@ export interface operations {
                     "application/json": components["schemas"]["GoldenWorkflowCase"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -59301,6 +60207,8 @@ export interface operations {
                     "application/json": components["schemas"]["ExpectedOutputContract"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -59340,6 +60248,8 @@ export interface operations {
                     "application/json": components["schemas"]["ExpectedOutputContract"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -59380,6 +60290,8 @@ export interface operations {
                     "application/json": components["schemas"]["DemoTenantSeed"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -59416,6 +60328,8 @@ export interface operations {
                     "application/json": components["schemas"]["DemoTenantSeed"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -59456,6 +60370,8 @@ export interface operations {
                     "application/json": components["schemas"]["PilotRunDetail"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -59492,6 +60408,8 @@ export interface operations {
                     "application/json": components["schemas"]["PilotRun"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -59528,6 +60446,8 @@ export interface operations {
                     "application/json": components["schemas"]["PilotRunDetail"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -59564,6 +60484,8 @@ export interface operations {
                     "application/json": components["schemas"]["ScenarioValidationResult"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -59600,6 +60522,8 @@ export interface operations {
                     "application/json": components["schemas"]["ScenarioValidationResult"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -59636,6 +60560,8 @@ export interface operations {
                     "application/json": components["schemas"]["CustomerAcceptanceProtocol"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -59674,6 +60600,8 @@ export interface operations {
                     "application/json": components["schemas"]["CustomerAcceptanceProtocol"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -59710,6 +60638,8 @@ export interface operations {
                     "application/json": components["schemas"]["CustomerAcceptanceProtocol"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -59750,6 +60680,8 @@ export interface operations {
                     "application/json": components["schemas"]["CustomerAcceptanceProtocol"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -59790,6 +60722,8 @@ export interface operations {
                     "application/json": components["schemas"]["CustomerAcceptanceTest"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -59826,6 +60760,8 @@ export interface operations {
                     "application/json": components["schemas"]["CustomerAcceptanceTest"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -59862,6 +60798,8 @@ export interface operations {
                     "application/json": components["schemas"]["PilotReadinessAssessment"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -59900,6 +60838,8 @@ export interface operations {
                     "application/json": components["schemas"]["PilotReadinessAssessment"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -59936,6 +60876,8 @@ export interface operations {
                     "application/json": components["schemas"]["PilotReadinessAssessment"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -59974,6 +60916,8 @@ export interface operations {
                     "application/json": components["schemas"]["PilotSignoffRecord"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -60010,6 +60954,8 @@ export interface operations {
                     "application/json": components["schemas"]["PilotSignoffRecord"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -60046,6 +60992,8 @@ export interface operations {
                     "application/json": components["schemas"]["PilotEvidenceBundle"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -60086,6 +61034,8 @@ export interface operations {
                     "application/json": components["schemas"]["PilotEvidenceBundle"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -60122,6 +61072,8 @@ export interface operations {
                     "application/json": components["schemas"]["PilotCustomerDashboard"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -60156,6 +61108,8 @@ export interface operations {
                     "application/json": components["schemas"]["RegulatoryJurisdiction"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -60193,6 +61147,8 @@ export interface operations {
                     "application/json": components["schemas"]["RegulatoryJurisdiction"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -60230,6 +61186,8 @@ export interface operations {
                     "application/json": components["schemas"]["RegulatorySourceDocument"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -60265,6 +61223,8 @@ export interface operations {
                     "application/json": components["schemas"]["RegulatorySourceDocument"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -60300,6 +61260,8 @@ export interface operations {
                     "application/json": components["schemas"]["RegulatorySourceDocument"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -60335,6 +61297,8 @@ export interface operations {
                     "application/json": components["schemas"]["RegulatoryCitation"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -60372,6 +61336,8 @@ export interface operations {
                     "application/json": components["schemas"]["RegulatorySourceSearchResult"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -60408,6 +61374,8 @@ export interface operations {
                     "application/json": components["schemas"]["RegulatorySourceWatcher"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -60445,6 +61413,8 @@ export interface operations {
                     "application/json": components["schemas"]["RegulatorySourceWatcher"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -60480,6 +61450,8 @@ export interface operations {
                     "application/json": components["schemas"]["RegulatorySourceWatcher"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -60519,6 +61491,8 @@ export interface operations {
                     "application/json": components["schemas"]["RegulatorySourceWatcher"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -60555,6 +61529,8 @@ export interface operations {
                     "application/json": components["schemas"]["RegulatorySurveillanceRun"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -60592,6 +61568,8 @@ export interface operations {
                     "application/json": components["schemas"]["RegulatorySurveillanceRun"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -60627,6 +61605,8 @@ export interface operations {
                     "application/json": components["schemas"]["RegulatorySurveillanceRun"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -60662,6 +61642,8 @@ export interface operations {
                     "application/json": components["schemas"]["RegulatorySourceVersion"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -60698,6 +61680,8 @@ export interface operations {
                     "application/json": components["schemas"]["RegulatorySourceVersion"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -60737,6 +61721,8 @@ export interface operations {
                     "application/json": components["schemas"]["RegulatorySourceVersionCompareResponse"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -60773,6 +61759,8 @@ export interface operations {
                     "application/json": components["schemas"]["RegulatoryChangeEvent"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -60808,6 +61796,8 @@ export interface operations {
                     "application/json": components["schemas"]["RegulatoryChangeEvent"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -60847,6 +61837,8 @@ export interface operations {
                     "application/json": components["schemas"]["RegulatoryChangeEvent"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -60882,6 +61874,8 @@ export interface operations {
                     "application/json": components["schemas"]["RegulatoryImpactAssessment"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -60921,6 +61915,8 @@ export interface operations {
                     "application/json": components["schemas"]["RegulatoryImpactAssessment"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -60960,6 +61956,8 @@ export interface operations {
                     "application/json": components["schemas"]["RegulatoryRuleUpdateProposal"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -60996,6 +61994,8 @@ export interface operations {
                     "application/json": components["schemas"]["RegulatoryRuleUpdateProposal"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -61031,6 +62031,8 @@ export interface operations {
                     "application/json": components["schemas"]["RegulatoryRuleUpdateProposal"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -61070,6 +62072,8 @@ export interface operations {
                     "application/json": components["schemas"]["RegulatoryRuleUpdateProposal"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -61109,6 +62113,8 @@ export interface operations {
                     "application/json": components["schemas"]["RegulatoryRuleUpdateProposal"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -61144,6 +62150,8 @@ export interface operations {
                     "application/json": components["schemas"]["RegulatoryDossierChangeImpact"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -61180,6 +62188,8 @@ export interface operations {
                     "application/json": components["schemas"]["RegulatoryImpactNotification"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -61219,6 +62229,8 @@ export interface operations {
                     "application/json": components["schemas"]["RegulatoryImpactNotification"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -61255,6 +62267,8 @@ export interface operations {
                     "application/json": components["schemas"]["KnowledgeSource"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -61292,6 +62306,8 @@ export interface operations {
                     "application/json": components["schemas"]["KnowledgeSource"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -61327,6 +62343,8 @@ export interface operations {
                     "application/json": components["schemas"]["KnowledgeSource"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -61366,6 +62384,8 @@ export interface operations {
                     "application/json": components["schemas"]["KnowledgeSource"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -61401,6 +62421,8 @@ export interface operations {
                     "application/json": components["schemas"]["KnowledgeDeploymentCandidate"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -61438,6 +62460,8 @@ export interface operations {
                     "application/json": components["schemas"]["KnowledgeDeploymentCandidate"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -61473,6 +62497,8 @@ export interface operations {
                     "application/json": components["schemas"]["KnowledgeDeploymentCandidate"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -61508,6 +62534,8 @@ export interface operations {
                     "application/json": components["schemas"]["KnowledgeDeploymentCandidate"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -61543,6 +62571,8 @@ export interface operations {
                     "application/json": components["schemas"]["KnowledgeDeploymentCandidate"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -61578,6 +62608,8 @@ export interface operations {
                     "application/json": components["schemas"]["KnowledgeDeploymentCandidate"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -61613,6 +62645,8 @@ export interface operations {
                     "application/json": components["schemas"]["DatasetVersionApprovalState"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -61652,6 +62686,8 @@ export interface operations {
                     "application/json": components["schemas"]["DatasetVersionApprovalState"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -61687,6 +62723,8 @@ export interface operations {
                     "application/json": components["schemas"]["KnowledgeSourceRevision"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -61722,6 +62760,8 @@ export interface operations {
                     "application/json": components["schemas"]["KnowledgeSourceFile"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -61761,6 +62801,8 @@ export interface operations {
                     "application/json": components["schemas"]["KnowledgeSourceFile"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -61798,6 +62840,8 @@ export interface operations {
                     "application/json": components["schemas"]["KnowledgeExtractionRun"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -61833,6 +62877,8 @@ export interface operations {
                     "application/json": components["schemas"]["KnowledgeExtractionRun"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -61868,6 +62914,8 @@ export interface operations {
                     "application/json": components["schemas"]["KnowledgeExtractionRun"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -61903,6 +62951,8 @@ export interface operations {
                     "application/json": components["schemas"]["ExtractedReactionRecord"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -61938,6 +62988,8 @@ export interface operations {
                     "application/json": components["schemas"]["ExtractedAnalyticalRecord"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -61973,6 +63025,8 @@ export interface operations {
                     "application/json": components["schemas"]["ExtractedRegulatoryRecord"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -62009,6 +63063,8 @@ export interface operations {
                     "application/json": components["schemas"]["KnowledgeReviewTask"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -62046,6 +63102,8 @@ export interface operations {
                     "application/json": components["schemas"]["KnowledgeReviewTask"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -62085,6 +63143,8 @@ export interface operations {
                     "application/json": components["schemas"]["KnowledgeReviewTask"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -62124,6 +63184,8 @@ export interface operations {
                     "application/json": components["schemas"]["KnowledgeRecordReviewResult"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -62163,6 +63225,8 @@ export interface operations {
                     "application/json": components["schemas"]["KnowledgeRecordReviewResult"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -62202,6 +63266,8 @@ export interface operations {
                     "application/json": components["schemas"]["KnowledgeGraphLink"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -62240,6 +63306,8 @@ export interface operations {
                     "application/json": components["schemas"]["KnowledgeSearchResult"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -62275,6 +63343,8 @@ export interface operations {
                     "application/json": components["schemas"]["TrainingDatasetCandidate"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -62312,6 +63382,8 @@ export interface operations {
                     "application/json": components["schemas"]["TrainingDatasetCandidate"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -62351,6 +63423,8 @@ export interface operations {
                     "application/json": components["schemas"]["TrainingDatasetCandidate"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -62386,6 +63460,8 @@ export interface operations {
                     "application/json": components["schemas"]["BenchmarkDatasetCandidate"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -62423,6 +63499,8 @@ export interface operations {
                     "application/json": components["schemas"]["BenchmarkDatasetCandidate"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -62462,6 +63540,8 @@ export interface operations {
                     "application/json": components["schemas"]["BenchmarkDatasetCandidate"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -62497,6 +63577,8 @@ export interface operations {
                     "application/json": components["schemas"]["ModelImprovementQueueItem"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -62534,6 +63616,8 @@ export interface operations {
                     "application/json": components["schemas"]["ModelImprovementQueueItem"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -62573,6 +63657,8 @@ export interface operations {
                     "application/json": components["schemas"]["ModelImprovementQueueItem"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -62610,6 +63696,8 @@ export interface operations {
                     "application/json": components["schemas"]["FeatureRecord"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -62646,6 +63734,8 @@ export interface operations {
                     "application/json": components["schemas"]["FeatureRecord"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -62681,6 +63771,8 @@ export interface operations {
                     "application/json": components["schemas"]["DatasetVersion"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -62718,6 +63810,8 @@ export interface operations {
                     "application/json": components["schemas"]["DatasetVersion"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -62753,6 +63847,8 @@ export interface operations {
                     "application/json": components["schemas"]["DatasetVersion"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -62792,6 +63888,8 @@ export interface operations {
                     "application/json": components["schemas"]["DatasetVersion"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -62827,6 +63925,8 @@ export interface operations {
                     "application/json": components["schemas"]["MLTaskDefinition"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -62864,6 +63964,8 @@ export interface operations {
                     "application/json": components["schemas"]["MLTaskDefinition"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -62900,6 +64002,8 @@ export interface operations {
                     "application/json": components["schemas"]["FeaturePipeline"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -62937,6 +64041,8 @@ export interface operations {
                     "application/json": components["schemas"]["FeaturePipeline"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -62972,6 +64078,8 @@ export interface operations {
                     "application/json": components["schemas"]["FeaturePipeline"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -63008,6 +64116,8 @@ export interface operations {
                     "application/json": components["schemas"]["MLTrainingRun"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -63045,6 +64155,8 @@ export interface operations {
                     "application/json": components["schemas"]["MLTrainingRunResponse"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -63080,6 +64192,8 @@ export interface operations {
                     "application/json": components["schemas"]["MLTrainingRunResponse"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -63115,6 +64229,8 @@ export interface operations {
                     "application/json": components["schemas"]["MLTrainingRunResponse"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -63150,6 +64266,8 @@ export interface operations {
                     "application/json": components["schemas"]["MLEvaluationRun"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -63187,6 +64305,8 @@ export interface operations {
                     "application/json": components["schemas"]["MLEvaluationRunResponse"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -63222,6 +64342,8 @@ export interface operations {
                     "application/json": components["schemas"]["MLEvaluationRunResponse"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -63258,6 +64380,8 @@ export interface operations {
                     "application/json": components["schemas"]["ModelArtifact"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -63293,6 +64417,8 @@ export interface operations {
                     "application/json": components["schemas"]["ModelArtifact"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -63328,6 +64454,8 @@ export interface operations {
                     "application/json": components["schemas"]["ModelCard"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -63365,6 +64493,8 @@ export interface operations {
                     "application/json": components["schemas"]["ModelCard"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -63400,6 +64530,8 @@ export interface operations {
                     "application/json": components["schemas"]["ModelCard"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -63439,6 +64571,8 @@ export interface operations {
                     "application/json": components["schemas"]["ModelCard"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -63473,6 +64607,8 @@ export interface operations {
                     "application/json": components["schemas"]["CalibrationAssessment"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -63510,6 +64646,8 @@ export interface operations {
                     "application/json": components["schemas"]["CalibrationAssessment"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -63545,6 +64683,8 @@ export interface operations {
                     "application/json": components["schemas"]["CalibrationAssessment"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -63579,6 +64719,8 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorAnalysisSlice"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -63616,6 +64758,8 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorAnalysisSlice"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -63651,6 +64795,8 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorAnalysisSlice"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -63685,6 +64831,8 @@ export interface operations {
                     "application/json": components["schemas"]["OutOfDomainAssessment"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -63722,6 +64870,8 @@ export interface operations {
                     "application/json": components["schemas"]["OutOfDomainAssessment"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -63757,6 +64907,8 @@ export interface operations {
                     "application/json": components["schemas"]["OutOfDomainAssessment"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -63792,6 +64944,8 @@ export interface operations {
                     "application/json": components["schemas"]["DeploymentCandidate"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -63829,6 +64983,8 @@ export interface operations {
                     "application/json": components["schemas"]["DeploymentCandidateResponse"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -63864,6 +65020,8 @@ export interface operations {
                     "application/json": components["schemas"]["DeploymentCandidateResponse"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -63903,6 +65061,8 @@ export interface operations {
                     "application/json": components["schemas"]["DeploymentCandidateResponse"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -63942,6 +65102,8 @@ export interface operations {
                     "application/json": components["schemas"]["DeploymentCandidateResponse"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -63975,6 +65137,8 @@ export interface operations {
                     "application/json": components["schemas"]["MLModelHealthSummary"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -64010,6 +65174,8 @@ export interface operations {
                     "application/json": components["schemas"]["PredictionServiceConfig"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -64047,6 +65213,8 @@ export interface operations {
                     "application/json": components["schemas"]["PredictionServiceConfig"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -64084,6 +65252,8 @@ export interface operations {
                     "application/json": components["schemas"]["AIEvidenceItem"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -64124,6 +65294,8 @@ export interface operations {
                     "application/json": components["schemas"]["AIEvidenceReviewResponse"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -64159,6 +65331,8 @@ export interface operations {
                     "application/json": components["schemas"]["AIServiceRegistry"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -64196,6 +65370,8 @@ export interface operations {
                     "application/json": components["schemas"]["AIServiceRegistry"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -64231,6 +65407,8 @@ export interface operations {
                     "application/json": components["schemas"]["AIServiceRegistry"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -64270,6 +65448,8 @@ export interface operations {
                     "application/json": components["schemas"]["AIServiceRegistry"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -64305,6 +65485,8 @@ export interface operations {
                     "application/json": components["schemas"]["PredictionRun"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -64342,6 +65524,8 @@ export interface operations {
                     "application/json": components["schemas"]["PredictionResponse"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -64377,6 +65561,8 @@ export interface operations {
                     "application/json": components["schemas"]["PredictionResponse"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -64416,6 +65602,8 @@ export interface operations {
                     "application/json": components["schemas"]["PredictionFeedbackResponse"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -64455,6 +65643,8 @@ export interface operations {
                     "application/json": components["schemas"]["PredictionFeedbackResponse"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -64492,6 +65682,8 @@ export interface operations {
                     "application/json": components["schemas"]["ModelRoutingDecision"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -64526,6 +65718,8 @@ export interface operations {
                     "application/json": components["schemas"]["ModelRoutingDecision"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -64561,6 +65755,8 @@ export interface operations {
                     "application/json": components["schemas"]["ModelRoutingDecision"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -64598,6 +65794,8 @@ export interface operations {
                     "application/json": components["schemas"]["InferenceExplanation"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -64633,6 +65831,8 @@ export interface operations {
                     "application/json": components["schemas"]["InferenceExplanation"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -64668,6 +65868,8 @@ export interface operations {
                     "application/json": components["schemas"]["ActiveLearningCandidate"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -64705,6 +65907,8 @@ export interface operations {
                     "application/json": components["schemas"]["ActiveLearningCandidate"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -64744,6 +65948,8 @@ export interface operations {
                     "application/json": components["schemas"]["ActiveLearningCandidate"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -64778,6 +65984,8 @@ export interface operations {
                     "application/json": components["schemas"]["ShadowEvaluationRun"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -64815,6 +66023,8 @@ export interface operations {
                     "application/json": components["schemas"]["ShadowEvaluationRun"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -64850,6 +66060,8 @@ export interface operations {
                     "application/json": components["schemas"]["ShadowEvaluationRun"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -64884,6 +66096,8 @@ export interface operations {
                     "application/json": components["schemas"]["CanaryDeploymentRecord"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -64921,6 +66135,8 @@ export interface operations {
                     "application/json": components["schemas"]["CanaryDeploymentRecord"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -64956,6 +66172,8 @@ export interface operations {
                     "application/json": components["schemas"]["CanaryDeploymentRecord"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -64995,6 +66213,8 @@ export interface operations {
                     "application/json": components["schemas"]["CanaryDeploymentRecord"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -65034,6 +66254,8 @@ export interface operations {
                     "application/json": components["schemas"]["CanaryDeploymentRecord"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -65067,6 +66289,8 @@ export interface operations {
                     "application/json": components["schemas"]["AIModelMonitoringSummary"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -65102,6 +66326,8 @@ export interface operations {
                     "application/json": components["schemas"]["ModelMonitoringEvent"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -65139,6 +66365,8 @@ export interface operations {
                     "application/json": components["schemas"]["ModelMonitoringEvent"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -65173,6 +66401,8 @@ export interface operations {
                     "application/json": components["schemas"]["PredictionAuditEntry"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -65207,6 +66437,8 @@ export interface operations {
                     "application/json": components["schemas"]["MobileConfigResponse"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -65244,6 +66476,8 @@ export interface operations {
                     "application/json": components["schemas"]["MobileConfigResponse"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -65279,6 +66513,8 @@ export interface operations {
                     "application/json": components["schemas"]["MobileDeviceSession"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -65316,6 +66552,8 @@ export interface operations {
                     "application/json": components["schemas"]["MobileDeviceSession"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -65355,6 +66593,8 @@ export interface operations {
                     "application/json": components["schemas"]["MobileDeviceSession"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -65388,6 +66628,8 @@ export interface operations {
                     "application/json": components["schemas"]["MobileDashboardResponse"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -65421,6 +66663,8 @@ export interface operations {
                     "application/json": components["schemas"]["MobileCommandCenterResponse"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -65456,6 +66700,8 @@ export interface operations {
                     "application/json": components["schemas"]["MobileResourceSummary"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -65491,6 +66737,8 @@ export interface operations {
                     "application/json": components["schemas"]["MobileResourceSummary"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -65526,6 +66774,8 @@ export interface operations {
                     "application/json": components["schemas"]["MobileResourceSummary"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -65561,6 +66811,8 @@ export interface operations {
                     "application/json": components["schemas"]["MobileActionQueueResponse"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -65597,6 +66849,8 @@ export interface operations {
                     "application/json": components["schemas"]["MobileActionDraft"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -65634,6 +66888,8 @@ export interface operations {
                     "application/json": components["schemas"]["MobileActionDraft"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -65673,6 +66929,8 @@ export interface operations {
                     "application/json": components["schemas"]["MobileActionDraft"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -65710,6 +66968,8 @@ export interface operations {
                     "application/json": components["schemas"]["MobileSyncResponse"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -65747,6 +67007,8 @@ export interface operations {
                     "application/json": components["schemas"]["MobilePushSubscription"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -65782,6 +67044,8 @@ export interface operations {
                     "application/json": components["schemas"]["MobileNotification"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -65819,6 +67083,8 @@ export interface operations {
                     "application/json": components["schemas"]["MobileNotification"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -65858,6 +67124,8 @@ export interface operations {
                     "application/json": components["schemas"]["MobileNotification"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -65893,6 +67161,8 @@ export interface operations {
                     "application/json": components["schemas"]["MobileReportPreview"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -65927,6 +67197,8 @@ export interface operations {
                     "application/json": components["schemas"]["MobileJobsSummary"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -65960,6 +67232,8 @@ export interface operations {
                     "application/json": components["schemas"]["MobileOfflineSafeSummary"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -65993,6 +67267,8 @@ export interface operations {
                     "application/json": components["schemas"]["ProductProgramRegistry"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -66030,6 +67306,8 @@ export interface operations {
                     "application/json": components["schemas"]["ProductProgramRegistry"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -66064,6 +67342,8 @@ export interface operations {
                     "application/json": components["schemas"]["ModulePriorityMap"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -66101,6 +67381,8 @@ export interface operations {
                     "application/json": components["schemas"]["ModulePriorityMap"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -66136,6 +67418,8 @@ export interface operations {
                     "application/json": components["schemas"]["CrossModuleWorkflowTemplate"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -66173,6 +67457,8 @@ export interface operations {
                     "application/json": components["schemas"]["CrossModuleWorkflowTemplate"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -66208,6 +67494,8 @@ export interface operations {
                     "application/json": components["schemas"]["SpectroscopyToRegulatoryBridge"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -66245,6 +67533,8 @@ export interface operations {
                     "application/json": components["schemas"]["SpectroscopyToRegulatoryBridge"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -66280,6 +67570,8 @@ export interface operations {
                     "application/json": components["schemas"]["SpectroscopyToRegulatoryBridge"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -66319,6 +67611,8 @@ export interface operations {
                     "application/json": components["schemas"]["SpectroscopyToRegulatoryBridge"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -66354,6 +67648,8 @@ export interface operations {
                     "application/json": components["schemas"]["RegulatoryToReactionBridge"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -66391,6 +67687,8 @@ export interface operations {
                     "application/json": components["schemas"]["RegulatoryToReactionBridge"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -66426,6 +67724,8 @@ export interface operations {
                     "application/json": components["schemas"]["RegulatoryToReactionBridge"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -66465,6 +67765,8 @@ export interface operations {
                     "application/json": components["schemas"]["RegulatoryToReactionBridge"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -66500,6 +67802,8 @@ export interface operations {
                     "application/json": components["schemas"]["RegulatoryConstraintSet"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -66539,6 +67843,8 @@ export interface operations {
                     "application/json": components["schemas"]["RegulatoryConstraintSet"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -66578,6 +67884,8 @@ export interface operations {
                     "application/json": components["schemas"]["RegulatoryConstraintSet"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -66613,6 +67921,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReactionRegulatoryComplianceReport"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -66648,6 +67958,8 @@ export interface operations {
                     "application/json": components["schemas"]["ComplianceDrivenOptimizationObjective"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -66687,6 +67999,8 @@ export interface operations {
                     "application/json": components["schemas"]["ComplianceDrivenOptimizationObjective"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -66722,6 +68036,8 @@ export interface operations {
                     "application/json": components["schemas"]["CTDModule3ReportBundle"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -66761,6 +68077,8 @@ export interface operations {
                     "application/json": components["schemas"]["CTDModule3ReportBundle"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -66796,6 +68114,8 @@ export interface operations {
                     "application/json": components["schemas"]["CTDModule3ReportBundle"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -66831,6 +68151,8 @@ export interface operations {
                     "application/json": components["schemas"]["CrossModuleActionItem"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -66868,6 +68190,8 @@ export interface operations {
                     "application/json": components["schemas"]["CrossModuleActionItem"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -66907,6 +68231,8 @@ export interface operations {
                     "application/json": components["schemas"]["CrossModuleActionItem"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -66940,6 +68266,8 @@ export interface operations {
                     "application/json": components["schemas"]["CrossModuleCommandCenterSummary"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -66975,6 +68303,8 @@ export interface operations {
                     "application/json": components["schemas"]["CrossModuleCommandCenterSummary"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -67010,6 +68340,8 @@ export interface operations {
                     "application/json": components["schemas"]["CrossModuleCommandCenterSummary"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -67045,6 +68377,8 @@ export interface operations {
                     "application/json": components["schemas"]["CrossModuleCommandCenterSummary"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -67079,6 +68413,8 @@ export interface operations {
                     "application/json": components["schemas"]["RegulatoryDossier"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -67116,6 +68452,8 @@ export interface operations {
                     "application/json": components["schemas"]["RegulatoryDossier"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -67151,6 +68489,8 @@ export interface operations {
                     "application/json": components["schemas"]["RegulatoryDossier"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -67190,6 +68530,8 @@ export interface operations {
                     "application/json": components["schemas"]["RegulatoryDossier"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -67225,6 +68567,8 @@ export interface operations {
                     "application/json": components["schemas"]["RegulatoryRequirement"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -67264,6 +68608,8 @@ export interface operations {
                     "application/json": components["schemas"]["RegulatoryRequirement"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -67303,6 +68649,8 @@ export interface operations {
                     "application/json": components["schemas"]["RegulatoryRequirement"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -67338,6 +68686,8 @@ export interface operations {
                     "application/json": components["schemas"]["RegulatoryEvidenceLink"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -67377,6 +68727,8 @@ export interface operations {
                     "application/json": components["schemas"]["RegulatoryEvidenceLink"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -67416,6 +68768,8 @@ export interface operations {
                     "application/json": components["schemas"]["RegulatoryQuery"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -67451,6 +68805,8 @@ export interface operations {
                     "application/json": components["schemas"]["RegulatoryQuery"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -67486,6 +68842,8 @@ export interface operations {
                     "application/json": components["schemas"]["RegulatoryRiskAssessment"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -67525,6 +68883,8 @@ export interface operations {
                     "application/json": components["schemas"]["RegulatoryRiskAssessment"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -67560,6 +68920,8 @@ export interface operations {
                     "application/json": components["schemas"]["RegulatoryReviewDecision"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -67599,6 +68961,8 @@ export interface operations {
                     "application/json": components["schemas"]["RegulatoryReviewDecision"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -67634,6 +68998,8 @@ export interface operations {
                     "application/json": components["schemas"]["RegulatoryReadinessReport"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -67673,6 +69039,8 @@ export interface operations {
                     "application/json": components["schemas"]["RegulatoryReadinessReport"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -67708,6 +69076,8 @@ export interface operations {
                     "application/json": components["schemas"]["RegulatoryReadinessReport"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -67743,6 +69113,8 @@ export interface operations {
                     "application/json": components["schemas"]["RegulatoryRuleSet"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -67780,6 +69152,8 @@ export interface operations {
                     "application/json": components["schemas"]["RegulatoryRuleSet"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -67815,6 +69189,8 @@ export interface operations {
                     "application/json": components["schemas"]["RegulatoryRuleSet"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -67850,6 +69226,8 @@ export interface operations {
                     "application/json": components["schemas"]["BatchRegulatoryAssessment"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -67889,6 +69267,8 @@ export interface operations {
                     "application/json": components["schemas"]["BatchRegulatoryAssessment"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -67924,6 +69304,8 @@ export interface operations {
                     "application/json": components["schemas"]["ImpurityRiskRegister"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -67963,6 +69345,8 @@ export interface operations {
                     "application/json": components["schemas"]["ImpurityRiskRegister"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -67998,6 +69382,8 @@ export interface operations {
                     "application/json": components["schemas"]["BatchRegulatoryAssessment"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -68037,6 +69423,8 @@ export interface operations {
                     "application/json": components["schemas"]["BatchRegulatoryAssessment"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -68072,6 +69460,8 @@ export interface operations {
                     "application/json": components["schemas"]["BatchRegulatoryAssessment"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -68111,6 +69501,8 @@ export interface operations {
                     "application/json": components["schemas"]["BatchRegulatoryAssessment"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -68146,6 +69538,8 @@ export interface operations {
                     "application/json": components["schemas"]["BatchRegulatoryAssessment"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -68185,6 +69579,8 @@ export interface operations {
                     "application/json": components["schemas"]["BatchRegulatoryAssessment"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -68220,6 +69616,8 @@ export interface operations {
                     "application/json": components["schemas"]["DossierNitrosamineCumulativeRisk"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -68255,6 +69653,8 @@ export interface operations {
                     "application/json": components["schemas"]["QNMRComplianceProfile"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -68294,6 +69694,8 @@ export interface operations {
                     "application/json": components["schemas"]["QNMRComplianceProfile"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -68329,6 +69731,8 @@ export interface operations {
                     "application/json": components["schemas"]["AnalyticalMethodValidationProfile"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -68368,6 +69772,8 @@ export interface operations {
                     "application/json": components["schemas"]["AnalyticalMethodValidationProfile"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -68403,6 +69809,8 @@ export interface operations {
                     "application/json": components["schemas"]["AIGovernanceRecord"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -68442,6 +69850,8 @@ export interface operations {
                     "application/json": components["schemas"]["AIGovernanceRecord"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -68477,6 +69887,8 @@ export interface operations {
                     "application/json": components["schemas"]["RegulatoryAIDecision"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -68516,6 +69928,8 @@ export interface operations {
                     "application/json": components["schemas"]["RegulatoryAIDecision"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -68551,6 +69965,8 @@ export interface operations {
                     "application/json": components["schemas"]["RegulatoryAIDecisionChainStatus"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -68591,6 +70007,8 @@ export interface operations {
                     "application/json": components["schemas"]["RegulatoryAIDecision"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -68626,6 +70044,8 @@ export interface operations {
                     "application/json": components["schemas"]["JurisdictionalRequirementMap"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -68665,6 +70085,8 @@ export interface operations {
                     "application/json": components["schemas"]["JurisdictionalRequirementMap"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -68701,6 +70123,8 @@ export interface operations {
                     "application/json": components["schemas"]["RegulatoryActionItem"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -68738,6 +70162,8 @@ export interface operations {
                     "application/json": components["schemas"]["RegulatoryActionItem"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -68777,6 +70203,8 @@ export interface operations {
                     "application/json": components["schemas"]["RegulatoryActionItem"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -68814,6 +70242,8 @@ export interface operations {
                     "application/json": components["schemas"]["CompoundEntity"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -68851,6 +70281,8 @@ export interface operations {
                     "application/json": components["schemas"]["CompoundEntity"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -68886,6 +70318,8 @@ export interface operations {
                     "application/json": components["schemas"]["CompoundEntity"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -68925,6 +70359,8 @@ export interface operations {
                     "application/json": components["schemas"]["CompoundEntity"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -68960,6 +70396,8 @@ export interface operations {
                     "application/json": components["schemas"]["CompoundStructureRecord"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -68999,6 +70437,8 @@ export interface operations {
                     "application/json": components["schemas"]["CompoundStructureRecord"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -69034,6 +70474,8 @@ export interface operations {
                     "application/json": components["schemas"]["CompoundAlias"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -69073,6 +70515,8 @@ export interface operations {
                     "application/json": components["schemas"]["CompoundAlias"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -69108,6 +70552,8 @@ export interface operations {
                     "application/json": components["schemas"]["CompoundRelationship"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -69147,6 +70593,8 @@ export interface operations {
                     "application/json": components["schemas"]["CompoundRelationship"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -69183,6 +70631,8 @@ export interface operations {
                     "application/json": components["schemas"]["CompoundBatch"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -69220,6 +70670,8 @@ export interface operations {
                     "application/json": components["schemas"]["CompoundBatch"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -69255,6 +70707,8 @@ export interface operations {
                     "application/json": components["schemas"]["CompoundBatch"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -69294,6 +70748,8 @@ export interface operations {
                     "application/json": components["schemas"]["CompoundBatch"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -69329,6 +70785,8 @@ export interface operations {
                     "application/json": components["schemas"]["SampleAliquot"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -69368,6 +70826,8 @@ export interface operations {
                     "application/json": components["schemas"]["SampleAliquot"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -69405,6 +70865,8 @@ export interface operations {
                     "application/json": components["schemas"]["CompoundEvidenceLink"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -69440,6 +70902,8 @@ export interface operations {
                     "application/json": components["schemas"]["CompoundEvidenceLink"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -69475,6 +70939,8 @@ export interface operations {
                     "application/json": components["schemas"]["CompoundEvidenceLink"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -69512,6 +70978,8 @@ export interface operations {
                     "application/json": components["schemas"]["ScientificKnowledgeGraphEdge"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -69547,6 +71015,8 @@ export interface operations {
                     "application/json": components["schemas"]["ScientificKnowledgeGraph"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -69586,6 +71056,8 @@ export interface operations {
                     "application/json": components["schemas"]["CompoundRegistryLinkResponse"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -69625,6 +71097,8 @@ export interface operations {
                     "application/json": components["schemas"]["CompoundRegistryLinkResponse"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -69664,6 +71138,8 @@ export interface operations {
                     "application/json": components["schemas"]["CompoundRegistryLinkResponse"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -69703,6 +71179,8 @@ export interface operations {
                     "application/json": components["schemas"]["CompoundRegistryLinkResponse"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -69740,6 +71218,8 @@ export interface operations {
                     "application/json": components["schemas"]["CompoundRegistrySearchResult"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -69776,6 +71256,8 @@ export interface operations {
                     "application/json": components["schemas"]["SessionFileLinkRecord"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -69815,6 +71297,8 @@ export interface operations {
                     "application/json": components["schemas"]["SessionFileLinkRecord"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -69851,6 +71335,8 @@ export interface operations {
                     "application/json": components["schemas"]["MessageResponse"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -69885,6 +71371,8 @@ export interface operations {
                     "application/json": (components["schemas"]["JobRecord"] | components["schemas"]["AnalysisJobRecord"])[];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -69922,6 +71410,8 @@ export interface operations {
                     "application/json": components["schemas"]["AnalysisJobRecord"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -69957,6 +71447,8 @@ export interface operations {
                     "application/json": components["schemas"]["AnalysisJobRecord"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -69993,6 +71485,8 @@ export interface operations {
                     "application/json": components["schemas"]["JobEventRecord"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -70029,6 +71523,8 @@ export interface operations {
                     "application/json": components["schemas"]["AnalysisJobRecord"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -70065,6 +71561,8 @@ export interface operations {
                     "application/json": components["schemas"]["ArtifactRecord"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -70100,6 +71598,8 @@ export interface operations {
                     "application/json": components["schemas"]["ArtifactRecord"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -70135,6 +71635,8 @@ export interface operations {
                     "application/json": unknown;
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -70170,6 +71672,8 @@ export interface operations {
                     "application/json": components["schemas"]["VisualizationArtifact"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -70207,6 +71711,8 @@ export interface operations {
                     "application/json": components["schemas"]["VisualizationArtifact"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -70241,6 +71747,8 @@ export interface operations {
                     "application/json": components["schemas"]["OrganizationRecord"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -70278,6 +71786,8 @@ export interface operations {
                     "application/json": components["schemas"]["OrganizationRecord"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -70313,6 +71823,8 @@ export interface operations {
                     "application/json": components["schemas"]["OrganizationRecord"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -70349,6 +71861,8 @@ export interface operations {
                     "application/json": components["schemas"]["TeamMemberRecord"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -70388,6 +71902,8 @@ export interface operations {
                     "application/json": components["schemas"]["TeamMemberRecord"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -70428,6 +71944,8 @@ export interface operations {
                     "application/json": components["schemas"]["TeamMemberRecord"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -70464,6 +71982,8 @@ export interface operations {
                     "application/json": components["schemas"]["ProjectPermissionRecord"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -70503,6 +72023,8 @@ export interface operations {
                     "application/json": components["schemas"]["ProjectPermissionRecord"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -70539,6 +72061,8 @@ export interface operations {
                     "application/json": components["schemas"]["ProjectPermissionRecord"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -70579,6 +72103,8 @@ export interface operations {
                     "application/json": components["schemas"]["ProjectPermissionRecord"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -70615,6 +72141,8 @@ export interface operations {
                     "application/json": components["schemas"]["SessionReviewerRecord"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -70654,6 +72182,8 @@ export interface operations {
                     "application/json": components["schemas"]["SessionReviewerRecord"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -70690,6 +72220,8 @@ export interface operations {
                     "application/json": components["schemas"]["SessionReviewerRecord"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -70730,6 +72262,8 @@ export interface operations {
                     "application/json": components["schemas"]["SessionReviewerRecord"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -70766,6 +72300,8 @@ export interface operations {
                     "application/json": components["schemas"]["EvidenceCommentRecord"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -70805,6 +72341,8 @@ export interface operations {
                     "application/json": components["schemas"]["EvidenceCommentRecord"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -70841,6 +72379,8 @@ export interface operations {
                     "application/json": components["schemas"]["EvidenceCommentRecord"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -70881,6 +72421,8 @@ export interface operations {
                     "application/json": components["schemas"]["EvidenceCommentRecord"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -70917,6 +72459,8 @@ export interface operations {
                     "application/json": components["schemas"]["SessionReviewerRecord"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -70954,6 +72498,8 @@ export interface operations {
                     "application/json": components["schemas"]["SessionReviewerRecord"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -70990,6 +72536,8 @@ export interface operations {
                     "application/json": components["schemas"]["ApprovalRecord"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -71027,6 +72575,8 @@ export interface operations {
                     "application/json": components["schemas"]["ApprovalRecord"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -71063,6 +72613,8 @@ export interface operations {
                     "application/json": components["schemas"]["EvidenceCommentRecord"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -71100,6 +72652,8 @@ export interface operations {
                     "application/json": components["schemas"]["EvidenceCommentRecord"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -71139,6 +72693,8 @@ export interface operations {
                     "application/json": components["schemas"]["EvidenceCommentRecord"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -71175,6 +72731,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReviewTaskRecord"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -71212,6 +72770,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReviewTaskRecord"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -71251,6 +72811,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReviewTaskRecord"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -71287,6 +72849,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReviewTaskRecord"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -71326,6 +72890,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReviewTaskRecord"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -71366,6 +72932,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReviewTaskRecord"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -71402,6 +72970,8 @@ export interface operations {
                     "application/json": components["schemas"]["ApprovalRecord"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -71441,6 +73011,8 @@ export interface operations {
                     "application/json": components["schemas"]["ApprovalRecord"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -71476,6 +73048,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReportLock"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -71515,6 +73089,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReportLock"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -71554,6 +73130,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReportLock"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -71593,6 +73171,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReportLock"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -71630,6 +73210,8 @@ export interface operations {
                     "application/json": components["schemas"]["SecureShareLinkRecord"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -71661,6 +73243,8 @@ export interface operations {
                     "application/json": components["schemas"]["SecureShareLinkRecord"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -71696,6 +73280,8 @@ export interface operations {
                     "application/json": components["schemas"]["SecureShareLinkRecord"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -71732,6 +73318,8 @@ export interface operations {
                     "application/json": components["schemas"]["MethodRegistryEntry"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -71769,6 +73357,8 @@ export interface operations {
                     "application/json": components["schemas"]["MethodRegistryEntry"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -71804,6 +73394,8 @@ export interface operations {
                     "application/json": components["schemas"]["MethodRegistryEntry"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -71843,6 +73435,8 @@ export interface operations {
                     "application/json": components["schemas"]["MethodRegistryEntry"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -71879,6 +73473,8 @@ export interface operations {
                     "application/json": components["schemas"]["ModelVersion"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -71916,6 +73512,8 @@ export interface operations {
                     "application/json": components["schemas"]["ModelVersion"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -71951,6 +73549,8 @@ export interface operations {
                     "application/json": components["schemas"]["ModelVersion"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -71990,6 +73590,8 @@ export interface operations {
                     "application/json": components["schemas"]["ModelVersion"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -72026,6 +73628,8 @@ export interface operations {
                     "application/json": components["schemas"]["ScoringProfile"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -72063,6 +73667,8 @@ export interface operations {
                     "application/json": components["schemas"]["ScoringProfile"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -72098,6 +73704,8 @@ export interface operations {
                     "application/json": components["schemas"]["ScoringProfile"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -72137,6 +73745,8 @@ export interface operations {
                     "application/json": components["schemas"]["ScoringProfile"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -72173,6 +73783,8 @@ export interface operations {
                     "application/json": components["schemas"]["ThresholdProfile"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -72210,6 +73822,8 @@ export interface operations {
                     "application/json": components["schemas"]["ThresholdProfile"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -72245,6 +73859,8 @@ export interface operations {
                     "application/json": components["schemas"]["ThresholdProfile"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -72284,6 +73900,8 @@ export interface operations {
                     "application/json": components["schemas"]["ThresholdProfile"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -72319,6 +73937,8 @@ export interface operations {
                     "application/json": components["schemas"]["BenchmarkDataset"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -72356,6 +73976,8 @@ export interface operations {
                     "application/json": components["schemas"]["BenchmarkDataset"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -72391,6 +74013,8 @@ export interface operations {
                     "application/json": components["schemas"]["BenchmarkDataset"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -72425,6 +74049,8 @@ export interface operations {
                     "application/json": components["schemas"]["ValidationRun"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -72462,6 +74088,8 @@ export interface operations {
                     "application/json": components["schemas"]["ValidationRun"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -72497,6 +74125,8 @@ export interface operations {
                     "application/json": components["schemas"]["ValidationRun"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -72531,6 +74161,8 @@ export interface operations {
                     "application/json": components["schemas"]["MethodComparisonRun"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -72568,6 +74200,8 @@ export interface operations {
                     "application/json": components["schemas"]["MethodComparisonRun"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -72603,6 +74237,8 @@ export interface operations {
                     "application/json": components["schemas"]["MethodComparisonRun"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -72636,6 +74272,8 @@ export interface operations {
                     "application/json": components["schemas"]["ModelHealthSummary"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -72671,6 +74309,8 @@ export interface operations {
                     "application/json": components["schemas"]["DriftAlert"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -72706,6 +74346,8 @@ export interface operations {
                     "application/json": components["schemas"]["DriftAlert"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -72741,6 +74383,8 @@ export interface operations {
                     "application/json": components["schemas"]["DriftAlert"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -72780,6 +74424,8 @@ export interface operations {
                     "application/json": components["schemas"]["QualityAssessment"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -72819,6 +74465,8 @@ export interface operations {
                     "application/json": components["schemas"]["QualityAssessment"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -72858,6 +74506,8 @@ export interface operations {
                     "application/json": components["schemas"]["QualityAssessment"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -72897,6 +74547,8 @@ export interface operations {
                     "application/json": components["schemas"]["QualityAssessment"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -72932,6 +74584,8 @@ export interface operations {
                     "application/json": components["schemas"]["QualityAssessment"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -72967,6 +74621,8 @@ export interface operations {
                     "application/json": components["schemas"]["QualityAssessment"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -73002,6 +74658,8 @@ export interface operations {
                     "application/json": components["schemas"]["QualityAssessment"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -73037,6 +74695,8 @@ export interface operations {
                     "application/json": components["schemas"]["QualityAssessment"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -73076,6 +74736,8 @@ export interface operations {
                     "application/json": components["schemas"]["QualityFinding"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -73115,6 +74777,8 @@ export interface operations {
                     "application/json": components["schemas"]["QualityAssessment"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -73150,6 +74814,8 @@ export interface operations {
                     "application/json": components["schemas"]["WorkflowTemplateRecord"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -73187,6 +74853,8 @@ export interface operations {
                     "application/json": components["schemas"]["WorkflowTemplateRecord"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -73222,6 +74890,8 @@ export interface operations {
                     "application/json": components["schemas"]["WorkflowTemplateRecord"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -73261,6 +74931,8 @@ export interface operations {
                     "application/json": components["schemas"]["WorkflowTemplateRecord"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -73296,6 +74968,8 @@ export interface operations {
                     "application/json": components["schemas"]["WorkflowRunRecord"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -73333,6 +75007,8 @@ export interface operations {
                     "application/json": components["schemas"]["WorkflowRunRecord"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -73368,6 +75044,8 @@ export interface operations {
                     "application/json": components["schemas"]["WorkflowRunRecord"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -73403,6 +75081,8 @@ export interface operations {
                     "application/json": components["schemas"]["WorkflowRunRecord"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -73438,6 +75118,8 @@ export interface operations {
                     "application/json": components["schemas"]["WorkflowRunRecord"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -73473,6 +75155,8 @@ export interface operations {
                     "application/json": components["schemas"]["WorkflowRunEventRecord"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -73508,6 +75192,8 @@ export interface operations {
                     "application/json": components["schemas"]["WorkflowRunStepRecord"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -73543,6 +75229,8 @@ export interface operations {
                     "application/json": components["schemas"]["WorkflowRunArtifactRecord"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -73579,6 +75267,8 @@ export interface operations {
                     "application/json": components["schemas"]["WorkflowRunRecord"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -73613,6 +75303,8 @@ export interface operations {
                     "application/json": components["schemas"]["ProjectRecord"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -73650,6 +75342,8 @@ export interface operations {
                     "application/json": components["schemas"]["ProjectRecord"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -73686,6 +75380,8 @@ export interface operations {
                     "application/json": components["schemas"]["ProjectSampleRecord"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -73725,6 +75421,8 @@ export interface operations {
                     "application/json": components["schemas"]["ProjectSampleRecord"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -73765,6 +75463,8 @@ export interface operations {
                     "application/json": components["schemas"]["ProjectSampleRecord"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -73800,6 +75500,8 @@ export interface operations {
                     "application/json": components["schemas"]["ProjectDashboardRecord"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -73835,6 +75537,8 @@ export interface operations {
                     "application/json": components["schemas"]["StoredAnalysisRecord"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -73870,6 +75574,8 @@ export interface operations {
                     "application/json": components["schemas"]["SampleTimelineRecord"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -73905,6 +75611,8 @@ export interface operations {
                     "application/json": components["schemas"]["SampleReportsRecord"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -73940,6 +75648,8 @@ export interface operations {
                     "application/json": components["schemas"]["SampleAnalysisComparison"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -73975,6 +75685,8 @@ export interface operations {
                     "application/json": components["schemas"]["StoredReportRecord"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -74012,6 +75724,8 @@ export interface operations {
                     "application/json": components["schemas"]["StructureElucidationReportResult"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -74049,6 +75763,8 @@ export interface operations {
                     "application/json": components["schemas"]["StructureElucidationReportResult"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -74086,6 +75802,24 @@ export interface operations {
                     "text/html": string;
                 };
             };
+            /** @description Authentication is required or must be repeated. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/html": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The action is not available to this caller. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/html": components["schemas"]["ErrorResponse"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -74121,6 +75855,8 @@ export interface operations {
                     "application/json": components["schemas"]["AnalysisEvidenceReport"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -74154,6 +75890,24 @@ export interface operations {
                 };
                 content: {
                     "text/html": string;
+                };
+            };
+            /** @description Authentication is required or must be repeated. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/html": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The action is not available to this caller. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/html": components["schemas"]["ErrorResponse"];
                 };
             };
             /** @description Validation Error */
@@ -74191,6 +75945,8 @@ export interface operations {
                     "application/json": components["schemas"]["StoredReportRecord"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -74225,6 +75981,8 @@ export interface operations {
                     "application/json": components["schemas"]["StoredAnalysisRecord"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -74259,6 +76017,8 @@ export interface operations {
                     "application/json": unknown;
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -74294,6 +76054,8 @@ export interface operations {
                     "application/json": components["schemas"]["FullStoredAnalysisRecord"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -74329,6 +76091,8 @@ export interface operations {
                     "application/json": components["schemas"]["StoredAnalysisRecord"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -74364,6 +76128,8 @@ export interface operations {
                     "application/json": components["schemas"]["JobRecord"] | components["schemas"]["AnalysisJobRecord"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -74399,6 +76165,8 @@ export interface operations {
                     "application/json": components["schemas"]["StoredAnalysisRecord"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -74434,6 +76202,8 @@ export interface operations {
                     "application/json": unknown;
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -74469,6 +76239,8 @@ export interface operations {
                     "application/json": unknown;
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -74504,6 +76276,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReviewQueueItem"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -74543,6 +76317,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReviewDecisionRecord"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -74582,6 +76358,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReviewDecisionRecord"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -74621,6 +76399,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReviewDecisionRecord"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -74656,6 +76436,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReviewDecisionRecord"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -74693,6 +76475,8 @@ export interface operations {
                     "application/json": components["schemas"]["AuditEventRecord"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -74730,6 +76514,8 @@ export interface operations {
                     "application/json": components["schemas"]["AuditEventRecord"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -74763,6 +76549,8 @@ export interface operations {
                     "application/json": components["schemas"]["MetricsSummary"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -74796,6 +76584,8 @@ export interface operations {
                     "application/json": components["schemas"]["MetricsSummary"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -74830,6 +76620,8 @@ export interface operations {
                     "application/json": components["schemas"]["AdminUserRecord"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -74865,6 +76657,8 @@ export interface operations {
                     "application/json": components["schemas"]["UserPublic"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -74900,6 +76694,8 @@ export interface operations {
                     "application/json": components["schemas"]["UserPublic"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -74936,6 +76732,8 @@ export interface operations {
                     "application/json": components["schemas"]["AuditEventRecord"][];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -74975,6 +76773,8 @@ export interface operations {
                     "application/json": components["schemas"]["UserPublic"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -75008,6 +76808,8 @@ export interface operations {
                     "application/json": components["schemas"]["AdminSystemSummary"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -75043,6 +76845,8 @@ export interface operations {
                     };
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -75076,6 +76880,8 @@ export interface operations {
                     "application/json": components["schemas"]["OpsDeploymentGateStatus"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -75109,6 +76915,8 @@ export interface operations {
                     "application/json": components["schemas"]["OpsModelLineageResponse"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -75144,6 +76952,8 @@ export interface operations {
                     };
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -75183,6 +76993,8 @@ export interface operations {
                     };
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -75220,6 +77032,8 @@ export interface operations {
                     "application/json": components["schemas"]["ProtonEvidenceReport"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -75257,6 +77071,8 @@ export interface operations {
                     "application/json": components["schemas"]["Carbon13UploadPreview"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -75294,6 +77110,8 @@ export interface operations {
                     "application/json": components["schemas"]["Carbon13AnalysisReport"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -75331,6 +77149,8 @@ export interface operations {
                     "application/json": components["schemas"]["Carbon13AnalysisReport"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -75368,6 +77188,8 @@ export interface operations {
                     "application/json": components["schemas"]["DeptAptPreviewReport"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -75405,6 +77227,8 @@ export interface operations {
                     "application/json": components["schemas"]["DeptAptAnalyzeResult"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -75442,6 +77266,8 @@ export interface operations {
                     "application/json": components["schemas"]["CandidateComparisonResult"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -75479,6 +77305,8 @@ export interface operations {
                     "application/json": components["schemas"]["MultipletJCouplingBridgeResult"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -75516,6 +77344,8 @@ export interface operations {
                     "application/json": components["schemas"]["CandidateComparisonResult"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -75553,6 +77383,8 @@ export interface operations {
                     "application/json": components["schemas"]["SpectralSimilarityResult"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -75590,6 +77422,8 @@ export interface operations {
                     "application/json": components["schemas"]["SpectralSimilarityResult"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -75628,6 +77462,8 @@ export interface operations {
                     "application/json": components["schemas"]["PredictedNMRReport"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -75665,6 +77501,8 @@ export interface operations {
                     "application/json": components["schemas"]["CandidatePredictedNMRMatchResult"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -75702,6 +77540,8 @@ export interface operations {
                     "application/json": components["schemas"]["CandidatePredictedNMRMatchResult"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -75739,6 +77579,8 @@ export interface operations {
                     "application/json": components["schemas"]["HRMSCandidateMatchResult"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -75776,6 +77618,8 @@ export interface operations {
                     "application/json": components["schemas"]["HRMSCandidateMatchResult"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -75813,6 +77657,8 @@ export interface operations {
                     "application/json": components["schemas"]["HRMSFormulaSearchResult"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -75850,6 +77696,8 @@ export interface operations {
                     "application/json": components["schemas"]["MS1AdductInferenceResult"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -75887,6 +77735,8 @@ export interface operations {
                     "application/json": components["schemas"]["MS1AdductInferenceResult"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -75924,6 +77774,8 @@ export interface operations {
                     "application/json": components["schemas"]["MSMSAnnotationResult"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -75961,6 +77813,8 @@ export interface operations {
                     "application/json": components["schemas"]["MSMSAnnotationResult"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -75998,6 +77852,8 @@ export interface operations {
                     "application/json": components["schemas"]["MSMSFragmentationTreeResult"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -76035,6 +77891,8 @@ export interface operations {
                     "application/json": components["schemas"]["MSMSFragmentationTreeResult"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -76072,6 +77930,8 @@ export interface operations {
                     "application/json": components["schemas"]["UnifiedCandidateConfidenceResult"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -76109,6 +77969,8 @@ export interface operations {
                     "application/json": components["schemas"]["UnifiedCandidateConfidenceResult"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -76146,6 +78008,8 @@ export interface operations {
                     "application/json": components["schemas"]["UnifiedCandidateConfidenceResult"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -76183,6 +78047,8 @@ export interface operations {
                     "application/json": components["schemas"]["UnifiedEvidenceBundleConfidenceResult"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -76220,6 +78086,8 @@ export interface operations {
                     "application/json": components["schemas"]["LCMSImportBridgeResult"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -76257,6 +78125,8 @@ export interface operations {
                     "application/json": components["schemas"]["LCMSImportBridgeResult"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -76294,6 +78164,8 @@ export interface operations {
                     "application/json": components["schemas"]["LCMSImportBridgeResult"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -76331,6 +78203,8 @@ export interface operations {
                     "application/json": components["schemas"]["LCMSFeatureDetectionResult"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -76368,6 +78242,8 @@ export interface operations {
                     "application/json": components["schemas"]["LCMSFeatureDetectionResult"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -76405,6 +78281,8 @@ export interface operations {
                     "application/json": components["schemas"]["LCMSFeatureDetectionResult"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -76442,6 +78320,8 @@ export interface operations {
                     "application/json": components["schemas"]["LCMSFeatureGroupingResult"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -76479,6 +78359,8 @@ export interface operations {
                     "application/json": components["schemas"]["LCMSFeatureGroupingResult"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -76516,6 +78398,8 @@ export interface operations {
                     "application/json": components["schemas"]["LCMSFeatureGroupingResult"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -76553,6 +78437,8 @@ export interface operations {
                     "application/json": components["schemas"]["LCMSFeatureFamilyConsensusResult"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -76590,6 +78476,8 @@ export interface operations {
                     "application/json": components["schemas"]["LCMSFeatureFamilyConsensusResult"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -76627,6 +78515,8 @@ export interface operations {
                     "application/json": components["schemas"]["LCMSFeatureFamilyConsensusResult"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -76664,6 +78554,8 @@ export interface operations {
                     "application/json": components["schemas"]["LCMSConsensusCandidateBridgeResult"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -76701,6 +78593,8 @@ export interface operations {
                     "application/json": components["schemas"]["LCMSLibraryDereplicationResult"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -76738,6 +78632,8 @@ export interface operations {
                     "application/json": components["schemas"]["LCMSLibraryDereplicationResult"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -76775,6 +78671,8 @@ export interface operations {
                     "application/json": components["schemas"]["Carbon13AnalysisReport"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -76812,6 +78710,8 @@ export interface operations {
                     "application/json": components["schemas"]["Carbon13UploadPreview"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -76849,6 +78749,8 @@ export interface operations {
                     "application/json": components["schemas"]["Carbon13AnalysisReport"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -76886,6 +78788,8 @@ export interface operations {
                     "application/json": components["schemas"]["Carbon13UploadPreview"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -76923,6 +78827,8 @@ export interface operations {
                     "application/json": components["schemas"]["Carbon13AnalysisReport"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -76957,6 +78863,8 @@ export interface operations {
                     "application/json": components["schemas"]["SpectralImpurityObservationListResult"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -76994,6 +78902,8 @@ export interface operations {
                     "application/json": components["schemas"]["SpectralImpurityObservationResult"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -77031,6 +78941,8 @@ export interface operations {
                     "application/json": components["schemas"]["SpectrumSeriesOut"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -77070,6 +78982,8 @@ export interface operations {
                     "application/json": components["schemas"]["SpectrumSeriesPointOut"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -77105,6 +79019,8 @@ export interface operations {
                     "application/json": components["schemas"]["SpectrumKineticsResult"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -77424,6 +79340,8 @@ export interface operations {
                     };
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
         };
     };
     nmr2d_preview_nmr2d_preview_post: {
@@ -77452,6 +79370,8 @@ export interface operations {
                     "application/json": components["schemas"]["NMR2DPreview"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -77489,6 +79409,8 @@ export interface operations {
                     "application/json": components["schemas"]["NMR2DAnalysisReport"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -77524,6 +79446,8 @@ export interface operations {
                     "application/json": components["schemas"]["NMR2DRunRecord"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -77559,6 +79483,8 @@ export interface operations {
                     "application/json": components["schemas"]["NMR2DAnalysisReport"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -77598,6 +79524,8 @@ export interface operations {
                     "application/json": components["schemas"]["NMR2DRunRecord"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -77633,6 +79561,8 @@ export interface operations {
                     };
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {

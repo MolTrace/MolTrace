@@ -1,10 +1,13 @@
-"""Stable error codes: every failure carries one, and `detail` stops being an API.
+"""Stable error codes: every failure carries one, and `detail` is no longer an API.
 
 The audit chain split `break_kind` out of `detail` for this exact reason. Five codes were
-already riding inside `detail` here, kept alive by three separate allowlists — the server's
-403 list, two exception handlers that bypass the sanitizer, and the frontend proxy's own
-list. These pin the replacement and, more importantly, pin that the replacement did not
-break the clients depending on the old shape.
+riding inside `detail` here, kept alive by three separate allowlists — the server's 403 list,
+two exception handlers that bypassed the sanitizer, and the frontend proxy's own list.
+
+All three are now gone or derived: the 403 list and both bypasses were removed once every
+client had moved to `code`, and the proxy's list is generated from `PUBLIC_CODES`. So these
+no longer pin that the old shape still works — they pin that it does not, and that the
+vocabulary which replaced it stays well-formed.
 """
 
 from __future__ import annotations
@@ -52,24 +55,36 @@ def test_an_unregistered_detail_falls_back_to_the_status_never_to_nothing() -> N
     assert error_codes.code_for(418, None) == error_codes.BAD_REQUEST
 
 
-# --- the old shape still works -----------------------------------------------------------
-def test_detail_is_unchanged_for_the_codes_clients_already_branch_on() -> None:
-    """`code` was added BESIDE `detail`, not instead of it. The SPA branches on
-    `detail === "step_up_required"` today and must keep working until it has moved."""
-    from nmrcheck.api import _safe_http_exception_detail
+# --- `detail` is no longer a carrier ------------------------------------------------------
+def test_a_public_code_no_longer_survives_in_detail() -> None:
+    """Re-baselined, and inverted rather than moved.
+
+    This used to assert the opposite -- that a 403 whose `detail` IS a public code is echoed
+    verbatim -- justified by "the SPA branches on `detail === "step_up_required"` today and
+    must keep working until it has moved." That justification had already stopped holding
+    before this change: the /api/backend proxy replaces `detail` on every 401/403, including
+    when it forwards a recognised code, so the branch it was protecting never fired. The
+    passthrough was being preserved for a reader that had already stopped reading.
+
+    It also meant every newly registered public code silently widened what a 403 `detail` may
+    say, as a side effect of registration. `code` carries the signal now.
+    """
+    from nmrcheck.api import PUBLIC_ACCESS_DENIED_DETAIL, _safe_http_exception_detail
 
     assert _safe_http_exception_detail(403, error_codes.MODULE_NOT_LICENSED) == (
-        error_codes.MODULE_NOT_LICENSED
+        PUBLIC_ACCESS_DENIED_DETAIL
     )
 
 
-def test_the_403_allowlist_is_now_derived_rather_than_hand_maintained() -> None:
-    """It was a second copy of the registry. A third (the frontend proxy) still exists and
-    should be regenerated from PUBLIC_CODES rather than edited."""
-    from nmrcheck.api import PUBLIC_MACHINE_READABLE_403_DETAILS
+def test_module_not_licensed_is_still_a_public_code() -> None:
+    """Re-homed, not deleted.
 
-    assert PUBLIC_MACHINE_READABLE_403_DETAILS is error_codes.PUBLIC_CODES
-    assert error_codes.MODULE_NOT_LICENSED in PUBLIC_MACHINE_READABLE_403_DETAILS
+    This assertion used to sit beside one pinning `PUBLIC_MACHINE_READABLE_403_DETAILS is
+    error_codes.PUBLIC_CODES` -- an alias that is gone with the passthrough it fed. But this
+    half was never about the alias: it says `module_not_licensed` is public, which is still
+    true and still worth pinning. Deleting the test wholesale would have dropped it silently.
+    """
+    assert error_codes.MODULE_NOT_LICENSED in error_codes.PUBLIC_CODES
 
 
 def test_a_public_code_never_names_a_resource_a_user_or_a_reason() -> None:

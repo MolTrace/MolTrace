@@ -70,6 +70,43 @@ PRODUCT_NOT_PROVISIONED = "product_not_provisioned"
 ROLE_REQUIRED = "role_required"
 
 # --------------------------------------------------------------------------- #
+# Authentication situations. Each names WHAT HAPPENED to the caller's own
+# submission, never why an authorization check failed — the distinction the
+# module docstring draws, and the reason these are safe to publish.
+#
+# Before these existed the sanitizer replaced every 401 with one sentence, so a
+# desktop client could not tell "that authenticator code was wrong" from "your
+# session ended". Both are things the caller already knows they attempted; the
+# code lets the client say so without the server writing the copy.
+# --------------------------------------------------------------------------- #
+#: Sign-in was refused. Deliberately does NOT distinguish a wrong password from an
+#: unknown address or an unverified email — that difference is an account-existence
+#: oracle, and the three sign-in sites already collapse it in their prose.
+CREDENTIALS_INVALID = "credentials_invalid"
+#: The org requires a second factor, the user HAS one, and this session has not used
+#: it. Next action: step up.
+MFA_REQUIRED = "mfa_required"
+#: The org requires a second factor and the user has NONE. Next action: enrol one.
+#: Split from MFA_REQUIRED for the reason upgrade_state splits its four: the two need
+#: different screens, and `detail` is fixed copy now, so `code` is the only carrier.
+MFA_ENROLLMENT_REQUIRED = "mfa_enrollment_required"
+#: A presented factor was not accepted — TOTP, recovery code, step-up password, or a
+#: passkey assertion. One code for all four on purpose: the client always knows which
+#: factor it just submitted, so a per-factor code would be the server restating the
+#: client's own request.
+#:
+#: This deliberately also covers a passkey assertion refused for a sign-count regression.
+#: Naming the clone/replay detector in the denial body tells the holder of a cloned
+#: credential that the clone was caught and how; the person who owns the credential is
+#: told through the audit chain and the account's notification path instead, which
+#: reaches the owner rather than whoever is holding the copy.
+MFA_FACTOR_INVALID = "mfa_factor_invalid"
+#: A capability this build can serve is switched off in this deployment. The flag's
+#: NAME is deployment configuration and never goes on the wire — not in `detail`, not
+#: in a header; it goes to the operator log with the correlation id.
+FEATURE_NOT_ENABLED = "feature_not_enabled"
+
+# --------------------------------------------------------------------------- #
 # Generic fallbacks, so every error carries a code even before a route is
 # migrated. Never let absence of a specific code mean absence of the field —
 # a client that must handle "sometimes there is a code" gains nothing.
@@ -109,6 +146,27 @@ REGISTRY: dict[str, ErrorCode] = {
             PRODUCT_NOT_PROVISIONED, "The product is enabled but not yet set up.", True
         ),
         ErrorCode(ROLE_REQUIRED, "Your role does not include this action.", True),
+        ErrorCode(CREDENTIALS_INVALID, "The sign-in details were not accepted.", True),
+        ErrorCode(
+            MFA_REQUIRED,
+            "A second authentication factor is required for this session.",
+            True,
+        ),
+        ErrorCode(
+            MFA_ENROLLMENT_REQUIRED,
+            "A second authentication factor must be enrolled before continuing.",
+            True,
+        ),
+        ErrorCode(
+            MFA_FACTOR_INVALID,
+            "The authentication factor presented was not accepted.",
+            True,
+        ),
+        ErrorCode(
+            FEATURE_NOT_ENABLED,
+            "A feature this deployment can serve is switched off.",
+            True,
+        ),
         ErrorCode(
             UNKNOWN_PROCESSING_PRESET,
             "The requested processing preset is not one the engine implements.",
@@ -128,6 +186,15 @@ REGISTRY: dict[str, ErrorCode] = {
 PUBLIC_CODES: frozenset[str] = frozenset(
     entry.code for entry in REGISTRY.values() if entry.public
 )
+
+#: Every value ``code`` may take on a sanitized 401 or 403: the public codes plus the two
+#: status fallbacks, because a denial that names no particular situation still carries a code
+#: (never absent — see ``code_for``). This is the enumeration that reaches the OpenAPI contract
+#: and therefore the generated frontend types.
+#:
+#: Derived, like ``PUBLIC_CODES``. A fourth hand-maintained list of the same idea is exactly
+#: what this module was written to remove.
+SANITIZED_AUTH_CODES: frozenset[str] = PUBLIC_CODES | {UNAUTHENTICATED, FORBIDDEN}
 
 _STATUS_FALLBACK: dict[int, str] = {
     400: BAD_REQUEST,

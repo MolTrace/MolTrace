@@ -214,7 +214,7 @@ def test_step_up_required_before_signing(tmp_path):
         bearer = _signup(client, "signer@acme.com")
         # No step-up yet -> the signing route is gated before the body is even processed.
         blocked = client.post("/esignatures/records", headers=bearer, json={})
-        assert blocked.status_code == 401 and blocked.json()["detail"] == "step_up_required"
+        assert blocked.status_code == 401 and blocked.json()["code"] == "step_up_required"
         # System api key (operator break-glass) bypasses step-up — existing behavior preserved.
         # (A 422 for the empty body proves the step-up gate did NOT block the api-key path.)
         assert client.post("/esignatures/records", headers=SYSTEM, json={}).status_code in (400, 422)
@@ -236,7 +236,7 @@ def test_step_up_required_before_admin_mutation(tmp_path):
             json={"mfa_required": True, "grace_period_days": 0, "allowed_factors": ["totp"],
                   "enforce_for_sso": False, "require_step_up_for_signing": True},
         )
-        assert blocked.status_code == 401 and blocked.json()["detail"] == "step_up_required"
+        assert blocked.status_code == 401 and blocked.json()["code"] == "step_up_required"
         # Password step-up, then the same call succeeds.
         _password_step_up(client, admin_bearer)
         ok = client.put(
@@ -426,7 +426,7 @@ def test_per_tenant_mfa_blocks_product_routes(tmp_path):
         _set_policy(client, _make_org_lookup(app, "Acme"), required=True, grace=0)
         # A product route (require_access_context) is blocked until MFA is satisfied.
         blocked = client.get("/esignatures/records", headers=bearer)
-        assert blocked.status_code == 403 and blocked.json()["detail"] == "mfa_enrollment_required"
+        assert blocked.status_code == 403 and blocked.json()["code"] == "mfa_enrollment_required"
         # The MFA/enrollment surface stays reachable.
         assert client.get("/auth/mfa/status", headers=bearer).status_code == 200
         # After enrolling a factor + a fresh step-up, the product route is allowed.
