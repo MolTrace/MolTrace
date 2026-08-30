@@ -100,11 +100,44 @@ function scienceNewerThanFreeze(frozenBinary) {
   const repo = path.join(ROOT, '..')
   const frozenAt = Math.floor(fs.statSync(frozenBinary).mtimeMs / 1000)
   const git = (args) => execFileSync('git', args, { cwd: repo, encoding: 'utf8' })
-  let commits
+  // WHAT MAKES A FREEZE STALE IS THE SOURCE ON DISK, NOT WHEN SOMEONE TYPED
+  // `git commit`. This asked git for commits DATED after the freeze, which meant
+  // the natural order -- freeze, verify, commit -- always tripped it: the freeze
+  // built at 11:42 from the tree that became a commit at 11:45 was reported as
+  // three minutes behind code it already contained. That is a gate that cries
+  // wolf, and a gate that cries wolf gets bypassed.
+  //
+  // So the verdict is now the file mtimes, which is the question that was always
+  // being asked. Commits are still listed, but only the ones whose files are
+  // ACTUALLY newer on disk, so the refusal names something real.
+  const changed = []
+  const walk = (rel) => {
+    const abs = path.join(repo, rel)
+    let stat
+    try { stat = fs.statSync(abs) } catch { return }
+    if (stat.isDirectory()) {
+      for (const entry of fs.readdirSync(abs)) {
+        if (entry === '__pycache__' || entry.startsWith('.')) continue
+        walk(path.join(rel, entry))
+      }
+      return
+    }
+    if (!/\.(py|json|gz)$/.test(rel)) return
+    if (stat.mtimeMs / 1000 > frozenAt) changed.push(rel)
+  }
+  for (const rel of FROZEN_SCIENCE_SURFACE) walk(rel)
+
+  let commits = []
   try {
-    commits = git(['log', `--since=@${frozenAt}`, '--format=%h %ad %s',
-      '--date=format-local:%Y-%m-%d %H:%M', '--', ...FROZEN_SCIENCE_SURFACE])
-      .split('\n').map((l) => l.trim()).filter(Boolean)
+    if (changed.length) {
+      commits = git(['log', `--since=@${frozenAt}`, '--format=%h %ad %s',
+        '--date=format-local:%Y-%m-%d %H:%M', '--', ...FROZEN_SCIENCE_SURFACE])
+        .split('\n').map((l) => l.trim()).filter(Boolean)
+    } else {
+      // Proves git answers here, so an unreadable repository still fails closed
+      // rather than reporting a fresh freeze it never checked.
+      git(['rev-parse', 'HEAD'])
+    }
   } catch (err) {
     return { checked: false, why: String(err.message).trim().split('\n')[0] }
   }
@@ -118,7 +151,7 @@ function scienceNewerThanFreeze(frozenBinary) {
         try { return fs.statSync(path.join(repo, rel)).mtimeMs / 1000 > frozenAt } catch { return false }
       })
   } catch { /* the commit query already proved git answers here */ }
-  return { checked: true, frozenAt, commits, dirty }
+  return { checked: true, frozenAt, commits, dirty, changed }
 }
 
 // AD-HOC SIGNING IS NOT DISTRIBUTION SIGNING, and `osxSign` below stays false:
@@ -307,7 +340,7 @@ async function main() {
       )
     }
     console.log('WARNING: freeze vintage unverified (' + freshness.why + ') — proceeding as instructed')
-  } else if (freshness.commits.length || freshness.dirty.length) {
+  } else if (freshness.changed.length) {
     // Local, to match git's format-local above. Printing the freeze in UTC beside
     // commit times in local time made this refusal read as though the commits came
     // BEFORE the freeze — the gate looked broken at exactly the moment it was right.
