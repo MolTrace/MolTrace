@@ -401,6 +401,23 @@ function describeFailure(err, diagnostic) {
   }
 }
 
+/**
+ * Why one file could not be read, in the words that fit what actually happened.
+ *
+ * TWO DIFFERENT FAILURES were being told as one. `describeFailure` exists to
+ * describe a dead CHILD and opens with "The local science service is not running,
+ * so analysis on this computer is unavailable." Every per-file refusal was routed
+ * through it, so a service that had just read the file and correctly declined it
+ * was reported as dead -- and the real cause, which names the file and what is
+ * wrong with it, was demoted to the second half of a sentence that had already
+ * misdiagnosed the app to itself. A reader told the service is down restarts it
+ * and gets the same result.
+ */
+function readFailureReason(err) {
+  if (err && err.answeredByService && err.message) return err.message
+  return describeFailure(err).reason
+}
+
 /** The four sources §7.1 names, as the capability readout expects them. */
 function capabilityWorld(service) {
   return {
@@ -417,5 +434,4 @@ function capabilityWorld(service) {
 module.exports = {
   createSocketDirectory, createListener, buildSpawn, start, waitUntilReady, describeFailure,
   capabilityWorld, spawn, _exitReason, resolveService,
-  _NOT_FOR_A_PERSON,
-}
+  _NOT_FOR_A_PERSON, readFailureReason }
