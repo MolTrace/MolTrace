@@ -12,6 +12,10 @@ export type ModelDiagnosticsCardProps = {
   warnings: string[]
   uncertaintySummary: string | null
   featureEncodingSummary: string | null
+  /** The surrogate reported that it learned nothing from the training data. */
+  surrogateDegenerate?: boolean
+  feasibleCandidateCount?: number | null
+  regulatoryBlockedCandidateCount?: number | null
 }
 
 function jsonPreview(raw: unknown, maxChars = 4000): string {
@@ -34,6 +38,9 @@ export function ModelDiagnosticsCard({
   warnings,
   uncertaintySummary,
   featureEncodingSummary,
+  surrogateDegenerate = false,
+  feasibleCandidateCount = null,
+  regulatoryBlockedCandidateCount = null,
 }: ModelDiagnosticsCardProps) {
   const trainingDisplay =
     trainingExperimentCount != null ? String(trainingExperimentCount) : String(trainingCountFallbackTotal)
@@ -107,6 +114,33 @@ export function ModelDiagnosticsCard({
             <div className="space-y-2">
               <p className="text-xs font-medium text-muted-foreground">uncertainty summary</p>
               <p className="text-xs leading-relaxed text-muted-foreground">{uncertaintySummary ?? "—"}</p>
+              {surrogateDegenerate ? (
+                <p
+                  data-testid="surrogate-degenerate"
+                  className="mt-2 rounded-md border border-warning/50 px-2 py-1.5 text-[11px] text-warning"
+                >
+                  The surrogate did not learn from these observations — its fitted length scale
+                  collapsed. Rankings below come from the acquisition function operating on a model
+                  that found no structure in the data, so treat them as exploration, not prediction.
+                </p>
+              ) : null}
+              {feasibleCandidateCount != null || regulatoryBlockedCandidateCount != null ? (
+                <p className="mt-2 text-[11px] text-muted-foreground" data-testid="candidate-gate-counts">
+                  {feasibleCandidateCount != null ? (
+                    <>
+                      feasible candidates{" "}
+                      <span className="font-mono text-foreground">{feasibleCandidateCount}</span>
+                    </>
+                  ) : null}
+                  {feasibleCandidateCount != null && regulatoryBlockedCandidateCount != null ? " · " : null}
+                  {regulatoryBlockedCandidateCount != null ? (
+                    <>
+                      blocked on a regulatory limit{" "}
+                      <span className="font-mono text-foreground">{regulatoryBlockedCandidateCount}</span>
+                    </>
+                  ) : null}
+                </p>
+              ) : null}
             </div>
 
             <div className="space-y-2">

@@ -1447,6 +1447,34 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/reaction-optimization/bo-runs/{bo_run_id}/surrogate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Reaction Bo Surrogate Route
+         * @description The surrogate a BO run fitted: version, feature encoding, fit metrics, its warnings.
+         *
+         *     Every run wrote this record and nothing could read it -- no caller, no route -- so the one
+         *     artifact saying whether the model behind a recommendation was any good was invisible.
+         *
+         *     Sits under ``/reaction-optimization/bo-runs/`` deliberately: ``reaction_access`` resolves
+         *     that prefix's ``bo_run_id`` to the owning project by ``startswith``, so this nested path
+         *     inherits the same owner scoping as its sibling rather than needing a new resolver. A run
+         *     that does not exist and one owned by someone else return the same 404.
+         */
+        get: operations["get_reaction_bo_surrogate_route_reaction_optimization_bo_runs__bo_run_id__surrogate_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/reaction-projects/{reaction_project_id}/advisor/run": {
         parameters: {
             query?: never;
@@ -34205,6 +34233,52 @@ export interface components {
             /** Reason For Change */
             reason_for_change: string;
         };
+        /** ReactionSurrogateModelRecord */
+        ReactionSurrogateModelRecord: {
+            /** Id */
+            id: number;
+            /** Reaction Project Id */
+            reaction_project_id: number;
+            /** Bo Run Id */
+            bo_run_id?: number | null;
+            /**
+             * Model Type
+             * @enum {string}
+             */
+            model_type: "gaussian_process" | "random_forest" | "extra_trees" | "tpe_like" | "rule_based_fallback";
+            /** Model Version */
+            model_version: string;
+            /** Training Experiment Count */
+            training_experiment_count: number;
+            /** Feature Encoding Json */
+            feature_encoding_json?: {
+                [key: string]: unknown;
+            };
+            /** Objective Summary Json */
+            objective_summary_json?: {
+                [key: string]: unknown;
+            };
+            /** Metrics Json */
+            metrics_json?: {
+                [key: string]: unknown;
+            };
+            /** Warnings Json */
+            warnings_json?: string[];
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Metadata Json */
+            metadata_json?: {
+                [key: string]: unknown;
+            };
+            /**
+             * Human Review Required
+             * @default true
+             */
+            human_review_required: boolean;
+        };
         /** ReactionVariable */
         ReactionVariable: {
             /** Id */
@@ -47691,6 +47765,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ReactionBayesianOptimizationRun"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_reaction_bo_surrogate_route_reaction_optimization_bo_runs__bo_run_id__surrogate_get: {
+        parameters: {
+            query?: {
+                access_token?: string | null;
+            };
+            header?: {
+                "x-api-key"?: string | null;
+            };
+            path: {
+                bo_run_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReactionSurrogateModelRecord"];
                 };
             };
             /** @description Validation Error */
