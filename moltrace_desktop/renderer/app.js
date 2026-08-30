@@ -138,6 +138,9 @@
     everRan: false,
     candidate: '',
     verdicts: [],
+    ranking: null,
+    ranking_error: null,
+    rankingBusy: false,
     verdictError: null,
     checking: false,
   }
@@ -456,6 +459,8 @@
     page.append(results)
 
     page.append(structureSection())
+    const ranking = rankingSection()
+    if (ranking) page.append(ranking)
 
     if (quantifiable.length) {
       const c = card(null, null, 'var(--mt-teal)')
@@ -602,6 +607,82 @@
       + 'the highest number is not the answer.'
   }
 
+  // DP4, and only from the second candidate on. Its probabilities are normalised
+  // across the candidates supplied and sum to one, so a DP4 figure for a single
+  // structure is 1.0 and says nothing at all -- offering it for one would be
+  // offering a number that cannot be wrong.
+  //
+  // A SECOND, INDEPENDENT reading beside the confidence above: the verifier
+  // combines four tests through a Bayesian update; DP4 asks one narrower question
+  // under Smith & Goodman's error model. Two methods agreeing is worth more than
+  // either alone, and two disagreeing is worth knowing.
+  function rankingSection() {
+    if (state.verdicts.length < 2) return null
+    const c = card('Rank these candidates by shift agreement', null, 'var(--mt-teal)')
+    c.insertBefore(eyebrow('Step 4 \u00b7 Candidate ranking'), c.firstChild)
+
+    const go = node('button', 'btn btn--secondary rank__run')
+    go.type = 'button'
+    go.append(document.createTextNode(state.rankingBusy ? 'Ranking\u2026' : 'Rank ' + state.verdicts.length + ' candidates'))
+    go.disabled = state.rankingBusy || !(state.service && state.service.running)
+    go.addEventListener('click', rankStructures)
+    c.append(go)
+
+    if (state.ranking_error) c.append(alert('warn', 'These were not ranked', state.ranking_error))
+
+    const r = state.ranking
+    if (!r) return c
+
+    // NOT A PROBABILITY, and said before the numbers rather than under them.
+    const basis = (r.rows[0] || {}).probability_basis
+    if (!(r.rows[0] || {}).probability_is_calibrated) {
+      c.append(alert('warn', 'A ranking, not a probability', basis
+        + ' Errors are computed over matched peaks only, so read every error against the '
+        + 'coverage beside it.'))
+    }
+
+    const table = node('table', 'peaks rank__table')
+    const thead = node('thead'); const hr = node('tr')
+    for (const label of ['#', 'Structure', 'Share', 'Matched', 'Mean error (ppm)', 'RMS (ppm)'])
+      hr.append(node('th', null, label))
+    thead.append(hr); table.append(thead)
+    const tb = node('tbody')
+    r.rows.forEach((row, i) => {
+      const tr = node('tr')
+      const cells = [
+        String(i + 1),
+        row.smiles,
+        (row.probability * 100).toFixed(1) + '%',
+        row.matched_peaks + ' of ' + row.observed_peaks + (row.low_coverage ? ' \u00b7 low' : ''),
+        row.mean_abs_error_ppm.toFixed(2),
+        row.rms_error_ppm.toFixed(2),
+      ]
+      for (const cell of cells) tr.append(node('td', null, cell))
+      tb.append(tr)
+    })
+    table.append(tb)
+    c.append(table)
+    c.append(node('p', 'tablenote',
+      'Ranked over the ' + r.observed_peaks + ' ' + r.nucleus + ' signals strong enough to measure '
+      + 'and attributable to the compound \u2014 solvent, impurities and satellites are excluded, '
+      + 'because a correct structure should not be penalised for the sample being real.'))
+    return c
+  }
+
+  async function rankStructures() {
+    state.rankingBusy = true; state.ranking_error = null; render()
+    try {
+      const out = await window.moltrace.analysis.rankStructures(state.verdicts.map((v) => v.smiles))
+      if (out && out.ok) { state.ranking = out.result }
+      else { state.ranking = null; state.ranking_error = (out && out.reason) || 'these could not be ranked' }
+    } catch (e) {
+      state.ranking = null
+      state.ranking_error = (e && e.message) || 'these could not be ranked'
+    } finally {
+      state.rankingBusy = false; render()
+    }
+  }
+
   async function checkStructure() {
     if (!state.candidate.trim()) {
       state.verdictError = 'Type a structure to check it against this spectrum.'
@@ -615,6 +696,8 @@
         state.verdicts = state.verdicts.filter((x) => x.smiles !== out.result.smiles)
         state.verdicts.push(out.result)
         state.verdicts.sort((a, b) => b.confidence - a.confidence)
+        // The ranking is over a SET; adding a candidate changes it.
+        state.ranking = null
         state.candidate = ''
       } else {
         state.verdictError = (out && out.reason) || 'that structure could not be checked'
@@ -633,7 +716,7 @@
       if (out && out.ok) {
         state.spectrum = out.summary
         // A verdict belongs to the spectrum it was computed against.
-        state.verdicts = []; state.verdictError = null
+        state.verdicts = []; state.verdictError = null; state.ranking = null
       }
       else if (out && !out.cancelled) { state.error = out.reason || 'that spectrum could not be read' }
     } catch (e) {

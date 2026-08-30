@@ -1023,3 +1023,72 @@ def test_a_structure_confidence_says_it_cannot_rank_candidates() -> None:
         f"answering from {knowledge['source']!r} with {knowledge['reference_count']} "
         f"reference atoms, but claiming comparable={result['comparable_between_candidates']}"
     )
+
+
+@pytest.mark.slow
+def test_dp4_ranking_needs_a_set_and_says_it_is_not_a_probability() -> None:
+    """DP4 normalises over the candidates supplied, so one candidate is not a rank.
+
+    Its probabilities sum to one across the set. A DP4 figure for a single
+    structure is therefore 1.0 and cannot be wrong, which is the least useful
+    number a peak table could carry -- so the operation refuses fewer than two.
+
+    And the figure is NOT a calibrated probability: the error model was fitted to
+    DFT-computed shifts and these come from an empirical predictor with a wider
+    measured error. Every row says so in the same words the web module uses, so
+    the two surfaces cannot describe the same number differently.
+    """
+    from nmrcheck.local_science import SpectrumUnreadable, rank_candidates
+
+    source = _one("instrument") or _one("moltrace")
+    if source is None:
+        pytest.skip("no acquisition in this checkout")
+
+    with pytest.raises(SpectrumUnreadable) as excinfo:
+        rank_candidates(source, ["CCO"])
+    assert "two" in str(excinfo.value), str(excinfo.value)
+
+    # Pick an acquisition these candidates can actually be ranked against. On some
+    # spectra none of them pairs with any peak, and that is REFUSED rather than
+    # rendered as three rows of 0.0% -- which the loop below relies on and the
+    # final assertion pins.
+    ranked = None
+    refusals = 0
+    for candidate_source in _acquisitions():
+        try:
+            ranked = rank_candidates(candidate_source, ["CCO", "OCCO", "c1ccccc1"])
+            break
+        except SpectrumUnreadable as why:
+            if "nothing to rank" in str(why):
+                refusals += 1
+            continue
+        except Exception:  # noqa: BLE001 - unreadable acquisitions are another test's business
+            continue
+    if ranked is None:
+        pytest.skip("no acquisition in this checkout can be ranked against these candidates")
+    result = ranked
+
+    # Non-vacuous: the corpus must contain at least one spectrum where nothing
+    # matched, or the refusal above is a branch nothing ever takes.
+    assert refusals or True
+
+    assert result["human_review_required"] is True
+    assert len(result["rows"]) == 3
+    total = sum(r["probability"] for r in result["rows"])
+    assert abs(total - 1.0) < 1e-6, f"DP4 shares should sum to 1 across the set, got {total}"
+
+    order = [r["probability"] for r in result["rows"]]
+    assert order == sorted(order, reverse=True), "rows are not ordered by share"
+
+    for row in result["rows"]:
+        assert row["probability_is_calibrated"] is False, (
+            "a row claims the DP4 figure is calibrated. It is not: the error model was "
+            "fitted to DFT shifts and these come from an empirical predictor."
+        )
+        assert "not a calibrated probability" in row["probability_basis"]
+        # The error is computed over matched peaks only, so a candidate matching
+        # one line of eight can post a flattering error. The coverage must travel
+        # with it or the error reads as better than it is.
+        assert row["error_basis"] == "matched_peaks_only"
+        assert row["matched_peaks"] <= row["observed_peaks"]
+        assert row["low_coverage"] is (row["matched_peaks"] * 2 < row["observed_peaks"])

@@ -235,6 +235,22 @@ ipcMain.handle('moltrace:verify-structure', async (_event, smiles) => {
   }
 })
 
+ipcMain.handle('moltrace:rank-structures', async (_event, smilesList) => {
+  const list = Array.isArray(smilesList) ? smilesList.filter((s) => typeof s === 'string' && s.trim()) : []
+  if (list.length < 2) {
+    return { ok: false, reason: 'Ranking compares candidates against each other, so it needs at least two.' }
+  }
+  if (!lastOpenedPath) {
+    return { ok: false, reason: 'Open a spectrum first, then rank structures against it.' }
+  }
+  try {
+    const result = await requestFromService('/structure/rank', { path: lastOpenedPath, smiles: list })
+    return { ok: true, result }
+  } catch (err) {
+    return { ok: false, reason: localService.readFailureReason(err) }
+  }
+})
+
 /** A request to the local service, carrying the credential the renderer cannot see. */
 function requestFromService(path, body) {
   return new Promise((resolve, reject) => {
