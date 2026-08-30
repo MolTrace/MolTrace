@@ -226,6 +226,7 @@
         // that vanishes reads as a feature the product does not have.
         if (!item.local) b.append(icon('lock', 'navitem__lock'))
         b.title = item.name + (item.local ? '' : ' \u2014 not in this installation')
+        b.dataset.focusKey = 'nav:' + item.id
         b.addEventListener('click', () => { state.section = item.id; render() })
         g.append(b)
       }
@@ -247,6 +248,7 @@
     collapse.type = 'button'
     collapse.setAttribute('aria-label', state.collapsed ? 'Expand sidebar' : 'Collapse sidebar')
     collapse.append(icon('panel'))
+    collapse.dataset.focusKey = 'collapse'
     collapse.addEventListener('click', () => { state.collapsed = !state.collapsed; render() })
     bar.append(collapse)
 
@@ -257,6 +259,7 @@
     theme.type = 'button'
     theme.setAttribute('aria-label', state.dark ? 'Switch to light appearance' : 'Switch to dark appearance')
     theme.append(icon(state.dark ? 'sun' : 'moon'))
+    theme.dataset.focusKey = 'theme'
     theme.addEventListener('click', () => {
       state.dark = !state.dark
       document.documentElement.classList.toggle('dark', state.dark)
@@ -372,6 +375,7 @@
     open.append(icon('open'))
     open.append(document.createTextNode(state.busy ? 'Reading\u2026' : 'Choose a spectrum'))
     open.disabled = state.busy || !(state.service && state.service.running)
+    open.dataset.focusKey = 'open-spectrum'
     open.addEventListener('click', openSpectrum)
     zone.append(open)
     setup.append(zone)
@@ -514,6 +518,7 @@
     input.placeholder = 'CCO'
     input.value = state.candidate
     input.setAttribute('aria-label', 'Candidate structure as SMILES')
+    input.dataset.focusKey = 'candidate'
     input.addEventListener('input', (e) => { state.candidate = e.target.value })
     input.addEventListener('keydown', (e) => { if (e.key === 'Enter') checkStructure() })
 
@@ -521,6 +526,7 @@
     go.type = 'button'
     go.append(document.createTextNode(state.checking ? 'Checking\u2026' : 'Check structure'))
     go.disabled = state.checking || !(state.service && state.service.running)
+    go.dataset.focusKey = 'check-structure'
     go.addEventListener('click', checkStructure)
 
     row.append(input, go)
@@ -645,6 +651,7 @@
     go.type = 'button'
     go.append(document.createTextNode(state.rankingBusy ? 'Ranking\u2026' : 'Rank ' + state.verdicts.length + ' candidates'))
     go.disabled = state.rankingBusy || !(state.service && state.service.running)
+    go.dataset.focusKey = 'rank'
     go.addEventListener('click', rankStructures)
     c.append(go)
 
@@ -720,6 +727,7 @@
     go.type = 'button'
     go.append(document.createTextNode(state.similarBusy ? 'Searching\u2026' : 'Find similar spectra'))
     go.disabled = state.similarBusy || !(state.service && state.service.running)
+    go.dataset.focusKey = 'find-similar'
     go.addEventListener('click', findSimilar)
     c.append(go)
 
@@ -825,6 +833,10 @@
     }
   }
 
+  //: Which section the DOM currently shows, so a re-render can tell a state
+  //: change apart from a navigation.
+  let _renderedSection = null
+
   // ---- render --------------------------------------------------------------
   async function render() {
     try {
@@ -856,7 +868,51 @@
     else main.append(gatedPage(item))
 
     shell.append(main)
+
+    // EVERY RENDER REPLACES THE WHOLE TREE, so without this the page jumps to the
+    // top on any click -- a nav item, a theme toggle, checking a structure -- and
+    // the element you just pressed loses focus. Reported as "clicking anything
+    // jumps to the top and will not stay stable", which is exactly what a full
+    // rebuild does: the new nodes have no scroll offset and no focus.
+    //
+    // Both scrollers are captured, because the sidebar has its own and a long
+    // section list scrolls independently of the page.
+    const previous = root.firstElementChild
+    const keepScroll = previous
+      ? {
+          main: (previous.querySelector('.main') || {}).scrollTop || 0,
+          sidebar: (previous.querySelector('.sidebar') || {}).scrollTop || 0,
+        }
+      : { main: 0, sidebar: 0 }
+    const focusKey = document.activeElement && document.activeElement.dataset
+      ? document.activeElement.dataset.focusKey || null
+      : null
+    const caret = document.activeElement && document.activeElement.tagName === 'INPUT'
+      ? document.activeElement.selectionStart
+      : null
+
     root.replaceChildren(shell)
+
+    const mainEl = shell.querySelector('.main')
+    const sideEl = shell.querySelector('.sidebar')
+    // A DIFFERENT SECTION STARTS AT THE TOP. Keeping the offset across a section
+    // change would drop the reader into the middle of content they have not seen,
+    // which is the opposite failure to the one this fixes. The sidebar keeps its
+    // own offset either way -- it did not change.
+    if (mainEl) mainEl.scrollTop = state.section === _renderedSection ? keepScroll.main : 0
+    _renderedSection = state.section
+    if (sideEl) sideEl.scrollTop = keepScroll.sidebar
+    if (focusKey) {
+      const again = shell.querySelector('[data-focus-key="' + focusKey + '"]')
+      if (again) {
+        again.focus({ preventScroll: true })
+        // A caret at position 0 after every keystroke would be worse than losing
+        // focus, so it is restored where the field is still the same one.
+        if (caret != null && again.tagName === 'INPUT') {
+          try { again.setSelectionRange(caret, caret) } catch { /* not a text input */ }
+        }
+      }
+    }
   }
 
   // Namespaced element builder. SVG nodes MUST be created in the SVG namespace or
