@@ -14,6 +14,41 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.69.10 — One `rp_id`, several exact origins (2026-08-21)
+
+Hardware-backed step-up pinned exactly one expected origin, server-side. That is where its
+phishing resistance comes from, and it is also why a deployment whose users legitimately arrive
+from more than one origin under the same registrable domain could only ever accept one of them.
+
+`WEBAUTHN_ADDITIONAL_ORIGINS` (comma-separated, empty by default) adds further origins that a
+ceremony may claim. Three things about it matter more than the feature:
+
+- **The match is whole-string equality, and nothing else.** No prefix, no suffix, no wildcard, no
+  regular expression, anywhere. A suffix match on `moltrace.co` accepts `evil-moltrace.co`; a
+  prefix match on `https://app.moltrace.co` accepts `https://app.moltrace.co.attacker.test`. Both
+  are registrable domains somebody can buy, so a pattern here would not be a convenience, it would
+  be the vulnerability. The test that pins this was written by implementing the match with
+  `endswith`, watching it accept both lookalikes, and then restoring the exact form.
+- **Only verification widened.** `WEBAUTHN_RP_ID` is still a single value and options are still
+  minted against it. Varying it per ceremony would mint credentials that cannot verify against
+  each other — a failure that surfaces months later as "my key stopped working". Enrolled
+  credentials are unaffected by this change: no migration, no re-enrolment.
+- **The literal origin `null` is never accepted**, even if configured. Every opaque origin
+  serialises that way, so one such entry would accept all of them.
+
+Empty is the default, and an empty list is passed to the verifier as the same bare string it has
+always received, so a deployment that does not configure this verifies — and refuses —
+byte-identically to before. In production the service now refuses to start when an entry in the
+allowlist is loopback, plaintext or malformed, naming the value; that path is reachable only by
+setting the new variable, so nothing that has not opted in can be affected. The pre-existing
+`WEBAUTHN_ORIGIN` is reported rather than made fatal, because a deployment could be running on a
+stale value today and a startup refusal would be the fix causing the outage.
+
+No route, request or response model changed, so there is no contract delta and `schema.d.ts` is
+untouched.
+
+---
+
 ## v0.74.5 — Three regulatory residuals: two were real, one was not the one claimed (2026-08-30)
 
 Three items carried over from the Prompt 5 audit. Each was put through an
