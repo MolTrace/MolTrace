@@ -4,6 +4,7 @@ import os
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from .secrets_provider import resolve_secret, resolve_secret_strict
 
@@ -112,6 +113,11 @@ class Settings:
     webauthn_rp_id: str = "localhost"
     webauthn_rp_name: str = "MolTrace"
     webauthn_origin: str = "http://localhost:3000"
+    # Additional EXACT origins accepted when VERIFYING a ceremony. The rp_id
+    # above stays single and is never widened (varying it per ceremony mints credentials that
+    # cannot verify against each other). Empty by default, so an unconfigured deployment
+    # verifies against exactly the one origin it does today.
+    webauthn_additional_origins: tuple[str, ...] = ()
     mfa_pending_ttl_minutes: int = 5
     step_up_ttl_minutes: int = 5
     # Session/token hardening (Prompt 4). Defaults are generous (access TTL unchanged for
@@ -300,6 +306,7 @@ def get_settings() -> Settings:
             "WEBAUTHN_ORIGIN",
             os.getenv("FRONTEND_BASE_URL", "http://localhost:3000"),
         ).rstrip("/"),
+        webauthn_additional_origins=_parse_csv(os.getenv("WEBAUTHN_ADDITIONAL_ORIGINS"), ()),
         mfa_pending_ttl_minutes=_parse_int(os.getenv("MFA_PENDING_TTL_MINUTES"), 5),
         step_up_ttl_minutes=_parse_int(os.getenv("STEP_UP_TTL_MINUTES"), 5),
         refresh_token_idle_minutes=_parse_int(
@@ -416,6 +423,104 @@ def get_settings() -> Settings:
     )
 
 
+_OPAQUE_ORIGIN = "null"
+_DEFAULT_PORTS = {"http": 80, "https": 443}
+_LOOPBACK_HOSTS = {"localhost", "127.0.0.1", "::1"}
+
+
+def normalize_webauthn_origin(value: str) -> str | None:
+    """Canonicalise one configured WebAuthn origin to ``scheme://host[:port]``, or ``None``.
+
+    ``None`` means the value cannot be a browser origin at all: it carries a path, query, fragment
+    or credentials, it does not parse, or it is the opaque origin ``"null"`` — every opaque origin
+    serialises that way, so one such entry would accept all of them.
+
+    Origins are compared to a ceremony's claimed origin by **whole-string equality** on this
+    result. There is no prefix, suffix, wildcard or regular expression anywhere on this path, and
+    there must never be one: a suffix match on ``moltrace.co`` also accepts ``evil-moltrace.co``,
+    and a prefix match on ``https://app.moltrace.co`` also accepts
+    ``https://app.moltrace.co.attacker.test``. Both are registrable domains an attacker can buy.
+    """
+    candidate = value.strip()
+    if not candidate or candidate.lower() == _OPAQUE_ORIGIN:
+        return None
+    candidate = candidate.rstrip("/")
+    try:
+        parts = urlsplit(candidate)
+        host, port = parts.hostname, parts.port
+    except ValueError:  # unparseable authority, or a port that is not a number in range
+        return None
+    if parts.path or parts.query or parts.fragment or parts.username or parts.password:
+        return None
+    scheme = parts.scheme.lower()
+    if not scheme or not host:
+        return None
+    host = host.lower()
+    if ":" in host:  # an IPv6 literal keeps its brackets in a serialised origin
+        host = f"[{host}]"
+    if port is None or port == _DEFAULT_PORTS.get(scheme):
+        # A browser omits the default port when it serialises an origin, and the comparison is
+        # against that serialisation.
+        return f"{scheme}://{host}"
+    return f"{scheme}://{host}:{port}"
+
+
+def _unsafe_origin_reason(normalized: str) -> str | None:
+    """Why a well-formed origin still must not be trusted in production, or ``None`` if it may."""
+    parts = urlsplit(normalized)
+    if parts.scheme != "https":
+        return "is not HTTPS"
+    hostname = (parts.hostname or "").lower()
+    if hostname in _LOOPBACK_HOSTS:
+        return "is a loopback origin"
+    return None
+
+
+def webauthn_accepted_origins(settings: Settings) -> tuple[str, ...]:
+    """The exact origin strings a passkey ceremony may claim: the primary plus any configured
+    additional ones, normalised and de-duplicated, primary first.
+
+    ``webauthn_additional_origins`` is empty by default, so an unconfigured deployment gets a
+    one-element tuple holding exactly what it verifies against today. Values that cannot be an
+    origin are dropped here and named by :func:`webauthn_origin_issues` at startup.
+    """
+    accepted: list[str] = []
+    for raw in (settings.webauthn_origin, *settings.webauthn_additional_origins):
+        normalized = normalize_webauthn_origin(raw)
+        if normalized is not None and normalized not in accepted:
+            accepted.append(normalized)
+    return tuple(accepted)
+
+
+def webauthn_origin_issues(settings: Settings) -> list[str]:
+    """Faults in the configured WebAuthn origin allowlist, each naming the offending value.
+
+    An allowlist is a standing invitation to add a development origin and ship it, so in
+    production a loopback or plaintext entry is refused rather than left to present months later
+    as an unexplained authentication failure. ``create_app`` treats a non-empty result as fatal in
+    production; that path is reachable only by setting ``WEBAUTHN_ADDITIONAL_ORIGINS``, which
+    defaults to empty, so no deployment that has not opted in can be affected.
+    """
+    issues: list[str] = []
+    for raw in settings.webauthn_additional_origins:
+        normalized = normalize_webauthn_origin(raw)
+        if normalized is None:
+            issues.append(
+                f"WEBAUTHN_ADDITIONAL_ORIGINS entry {raw!r} is not a usable origin; expected "
+                "scheme://host[:port] with no path, and never the opaque origin 'null'."
+            )
+            continue
+        if settings.app_env != "production":
+            continue
+        reason = _unsafe_origin_reason(normalized)
+        if reason is not None:
+            issues.append(
+                f"WEBAUTHN_ADDITIONAL_ORIGINS entry {raw!r} {reason} and must not be accepted "
+                "in production."
+            )
+    return issues
+
+
 def validate_startup_settings(settings: Settings) -> list[str]:
     issues: list[str] = []
     # A typo here would serve a customer the wrong product, so it is a startup issue rather than
@@ -442,6 +547,23 @@ def validate_startup_settings(settings: Settings) -> list[str]:
         issues.append("SSO_ENCRYPTION_KEY must be set in production.")
     if settings.app_env == "production" and not settings.mfa_encryption_key:
         issues.append("MFA_ENCRYPTION_KEY must be set in production.")
+    issues.extend(webauthn_origin_issues(settings))
+    # The primary origin is reported but never fatal: it predates the allowlist and a deployment
+    # could be running on a stale value today, so taking it down at startup would be the fix
+    # causing the outage.
+    primary_origin = normalize_webauthn_origin(settings.webauthn_origin)
+    if primary_origin is None:
+        issues.append(
+            f"WEBAUTHN_ORIGIN {settings.webauthn_origin!r} is not a usable origin; passkey "
+            "verification would refuse every ceremony."
+        )
+    elif settings.app_env == "production":
+        primary_reason = _unsafe_origin_reason(primary_origin)
+        if primary_reason is not None:
+            issues.append(
+                f"WEBAUTHN_ORIGIN {settings.webauthn_origin!r} {primary_reason}; passkeys cannot "
+                "work in production against it."
+            )
     # A missing knowledge base does not stop the service — it silently answers from a
     # 16-molecule seed table (~35 ppm median 13C uncertainty vs ~1.88 ppm with the full
     # NMRShiftDB2 index), which is why it must be a startup issue rather than something

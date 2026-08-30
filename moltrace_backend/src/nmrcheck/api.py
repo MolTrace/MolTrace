@@ -1033,7 +1033,12 @@ from .raw_vault import (
     verify_stored_raw_upload,
 )
 from .regulatory_report import StructureElucidationReportError, compose_structure_elucidation_report
-from .settings import Settings, get_settings, validate_startup_settings
+from .settings import (
+    Settings,
+    get_settings,
+    validate_startup_settings,
+    webauthn_origin_issues,
+)
 from .spectral_similarity import (
     combine_similarity_layers,
     score_nmr2d_similarity,
@@ -31890,6 +31895,16 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     for issue in startup_issues:
         # Alertable signal — these otherwise surface only on /admin/deployment.
         logger.error("Startup configuration issue: %s", issue)
+    # One class of issue is not survivable: a loopback, plaintext or malformed entry in the
+    # WebAuthn origin allowlist is a live phishing hole, not a grumble, so production refuses to
+    # start instead of accepting ceremonies from it. Only a deployment that has explicitly set
+    # WEBAUTHN_ADDITIONAL_ORIGINS (empty by default) can reach this.
+    unsafe_origins = webauthn_origin_issues(settings)
+    if settings.app_env == "production" and unsafe_origins:
+        raise RuntimeError(
+            "Refusing to start: the WebAuthn origin allowlist is unsafe. "
+            + " ".join(unsafe_origins)
+        )
 
     @asynccontextmanager
     async def app_lifespan(_: FastAPI) -> AsyncIterator[None]:
