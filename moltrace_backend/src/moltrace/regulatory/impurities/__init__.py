@@ -29,6 +29,7 @@ from moltrace.regulatory.impurities.q3ab_calculator import (
     q3ab_rule_set,
 )
 from moltrace.regulatory.impurities.q3c_solvents import (
+    Q3C_ROUTES,
     ComplianceResult,
     SolventClassification,
     check_residual_solvent_limits,
@@ -65,6 +66,7 @@ __all__ = [
     "check_residual_solvent_limits",
     "classify_cpca",
     "classify_m7",
+    "Q3C_ROUTES",
     "classify_solvent",
     "cpca_rule_set",
     "get_element_pde",

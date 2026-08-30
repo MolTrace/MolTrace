@@ -37,6 +37,7 @@ from moltrace.regulatory.infra.versioning import content_hash, rule_set_version
 
 __all__ = [
     "ComplianceResult",
+    "Q3C_ROUTES",
     "SolventClassification",
     "check_residual_solvent_limits",
     "classify_solvent",
@@ -52,6 +53,11 @@ EFFECTIVE_YEAR = "2021"
 # that the guideline lists separately are not encoded here. The supplied route is
 # validated + recorded and the systemic PDE is returned for it.
 _Q3C_ROUTES = frozenset({"oral", "parenteral", "inhalation"})
+
+# Public alias. Callers outside this package need to know which routes Q3C covers so they can
+# decline to assess the others; retyping the set at each call site is what let a dossier on an
+# uncovered route receive a limit from one endpoint and a refusal from another.
+Q3C_ROUTES = _Q3C_ROUTES
 
 _ANALYTICAL_METHODS = ("Headspace gas chromatography (Ph. Eur. 2.4.24 / USP <467>)",)
 

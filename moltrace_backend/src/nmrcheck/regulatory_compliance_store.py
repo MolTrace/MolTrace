@@ -1016,6 +1016,8 @@ def create_residual_solvent_assessment(
     *,
     actor: RegulatoryComplianceActor,
 ) -> BatchRegulatoryAssessment:
+    from moltrace.regulatory.impurities import Q3C_ROUTES
+
     with session_scope(session_factory) as session:
         dossier = _require_dossier(session, dossier_id)
         _require_batch(session, payload.batch_id)
@@ -1023,6 +1025,12 @@ def create_residual_solvent_assessment(
         rule_set_ids = [row.id for row in _active_rule_sets(session, dossier)]
         rules = session.scalars(select(ResidualSolventRuleORM).where(ResidualSolventRuleORM.rule_set_id.in_(rule_set_ids))).all() if rule_set_ids else []
         by_name = {_solvent_key(rule.solvent_name): rule for rule in rules}
+        # ICH Q3C covers oral / parenteral / inhalation. `/regulatory/impurities/assess` already
+        # declines a route outside that set and says so; this path reached the same engine with no
+        # gate, so a cutaneous dossier was given a Q3C limit that the sibling endpoint refuses for
+        # the same product. A dossier with no declared route is not gated -- absence of a route is
+        # not evidence that Q3C fails to apply, and the reference-dose warning below still fires.
+        q3c_route_covered = dossier.route is None or dossier.route in Q3C_ROUTES
         matches: list[dict[str, Any]] = []
         action_ids: list[int] = []
         warnings: list[str] = []
@@ -1056,6 +1064,14 @@ def create_residual_solvent_assessment(
                     match["threshold_triggered"] = True
                 if rule.solvent_class == "class_1":
                     match["review_required"] = True
+            elif not q3c_route_covered:
+                # Named, never silent: the reviewer has to be able to tell "no limit applies to
+                # this route" from "we had nothing to say about this solvent".
+                warnings.append(
+                    f"ICH Q3C residual-solvent limits are not defined for the {dossier.route} "
+                    f"route; {name or 'this solvent'} was not assessed against Q3C."
+                )
+                match["review_required"] = True
             else:
                 engine = _q3c_default(name, dossier.max_daily_dose_g)
                 if engine is not None:
