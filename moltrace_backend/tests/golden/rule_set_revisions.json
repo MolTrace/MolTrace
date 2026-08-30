@@ -25,6 +25,10 @@
     "q3d": {
       "identity_hash": "sha256:0ca79670bc792d8ce3cce8aec2ad706b97346008da706cc3913c8e4074a51ed9",
       "semver": "1.0.0"
+    },
+    "supplier_defaults": {
+      "identity_hash": "sha256:ed97173131b6be428567af5801e7a46073c3f3aa86b4b2cc6cc2ebd581791342",
+      "semver": "1.1.0"
     }
   }
 }

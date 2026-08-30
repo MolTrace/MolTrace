@@ -383,4 +383,8 @@ def test_step_up_still_raises_its_own_code(tmp_path):
         bearer = {"Authorization": f"Bearer {res.json()['access_token']}"}
         blocked = client.post("/auth/mfa/webauthn/register/options", headers=bearer)
         assert blocked.status_code == 401
-        assert blocked.json()["detail"] == "step_up_required"
+        # Re-baselined on merge: `detail` on a 401/403 is now one of two fixed sentences, and
+        # the machine code travels in `code`. This assertion was written on a branch that had
+        # not seen that change, so it is the fifteenth reader of the old shape — the fourteen
+        # found earlier were all that existed in the tree at the time.
+        assert blocked.json()["code"] == "step_up_required"

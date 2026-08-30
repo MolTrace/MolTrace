@@ -57,7 +57,7 @@ METHOD_DEFAULTS_LINEAGE = "supplier_defaults"
 #: The constants themselves live in three other modules, so nothing at the edit site prompts this
 #: bump. `tests/test_rule_set_revisions.py` is the enforcement, exactly as it is for the five
 #: rule sets: it fails when the payload's content hash moves and this does not.
-METHOD_DEFAULTS_SEMVER = "1.0.0"
+METHOD_DEFAULTS_SEMVER = "1.1.0"
 
 #: lineage -> (display name, import path of the engine module).
 _RULE_ENGINES: tuple[tuple[str, str, str], ...] = (
