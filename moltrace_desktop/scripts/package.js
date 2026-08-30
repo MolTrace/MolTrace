@@ -129,6 +129,41 @@ function signAdHoc(appPath) {
   }
 }
 
+// THE ARTIFACT A TESTER RECEIVES IS THE ZIP, and nothing here used to produce it.
+// The `.app` was rebuilt by this script while the zip beside it was made by hand at
+// some earlier point, with no record of how and no relationship between the two --
+// so the deliverable could silently lag the build it sits next to. That is the same
+// shape as the stale freeze this script already refuses, one level further out.
+//
+// `ditto`, not `zip`: a macOS bundle carries symlinks (Contents/MacOS ->
+// Versions/Current) and extended attributes, and a plain `zip` flattens them, which
+// invalidates the seal the step above just applied. `--keepParent` puts the .app at
+// the archive root so the tester unzips one obvious thing.
+function archiveApp(appPath, outDir, config) {
+  const base = String(config.productName).replace(/\s+/g, '-')
+  const zipPath = path.join(outDir, `${base}-macos-${process.arch}.zip`)
+  fs.rmSync(zipPath, { force: true })
+  execFileSync('ditto', ['-c', '-k', '--sequesterRsrc', '--keepParent', appPath, zipPath], {
+    stdio: 'pipe',
+  })
+  // Prove it round-trips WITH its signature intact rather than trusting ditto. An
+  // archive that strips the seal recreates exactly the "damaged app" the signing
+  // step exists to prevent, and it would not be visible until a tester tried it.
+  const check = fs.mkdtempSync(path.join(require('node:os').tmpdir(), 'moltrace-zip-'))
+  try {
+    execFileSync('ditto', ['-x', '-k', zipPath, check], { stdio: 'pipe' })
+    const unpacked = path.join(check, path.basename(appPath))
+    execFileSync('codesign', ['--verify', '--deep', unpacked], { stdio: 'pipe' })
+  } catch (e) {
+    throw new Error(
+      'the archive did not round-trip with a valid signature: ' + String(e.stderr || e.message).trim(),
+    )
+  } finally {
+    fs.rmSync(check, { recursive: true, force: true })
+  }
+  return zipPath
+}
+
 async function main() {
   const overlayPath = process.argv.find((a) => a.startsWith('--config='))
   const config = overlayPath
@@ -254,6 +289,13 @@ async function main() {
       }
     }
     console.log('  built: ' + p)
+    if (process.platform === 'darwin') {
+      for (const app of fs.readdirSync(p).filter((n) => n.endsWith('.app'))) {
+        const zip = archiveApp(path.join(p, app), path.join(ROOT, 'out'), config)
+        const mb = (fs.statSync(zip).size / (1024 * 1024)).toFixed(0)
+        console.log(`  archived: ${zip} (${mb} MB)`)
+      }
+    }
   }
   console.log(
     '\nUNSIGNED — ad-hoc sealed, not notarized. macOS will still refuse it on first open, and that\n'

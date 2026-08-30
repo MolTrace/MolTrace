@@ -48,7 +48,16 @@ From `moltrace_desktop/`:
 npm run package
 ```
 
-The build lands in `out/`, is about 470 MB unzipped (**181 MB zipped**), and is **unsigned**.
+The build lands in `out/` as both the `.app` and the archive a tester actually
+receives — `MolTrace-Preview-macos-<arch>.zip`, about 470 MB unpacked and **181 MB
+zipped**. The archive is produced by the same command, deliberately: it used to be
+made by hand with no record of how, so the deliverable could sit next to a build it
+did not come from. It is written with `ditto`, not `zip`, because a macOS bundle
+carries symlinks and extended attributes that a plain `zip` flattens — which
+invalidates the seal — and packaging unpacks the archive again and re-verifies the
+signature before reporting success.
+
+The build is **ad-hoc sealed, not notarized**.
 
 Pass `--config=<path>` to supply a real configuration. With no argument it builds
 a **preview**: named "MolTrace Preview", declaring `previewModules`, carrying an
