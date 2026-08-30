@@ -14,6 +14,53 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.74.6 — An assumed route may not decide a pass (2026-08-30)
+
+Two ICH Q3D route defects in the elemental-impurity assessment, both ending in a
+record that said "within limits" where the guidance supports no such conclusion.
+Found by following up the Q3C route work in v0.74.5 into its sibling engine.
+
+**An undeclared route silently took the most permissive limit.** `route =
+dossier.route or "oral"` defaulted the route and wrote it onto the assessment, so
+an undeclared route was indistinguishable from a declared one. Measured across the
+encoded table: oral is the most permissive route for **all 24** elements, and the
+PDE differs across routes for **22** of them — nickel 200 µg/day oral against 5
+inhalation, mercury 30 against 1.
+
+The default is kept; withholding the assessment outright would be worse than
+performing it. What changed is that the record now says the route was assumed, and
+no verdict is asserted where the assumption could have produced it.
+
+Only a *pass* can be decided by the assumption. Oral being the maximum PDE and
+permitted concentration monotonic in it, a level at or above the oral limit is at or
+above every other route's limit, so an exceedance holds whatever the real route is.
+An earlier draft withheld the verdict on observation alone and so downgraded a
+confirmed exceedance to "undetermined" — the safety direction inverted, and neither
+of its two tests caught it because both used levels that pass under oral. That case
+is now pinned by its own test.
+
+Whether the assumption is load-bearing is read from the guidance table rather than
+applied as one blanket policy: lead is 5 µg/day on all three encoded routes and
+thallium 8, so for those two the verdict still stands.
+
+**A declared route with no encoded limit reported a pass.** Pre-existing, same
+class, and the worse of the two. Q3D(R2)'s cutaneous appendix is deliberately not
+encoded, so `get_element_pde` returns `route_data_available = False` with no PDE.
+With a dose recorded, the permitted-concentration branch was skipped for want of
+route data and the missing-dose branch could not fire — no warning, and
+`threshold_triggered` kept its initialiser. Measured before the fix: **10,000 ppm
+nickel on a cutaneous dossier was stored as within limits.** A measured level with
+no limit to measure it against is now undetermined, never a pass.
+
+Both withheld verdicts set `review_required`, because existing readers flag a row on
+`threshold_triggered is True OR review_required is True` and a withheld verdict
+leaving both unset would render as nothing to see.
+
+The inverted safety direction was caught by an adversarial review of the first
+version of this fix, not by the tests written for it.
+
+---
+
 ## v0.74.5 — Three regulatory residuals: two were real, one was not the one claimed (2026-08-30)
 
 Three items carried over from the Prompt 5 audit. Each was put through an
