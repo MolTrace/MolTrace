@@ -29,10 +29,32 @@ const FROZEN_SERVICE = path.join(ROOT, '..', 'moltrace_backend', 'dist', 'moltra
 
 // Named once because two refusals below quote it, and a runbook that drifts from
 // the command it documents is worse than no runbook.
+// THE SHIFT-PREDICTION TABLE RIDES WITH THE SERVICE. Without it the predictor
+// answers from a bundled 16-molecule seed, and the difference decides whether the
+// product works: median 13C uncertainty ~35 ppm against ~1.9 ppm. Measured on one
+// acquisition with four candidate structures, the seed ranked the WRONG molecule
+// first (ethanol 0.623 over ethylene glycol's 0.556); with the table the right one
+// wins at 0.939 and aspirin is called inconsistent at 0.166.
+//
+// 14 MB gzipped against a 185 MB artifact, loaded lazily in 1.3 s on the first
+// structure check rather than at startup.
+const KNOWLEDGE_BASE = path.join(
+  require('node:os').homedir(), '.cache', 'moltrace', 'nmrnet', 'hose_index.json.gz',
+)
+
 const REFREEZE_COMMAND =
   '    uv run --with pyinstaller pyinstaller --noconfirm --onedir --name moltrace-local-service \\\n'
   + '      --distpath dist --workpath build/pyi --specpath build/pyi \\\n'
   + '      --collect-submodules nmrcheck --collect-submodules moltrace \\\n'
+  + '      --add-data "' + KNOWLEDGE_BASE + ':." \\\n'
+  // The licence travels WITH the data it covers. A CC BY-SA table redistributed
+  // without its attribution is the obligation broken, and a NOTICE that lives
+  // only in the source repository does not reach whoever holds the artifact.
+  //
+  // ABSOLUTE, because PyInstaller resolves a relative --add-data source against
+  // the --specpath, not the working directory. A bare 'NOTICE' looked for it in
+  // build/pyi/ and logged one ERROR line in a long build that still exited 0.
+  + '      --add-data "' + path.join(ROOT, '..', 'moltrace_backend', 'NOTICE') + ':." \\\n'
   + '      --hidden-import uvicorn.protocols.http.h11_impl \\\n'
   + '      --hidden-import uvicorn.lifespan.on --hidden-import uvicorn.loops.asyncio \\\n'
   + '      --console packaging/moltrace_local_service.py'
@@ -234,6 +256,36 @@ async function main() {
     refuse(
       'the frozen local science service is not built, so the app would ship unable to read a spectrum.\n'
       + '  Build it first, from moltrace_backend:\n'
+      + REFREEZE_COMMAND,
+    )
+  }
+
+  // A FREEZE WITHOUT THE TABLE IS NOT A SMALLER BUILD, IT IS A DIFFERENT PRODUCT.
+  // The predictor falls back to a 16-molecule seed and says so only in a warning
+  // most readers will not reach, while every structure verdict quietly loses the
+  // ability to tell a right answer from a wrong one. Refusing here is the same
+  // judgement as refusing a stale freeze: the artifact must not be able to look
+  // finished while answering from the wrong table.
+  const frozenKb = ['hose_index.json.gz', 'hose_index.json']
+    .map((n) => path.join(FROZEN_SERVICE, '_internal', n))
+    .find((p) => fs.existsSync(p))
+  if (!frozenKb) {
+    refuse(
+      'the frozen service carries no shift-prediction table, so it would answer every\n'
+      + '  structure check from the 16-molecule seed -- which ranked a WRONG molecule first\n'
+      + '  on the one acquisition we can check against. Re-freeze with the table:\n'
+      + REFREEZE_COMMAND,
+    )
+  }
+
+  // The attribution must be inside the artifact, not only in the repository: the
+  // table is CC BY-SA and the person holding the build is the one who needs the
+  // licence terms.
+  if (frozenKb && !fs.existsSync(path.join(FROZEN_SERVICE, '_internal', 'NOTICE'))) {
+    refuse(
+      'the frozen service carries the NMRShiftDB2-derived prediction table but not the\n'
+      + '  NOTICE that licenses it. That table is CC BY-SA and redistributing it without\n'
+      + '  its attribution breaks the obligation. Re-freeze with the NOTICE:\n'
       + REFREEZE_COMMAND,
     )
   }

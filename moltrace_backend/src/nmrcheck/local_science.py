@@ -255,6 +255,27 @@ def _summarise_multiplet(
 #: How the four verification tests are named to a chemist. The wire keys stay as
 #: the engine emits them -- a display name is not a rename -- but `dp4_ranking` is
 #: not what a person calls the thing it does.
+
+#: How often the true structure scored highest, measured on this repository's own
+#: corpus: every acquisition whose structure the NMReDATA source states, against
+#: four decoys drawn from that same corpus. Reported to the reader rather than
+#: kept as a footnote, because a comparison whose accuracy is unstated is a
+#: comparison a chemist cannot weigh.
+#:
+#: Re-measure with scripts against `eval/curated_shifts._DEFAULT_SOURCE` if the
+#: knowledge base or the predictor changes. Do not adjust these numbers to match
+#: a hoped-for result.
+_RANKING_ACCURACY: dict[str, object] = {
+    "13C": {"first": 9, "of": 12},
+    "1H": {"first": 3, "of": 8},
+    "decoys_per_case": 4,
+    "note": (
+        "Measured on 20 acquisitions from this build's own reference corpus, each checked "
+        "against four other real molecules from it."
+    ),
+}
+
+
 _TEST_LABELS: dict[str, str] = {
     "prediction_bounds": "Predicted shifts against the observed ones",
     "assignments": "Every observed signal assigned to an atom",
@@ -307,6 +328,18 @@ def verify_candidate(path: str | Path, smiles: str) -> dict:
 
     warnings = list(result.warnings or [])
 
+    # WHICH TABLE ANSWERED. A prediction from 495,215 reference atoms and one from
+    # 146 are different products, and the reader must be able to tell which they
+    # got -- the engine's own error path exists because silently substituting a
+    # worse predictor for a configured one is the failure that matters here.
+    from moltrace.spectroscopy.predict.nmrnet_wrapper import knowledge_base_status
+
+    status = knowledge_base_status()
+    knowledge = {
+        "source": status.get("source") or ("seed" if status.get("loaded") else "unknown"),
+        "reference_count": int(status.get("reference_count") or 0),
+    }
+
     # A TYPO IS NOT AN ANSWER. The engine handles an unreadable structure
     # honestly -- it warns `invalid_smiles`, abstains from every test, and returns
     # the prior back unchanged as `inconclusive` at 0.50. That is correct FOR THE
@@ -341,18 +374,41 @@ def verify_candidate(path: str | Path, smiles: str) -> dict:
             }
             for t in result.test_results
         ],
-        # NOT A SCORE TO COMPARE CANDIDATES WITH, and this is measured rather than
-        # cautious. On the ethylene glycol acquisition in this repository, checked
-        # against four structures: ethylene glycol itself came back 0.556 and
-        # ETHANOL came back 0.623 -- the wrong molecule outranked the right one,
-        # with aspirin at 0.542 close behind. The engine is not at fault; it
-        # returns "inconclusive" for all four, which is correct. What cannot carry
-        # the weight is the prediction underneath, at a 35 ppm median uncertainty.
+        # WHETHER THESE NUMBERS CAN RANK ANYTHING DEPENDS ON THE TABLE, so it is
+        # read from the table rather than asserted. Measured on the ethylene
+        # glycol acquisition in this repository against four structures:
         #
-        # So the desktop states this on every result rather than offering a ranked
-        # candidate list. A list would put the wrong molecule first and look
-        # exactly like a list that had put the right one first.
-        "comparable_between_candidates": False,
+        #                     seed (146 atoms)   nmrshiftdb2 (495,215)
+        #   ethylene glycol      0.556               0.939  consistent
+        #   ethanol              0.623  <- won       0.242  inconclusive
+        #   aspirin              0.542               0.166  inconsistent
+        #
+        # On the seed the WRONG molecule outranked the right one and every verdict
+        # was "inconclusive". With the real table the right one wins by 0.697 and
+        # the verdicts become words that mean something. Same verifier, same
+        # spectrum: the predictor was starved, not the method.
+        #
+        # So a build answering from the seed says its number cannot rank, and one
+        # answering from nmrshiftdb2 says it can -- and the reader is told which,
+        # because those are different products.
+        # COMPARABLE, WITH A STATED HIT RATE -- not a ranking. Measured over all 20
+        # acquisitions in this repository whose structure the corpus states, each
+        # against four decoys drawn from the same corpus (so the decoys are real
+        # molecules, not absurdities):
+        #
+        #     13C   9/12 (75%)      1H   3/8 (38%)      overall 12/20
+        #
+        # 75% is genuinely useful and is NOT an ordering a reader should trust:
+        # one carbon spectrum in four puts the wrong structure on top, and a
+        # sorted list claims the top is the answer. So the desktop lets a chemist
+        # put candidates side by side and tells them how often this has been
+        # right, rather than presenting a winner.
+        #
+        # On the seed table the same measurement is not worth running: it ranked
+        # ethanol above ethylene glycol on glycol's own spectrum.
+        "comparable_between_candidates": knowledge["source"] == "nmrshiftdb2",
+        "ranking_accuracy": _RANKING_ACCURACY if knowledge["source"] == "nmrshiftdb2" else None,
+        "knowledge_base": knowledge,
         "prediction_coverage": coverage,
         "predictor_note": predictor,
         "warnings": warnings,

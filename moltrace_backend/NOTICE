@@ -78,7 +78,17 @@ index or embedding table produced by scripts/build_similarity_index.py -- is a
 derivative work and must itself be distributed
 under CC BY-SA (with attribution to NMRShiftDB2). The raw NMRShiftDB2 database
 and any table derived from it are NOT committed to this repository; build them
-locally (see scripts/build_hose_kb.py). The small literature seed table embedded
+locally (see scripts/build_hose_kb.py).
+
+REDISTRIBUTION IN THE DESKTOP APPLICATION. From 2026-08-30 the packaged MolTrace
+desktop build SHIPS the precomputed index (hose_index.json.gz) inside the frozen
+local service, because without it the predictor answers from the 16-molecule seed
+and a structure check cannot tell a right answer from a wrong one -- measured, it
+ranked ethanol above ethylene glycol on ethylene glycol's own spectrum. That
+artifact is therefore a CC BY-SA redistribution: this NOTICE travels inside it
+beside the table, and the application states the source and the licence on screen
+wherever a predicted shift is shown. Anyone redistributing that build inherits the
+same ShareAlike and attribution obligation. The small literature seed table embedded
 in nmrnet_wrapper.py is independently sourced from textbook reference shifts and
 is not derived from NMRShiftDB2.
 
