@@ -65,6 +65,11 @@ POLICY: dict[str, str] = {
     # against a seed knowledge base, and says so in its own warnings. That is a
     # quality caveat the result carries, not a reason to withhold the operation.
     "structure.verify": "offline-compute",
+    # Ordering candidate structures against the spectrum already here. Same class
+    # and same reasoning as `structure.verify`: deterministic arithmetic over
+    # local bytes and the chemist's own candidates, with no record and no
+    # authorization involved.
+    "structure.rank": "offline-compute",
     # Signing is server-authoritative — identity, step-up and record binding all
     # live there, and §6.5 refuses offline signing in every profile.
     "signature.create": "online-only",
