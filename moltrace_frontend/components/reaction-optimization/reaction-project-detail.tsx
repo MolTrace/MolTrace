@@ -1606,6 +1606,35 @@ function formatPredictedScoreDisplay(r: Record<string, unknown>): string {
   return "—"
 }
 
+/** How the model's uncertainty reads to someone who did not write the predictor.
+ *
+ *  The column used to render `uncertainty_json` as a truncated JSON blob. The number alone is
+ *  no better: the four predictor branches emit two different quantities -- a unit-free 0-1
+ *  value from the fallback and TPE-like branches, and a posterior standard deviation in the
+ *  objective's own units from the GP and forest branches. 0.62 and 3.7 are not the same kind
+ *  of thing, and a column showing both as plain numbers invites comparing them.
+ *
+ *  So the scale travels with the figure, and a candidate whose run predates the scale being
+ *  recorded says so rather than showing a bare number the reader would place on whichever
+ *  scale they assumed.
+ */
+export function formatUncertaintyDisplay(r: Record<string, unknown>): string {
+  const block = isRecord(r.uncertainty_json) ? r.uncertainty_json : {}
+  const value = readNum(block.uncertainty) ?? readNum(r.uncertainty)
+  if (value == null) return "not modeled"
+
+  const scale =
+    typeof block.uncertainty_scale === "string"
+      ? block.uncertainty_scale
+      : typeof r.uncertainty_scale === "string"
+        ? r.uncertainty_scale
+        : null
+
+  if (scale === "unit_interval") return `${value} relative`
+  if (scale === "objective_units") return `±${value} objective units`
+  return `${value} — scale not recorded`
+}
+
 function formatExpectedImprovementDisplay(r: Record<string, unknown>): string {
   const v = readNum(r.expected_improvement) ?? readNum(r.estimated_improvement)
   if (v != null) return String(v)
@@ -2855,12 +2884,39 @@ export function ReactionProjectDetail() {
         : bo && isRecord(bo.diagnostics)
           ? (bo.diagnostics as Record<string, unknown>)
           : null
+    // The BO run writes model_metrics / feature_encoding / scalarization. This read
+    // uncertainty_summary / feature_encoding_summary / validation_metrics -- three keys the
+    // run has never written -- so all three resolved to null and the card showed nothing
+    // while the real diagnostics sat unread in the same object. The old names are still
+    // accepted so a run persisted by some other producer is not dropped.
     const uncertaintySummary =
-      diag && typeof diag.uncertainty_summary === "string" ? diag.uncertainty_summary : null
+      diag && typeof diag.scalarization === "string"
+        ? diag.scalarization
+        : diag && typeof diag.uncertainty_summary === "string"
+          ? diag.uncertainty_summary
+          : null
     const featureEncodingSummary =
-      diag && typeof diag.feature_encoding_summary === "string" ? diag.feature_encoding_summary : null
+      diag && typeof diag.feature_encoding === "string"
+        ? diag.feature_encoding
+        : diag && isRecord(diag.feature_encoding)
+          ? jsonPreview(diag.feature_encoding, 400)
+          : diag && typeof diag.feature_encoding_summary === "string"
+            ? diag.feature_encoding_summary
+            : null
     const valFromDiag =
-      diag && isRecord(diag.validation_metrics) ? diag.validation_metrics : null
+      diag && isRecord(diag.model_metrics)
+        ? diag.model_metrics
+        : diag && isRecord(diag.validation_metrics)
+          ? diag.validation_metrics
+          : null
+    // Promoted out of the truncated blob: whether the surrogate learned anything at all, and
+    // how many candidates survived each gate. A run whose GP degenerated is still ranked and
+    // still rendered, so this is the difference between a recommendation and a coin flip.
+    const surrogateDegenerate = diag?.surrogate_degenerate === true
+    const feasibleCandidateCount = diag ? readNum(diag.feasible_candidate_count) : null
+    const regulatoryBlockedCandidateCount = diag
+      ? readNum(diag.regulatory_blocked_candidate_count)
+      : null
     const mBo = bo && isRecord(bo.metrics_json) ? bo.metrics_json : null
     const mRule = rule && isRecord(rule.metrics_json) ? rule.metrics_json : null
     let validationMetricsJson: unknown = null
@@ -2880,6 +2936,9 @@ export function ReactionProjectDetail() {
       validationMetricsJson,
       warnings,
       uncertaintySummary,
+      surrogateDegenerate,
+      feasibleCandidateCount,
+      regulatoryBlockedCandidateCount,
       featureEncodingSummary,
     }
   }, [lastBoRun, lastOptimizationRun, objective])
@@ -6596,6 +6655,9 @@ export function ReactionProjectDetail() {
             warnings={modelDiagnosticsDerived.warnings}
             uncertaintySummary={modelDiagnosticsDerived.uncertaintySummary}
             featureEncodingSummary={modelDiagnosticsDerived.featureEncodingSummary}
+            surrogateDegenerate={modelDiagnosticsDerived.surrogateDegenerate}
+            feasibleCandidateCount={modelDiagnosticsDerived.feasibleCandidateCount}
+            regulatoryBlockedCandidateCount={modelDiagnosticsDerived.regulatoryBlockedCandidateCount}
           />
           <ReactionResponsePreview
             loading={loading}
@@ -8561,10 +8623,8 @@ export function ReactionProjectDetail() {
                               <TableCell className="font-mono text-xs tabular-nums">
                                 {formatExpectedImprovementDisplay(r)}
                               </TableCell>
-                              <TableCell className="max-w-[140px] align-top">
-                                <pre className="max-h-24 overflow-auto whitespace-pre-wrap break-words rounded-md bg-muted/40 p-2 text-[10px] leading-snug">
-                                  {jsonPreview(r.uncertainty_json ?? {}, 600)}
-                                </pre>
+                              <TableCell className="max-w-[140px] font-mono text-xs">
+                                {formatUncertaintyDisplay(r)}
                               </TableCell>
                               <TableCell className="font-mono text-xs tabular-nums">
                                 {formatEstimatedCostDisplay(r)}
