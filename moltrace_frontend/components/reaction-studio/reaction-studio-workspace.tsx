@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { apiFetch } from "@/lib/api/client"
 import { trackOutboundSyncJobCreated } from "@/src/lib/analytics/analytics-client"
 import { Badge } from "@/components/ui/badge"
@@ -77,6 +78,7 @@ const DEMO_NEXT_EXPERIMENT = {
 }
 
 export function ReactionStudioWorkspace() {
+  const router = useRouter()
   const [importConnector, setImportConnector] = useState("")
   const [importExternalRecord, setImportExternalRecord] = useState("")
   const [importReactionProjectId, setImportReactionProjectId] = useState("")
@@ -233,6 +235,56 @@ export function ReactionStudioWorkspace() {
         />
       </header>
 
+      {/* The real campaign workspace. This surface is named "Reaction Studio" and, below, it
+          renders illustrative numbers for layout — so the first thing a chemist met here was a
+          fabricated yield. The optimizer, surrogate, Pareto front, safety screening and
+          regulatory constraints all live at /reactions/[reactionId] against their own data;
+          this routes there rather than mounting that workspace a second time, which would
+          duplicate every fetch it performs. */}
+      <section aria-labelledby="open-project-heading" className="space-y-4">
+        <div className="space-y-1">
+          <p
+            className="font-mono text-[10px] font-bold uppercase tracking-[0.22em]"
+            style={{ color: "var(--mt-violet-ink)" }}
+          >
+            Studio · Your campaigns
+          </p>
+          <h2 id="open-project-heading" className="font-mono text-xl font-bold tracking-tight">
+            Open a reaction project
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            Real optimization runs, surrogate diagnostics, safety screening and regulatory
+            constraints run against your own experiments in the project workspace.
+          </p>
+        </div>
+        <ModuleCard
+          accent="violet"
+          eyebrow="Studio · Projects"
+          title="Your reaction projects"
+          icon={Target}
+          description="Select a project to open its workspace."
+        >
+          <div className="space-y-2">
+            <Label htmlFor="rxn-studio-open-project">reaction project</Label>
+            <EntityPicker
+              id="rxn-studio-open-project"
+              ariaLabel="Open a reaction project"
+              value={null}
+              onChange={(id) => {
+                if (id != null) router.push(`/reactions/${id}`)
+              }}
+              load={loadReactionProjects}
+              placeholder="Select a reaction project"
+              searchPlaceholder="Search projects…"
+              emptyText="No reaction projects yet. Create one from Reactions to run a real optimization."
+            />
+            <p className="text-xs text-muted-foreground">
+              Nothing below this point is computed from your data.
+            </p>
+          </div>
+        </ModuleCard>
+      </section>
+
       {/* Reaction scheme */}
       <section aria-labelledby="scheme-heading" className="space-y-4">
         <div className="space-y-1">
@@ -270,7 +322,9 @@ export function ReactionStudioWorkspace() {
             Condition matrix &amp; outcomes
           </h2>
           <p className="text-sm text-muted-foreground">
-            Factor settings per run paired with measured yield / selectivity / impurity outcomes.
+            Illustrative layout only. The rows below are fixed sample values, not measurements —
+            open a project above to see condition matrices and outcomes computed from your own
+            experiments.
           </p>
         </div>
         <div className="grid gap-6 lg:grid-cols-2">
@@ -281,7 +335,7 @@ export function ReactionStudioWorkspace() {
             eyebrow="Studio · Conditions"
             title={<span id="conditions-heading">Condition matrix</span>}
             icon={Grid3X3}
-            description="Factor settings per experimental run (demo rows)."
+            description="Sample rows for layout — not your data and not a measurement."
             className="h-full"
           >
             <div className="overflow-x-auto">
