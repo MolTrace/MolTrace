@@ -520,6 +520,27 @@ jobs:
       # ten assertions about the service transport among them. Naming the chain
       # instead of its members means a new suite is covered the moment it is
       # added to the chain, and test:modules now asserts that it was.
+      # EXIT CODE 143 ON THE macOS LEG IS USUALLY NOT A TEST FAILURE. Measured
+      # across four consecutive red runs on 2026-08-30 (02:03, 03:00, 04:15,
+      # 04:37): every one logged
+      #
+      #   ##[error]The runner has received a shutdown signal.
+      #   ##[error]Process completed with exit code 143.
+      #
+      # and not one of them contained a single ✗ — no assertion failed in any of
+      # them. The hosted macOS VM was reclaimed 20-27s into the job, while this
+      # step was ~3s in, so it always died around the same test and looked like a
+      # code defect. The identical chain passes locally on macOS (all ten suites,
+      # exit 0) and the ubuntu leg of this same matrix passed every time.
+      #
+      # TELLING THEM APART, before spending an afternoon on it as three sessions
+      # have: grep the job log for "shutdown signal" and for "✗". A real failure
+      # names the assertion and prints ✗; a reclaimed runner names neither and the
+      # step's own duration is far shorter than its timeout.
+      #
+      # Deliberately NOT retried, marked continue-on-error, or dropped from the
+      # matrix. Each of those hides a genuine macOS regression to silence a
+      # transient one, and this job exists to catch the genuine kind.
       - name: Desktop suites — config, credential, keys, capabilities, service
         run: npm run test:node
 

@@ -61,6 +61,10 @@ contextBridge.exposeInMainWorld('moltrace', {
     // reason capabilities.read() returns verdicts: a page that can reason about
     // entitlement is a page that can disagree with the desktop about it.
     openSpectrum: async () => ipcRenderer.invoke('moltrace:open-spectrum'),
+    // Takes a STRUCTURE and no path. The renderer supplies what the chemist
+    // typed; the main process supplies the acquisition it already opened. Same
+    // rule as above, from the other direction: the page never names a file.
+    verifyStructure: async (smiles) => ipcRenderer.invoke('moltrace:verify-structure', smiles),
   },
   // A callback, not an event emitter: the renderer is told THAT something
   // changed and asks again, so nothing crosses the bridge except the invitation.

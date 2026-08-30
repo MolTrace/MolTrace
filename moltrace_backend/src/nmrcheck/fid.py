@@ -1429,11 +1429,43 @@ def _find_varian_dataset(root: Path) -> _VarianDataset:
     )
 
 
+def _refuse_truncated_parameter_files(root: Path) -> None:
+    """Refuse a dataset whose parameter files are cut short, BEFORE nmrglue sees it.
+
+    nmrglue's ``parse_jcamp_line`` reads an array parameter with
+    ``while len(value) < num``; at EOF ``readline()`` returns ``''`` and
+    ``''.split()`` is ``[]``, so the loop can never advance. **A ``try`` cannot
+    catch a loop** -- which is why the ``except Exception`` around every
+    ``ng.bruker.read`` in this module never protected against it, and why this has
+    to run before the call rather than around it.
+
+    The check itself belongs to nmrglue's file format rather than to either reader,
+    so it is imported rather than reimplemented: duplicating it would let the two
+    copies drift on a defect whose whole character is that it is data-dependent.
+    Imported inside the function, matching this package's convention for reaching
+    into ``moltrace`` (see ``ai_engine_adapter``), so no import cycle is created.
+    """
+    try:
+        from moltrace.spectroscopy.io.fid_reader import (
+            FIDReaderError,
+            _refuse_truncated_parameters,
+        )
+    except Exception:  # pragma: no cover - the guard is unavailable, not the reader
+        return
+    try:
+        _refuse_truncated_parameters(root)
+    except FIDReaderError as exc:
+        raise FIDProcessingError(str(exc)) from exc
+
+
 def _read_with_nmrglue(dataset: _BrukerDataset) -> tuple[dict[str, Any], np.ndarray] | None:
     try:
         import nmrglue as ng  # type: ignore[import-not-found]
     except Exception:
         return None
+    # OUTSIDE the try below: that except swallows everything and returns None, which
+    # would turn a named refusal into a silent fallback to the in-house parser.
+    _refuse_truncated_parameter_files(dataset.root)
     try:
         with _suppress_known_nmrglue_warnings():
             dic, data = ng.bruker.read(str(dataset.root))
@@ -1516,6 +1548,8 @@ def _maybe_remove_group_delay(
     if not settings.apply_group_delay:
         return (fid, False)
     grpdly = _param_float(params, "GRPDLY")
+    # Before nmrglue, and outside the try: see _refuse_truncated_parameter_files.
+    _refuse_truncated_parameter_files(dataset_root)
     try:
         import nmrglue as ng  # type: ignore[import-not-found]
 

@@ -1,70 +1,393 @@
-:root { color-scheme: light dark; font-family: system-ui, sans-serif; }
-body { margin: 0; padding: 2rem; }
-.capabilities { list-style: none; padding: 0; display: grid; gap: .75rem; max-width: 34rem; }
-.cap { border: 1px solid currentColor; border-radius: .5rem; padding: .75rem 1rem; display: grid; gap: .25rem; }
-.cap__headline { font-size: .875rem; opacity: .85; }
-.cap__action { margin: .25rem 0 0; font-size: .875rem; }
-/* The four states are visually distinct, not one grey box. */
-.cap--available  { border-left: 4px solid #2e7d32; }
-.cap--upgrade    { border-left: 4px solid #6a1b9a; }
-.cap--admin      { border-left: 4px solid #1565c0; }
-.cap--setup      { border-left: 4px solid #ef6c00; }
-.cap--permission { border-left: 4px solid #546e7a; }
-.cap--unknown    { border-left: 4px solid #c62828; }
-.service { border: 1px solid currentColor; border-left-width: 4px; border-radius: .5rem;
-           padding: .75rem 1rem; max-width: 34rem; margin-bottom: 1rem; }
-.service--running { border-left-color: #2e7d32; }
-.service--stopped { border-left-color: #c62828; }
-.service__detail { margin: .25rem 0 0; font-size: .875rem; opacity: .85; }
+/* MolTrace desktop — the platform's own design system, ported.
+ *
+ * Two colour layers, exactly as moltrace_frontend/app/globals.css declares them.
+ * Layer one is the semantic set in oklch; layer two is the additive MolTrace
+ * brand palette in hex, with the `-ink` variants that exist because the vivid
+ * accents FAIL WCAG AA as text: teal #00DFA0 is ~1.6:1 on light, cyan #00B8D9
+ * ~2.1:1, violet #6B3FE0 ~2.7:1 on the dark chip. Vivid for fills and icons,
+ * ink for type. That rule is the reason this file has two teals in it.
+ *
+ * Kept in oklch rather than converted to hex: four tokens are outside the sRGB
+ * gamut and any hex for them is a clip, not a match. Chromium reads oklch.
+ *
+ * Dark mode is a CLASS on <html>, not a media query, because that is what the
+ * web app does (next-themes, attribute="class") and the two must not disagree
+ * about what "dark" means.
+ */
 
-/* The analysis surface. */
-.analysis { margin-top: 1.5rem; max-width: 46rem; }
-.analysis__open { font: inherit; padding: .55rem 1.1rem; border-radius: .5rem;
-                  border: 1px solid currentColor; background: transparent; cursor: pointer; }
-.analysis__open[disabled] { opacity: .6; cursor: progress; }
-.analysis__hint  { margin: .5rem 0 0; font-size: .875rem; opacity: .8; }
-.analysis__error { margin: .75rem 0 0; font-size: .9rem; border-left: 4px solid #c62828;
-                   padding: .5rem .75rem; }
-.result { margin-top: 1.25rem; }
-.result__head   { font-weight: 600; margin: 0; }
-.result__counts { margin: .25rem 0 .75rem; font-size: .875rem; opacity: .85; }
-/* A wide table must scroll inside itself rather than push the window sideways. */
-.peaks { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
-.peaks th, .peaks td { text-align: right; padding: .35rem .6rem; border-bottom: 1px solid rgba(128,128,128,.35); }
-.peaks th:first-child, .peaks td:first-child,
-.peaks th:nth-child(3), .peaks td:nth-child(3) { text-align: left; }
-.peaks th { font-size: .8rem; text-transform: uppercase; letter-spacing: .04em; opacity: .75; }
-/* The limits are not fine print: same weight as the numbers they qualify. */
-.result__limits { margin: 1rem 0 0; padding-left: 1.1rem; font-size: .875rem; }
-.result__limits li { margin: .35rem 0; }
+:root {
+  color-scheme: light;
 
-/* Not fine print, and not a dismissible toast: an evaluator has to see this
-   before the numbers, every time. */
-.preview-banner { border: 1px solid currentColor; border-left: 4px solid #6a1b9a;
-                  border-radius: .5rem; padding: .6rem .9rem; margin: 0 0 1rem;
-                  max-width: 46rem; font-size: .9rem; }
+  --background: oklch(0.99 0.002 240);
+  --foreground: oklch(0.11 0.02 240);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.11 0.02 240);
+  --primary: oklch(0.13 0.02 240);
+  --primary-foreground: oklch(0.99 0 0);
+  --secondary: oklch(0.96 0.005 240);
+  --muted: oklch(0.96 0.005 240);
+  --muted-foreground: oklch(0.4 0.016 240);
+  --accent: oklch(0.55 0.18 200);
+  --destructive: oklch(0.5 0.2 25);
+  --success: oklch(0.55 0.17 145);
+  --warning: oklch(0.7 0.15 75);
+  --border: oklch(0.92 0.004 240);
+  --ring: oklch(0.55 0.18 200);
 
-/* A saturated detector is a warning about the numbers beside it, not a footnote. */
-.result__warning { margin: .5rem 0 .75rem; padding: .55rem .8rem; font-size: .9rem;
-                   border: 1px solid currentColor; border-left: 4px solid #ef6c00;
-                   border-radius: .5rem; }
+  /* Module palette: teal = spectroscopy, cyan = regulatory, violet = optimization. */
+  --mt-teal: #00DFA0;
+  --mt-cyan: #00B8D9;
+  --mt-violet: #6B3FE0;
+  --mt-amber: #E8A030;
+  --mt-red: #E84040;
+  --mt-slate: #64748B;
+  --mt-teal-soft: rgba(0, 223, 160, 0.10);
+  --mt-cyan-soft: rgba(0, 184, 217, 0.10);
+  --mt-violet-soft: rgba(107, 63, 224, 0.10);
+  --mt-amber-soft: rgba(232, 160, 48, 0.10);
+  --mt-slate-soft: rgba(100, 116, 139, 0.10);
 
-/* The spectrum. */
-.spectrum { margin: 0 0 1rem; }
-.spectrum__svg { width: 100%; height: auto; display: block; overflow: visible; }
-.spectrum__trace  { fill: currentColor; fill-opacity: .78; stroke: none; }
-.spectrum__zero   { stroke: currentColor; stroke-opacity: .35; stroke-width: 1; stroke-dasharray: 3 3; }
-.spectrum__tick   { stroke: currentColor; stroke-opacity: .5; stroke-width: 1; }
-.spectrum__tick-label { fill: currentColor; font-size: 11px; opacity: .75; }
-.spectrum__marker { stroke: #6a1b9a; stroke-width: 2; }
-.spectrum__caption { margin: .35rem 0 0; font-size: .8rem; opacity: .8; }
+  /* Ink — for brand-coloured TEXT. Never use the vivid tokens above on type. */
+  --mt-teal-ink: #0B6E5A;
+  --mt-cyan-ink: #0B6E8C;
+  --mt-violet-ink: #5B3FB8;
+  --mt-amber-ink: #8F5C00;
+  --mt-slate-ink: #475569;
 
-/* A signal that fits as more than one line. */
-.result__refined { margin: .4rem 0 .6rem; padding: .5rem .8rem; font-size: .875rem;
-                   border: 1px solid currentColor; border-left: 4px solid #1565c0;
-                   border-radius: .5rem; }
+  --radius: 0.5rem;
+  --radius-sm: 0.25rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
 
-/* Two tables: what can be measured, and what was only detected. */
-.peaks-section { margin: 0 0 1.25rem; }
-.peaks-section__heading { font-size: .95rem; margin: 0 0 .25rem; font-weight: 600; }
-.peaks-section__note { margin: 0 0 .5rem; font-size: .85rem; opacity: .85; }
+  --sidebar-w: 224px;
+  --sidebar-w-collapsed: 56px;
+
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+html.dark {
+  color-scheme: dark;
+  --background: oklch(0.12 0.015 240);
+  --foreground: oklch(0.98 0.004 240);
+  --card: oklch(0.15 0.015 240);
+  --card-foreground: oklch(0.98 0.004 240);
+  --primary: oklch(0.96 0.005 240);
+  --primary-foreground: oklch(0.12 0.015 240);
+  --secondary: oklch(0.22 0.015 240);
+  --muted: oklch(0.22 0.015 240);
+  --muted-foreground: oklch(0.76 0.01 240);
+  --accent: oklch(0.6 0.18 200);
+  --destructive: oklch(0.5 0.2 25);
+  --success: oklch(0.55 0.17 145);
+  --warning: oklch(0.7 0.15 75);
+  --border: oklch(0.25 0.015 240);
+  --ring: oklch(0.6 0.18 200);
+
+  /* Teal and cyan are already legible bright on a dark page; violet is not,
+   * so it LIGHTENS rather than darkens. */
+  --mt-teal-ink: #00DFA0;
+  --mt-cyan-ink: #00B8D9;
+  --mt-violet-ink: #A78BFA;
+  --mt-amber-ink: #E8A030;
+  --mt-slate-ink: #94A3B8;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: var(--sans);
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--foreground);
+  background: var(--background);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* The signature micro-label: mono, uppercase, wide tracking. Used for every
+ * eyebrow in the product. */
+.eyebrow {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: var(--mt-slate-ink);
+  margin: 0 0 6px;
+}
+
+/* ---------- shell ---------- */
+
+.shell { display: flex; height: 100vh; overflow: hidden; }
+
+.sidebar {
+  width: var(--sidebar-w);
+  flex: 0 0 var(--sidebar-w);
+  background: var(--card);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  transition: width 160ms ease, flex-basis 160ms ease;
+}
+.shell.collapsed .sidebar { width: var(--sidebar-w-collapsed); flex-basis: var(--sidebar-w-collapsed); }
+
+.brand {
+  display: flex; align-items: center; gap: 10px;
+  padding: 14px 12px; border-bottom: 1px solid var(--border);
+  min-height: 56px;
+}
+.brand__mark { width: 26px; height: 26px; flex: 0 0 26px; }
+.brand__name {
+  font-family: var(--mono); font-size: 14px; font-weight: 700; letter-spacing: -0.01em;
+}
+.brand__tag {
+  font-family: var(--mono); font-size: 9px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.18em; color: var(--mt-slate-ink);
+}
+.shell.collapsed .brand__text { display: none; }
+
+.navgroup { padding: 10px 8px 2px; }
+.navgroup__label {
+  font-family: var(--mono); font-size: 9px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.18em;
+  color: var(--mt-slate-ink); padding: 0 8px 6px;
+}
+.shell.collapsed .navgroup__label { visibility: hidden; height: 10px; }
+
+.navitem {
+  position: relative;
+  display: flex; align-items: center; gap: 10px;
+  width: 100%; text-align: left;
+  padding: 8px 10px; margin-bottom: 2px;
+  border: 0; border-radius: var(--radius-lg);
+  background: transparent; color: var(--foreground);
+  font-family: var(--sans); font-size: 13px; font-weight: 600;
+  cursor: pointer;
+}
+.navitem:hover { background: var(--muted); }
+.navitem:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; }
+
+/* Active: the platform's treatment — filled secondary plus a 3px inset rail in
+ * the module's own colour, and the icon recoloured to the vivid token. On an
+ * ICON the vivid token is the correct one; the ink variants exist for text. */
+.navitem[aria-current="page"] { background: var(--secondary); }
+.navitem[aria-current="page"]::before {
+  content: ""; position: absolute; left: 0; top: 6px; bottom: 6px;
+  width: 3px; border-radius: 0 3px 3px 0; background: var(--accent-rail, var(--mt-teal));
+}
+.navitem__icon { width: 16px; height: 16px; flex: 0 0 16px; color: var(--mt-slate-ink); }
+.navitem[aria-current="page"] .navitem__icon { color: var(--accent-rail, var(--mt-teal)); }
+.navitem__text { min-width: 0; }
+.navitem__sub {
+  display: block; font-family: var(--mono); font-size: 10px; font-weight: 600;
+  color: var(--muted-foreground); letter-spacing: 0;
+}
+.shell.collapsed .navitem__text { display: none; }
+.navitem__lock { margin-left: auto; width: 12px; height: 12px; color: var(--muted-foreground); opacity: 0.7; }
+.shell.collapsed .navitem__lock { display: none; }
+
+.sidebar__foot { margin-top: auto; padding: 8px; border-top: 1px solid var(--border); }
+
+/* ---------- main ---------- */
+
+.main { flex: 1 1 auto; overflow-y: auto; min-width: 0; }
+
+.topbar {
+  position: sticky; top: 0; z-index: 5;
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 20px; min-height: 56px;
+  background: var(--background); border-bottom: 1px solid var(--border);
+}
+.iconbutton {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 30px; height: 30px; padding: 0;
+  border: 1px solid var(--border); border-radius: var(--radius);
+  background: var(--card); color: var(--foreground); cursor: pointer;
+}
+.iconbutton:hover { background: var(--muted); }
+.iconbutton:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; }
+
+.statuspill {
+  margin-left: auto;
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 5px 10px; border-radius: 999px;
+  border: 1px solid var(--border); background: var(--card);
+  font-family: var(--mono); font-size: 11px; font-weight: 700;
+}
+.statusdot { width: 7px; height: 7px; border-radius: 999px; background: var(--mt-slate); }
+.statusdot[data-state="ok"] { background: var(--mt-teal); }
+.statusdot[data-state="starting"] { background: var(--mt-amber); animation: pulse 1.1s ease-in-out infinite; }
+.statusdot[data-state="down"] { background: var(--mt-red); }
+@keyframes pulse { 0%, 100% { opacity: 1 } 50% { opacity: 0.35 } }
+
+.page { padding: 22px 24px 56px; max-width: 1180px; }
+.page__head { margin-bottom: 18px; }
+.page__title { font-family: var(--mono); font-size: 24px; font-weight: 700; letter-spacing: -0.02em; margin: 0; }
+.page__sub { color: var(--muted-foreground); margin: 6px 0 0; max-width: 68ch; }
+
+/* ---------- cards ---------- */
+
+/* ModuleCard: 3px top border in the module colour, mono eyebrow, title. */
+.card {
+  background: var(--card); border: 1px solid var(--border);
+  border-top: 3px solid var(--card-accent, var(--mt-teal));
+  border-radius: var(--radius-xl);
+  padding: 16px 18px; margin-bottom: 14px;
+}
+.card__title { font-family: var(--mono); font-size: 15px; font-weight: 700; margin: 0 0 4px; letter-spacing: -0.01em; }
+.card__desc { color: var(--muted-foreground); margin: 0 0 12px; }
+
+/* AlertCard: 4px LEFT border, four tones. */
+.alert {
+  border: 1px solid var(--border); border-left: 4px solid var(--tone, var(--mt-slate));
+  background: var(--tone-soft, var(--mt-slate-soft));
+  border-radius: var(--radius-lg); padding: 12px 14px; margin-bottom: 14px;
+}
+.alert--warn { --tone: var(--mt-amber); --tone-soft: var(--mt-amber-soft); }
+.alert--info { --tone: var(--mt-cyan); --tone-soft: var(--mt-cyan-soft); }
+.alert__title { font-family: var(--mono); font-size: 12px; font-weight: 700; margin: 0 0 3px; }
+.alert__body { margin: 0; color: var(--muted-foreground); font-size: 13px; }
+
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 16px; }
+.kpi { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 12px 14px; }
+.kpi__label { font-family: var(--mono); font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.18em; color: var(--mt-slate-ink); }
+.kpi__value { font-family: var(--mono); font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; margin-top: 3px; }
+.kpi__sub { font-size: 11px; color: var(--muted-foreground); }
+
+.btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 9px 16px; min-height: 38px;
+  border: 1px solid transparent; border-radius: var(--radius);
+  background: var(--primary); color: var(--primary-foreground);
+  font-family: var(--sans); font-size: 13px; font-weight: 700; cursor: pointer;
+}
+.btn:hover { opacity: 0.9; }
+.btn:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+.btn--secondary { background: var(--card); color: var(--foreground); border-color: var(--border); }
+.btn--secondary:hover { background: var(--muted); }
+
+.chooser {
+  border: 1px solid var(--border); border-radius: var(--radius-xl);
+  padding: 22px; text-align: center; background: var(--muted);
+}
+.chooser__hint { color: var(--muted-foreground); font-size: 12px; margin: 8px 0 14px; }
+
+table.peaks { width: 100%; border-collapse: collapse; font-family: var(--mono); font-size: 12px; }
+table.peaks th {
+  text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--border);
+  font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.14em;
+  color: var(--mt-slate-ink); white-space: nowrap;
+}
+table.peaks td { padding: 6px 8px; border-bottom: 1px solid var(--border); font-variant-numeric: tabular-nums; }
+table.peaks tbody tr:hover { background: var(--muted); }
+.tablenote { color: var(--muted-foreground); font-size: 12px; margin: 0 0 10px; }
+
+.meta { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+.meta__item {
+  border: 1px solid var(--border); border-radius: 999px; padding: 4px 11px;
+  font-family: var(--mono); font-size: 11px; background: var(--card);
+}
+.meta__key { color: var(--mt-slate-ink); font-weight: 700; }
+
+.limits { margin: 12px 0 0; padding-left: 18px; color: var(--muted-foreground); font-size: 12.5px; }
+.limits li { margin-bottom: 5px; }
+
+.empty { text-align: center; padding: 44px 20px; color: var(--muted-foreground); }
+.empty__mark { width: 46px; height: 46px; opacity: 0.5; margin-bottom: 10px; }
+
+.gated { max-width: 62ch; }
+.gated__where {
+  font-family: var(--mono); font-size: 12px; color: var(--mt-slate-ink);
+  border-left: 3px solid var(--border); padding-left: 12px; margin-top: 14px;
+}
+
+.spectrum { width: 100%; height: auto; display: block; }
+.sronly {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+}
+
+/* ---------- spectrum ---------- */
+
+.spectrum { margin: 0 0 6px; }
+.spectrum__svg {
+  width: 100%; height: auto; display: block;
+  background: var(--muted); border: 1px solid var(--border); border-radius: var(--radius-lg);
+}
+.spectrum__trace { fill: var(--mt-teal-soft); stroke: var(--mt-teal-ink); stroke-width: 1; }
+.spectrum__zero { stroke: var(--border); stroke-width: 1; stroke-dasharray: 3 3; }
+.spectrum__tick { stroke: var(--muted-foreground); stroke-width: 1; }
+
+/* 11px, not the 8.1px this rendered at before. An axis label a reader has to
+ * lean in for is an axis label they do not read, and these are the numbers the
+ * whole figure is about. */
+.spectrum__tick-label {
+  font-family: var(--mono); font-size: 11px; fill: var(--muted-foreground);
+}
+
+/* The marker was #6a1b9a, which measures 1.99:1 against the dark surface -- it
+ * is the one mark that says "this row in the table is THIS line on the trace",
+ * so it has to be visible in both appearances. The brand amber carries its own
+ * contrast in either mode and is not one of the three module colours, so it
+ * cannot be mistaken for a module cue. */
+.spectrum__marker { stroke: var(--mt-amber); stroke-width: 2; stroke-linecap: round; }
+
+.spectrum__caption {
+  font-family: var(--mono); font-size: 11px; color: var(--muted-foreground);
+  margin-top: 8px; line-height: 1.45;
+}
+
+.peaks-section { margin-top: 4px; }
+.peaks-section__heading {
+  font-family: var(--mono); font-size: 14px; font-weight: 700;
+  margin: 0 0 4px; letter-spacing: -0.01em;
+}
+.peaks-section__note { color: var(--muted-foreground); font-size: 12.5px; margin: 0 0 10px; max-width: 78ch; }
+
+/* ---------- structure check ---------- */
+
+.formrow { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; }
+.input {
+  flex: 1 1 auto; min-width: 0; min-height: 38px;
+  padding: 8px 12px; border: 1px solid var(--border); border-radius: var(--radius);
+  background: var(--background); color: var(--foreground);
+  font-family: var(--mono); font-size: 13px;
+}
+.input:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; }
+
+.verdict {
+  display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;
+  padding: 12px 14px; margin-bottom: 10px;
+  border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--muted);
+}
+.verdict__word {
+  font-family: var(--mono); font-size: 18px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.verdict__conf { font-family: var(--mono); font-size: 12px; color: var(--muted-foreground); }
+
+.verdict__smiles {
+  font-family: var(--mono); font-size: 12px; padding: 3px 8px;
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  background: var(--background); color: var(--mt-slate-ink);
+}
+
+
+/* An inline SVG with no width has no intrinsic size and fills whatever box it is
+ * given: the folder glyph on the primary button rendered about 40px tall and
+ * pushed its own label onto two lines. Constrained here rather than at each call
+ * site, so a button added later cannot reintroduce it. */
+.btn svg { width: 16px; height: 16px; flex: 0 0 16px; }
+.iconbutton svg { width: 16px; height: 16px; }
+.btn { white-space: nowrap; }
+
+/* Said before anything else on the page, and it must not read as decoration. */
+.previewbanner {
+  margin: 0; padding: 9px 24px;
+  background: var(--mt-amber-soft);
+  border-bottom: 1px solid var(--border);
+  color: var(--mt-amber-ink);
+  font-family: var(--mono); font-size: 12px; font-weight: 600;
+}

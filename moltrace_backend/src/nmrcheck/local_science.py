@@ -140,6 +140,14 @@ class MultipletSummary:
     #: broad features or poor fits rather than merged pairs, so a flag would cry
     #: wolf. The number is shown; the chemist judges.
     width_hz: float
+    #: What this signal appears to BE: the compound, the solvent, its residual
+    #: proton, an impurity, a 13C satellite, or an artifact. A chemist otherwise
+    #: identifies these by eye every time they read a spectrum, and the engine
+    #: already knows: `classify_peaks` was computed nowhere and shown never.
+    category: str
+    #: How sure that call is, 0-1. Shown beside the category rather than used as
+    #: a filter: a low number is information, not a reason to hide a row.
+    category_confidence: float
     #: Area as a FRACTION OF THE TOTAL, never a proton count. Without an assigned
     #: structure there is nothing to normalise against, so a proton count would be
     #: an invention. The wire key says what it is; the display must not relabel it.
@@ -157,6 +165,8 @@ class MultipletSummary:
             "line_count": self.line_count,
             "resolved_lines": self.resolved_lines,
             "width_hz": self.width_hz,
+            "category": self.category,
+            "category_confidence": self.category_confidence,
             "relative_area": self.relative_area,
         }
 
@@ -198,6 +208,7 @@ def _summarise_multiplet(
     baseline_sigma: float,
     total_area: float,
     snr: float,
+    categories: dict[int, tuple[str, float]],
 ) -> MultipletSummary:
     """One signal, with every claim held to the floor this module declares.
 
@@ -228,11 +239,202 @@ def _summarise_multiplet(
         ),
         line_count=len(multiplet.peaks),
         width_hz=float(max((p.width_hz for p in multiplet.peaks), default=0.0)),
+        # THE STRONGEST LINE DECIDES. A multiplet is one signal, so it gets one
+        # answer, and the tallest line in it is the one the call was most
+        # confident about -- averaging categories across lines would invent a
+        # category nothing measured.
+        **_multiplet_category(multiplet, categories),
         resolved_lines=_resolved_line_count(spectrum, multiplet, baseline_sigma),
         snr=snr,
         quantifiable=quantifiable,
         relative_area=float(sum(abs(p.area) for p in multiplet.peaks) / total_area),
     )
+
+
+
+#: How the four verification tests are named to a chemist. The wire keys stay as
+#: the engine emits them -- a display name is not a rename -- but `dp4_ranking` is
+#: not what a person calls the thing it does.
+
+#: How often the true structure scored highest, measured on this repository's own
+#: corpus: every acquisition whose structure the NMReDATA source states, against
+#: four decoys drawn from that same corpus. Reported to the reader rather than
+#: kept as a footnote, because a comparison whose accuracy is unstated is a
+#: comparison a chemist cannot weigh.
+#:
+#: Re-measure with scripts against `eval/curated_shifts._DEFAULT_SOURCE` if the
+#: knowledge base or the predictor changes. Do not adjust these numbers to match
+#: a hoped-for result.
+_RANKING_ACCURACY: dict[str, object] = {
+    "13C": {"first": 9, "of": 12},
+    "1H": {"first": 3, "of": 8},
+    "decoys_per_case": 4,
+    "note": (
+        "Measured on 20 acquisitions from this build's own reference corpus, each checked "
+        "against four other real molecules from it."
+    ),
+}
+
+
+_TEST_LABELS: dict[str, str] = {
+    "prediction_bounds": "Predicted shifts against the observed ones",
+    "assignments": "Every observed signal assigned to an atom",
+    "hsqc_2d_ranges": "HSQC correlations (needs a 2-D spectrum)",
+    "ms_molecule_match": "Mass-spectrometry evidence (needs MS peaks)",
+}
+
+
+def verify_candidate(path: str | Path, smiles: str) -> dict:
+    """Check a proposed structure against an acquisition on this computer.
+
+    THE VERIFIER IS THE ARBITER, and it runs here in full: `verify_structure` is
+    the same deterministic function the platform uses everywhere, combining its
+    tests through a Bayesian log-odds update whose whole arithmetic comes back on
+    the result. Nothing about it needs a server.
+
+    WHAT IS DIFFERENT OFFLINE IS THE PREDICTION IT IS FED. Without NMRNet the
+    engine falls back to HOSE codes against a seed knowledge base, and on a real
+    acquisition that meant half the atoms matched no environment at all and the
+    median 13C uncertainty was 35 ppm -- which is most of the useful range. The
+    engine says so in its own warnings. Those warnings are lifted to the front of
+    this result rather than left at the end of a list, because a confidence read
+    without them is a number a chemist could act on and should not.
+    """
+    source = Path(path)
+    if not source.exists():
+        raise SpectrumUnreadable("that file is no longer where it was")
+    candidate = (smiles or "").strip()
+    if not candidate:
+        raise SpectrumUnreadable("no structure was given to check")
+
+    from moltrace.spectroscopy.verification import verify_structure
+
+    try:
+        spectrum = read_processed_spectrum(source)
+    except (FIDReaderError, OSError, ValueError):
+        try:
+            spectrum = read_fid(source)
+        except FIDReaderError as unreadable:
+            raise SpectrumUnreadable(_readable_refusal(unreadable, source)) from None
+
+    try:
+        result = verify_structure(spectrum, candidate)
+    except ValueError as bad:
+        # A structure the chemist typed that RDKit cannot read is their input, not
+        # a fault: say which part failed rather than reporting a dead service.
+        raise SpectrumUnreadable(
+            f"that structure could not be read as a molecule ({bad})"
+        ) from None
+
+    warnings = list(result.warnings or [])
+
+    # WHICH TABLE ANSWERED. A prediction from 495,215 reference atoms and one from
+    # 146 are different products, and the reader must be able to tell which they
+    # got -- the engine's own error path exists because silently substituting a
+    # worse predictor for a configured one is the failure that matters here.
+    from moltrace.spectroscopy.predict.nmrnet_wrapper import knowledge_base_status
+
+    status = knowledge_base_status()
+    knowledge = {
+        "source": status.get("source") or ("seed" if status.get("loaded") else "unknown"),
+        "reference_count": int(status.get("reference_count") or 0),
+    }
+
+    # A TYPO IS NOT AN ANSWER. The engine handles an unreadable structure
+    # honestly -- it warns `invalid_smiles`, abstains from every test, and returns
+    # the prior back unchanged as `inconclusive` at 0.50. That is correct FOR THE
+    # ENGINE and wrong to put in front of a person: a verdict and a confidence
+    # rendered for a mistyped structure look exactly like a verdict and a
+    # confidence for a real one, and the reader has no way to tell which they got.
+    if any(w == "invalid_smiles" for w in warnings):
+        raise SpectrumUnreadable(
+            "that structure could not be read as a molecule. Check the SMILES \u2014 "
+            "ethanol is CCO, benzene is c1ccccc1."
+        )
+    # The coverage line is the one that decides whether any of this is worth
+    # reading, so it is pulled out rather than left as the last of nine.
+    coverage = next((w for w in warnings if w.startswith("Coverage:")), None)
+    predictor = next((w for w in warnings if "NMRNet unavailable" in w), None)
+
+    return {
+        "smiles": candidate,
+        "verdict": str(result.verdict),
+        "confidence": float(result.posterior_confidence),
+        "prior": float(result.prior_confidence),
+        "summary": str(result.diagnostic),
+        "tests": [
+            {
+                "name": t.name,
+                "label": _TEST_LABELS.get(t.name, t.name.replace("_", " ")),
+                "applicable": bool(t.applicable),
+                "score": float(t.score),
+                "significance": float(t.significance),
+                "quality": float(t.quality),
+                "diagnostic": str(t.diagnostic),
+            }
+            for t in result.test_results
+        ],
+        # WHETHER THESE NUMBERS CAN RANK ANYTHING DEPENDS ON THE TABLE, so it is
+        # read from the table rather than asserted. Measured on the ethylene
+        # glycol acquisition in this repository against four structures:
+        #
+        #                     seed (146 atoms)   nmrshiftdb2 (495,215)
+        #   ethylene glycol      0.556               0.939  consistent
+        #   ethanol              0.623  <- won       0.242  inconclusive
+        #   aspirin              0.542               0.166  inconsistent
+        #
+        # On the seed the WRONG molecule outranked the right one and every verdict
+        # was "inconclusive". With the real table the right one wins by 0.697 and
+        # the verdicts become words that mean something. Same verifier, same
+        # spectrum: the predictor was starved, not the method.
+        #
+        # So a build answering from the seed says its number cannot rank, and one
+        # answering from nmrshiftdb2 says it can -- and the reader is told which,
+        # because those are different products.
+        # COMPARABLE, WITH A STATED HIT RATE -- not a ranking. Measured over all 20
+        # acquisitions in this repository whose structure the corpus states, each
+        # against four decoys drawn from the same corpus (so the decoys are real
+        # molecules, not absurdities):
+        #
+        #     13C   9/12 (75%)      1H   3/8 (38%)      overall 12/20
+        #
+        # 75% is genuinely useful and is NOT an ordering a reader should trust:
+        # one carbon spectrum in four puts the wrong structure on top, and a
+        # sorted list claims the top is the answer. So the desktop lets a chemist
+        # put candidates side by side and tells them how often this has been
+        # right, rather than presenting a winner.
+        #
+        # On the seed table the same measurement is not worth running: it ranked
+        # ethanol above ethylene glycol on glycol's own spectrum.
+        "comparable_between_candidates": knowledge["source"] == "nmrshiftdb2",
+        "ranking_accuracy": _RANKING_ACCURACY if knowledge["source"] == "nmrshiftdb2" else None,
+        "knowledge_base": knowledge,
+        "prediction_coverage": coverage,
+        "predictor_note": predictor,
+        "warnings": warnings,
+        # Every regulated result carries this, and a structure verdict is exactly
+        # the kind of thing that must not be read as a decision.
+        "human_review_required": True,
+    }
+
+
+
+def _multiplet_category(multiplet: object, categories: dict[int, tuple[str, float]]) -> dict:
+    """What this signal appears to be, taken from its strongest line."""
+    best: tuple[str, float] | None = None
+    best_intensity = -1.0
+    for peak in multiplet.peaks:
+        found = categories.get(id(peak))
+        if found is None:
+            continue
+        if float(peak.intensity) > best_intensity:
+            best_intensity = float(peak.intensity)
+            best = found
+    if best is None:
+        # Unclassified is a state, not a guess. An empty string renders as an em
+        # dash and says nothing, which is the truth.
+        return {"category": "", "category_confidence": 0.0}
+    return {"category": str(best[0]), "category_confidence": float(best[1])}
 
 
 def _has_processed_spectrum(source: Path) -> bool:
@@ -565,6 +767,29 @@ def open_spectrum(path: str) -> dict:
     # Definitional rather than a threshold: at or below the baseline there is
     # nothing to report. Dropped BEFORE `total_area` so they cannot set the scale
     # every other row is divided by either.
+    # WHAT EACH LINE APPEARS TO BE. The engine has always known -- `classify_peaks`
+    # separates the compound from the solvent, its residual proton, impurities,
+    # 13C satellites and artifacts -- and nothing has ever asked it. On one public
+    # acquisition that is 10 impurity lines and 2 satellites a chemist would
+    # otherwise pick out by eye, every time they read the spectrum.
+    #
+    # Classified against the solvent the FILE recorded, not the detected one: the
+    # instrument's record is the fact, and the detector's reading is a second
+    # opinion. Where they disagree that is said below rather than silently
+    # resolved -- a disagreement can mean a mislabelled sample or a mis-referenced
+    # axis, and both are things the chemist needs to know.
+    detected_solvent = ""
+    categories: dict[int, tuple[str, float]] = {}
+    try:
+        from moltrace.spectroscopy.classify import classify_peaks, detect_solvent
+
+        detected_solvent = str(detect_solvent(spectrum, peaks) or "")
+        assigned = classify_peaks(peaks, spectrum.solvent or detected_solvent)
+        categories = {id(peak): assigned[i] for i, peak in enumerate(peaks) if i < len(assigned)}
+    except Exception:  # noqa: BLE001 - a reading without categories beats no reading
+        detected_solvent = ""
+        categories = {}
+
     measured = [(m, _signal_to_noise(spectrum, m, baseline_sigma)) for m in multiplets]
     discarded = [m for m, snr in measured if snr <= 0.0]
     kept = [(m, snr) for m, snr in measured if snr > 0.0]
@@ -579,7 +804,7 @@ def open_spectrum(path: str) -> dict:
     # takes nothing away.
 
     summaries = [
-        _summarise_multiplet(spectrum, m, baseline_sigma, total_area, snr)
+        _summarise_multiplet(spectrum, m, baseline_sigma, total_area, snr, categories)
         for m, snr in kept
     ]
 
@@ -604,7 +829,24 @@ def open_spectrum(path: str) -> dict:
     return {
         "trace": trace,
         "nucleus": spectrum.nucleus,
+        # PARSED ON EVERY READER PATH AND THEN DROPPED HERE. A chemical shift is
+        # not interpretable without the solvent it was referenced in -- CDCl3 and
+        # DMSO-d6 move the same proton by more than a ppm -- and every reader
+        # already extracts it into `NMRSpectrum.solvent`. It reached this function
+        # and stopped. Empty string when the file does not say, which is honest:
+        # the reader never guesses one.
+        "solvent": spectrum.solvent,
+        #: What the peaks themselves look like they were run in. A SECOND OPINION,
+        #: never a correction: the file's own record is the fact.
+        "solvent_detected": detected_solvent,
         "field_mhz": float(spectrum.field_mhz),
+        # The date the instrument recorded it. A reviewer reading a peak table
+        # needs to know which run it came from, and the readers all carry it.
+        "acquired_at": (
+            spectrum.acquisition_time.isoformat()
+            if spectrum.acquisition_time is not None
+            else None
+        ),
         "points": int(len(spectrum.data)),
         "file_name": _readable_name(source),
         "processing": processing,
@@ -627,6 +869,20 @@ def open_spectrum(path: str) -> dict:
             "Areas are shown as a share of the signals listed here, not of the whole "
             "spectrum. They are ratios, not proton counts: assigning protons needs a "
             "structure this analysis was not given.",
+            *(
+                []
+                if not (
+                    detected_solvent
+                    and spectrum.solvent
+                    and detected_solvent.lower() != spectrum.solvent.lower()
+                )
+                else [
+                    f"This acquisition records {spectrum.solvent} as its solvent, but the peaks "
+                    f"look more like {detected_solvent}. Signals were sorted using the recorded "
+                    f"one. A disagreement here can mean a mislabelled sample or a shift axis "
+                    f"referenced to the wrong peak, and both change what the numbers mean."
+                ]
+            ),
             *(
                 []
                 if not discarded

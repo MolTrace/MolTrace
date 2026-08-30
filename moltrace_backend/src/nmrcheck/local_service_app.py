@@ -28,7 +28,12 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 
 from .desktop_transport import DesktopTransportGuard, TransportRefusal
 from .device_journal import ClockState, JournalEntry, append
-from .local_science import SpectrumUnreadable, open_spectrum, process_spectrum
+from .local_science import (
+    SpectrumUnreadable,
+    open_spectrum,
+    process_spectrum,
+    verify_candidate,
+)
 from .offline_policy import is_served_locally
 
 #: Operations this app serves, and the route each one is reached by. Routes are
@@ -44,6 +49,7 @@ ROUTES: dict[str, tuple[str, str]] = {
     "system.health": ("GET", "/health"),
     "fid.process": ("POST", "/fid/process"),
     "fid.open": ("POST", "/fid/open"),
+    "structure.verify": ("POST", "/structure/verify"),
 }
 
 #: Kept as a name because tests and callers read it, derived so it cannot drift.
@@ -203,6 +209,48 @@ def _fid_open(payload: dict = _BODY) -> dict[str, Any]:
     return summary
 
 
+def _structure_verify(payload: dict = _BODY) -> dict[str, Any]:
+    """Check a proposed structure against an acquisition on this computer.
+
+    NOT `async`, for the same reason `fid.open` is not: the body is blocking
+    numerical work with no await in it, and a coroutine would run it on the event
+    loop where one slow candidate stops the service answering anything.
+
+    The verifier itself is the platform's arbiter and runs here in full. What is
+    weaker offline is the shift PREDICTION it consumes -- without NMRNet it falls
+    back to HOSE codes over a seed knowledge base -- and the result carries that
+    in its own words rather than this handler deciding how much to admit.
+    """
+    HANDLER_CALLS.append("structure.verify")
+    path = str(payload.get("path") or "")
+    smiles = str(payload.get("smiles") or "")
+    if not path:
+        _journal("structure.verify", refused=True, cause="no file was named")
+        raise HTTPException(status_code=400, detail="no file was named")
+    if not smiles.strip():
+        _journal("structure.verify", refused=True, cause="no structure was given")
+        raise HTTPException(status_code=400, detail="no structure was given to check")
+    try:
+        result = verify_candidate(path, smiles)
+    except SpectrumUnreadable as unreadable:
+        # Names the FORMAT or the structure, never the path: a filename can carry
+        # a compound name and this string is written to the device journal.
+        _journal("structure.verify", refused=True, cause=str(unreadable))
+        raise HTTPException(status_code=400, detail=str(unreadable)) from None
+
+    # The verdict and how many tests spoke, not the structure and not the numbers.
+    # A journal carrying the candidate would be a second copy of the chemist's
+    # unpublished work, which is exactly what this machine is supposed to keep.
+    applied = sum(1 for t in result["tests"] if t["applicable"])
+    _journal(
+        "structure.verify",
+        refused=False,
+        cause=f"{result['verdict']} on {applied} of {len(result['tests'])} tests",
+    )
+    return result
+
+
+
 class TransportGuardMiddleware:
     """Runs before routing, before the body, before any handler."""
 
@@ -272,6 +320,7 @@ def create_local_app(
         "system.health": _health,
         "fid.process": _fid_process,
         "fid.open": _fid_open,
+        "structure.verify": _structure_verify,
     }
     for operation, (method, path) in ROUTES.items():
         handler = handlers.get(operation)
