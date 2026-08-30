@@ -906,3 +906,82 @@ def test_a_structure_that_cannot_be_read_is_refused_not_crashed() -> None:
 
     with pytest.raises(SpectrumUnreadable):
         verify_candidate(source, "   ")
+
+
+@pytest.mark.slow
+def test_every_signal_says_what_it_appears_to_be() -> None:
+    """The engine has always known; nothing ever asked it.
+
+    `classify_peaks` separates the compound from the solvent, its residual proton,
+    impurities, 13C satellites and artifacts. On one public 1H acquisition that is
+    ten impurity lines and two satellites a chemist would otherwise pick out by
+    eye, every single time they read the spectrum.
+
+    Non-vacuous by construction: a corpus where every signal came back "compound"
+    would pass a mere presence check while telling the reader nothing, so this
+    requires the corpus to contain at least one NON-compound call.
+    """
+    from nmrcheck.local_science import open_spectrum
+
+    sources = _acquisitions()
+    if not sources:
+        pytest.skip("no acquisition in this checkout")
+
+    seen: set[str] = set()
+    rows = 0
+    for source in sources:
+        try:
+            result = open_spectrum(source)
+        except Exception:  # noqa: BLE001 - unreadable acquisitions are another test's business
+            continue
+        for signal in result["multiplets"]:
+            rows += 1
+            assert "category" in signal, "a signal reached the boundary with no category field"
+            assert 0.0 <= signal["category_confidence"] <= 1.0, signal["category_confidence"]
+            if signal["category"]:
+                seen.add(signal["category"])
+
+    assert rows, "no signal was examined"
+    assert seen, "nothing was classified at all"
+    assert seen - {"compound"}, (
+        "every signal in the corpus came back as the compound, so this asserts nothing "
+        f"about the classifier actually separating anything: {seen}"
+    )
+
+
+@pytest.mark.slow
+def test_a_solvent_the_peaks_disagree_with_is_said_not_resolved() -> None:
+    """Two answers, and the reader is told there are two.
+
+    The file records a solvent and the peaks imply one. Where they differ the
+    result keeps the FILE's answer -- the instrument's record is the fact -- and
+    states the disagreement, because it can mean a mislabelled sample or an axis
+    referenced to the wrong peak, and both change what every shift means.
+    """
+    from nmrcheck.local_science import open_spectrum
+
+    sources = _acquisitions()
+    if not sources:
+        pytest.skip("no acquisition in this checkout")
+
+    disagreements = 0
+    for source in sources:
+        try:
+            result = open_spectrum(source)
+        except Exception:  # noqa: BLE001
+            continue
+        recorded, detected = result.get("solvent"), result.get("solvent_detected")
+        if not (recorded and detected) or recorded.lower() == detected.lower():
+            continue
+        disagreements += 1
+        said = [line for line in result["limits"] if "look more like" in line]
+        assert said, (
+            f"{os.path.basename(source)} records {recorded} but reads as {detected}, "
+            "and nothing on the result says so"
+        )
+        assert detected in said[0] and recorded in said[0], said[0]
+
+    assert disagreements, (
+        "no acquisition in the corpus disagrees with its own recorded solvent, so this "
+        "guard never fired -- it would pass just as well if the disclosure were deleted"
+    )
