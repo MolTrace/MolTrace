@@ -65,6 +65,9 @@ contextBridge.exposeInMainWorld('moltrace', {
     // typed; the main process supplies the acquisition it already opened. Same
     // rule as above, from the other direction: the page never names a file.
     verifyStructure: async (smiles) => ipcRenderer.invoke('moltrace:verify-structure', smiles),
+    // A LIST of structures and still no path. DP4 normalises across the set, so
+    // this is the one call that has to see them together.
+    rankStructures: async (smilesList) => ipcRenderer.invoke('moltrace:rank-structures', smilesList),
   },
   // A callback, not an event emitter: the renderer is told THAT something
   // changed and asks again, so nothing crosses the bridge except the invitation.
