@@ -41,12 +41,14 @@ __all__ = [
     "EngineUnavailable",
     "PromotionRecord",
     "RegistryView",
+    "ServingArtifact",
     "assert_no_model_derived_inputs",
     "dominance_verdict",
     "engine_backed_services",
     "is_engine_backed",
     "promote_to_serving",
     "registry_views",
+    "serving_artifacts",
     "run_prediction",
 ]
 
@@ -477,6 +479,67 @@ class RegistryView:
     status: str
     role: str
     nucleus: str | None
+
+
+@dataclass(frozen=True)
+class ServingArtifact:
+    """One artifact that is ACTUALLY serving traffic, with the two facts a comparison needs.
+
+    ``semantic_version`` orders it; ``artifact_sha256`` identifies it. Both come from the
+    registry entry rather than from any mirrored column, because a mirror is a copy that can
+    go stale and the whole point of a currency comparison is that it is not comparing stale
+    copies.
+    """
+
+    model_id: str
+    role: str
+    nucleus: str | None
+    semantic_version: str
+    artifact_sha256: str
+
+
+def serving_artifacts(session_factory: Any) -> tuple[ServingArtifact, ...]:
+    """Every registry entry whose CURRENT status is ``production``.
+
+    Status is resolved through ``ModelRegistry.current_status``, which reads the append-only
+    transition log — never from a declared status on the entry, and never from the mirrored
+    ``status`` column on ``model_artifacts``. Those two disagree exactly when it matters: an
+    artifact that was promoted and later retired still carries its promotion in the mirror, and
+    publishing it as serving would tell an installation to compare itself against something the
+    router has stopped resolving.
+
+    Empty when the registry is unavailable, for the same reason ``registry_views`` is: a read
+    path must not fail because an enrichment could not be computed. An empty catalogue axis
+    produces ``UNKNOWN`` and refuses, which is the safe direction.
+    """
+
+    try:
+        from moltrace.spectroscopy.ai.registry import (
+            InMemoryRegistryStore,
+            ModelRegistry,
+            ModelStatus,
+        )
+
+        store = _registry_store(session_factory)
+        if isinstance(store, InMemoryRegistryStore):
+            return ()
+        registry = ModelRegistry(store)
+        serving: list[ServingArtifact] = []
+        for entry in store.all_entries():
+            if registry.current_status(entry.model_id) is not ModelStatus.PRODUCTION:
+                continue
+            serving.append(
+                ServingArtifact(
+                    model_id=entry.model_id,
+                    role=entry.role.value,
+                    nucleus=entry.nucleus,
+                    semantic_version=entry.semantic_version,
+                    artifact_sha256=entry.artifact_sha256,
+                )
+            )
+        return tuple(sorted(serving, key=lambda a: a.model_id))
+    except Exception:  # noqa: BLE001 - enrichment is best-effort by design
+        return ()
 
 
 def promote_to_serving(
