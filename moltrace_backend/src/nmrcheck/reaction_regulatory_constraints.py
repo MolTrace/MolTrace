@@ -63,6 +63,38 @@ _DEFAULT_FIELD_BY_TYPE: dict[str, tuple[str, str]] = {
 # Tolerance so floating-point equality at exactly the limit is not reported as a violation.
 _EPS = 1e-9
 
+# The unit an objective field's own name declares. The convention is already load-bearing --
+# `_DEFAULT_FIELD_BY_TYPE` above names impurity_percent, residual_solvent_ppm and
+# nitrosamine_ng_per_day -- so the unit a limit must be expressed in is not a new rule, it is
+# what the field is already called.
+#
+# Checked because nothing compared `limit_unit` to it: a constraint stored in ppm against a
+# percent field was compared arithmetically without complaint, a 10,000x error producing a
+# confident verdict. Only a genuine CONTRADICTION is treated as unmeasured. An absent
+# limit_unit is unverifiable rather than wrong, and `parse_limit` defaults it to "", so
+# rejecting those would disable every real limit that omits it -- a worse failure than the one
+# being fixed.
+_FIELD_UNIT_SUFFIXES: tuple[tuple[str, str], ...] = (
+    ("_ng_per_day", "ng_per_day"),
+    ("_percent", "percent"),
+    ("_ppm", "ppm"),
+)
+
+
+def _declared_unit(objective_field: str) -> str | None:
+    """The unit ``objective_field``'s name declares, or ``None`` if it declares none."""
+
+    for suffix, unit in _FIELD_UNIT_SUFFIXES:
+        if objective_field.endswith(suffix):
+            return unit
+    return None
+
+
+def _unit_contradicts(limit: RegulatoryLimit) -> bool:
+    declared = _declared_unit(limit.objective_field)
+    stated = (limit.limit_unit or "").strip().lower()
+    return bool(declared and stated and stated != declared)
+
 
 @dataclass(frozen=True)
 class RegulatoryLimit:
@@ -122,6 +154,10 @@ class FeasibilityVerdict:
     penalty: float  # aggregate soft penalty in [0, 1] for ranking down-weighting
     violations: tuple[ConstraintViolation, ...] = ()
     unmeasured: tuple[str, ...] = ()  # objective_fields with a limit but no predicted value
+    #: objective_fields whose limit_unit contradicts the unit the field's own name declares.
+    #: These are also reported in ``unmeasured`` -- a comparison between two different
+    #: quantities is not a measurement of compliance.
+    unit_mismatches: tuple[str, ...] = ()
     applied_constraint_ids: tuple[int, ...] = ()
 
     def summary(self) -> dict[str, Any]:
@@ -131,6 +167,7 @@ class FeasibilityVerdict:
             "penalty": round(self.penalty, 6),
             "violations": [v.as_dict() for v in self.violations],
             "unmeasured": list(self.unmeasured),
+            "unit_mismatches": list(self.unit_mismatches),
             "applied_constraint_ids": list(self.applied_constraint_ids),
             "violation_reasons": [
                 f"{v.objective_field} {_reason_phrase(v)} {v.limit_value} {v.limit_unit}"
@@ -282,12 +319,20 @@ def evaluate_candidate(
     """
     violations: list[ConstraintViolation] = []
     unmeasured: list[str] = []
+    unit_mismatches: list[str] = []
     penalties: list[float] = []
     applied: list[int] = []
 
     for limit in limits:
         if limit.constraint_id is not None:
             applied.append(limit.constraint_id)
+        if _unit_contradicts(limit):
+            # Comparing a ppm limit against a percent field is arithmetic between two
+            # different quantities, not a compliance check. Reported the same way a limit
+            # with no predicted value is: unmeasured, advisory, never silently passing.
+            unit_mismatches.append(limit.objective_field)
+            unmeasured.append(limit.objective_field)
+            continue
         predicted = _coerce_float(predicted_outcome.get(limit.objective_field))
         if predicted is None:
             unmeasured.append(limit.objective_field)
@@ -327,6 +372,7 @@ def evaluate_candidate(
         penalty=penalty,
         violations=tuple(violations),
         unmeasured=tuple(dict.fromkeys(unmeasured)),  # de-dup, preserve order
+        unit_mismatches=tuple(dict.fromkeys(unit_mismatches)),
         applied_constraint_ids=tuple(applied),
     )
 

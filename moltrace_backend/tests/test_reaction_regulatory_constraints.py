@@ -283,3 +283,58 @@ def test_provenance_survives_the_singular_bridge_key():
 
     assert limit is not None
     assert limit.source_action_item_ids == (7,)
+
+
+# --- unit consistency ------------------------------------------------------------------------
+
+
+def test_a_limit_in_the_wrong_unit_is_not_silently_compared():
+    """A ppm limit against a percent field is a 10,000x error, compared without complaint.
+
+    ``objective_field`` names its own unit by convention -- impurity_percent,
+    residual_solvent_ppm, nitrosamine_ng_per_day -- and the limit carries ``limit_unit``
+    from the stored constraint. Nothing compared the two, so a constraint recorded in ppm
+    against a percent field produced a violation verdict from an arithmetic comparison of
+    two different quantities.
+
+    A mismatch reads as unmeasured, which is the same treatment a limit with no predicted
+    value already gets: advisory, never silently passing.
+    """
+
+    limits = parse_limits([_impurity_constraint(limit=100.0, limit_unit="ppm")])
+    verdict = evaluate_candidate({"impurity_percent": 0.20}, limits)
+
+    assert "impurity_percent" in verdict.unmeasured
+    assert "impurity_percent" in verdict.unit_mismatches
+    # 0.20 % against a "100" limit would have looked comfortably compliant.
+    assert verdict.violations == ()
+    assert verdict.hard_block is False
+    assert "impurity_percent" in verdict.summary()["unit_mismatches"]
+
+
+def test_a_matching_unit_is_compared_as_before():
+    limits = parse_limits([_impurity_constraint(limit=0.10, limit_unit="percent")])
+    verdict = evaluate_candidate({"impurity_percent": 0.25}, limits)
+    assert verdict.unit_mismatches == ()
+    assert verdict.hard_block is True
+
+
+def test_an_absent_unit_is_still_compared():
+    """limit_unit is optional on the stored constraint and many real limits omit it.
+
+    Treating an absent unit as a mismatch would disable those limits outright, which is a
+    worse failure than the one being fixed. Absence is unverifiable, not contradictory.
+    """
+
+    limits = parse_limits([_impurity_constraint(limit=0.10, limit_unit="")])
+    verdict = evaluate_candidate({"impurity_percent": 0.25}, limits)
+    assert verdict.unit_mismatches == ()
+    assert verdict.hard_block is True
+
+
+def test_a_field_with_no_unit_convention_is_left_alone():
+    """Only fields whose name encodes a unit can be checked this way."""
+
+    limits = parse_limits([_impurity_constraint(objective_field="green_score", limit_unit="ppm")])
+    verdict = evaluate_candidate({"green_score": 80.0}, limits)
+    assert verdict.unit_mismatches == ()

@@ -1944,6 +1944,28 @@ def chronological_objective_scores(
         return scores
 
 
+def get_surrogate_record_for_run(
+    session_factory: sessionmaker[Session], bo_run_id: int
+) -> ReactionSurrogateModelRecord | None:
+    """The surrogate this BO run fitted, or ``None`` if it wrote no record.
+
+    The record carries the model version, the feature encoding, the training count, the fit
+    metrics and the surrogate's own warnings -- including whether the GP degenerated, i.e.
+    learned nothing. All of it was written on every run and reachable by nothing:
+    ``_surrogate_to_record`` had no caller and no route mentioned "surrogate", so the one
+    artifact that says whether the model behind a recommendation was any good sat in the
+    database unread.
+    """
+
+    with session_scope(session_factory) as session:
+        row = session.scalars(
+            select(ReactionSurrogateModelRecordORM)
+            .where(ReactionSurrogateModelRecordORM.bo_run_id == bo_run_id)
+            .order_by(ReactionSurrogateModelRecordORM.id.desc())
+        ).first()
+        return None if row is None else _surrogate_to_record(row)
+
+
 def surrogate_model_version_for_run(
     session_factory: sessionmaker[Session], bo_run_id: int
 ) -> str | None:

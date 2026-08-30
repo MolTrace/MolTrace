@@ -375,3 +375,71 @@ def test_phase50_openapi_includes_all_endpoints(client):
         assert path in paths
     assert "post" in paths["/reaction-projects/{reaction_project_id}/optimization/bo/run"]
     assert "patch" in paths["/reaction-projects/{reaction_project_id}/design-space"]
+
+
+def test_the_surrogate_a_run_fitted_can_be_read_back(client):
+    """Every BO run wrote a surrogate record and nothing could read it.
+
+    `_surrogate_to_record` had no caller and no route mentioned "surrogate", so the model
+    version, the feature encoding, the fit metrics and the surrogate's own warnings -- the
+    one artifact saying whether the model behind a recommendation was any good -- sat in the
+    database unreachable.
+    """
+
+    with client:
+        headers = _sign_up(client, "surrogate-owner@example.com")
+        project = _project(client, headers)
+        _seed_five_completed(client, headers, project["id"])
+        run = client.post(
+            f"/reaction-projects/{project['id']}/optimization/bo/run",
+            headers=headers,
+            json={"batch_size": 2},
+        )
+        assert run.status_code == 201, run.text
+        bo_run_id = run.json()["bo_run_id"]
+
+        fetched = client.get(f"/reaction-optimization/bo-runs/{bo_run_id}/surrogate", headers=headers)
+        assert fetched.status_code == 200, fetched.text
+        body = fetched.json()
+
+    assert body["bo_run_id"] == bo_run_id
+    # The version the audit trail promises -- not the algorithm family, which has its own key.
+    assert body["model_version"]
+    assert body["model_version"] != body["model_type"]
+    assert body["training_experiment_count"] >= 1
+    assert body["human_review_required"] is True
+
+
+def test_another_users_surrogate_is_a_404_not_a_403(client):
+    """Same non-leaking 404 as every other project-scoped reaction resource.
+
+    The route sits under /reaction-optimization/bo-runs/, whose prefix `reaction_access`
+    already resolves to the owning project, so it inherits that scoping rather than needing
+    a resolver of its own. A run that does not exist and one owned by someone else must be
+    indistinguishable.
+    """
+
+    with client:
+        owner = _sign_up(client, "surrogate-a@example.com")
+        project = _project(client, owner)
+        _seed_five_completed(client, owner, project["id"])
+        run = client.post(
+            f"/reaction-projects/{project['id']}/optimization/bo/run",
+            headers=owner,
+            json={"batch_size": 2},
+        )
+        assert run.status_code == 201, run.text
+        bo_run_id = run.json()["bo_run_id"]
+
+        stranger = _sign_up(client, "surrogate-b@example.com")
+        denied = client.get(
+            f"/reaction-optimization/bo-runs/{bo_run_id}/surrogate", headers=stranger
+        )
+        missing = client.get(
+            "/reaction-optimization/bo-runs/99999999/surrogate", headers=stranger
+        )
+
+    assert denied.status_code == 404, denied.text
+    assert missing.status_code == 404
+    # Indistinguishable: a 403 would confirm the run exists.
+    assert denied.json().get("detail") == missing.json().get("detail")
