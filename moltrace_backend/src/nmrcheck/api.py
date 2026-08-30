@@ -56,6 +56,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from starlette.concurrency import run_in_threadpool
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from . import active_versions as active_versions
 from . import ai_evidence_store as ai_evidence_store
 from . import ai_inference_store as ai_store
 from . import alcoa as alcoa
@@ -235,6 +236,7 @@ from .models import (
     ActiveLearningCandidate,
     ActiveLearningCandidateCreate,
     ActiveLearningCandidateUpdate,
+    ActiveVersionEntry,
     AdminSystemSummary,
     AdminUserGSDGraduationRequest,
     AdminUserRecord,
@@ -912,6 +914,7 @@ from .models import (
     SubjectReviewTaskCreate,
     SubscriptionPlan,
     SubscriptionPlanCreate,
+    SystemActiveVersions,
     SystemCapabilities,
     SystemHealthResponse,
     SystemReleaseApproveRequest,
@@ -3583,6 +3586,51 @@ def system_version_route(request: Request) -> dict[str, Any]:
         "timestamp": datetime.now(UTC).isoformat(),
         "notes": ["Version metadata does not indicate scientific validation status."],
     }
+
+
+@router.get(
+    "/system/active-versions",
+    response_model=SystemActiveVersions,
+    dependencies=[Depends(require_access_context)],
+)
+def system_active_versions_route(request: Request) -> SystemActiveVersions:
+    """The versions of the science this workspace is actually running.
+
+    An installation that keeps its own copy of the rule sets compares against this before
+    producing a regulated result, so a result computed from a rule set this workspace has not
+    adopted is never presented as though it were.
+
+    **Authenticated, deliberately.** The catalogue names which regulated rule sets a customer has
+    adopted and which model artifacts they serve — a description of their validated
+    configuration, which is not ours to publish. `/system/version` is anonymous and carries build
+    metadata only; this is a different thing and does not belong beside it.
+
+    Deployment-scoped rather than user-scoped, so every authenticated caller of a workspace sees
+    the same answer and no owner scope applies. Clients must cache it against the API base URL
+    and never against the signed-in user: a per-user cache would let one person's stale catalogue
+    decide whether another person's result is current.
+
+    The catalogue is signed by this workspace's issuing key when it has one, so an installation
+    can keep verifying it offline. The certificate needed to check that signature is **not**
+    repeated here — an installation already holds it from its entitlement exchange, and
+    publishing the same public material on a second route widens the surface without answering
+    anything new.
+    """
+    state = _state(request)
+    coordinates = active_versions.active_version_coordinates(state.session_factory)
+    return SystemActiveVersions(
+        assertion_signature=active_versions.sign_version_assertion(state.settings, coordinates),
+        versions=[
+            ActiveVersionEntry(
+                kind=coordinate.kind,  # type: ignore[arg-type]
+                lineage=coordinate.lineage,
+                display_name=coordinate.display_name,
+                identity=coordinate.identity,
+                revision=coordinate.revision,
+            )
+            for coordinate in coordinates
+        ]
+    )
 
 
 @router.get(
