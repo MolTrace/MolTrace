@@ -158,8 +158,18 @@ async def _fid_process(payload: dict = _BODY) -> dict[str, Any]:
     return {"peaks": [p.to_dict() for p in peaks]}
 
 
-async def _fid_open(payload: dict = _BODY) -> dict[str, Any]:
+def _fid_open(payload: dict = _BODY) -> dict[str, Any]:
     """Read an acquisition already on this computer, and say what is in it.
+
+    DELIBERATELY NOT `async`. The body is entirely blocking numerical work with no
+    `await` in it, so declaring it a coroutine ran it ON the event loop: one
+    unreadable dataset then stopped the whole service answering anything, health
+    included, while the process stayed alive at full CPU and the desktop's status
+    box -- written only when the child exits -- went on saying the service was
+    running. A plain `def` hands it to the threadpool, so the worst case costs one
+    worker instead of the service. The truncated-parameter guard in `fid_reader`
+    is what stops the known hang; this is what bounds the blast radius of the next
+    one.
 
     Takes a path, not the spectrum. Measured: a processed 1H acquisition is
     131,072 points and 3.6 MB of JSON, and the caller is on the same machine

@@ -237,6 +237,96 @@ def read_processed_spectrum(path: Path) -> NMRSpectrum:
         return _read_bruker_pdata_spectrum(pdata_dir, source)
 
 
+#: Bruker parameter files, in the layout nmrglue reads them from.
+_JCAMP_PARAMETER_FILENAMES = (
+    "acqus", "acqu", "acqu2s", "acqu2", "acqu3s", "acqu3",
+    "procs", "proc", "proc2s", "proc2", "proc3s", "proc3",
+)
+
+
+def _truncated_jcamp_parameter(path: Path) -> str | None:
+    """The name of the first parameter in this file that runs off the end of it.
+
+    nmrglue's `parse_jcamp_line` has TWO unbounded reads, and a file cut short
+    inside either one spins forever rather than raising:
+
+        while ">" not in text:            # a <string> with no closing bracket
+            text += "\n" + f.readline().rstrip()
+
+        while len(value) < num:           # an array short of its declared count
+            nline = f.readline().rstrip()
+            for t in nline.split(): value.append(...)
+
+    At end of file `readline()` returns `""`, and `"".split()` is `[]`, so neither
+    loop can ever advance. `read_jcamp` wraps the call in a bare `except:`, which
+    catches an exception and cannot catch a loop.
+
+    This walks the file exactly the way nmrglue does -- same `##$` prefix test,
+    same `text` slice, same array count arithmetic -- and reports the parameter
+    that would not terminate. Anything nmrglue would raise on instead (a count
+    that will not parse) is left alone: its own handler warns and moves on, so
+    refusing there would reject files that read perfectly well today.
+    """
+    try:
+        lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+    except OSError:
+        return None
+
+    index = 0
+    total = len(lines)
+    while index < total:
+        line = lines[index]
+        index += 1
+        if not line.startswith("##$") or "=" not in line:
+            continue
+        name = line[3 : line.index("=")]
+        text = line[line.index("=") + 1 :].lstrip()
+
+        if "<" in text:
+            while ">" not in text:
+                if index >= total:
+                    return name
+                text += "\n" + lines[index].rstrip()
+                index += 1
+        elif "(" in text:
+            try:
+                declared = int(line[line.index("..") + 2 : line.index(")")]) + 1
+            except (ValueError, IndexError):
+                continue
+            seen = len(line[line.index(")") + 1 :].split())
+            while seen < declared:
+                if index >= total:
+                    return name
+                seen += len(lines[index].split())
+                index += 1
+    return None
+
+
+def _refuse_truncated_parameters(*roots: Path) -> None:
+    """Refuse a dataset whose parameter files are cut short, BEFORE nmrglue sees it.
+
+    Measured on a real acquisition: of seven truncation offsets of `acqus`, three
+    never returned -- and the read runs on the service's event loop, so one such
+    file wedges the whole service while its status stays green. Whether it hangs
+    depends on where the cut lands, which is why a single sample is not evidence
+    that a dataset is safe.
+    """
+    for root in roots:
+        if root is None or not root.is_dir():
+            continue
+        for name in _JCAMP_PARAMETER_FILENAMES:
+            candidate = root / name
+            if not candidate.is_file():
+                continue
+            truncated = _truncated_jcamp_parameter(candidate)
+            if truncated is not None:
+                raise FIDReaderError(
+                    f"This acquisition's parameter file '{name}' is incomplete: the entry "
+                    f"'{truncated}' stops before its values do. Reading it would not finish. "
+                    f"Re-copy the dataset from the instrument."
+                )
+
+
 def _locate_pdata(root: Path) -> Path | None:
     """The processing directory holding ``1r``, whether root *is* it or contains it."""
 
@@ -248,6 +338,10 @@ def _locate_pdata(root: Path) -> Path | None:
 
 def _read_bruker_pdata_spectrum(pdata_dir: Path, source: Path) -> NMRSpectrum:
     ng = _require_nmrglue()
+    # `read_pdata` reads `procs` here and `acqus` from the acquisition above it, so
+    # both are checked. This is not reachable from the raw-FID guard below: the two
+    # entry points are independent and a truncated file wedges either.
+    _refuse_truncated_parameters(pdata_dir, pdata_dir.parent.parent)
     try:
         dictionary, data = ng.bruker.read_pdata(str(pdata_dir))
     except Exception as exc:
@@ -698,6 +792,11 @@ def _require_nmrglue() -> Any:
 
 def _read_bruker(ng: Any, dataset_root: Path) -> tuple[dict[str, Any], dict[str, Any], np.ndarray]:
     _ensure_lowercase_marker_aliases(dataset_root)
+    # OUTSIDE the try, so the refusal keeps its own words. The handler below
+    # replaces every cause with one sentence that names a library rather than the
+    # problem, and this guard exists precisely to tell a chemist which file is
+    # incomplete.
+    _refuse_truncated_parameters(dataset_root)
     try:
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
