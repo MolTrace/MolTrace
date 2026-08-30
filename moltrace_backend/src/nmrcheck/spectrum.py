@@ -59,6 +59,11 @@ class _PeakComponent:
     left_index: int
     apex_index: int
     right_index: int
+    #: FWHM of THIS line in ppm, or 0.0 when it could not be measured. The
+    #: half-width was already being computed here to size the integration
+    #: window and then discarded; it is the only quantity on this path that
+    #: can be compared against a linewidth.
+    fwhm_ppm: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -67,9 +72,17 @@ class _PeakEstimate:
     area: float
     intensity: float
     multiplicity: str
+    #: EXTENT of the whole cluster, leftmost to rightmost point. This is not a
+    #: linewidth: measured on real acquisitions it runs ~13x the FWHM of the
+    #: line inside it, because it spans the wings as well.
     width_ppm: float
     component_count: int
     j_values_hz: tuple[float, ...]
+    #: FWHM of a single line within the cluster (ppm), and the same value in Hz
+    #: when the spectrometer frequency is known -- None when it is not, because
+    #: a Hz linewidth without a field is not a number a chemist can use.
+    line_width_ppm: float = 0.0
+    line_width_hz: float | None = None
 
 
 @dataclass(frozen=True)
@@ -1362,7 +1375,7 @@ def _cluster_peak_components(
         # GSD: deconvolve multi-line clusters into resolved Lorentzian lines so
         # multiplicity / J come from the true transition count, not the raw
         # local-maximum count (run only on request — it is costly).
-        resolved_lines: list[tuple[float, float, float]] = []
+        resolved_lines: list[tuple[float, float, float, float]] = []
         if (
             deconvolve
             and detection_trace is not None
@@ -1379,6 +1392,26 @@ def _cluster_peak_components(
                     noise_sigma=noise_sigma,
                     max_lines=max(8, len(cluster) + 6),
                 )
+        # Per-line width, which width_ppm above is not. Where the region was
+        # deconvolved the fit's own half-width is the better measurement, so it
+        # is preferred; otherwise the per-component half-widths carry it.
+        #
+        # The MEDIAN constituent, because the lines of one multiplet share a
+        # linewidth and the median is the estimator that survives a contaminant
+        # at either end. Both extremes have a recorded failure: the narrowest
+        # lets a spurious sliver of a component define the width (the same trap
+        # v0.74.2 hit using min() to set a rejection floor), and the widest is
+        # circular for the question this exists to answer, since a merged
+        # component is precisely the one that is too wide. For the
+        # single-component clusters this matters most for -- the ones a chemist
+        # reads as a singlet -- all three agree.
+        if resolved_lines:
+            line_width_ppm = median([2.0 * abs(line[2]) for line in resolved_lines])
+        else:
+            component_widths = [
+                component.fwhm_ppm for component in cluster if component.fwhm_ppm > 0.0
+            ]
+            line_width_ppm = median(component_widths) if component_widths else 0.0
         if resolved_lines:
             multiplicity, j_values_hz = multiplicity_from_lines(
                 [line[0] for line in resolved_lines], frequency_mhz=frequency_mhz
@@ -1397,6 +1430,12 @@ def _cluster_peak_components(
                 width_ppm=width_ppm,
                 component_count=len(cluster),
                 j_values_hz=j_values_hz,
+                line_width_ppm=line_width_ppm,
+                line_width_hz=(
+                    line_width_ppm * float(frequency_mhz)
+                    if frequency_mhz and line_width_ppm > 0.0
+                    else None
+                ),
             )
         )
 
@@ -1672,6 +1711,16 @@ def _infer_peak_estimates(
                 left_index=left,
                 apex_index=idx,
                 right_index=right,
+                # 1.0 is the helper's "could not locate the half-height
+                # crossing" fallback, not a measurement, so it is reported as
+                # unknown rather than as a one-point line. On a trace sampled
+                # densely enough for the width to mean anything a real line
+                # measures ~8 points half-width, so the two do not overlap.
+                fwhm_ppm=(
+                    2.0 * half_width_points * prep.ppm_step
+                    if half_width_points > 1.0
+                    else 0.0
+                ),
             )
         )
 
@@ -2412,6 +2461,8 @@ def _estimates_to_peaks(
     trace_scale = float(target_total_h) if target_total_h else raw_total_h
     peaks: list[Peak] = []
     below_quantitation: list[float] = []
+    line_widths_hz: list[float | None] = []
+    line_widths_ppm: list[float] = []
     for est, integration in zip(in_range_estimates, integrations):
         if integration <= 0:
             measured = (
@@ -2422,6 +2473,10 @@ def _estimates_to_peaks(
             # a representational limit, not a claim about the chemistry.
             integration = max(round(measured, 3), _MIN_REPORTABLE_INTEGRATION_H)
             below_quantitation.append(round(est.shift_ppm, 3))
+        line_widths_ppm.append(round(est.line_width_ppm, 5))
+        line_widths_hz.append(
+            round(est.line_width_hz, 2) if est.line_width_hz is not None else None
+        )
         peaks.append(
             Peak(
                 shift_ppm=round(est.shift_ppm, 3),
@@ -2451,6 +2506,25 @@ def _estimates_to_peaks(
         # integrals are trace-level rather than quantitated.
         "below_quantitation_peaks": len(below_quantitation),
         "below_quantitation_shifts": below_quantitation,
+        # FWHM of one line under each reported signal, index-aligned with the
+        # peak list. 0.0 (ppm) / None (Hz) mean it could not be measured; Hz is
+        # None throughout when the spectrometer frequency was not supplied.
+        #
+        # This is a MEASUREMENT, not a verdict. It is honest only where the
+        # trace is sampled densely enough: against a known 4 Hz line it reads
+        # 1.06x true at 16 points per FWHM but 1.38x at 8, 1.75x at 4 and 3.50x
+        # at 2, because the width is measured on the smoothed detection trace.
+        #
+        # It deliberately does NOT decide whether a signal is a merged pair.
+        # Merging does move it -- 1.47x a single line at the 0.577-FWHM limit
+        # where the dip disappears, 1.94x at 1.0 FWHM -- but on real isolated
+        # lines the natural spread within one spectrum already reaches a median
+        # 1.11x (p90 1.56x) for 13C and 1.87x (p90 2.99x) for 1H, so no fixed
+        # multiple of the narrowest line separates a merge from a genuinely
+        # broad resonance. Reporting the number lets a reviewer weigh it; a
+        # threshold here would manufacture the certainty the number lacks.
+        "line_widths_ppm": line_widths_ppm,
+        "line_widths_hz": line_widths_hz,
     }
     if out_of_range_shifts:
         meta["out_of_range_dropped_count"] = len(out_of_range_shifts)
