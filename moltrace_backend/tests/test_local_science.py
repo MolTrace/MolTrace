@@ -1143,3 +1143,49 @@ def test_similar_spectra_is_a_lookup_that_states_its_own_hit_rate() -> None:
 
     rate = result["accuracy"]
     assert rate["of"] > 0 and rate["first"] <= rate["top5"] <= rate["of"], rate
+
+
+@pytest.mark.slow
+def test_a_ranking_says_when_it_does_not_separate_the_top_two() -> None:
+    """Read the MARGIN, not the winner's identity.
+
+    The first version of this check asked whether the leading candidate changed
+    under resampling. It is blind to the case it exists for: two identical
+    candidates give exactly 50/50, `argmax` breaks the tie deterministically at
+    index 0, the leader never moves, and the check reports "stable" on a perfect
+    tie. Measured before it shipped.
+
+    So the margin between the top two is resampled within the acquisition's own
+    digital resolution -- conservative, since line fitting and referencing add
+    more -- and an ordering whose gap ever closes to nothing is not one.
+    """
+    from nmrcheck.local_science import SpectrumUnreadable, rank_candidates
+
+    source = None
+    for candidate in _acquisitions():
+        try:
+            rank_candidates(candidate, ["OCCO", "OCCO"])
+            source = candidate
+            break
+        except SpectrumUnreadable:
+            continue
+    if source is None:
+        pytest.skip("no acquisition here can be ranked")
+
+    # A perfect tie: the same structure twice. Nothing can separate them, and a
+    # check that says otherwise is measuring its own tie-breaking.
+    tied = rank_candidates(source, ["OCCO", "OCCO"])["separation"]
+    assert tied["checked"] is True
+    assert tied["separated"] is False, (
+        "two identical candidates were reported as separated, which means the check is "
+        "reading argmax rather than the margin"
+    )
+    assert tied["narrowest_margin"] == 0.0
+
+    # And it must not cry wolf: a candidate that genuinely fits should stay ahead.
+    try:
+        real = rank_candidates(source, ["OCCO", "CCO", "CC(=O)Oc1ccccc1C(=O)O"])["separation"]
+    except SpectrumUnreadable:
+        pytest.skip("this acquisition cannot rank the distinct-candidate case")
+    if real["separated"]:
+        assert real["narrowest_margin"] > 0.0
