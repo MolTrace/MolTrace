@@ -733,3 +733,81 @@ def test_a_signals_reported_noise_ratio_is_its_own_apex_not_a_neighbours() -> No
         f"{len(offenders)} of {checked} signals report a height they do not own:\n  "
         + "\n  ".join(offenders[:8])
     )
+
+
+@pytest.mark.slow
+def test_a_fit_whose_apex_is_below_the_baseline_is_not_reported_as_a_signal() -> None:
+    """A signal-to-noise ratio cannot be negative.
+
+    The fitted linewidth is not bounded against the acquisition's own resolution,
+    so the fitter can return a "line" wide enough to be modelling baseline roll
+    rather than a resonance -- measured up to 8871.9 Hz, 25.2% of the sweep on a
+    13C acquisition. Where such a fit sits over a trough, its apex within its own
+    extent falls BELOW the baseline and the reported ratio goes negative.
+
+    Four rows in the corpus did this (widths 812-5216 Hz), and they did not
+    merely render: the caveat interpolates the range into prose, so one
+    acquisition told the reader its weakest signals stood "between -2.7 and -0.2
+    times the baseline noise". A ratio below zero is not a weak signal, it is the
+    absence of one, and a sentence asserting it reads as a software fault and
+    takes the neighbouring numbers with it.
+
+    This is definitional and needs no threshold: at or below the baseline there
+    is nothing to report.
+    """
+    from nmrcheck.local_science import open_spectrum
+
+    sources = _acquisitions()
+    if not sources:
+        pytest.skip("no acquisition in this checkout")
+
+    checked = 0
+    offenders: list[str] = []
+    for source in sources:
+        try:
+            result = open_spectrum(source)
+        except Exception:  # noqa: BLE001 - unreadable acquisitions are a different test's business
+            continue
+        for signal in result["multiplets"]:
+            checked += 1
+            if signal["snr"] <= 0:
+                offenders.append(
+                    f"{os.path.basename(source)} {signal['name']} snr={signal['snr']:.2f} "
+                    f"width={signal['width_hz']:.1f}Hz"
+                )
+        for limit in result["limits"]:
+            if "-" in limit and "times the baseline noise" in limit:
+                # A caveat that interpolates a negative ratio into prose.
+                import re as _re
+
+                if _re.search(r"-\d+\.\d+ and", limit):
+                    offenders.append(f"{os.path.basename(source)} caveat reads: {limit[:90]}")
+
+    assert checked, "no signal was examined, so this proves nothing"
+    assert not offenders, (
+        f"{len(offenders)} negative-ratio reports of {checked} signals:\n  "
+        + "\n  ".join(offenders[:8])
+    )
+
+
+@pytest.mark.slow
+def test_the_area_caveat_names_the_denominator_it_actually_used() -> None:
+    """"Relative to the whole spectrum" was not what the code divided by.
+
+    `total_area` is the sum of the FITTED PEAK areas, which is not the spectrum's
+    integral: measured across the 22 acquisitions it runs from 0.042x to 2.150x
+    of it. So the stated basis was wrong by as much as 24x in one direction and
+    2x in the other, on a figure a chemist reads as a proportion.
+    """
+    from nmrcheck.local_science import open_spectrum
+
+    source = _one("instrument") or _one("moltrace")
+    if source is None:
+        pytest.skip("no acquisition in this checkout")
+
+    limits = open_spectrum(source)["limits"]
+    area_caveat = [x for x in limits if "not proton counts" in x or "ratios" in x]
+    assert area_caveat, "the area caveat is gone entirely"
+    assert not any("relative to the whole spectrum" in x for x in area_caveat), (
+        "the caveat still claims the whole spectrum as its basis: " + area_caveat[0]
+    )
