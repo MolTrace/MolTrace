@@ -1009,8 +1009,17 @@ def test_a_structure_confidence_says_it_cannot_rank_candidates() -> None:
         pytest.skip("no acquisition in this checkout")
 
     result = verify_candidate(source, "CCO")
-    assert result["comparable_between_candidates"] is False, (
-        "the result no longer says its confidence cannot rank candidates. If the "
-        "prediction has genuinely improved, re-measure the ethanol-beats-glycol case "
-        "before flipping this -- do not flip it because it looks pessimistic."
+    knowledge = result["knowledge_base"]
+    assert knowledge["source"], "the result does not say which table answered"
+    assert knowledge["reference_count"] >= 0
+
+    # THE CLAIM TRACKS THE TABLE, and is asserted in both directions rather than
+    # pinned to one answer. A build on the seed must not claim it can rank; a
+    # build on the real table must not pretend it cannot. Re-measured when the
+    # nmrshiftdb2 table was wired in: ethylene glycol went 0.556 -> 0.939 and
+    # ethanol 0.623 -> 0.242, so the ordering inverted and became correct.
+    expected = knowledge["source"] == "nmrshiftdb2"
+    assert result["comparable_between_candidates"] is expected, (
+        f"answering from {knowledge['source']!r} with {knowledge['reference_count']} "
+        f"reference atoms, but claiming comparable={result['comparable_between_candidates']}"
     )

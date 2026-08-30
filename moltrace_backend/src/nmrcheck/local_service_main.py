@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import os
 import sys
+from pathlib import Path
 
 from .local_service_app import create_local_app
 from .local_service_entry import (
@@ -51,6 +52,81 @@ def _require_socket(fd: int = SOCKET_FD) -> int:
     return fd
 
 
+
+#: The shift-prediction table, shipped beside the frozen service.
+#:
+#: WITHOUT IT THE PREDICTOR ANSWERS FROM A 16-MOLECULE SEED, and the difference is
+#: not a nuance: median 13C uncertainty ~35 ppm against ~1.9 ppm, the latter being
+#: below DP4's own 2.306 ppm error scale. Measured on the ethylene glycol
+#: acquisition in this repository, checking four candidate structures:
+#:
+#:                      seed (146 atoms)   nmrshiftdb2 (495,215 atoms)
+#:   ethylene glycol       0.556                0.939  consistent
+#:   ethanol               0.623  <- won        0.242  inconclusive
+#:   aspirin               0.542                0.166  inconsistent
+#:
+#: On the seed the WRONG molecule outranked the right one. With the table the
+#: right one wins by 0.697. Same verifier, same spectrum: the predictor was
+#: starved, not the method.
+_BUNDLED_KB_NAMES = ("hose_index.json.gz", "hose_index.json")
+
+
+def _bundled_knowledge_base() -> str | None:
+    """The table shipped with this build, if there is one.
+
+    Looked for beside the executable (PyInstaller lays data down in `_internal`
+    next to it) and beside this module for a source checkout. Returns None when
+    there is none, which is a legitimate configuration -- a dev checkout without
+    the table -- and the predictor then says so through `knowledge_base_status`.
+    """
+    roots = []
+    if getattr(sys, "frozen", False):
+        here = Path(sys.executable).resolve().parent
+        roots.append(here)
+        # onedir lays data in `_internal` BESIDE the executable, not next to it,
+        # so the executable's own directory is not enough. `sys._MEIPASS` is the
+        # documented answer and is checked first, but the explicit path costs
+        # nothing and removes an inference about a build tool's internals from
+        # the one lookup that decides which product the user gets.
+        roots.append(here / "_internal")
+        internal = getattr(sys, "_MEIPASS", None)
+        if internal:
+            roots.insert(-2, Path(internal))
+    roots.append(Path(__file__).resolve().parent)
+    # A SOURCE CHECKOUT LOOKS WHERE THE BUILDER WRITES. `scripts/build_hose_kb.py`
+    # documents this exact path and the predictor's docstring tells you to point
+    # MOLTRACE_HOSE_KB at it, so a developer who followed either would otherwise
+    # get a different product from the one they are packaging -- the seed here and
+    # the real table in the artifact, which is the worst way round.
+    #
+    # This cannot hide a missing table in a BUILD: packaging checks the freeze
+    # itself, not the running process.
+    roots.append(Path.home() / ".cache" / "moltrace" / "nmrnet")
+    for root in roots:
+        for name in _BUNDLED_KB_NAMES:
+            candidate = root / name
+            if candidate.is_file():
+                return str(candidate)
+    return None
+
+
+def _configure_knowledge_base() -> None:
+    """Point the predictor at the shipped table, unless the operator chose one.
+
+    An explicit `MOLTRACE_HOSE_KB` always wins: someone who set it meant it, and
+    silently overriding a chosen table with a bundled one is the same class of
+    substitution the predictor's own error path exists to prevent.
+
+    Set BEFORE the app is built, because `_fallback_kb` caches the first table it
+    loads for the life of the process.
+    """
+    if os.environ.get("MOLTRACE_HOSE_KB"):
+        return
+    bundled = _bundled_knowledge_base()
+    if bundled:
+        os.environ["MOLTRACE_HOSE_KB"] = bundled
+
+
 def main(
     argv: list[str] | None = None,
     *,
@@ -67,6 +143,7 @@ def main(
     way: under pytest, fd 3 is open, and this function hung.
     """
     del argv
+    _configure_knowledge_base()
     try:
         credential = read_credential_from_handle(credential_fd)
         socket_fd = _require_socket(socket_fd)

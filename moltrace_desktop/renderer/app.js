@@ -137,7 +137,7 @@
     busy: false,
     everRan: false,
     candidate: '',
-    verdict: null,
+    verdicts: [],
     verdictError: null,
     checking: false,
   }
@@ -514,8 +514,18 @@
 
     if (state.verdictError) c.append(alert('warn', 'That structure was not checked', state.verdictError))
 
-    const v = state.verdict
-    if (v) {
+    // SIDE BY SIDE, WITH THE HIT RATE. Measured on this build's own corpus, the
+    // true structure scored highest in 9 of 12 carbon spectra and 3 of 8 proton
+    // ones. That is useful and it is not an ordering to trust: a sorted list says
+    // the top is the answer, and one carbon spectrum in four it is not. So the
+    // candidates are shown together, sorted for reading, with how often this has
+    // been right printed next to them.
+    if (state.verdicts.length > 1) {
+      const said = accuracySentence(state.verdicts[0], (state.spectrum || {}).nucleus)
+      if (said) c.append(alert('info', 'How often this has been right', said))
+    }
+
+    for (const v of state.verdicts) {
       // THE CAVEAT FIRST. Without NMRNet the prediction falls back to HOSE codes
       // over a seed knowledge base; on a real acquisition that left half the atoms
       // with no matched environment and a 35 ppm median uncertainty.
@@ -525,6 +535,7 @@
       }
 
       const verdict = node('div', 'verdict')
+      verdict.append(node('code', 'verdict__smiles', v.smiles))
       verdict.append(node('div', 'verdict__word', String(v.verdict).replace(/_/g, ' ')))
       verdict.append(node('div', 'verdict__conf',
         (v.confidence * 100).toFixed(0) + '% confidence, from a starting point of '
@@ -549,16 +560,23 @@
       table.append(tb)
       c.append(table)
 
-      // MEASURED, not cautious. On the ethylene glycol acquisition in the test
-      // corpus this same path scored ethanol 0.623 against ethylene glycol's
-      // 0.556 -- the wrong molecule above the right one. So the number is honest
-      // about ONE structure and must never be used to rank two, which is also
-      // why this build offers no candidate list.
+      // WHICH TABLE ANSWERED, always. A prediction from 495,215 reference atoms
+      // and one from 146 are different products, and a confidence read without
+      // knowing which is a number the reader cannot weigh.
+      const kb = v.knowledge_base || {}
       if (v.comparable_between_candidates === false) {
+        // Measured: on the seed table this same path scored ethanol 0.623 against
+        // ethylene glycol's own 0.556 -- the wrong molecule above the right one.
         c.append(alert('warn', 'Do not compare this number between structures',
-          'It says how well ONE candidate fits, given a prediction that is weak on this '
-          + 'computer. Checked against a known spectrum, a wrong structure scored higher than '
-          + 'the right one. Use it to find contradictions, never to pick a winner.'))
+          'This build is answering from a ' + (kb.reference_count || 0).toLocaleString()
+          + '-atom fallback table, and on a known spectrum that ranked a wrong structure above '
+          + 'the right one. Use the number to find contradictions in one proposal, never to '
+          + 'pick a winner between two.'))
+      } else {
+        c.append(node('p', 'tablenote',
+          'Shifts predicted from the reference table shipped with this build \u2014 '
+          + (kb.reference_count || 0).toLocaleString() + ' assigned atoms from NMRShiftDB2, '
+          + 'which is CC BY-SA. Predictions are a model, not a measurement.'))
       }
       if (v.human_review_required) {
         c.append(node('p', 'tablenote',
@@ -569,6 +587,16 @@
     return c
   }
 
+  function accuracySentence(v, nucleus) {
+    const a = v.ranking_accuracy
+    if (!a) return null
+    const band = a[nucleus] || null
+    if (!band) return a.note
+    return 'On this build\u2019s own reference corpus the true structure scored highest in '
+      + band.first + ' of ' + band.of + ' ' + nucleus + ' spectra. Read these side by side; '
+      + 'the highest number is not the answer.'
+  }
+
   async function checkStructure() {
     if (!state.candidate.trim()) {
       state.verdictError = 'Type a structure to check it against this spectrum.'
@@ -577,10 +605,16 @@
     state.checking = true; state.verdictError = null; render()
     try {
       const out = await window.moltrace.analysis.verifyStructure(state.candidate)
-      if (out && out.ok) { state.verdict = out.result }
-      else { state.verdict = null; state.verdictError = (out && out.reason) || 'that structure could not be checked' }
+      if (out && out.ok) {
+        // Replace a re-check of the same structure rather than stacking duplicates.
+        state.verdicts = state.verdicts.filter((x) => x.smiles !== out.result.smiles)
+        state.verdicts.push(out.result)
+        state.verdicts.sort((a, b) => b.confidence - a.confidence)
+        state.candidate = ''
+      } else {
+        state.verdictError = (out && out.reason) || 'that structure could not be checked'
+      }
     } catch (e) {
-      state.verdict = null
       state.verdictError = (e && e.message) || 'that structure could not be checked'
     } finally {
       state.checking = false; render()
@@ -594,7 +628,7 @@
       if (out && out.ok) {
         state.spectrum = out.summary
         // A verdict belongs to the spectrum it was computed against.
-        state.verdict = null; state.verdictError = null
+        state.verdicts = []; state.verdictError = null
       }
       else if (out && !out.cancelled) { state.error = out.reason || 'that spectrum could not be read' }
     } catch (e) {
