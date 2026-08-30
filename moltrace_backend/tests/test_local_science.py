@@ -811,3 +811,38 @@ def test_the_area_caveat_names_the_denominator_it_actually_used() -> None:
     assert not any("relative to the whole spectrum" in x for x in area_caveat), (
         "the caveat still claims the whole spectrum as its basis: " + area_caveat[0]
     )
+
+
+def test_the_summary_carries_what_a_shift_cannot_be_read_without() -> None:
+    """Solvent was parsed on every reader path and dropped at this boundary.
+
+    A chemical shift is not interpretable without the solvent it was referenced
+    in: the same proton moves by more than a ppm between CDCl3 and DMSO-d6. Every
+    reader already extracts it into `NMRSpectrum.solvent`; it reached
+    `open_spectrum` and went no further, so the window could never show it and a
+    reviewer had to take the number on trust.
+
+    The acquisition date is here for the same reason -- a peak table a reviewer
+    cannot tie to a run is a peak table they cannot sign off.
+    """
+    from nmrcheck.local_science import open_spectrum
+
+    source = _one("instrument") or _one("moltrace")
+    if source is None:
+        pytest.skip("no acquisition in this checkout")
+
+    result = open_spectrum(source)
+    for key in ("solvent", "acquired_at", "nucleus", "field_mhz"):
+        assert key in result, f"{key} does not cross the boundary, so nothing can show it"
+
+    # Non-vacuous: at least one acquisition in the corpus must actually name a
+    # solvent, or this passes on a key that is always empty.
+    named = 0
+    for candidate in _acquisitions():
+        try:
+            if open_spectrum(candidate).get("solvent"):
+                named += 1
+                break
+        except Exception:  # noqa: BLE001 - unreadable acquisitions are another test's business
+            continue
+    assert named, "no acquisition reported a solvent, so this asserts nothing"
