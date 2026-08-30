@@ -16,6 +16,48 @@ about.
 
 ---
 
+## 2026-08-30 — a labelled mockup can still be the only thing on the page
+
+The 2026-08-08 sweep drew its line at **labelled mockup versus unlabelled
+substitution** and, on that line, cleared `reaction-studio`: every block there does
+render its own disclaimer at display time. That judgement still holds. This entry
+adds the case it did not cover — a mockup can be honestly labelled and still be
+misleading, if it is the only thing the page offers.
+
+### Reaction Studio opens a real campaign before it shows an illustrative one
+
+The surface named "Reaction Studio" led with fixed sample data. The numbers were
+disclosed: the outcomes card reads "values are fictional and shown for layout
+only", and the prediction card is `status="unavailable"` with "predicted yield
+placeholder 76%" and "Predictions are turned off until model evidence is
+connected". A chemist met them anyway, because there was nothing else to meet.
+
+The optimizer, surrogate diagnostics, Pareto front, safety screening and regulatory
+constraints all run against real experiments at `/reactions/[reactionId]`, and this
+page never mentioned it. An "Open a reaction project" picker now leads, above the
+scheme editor and the sample tables; selecting a project routes to its workspace.
+Accounts with no projects get an honest empty state pointing at where to create one,
+rather than a blank control.
+
+Routed rather than embedded, deliberately: `ReactionProjectDetail` takes no props
+and reads `useParams()` for its id, so embedding it would mean refactoring an
+11,000-line component and mounting it a second time would duplicate every fetch it
+performs.
+
+The sample content stays. It is honestly labelled and it is what gives the page its
+layout; the defect was that it had no alternative above it, not that it existed. One
+piece of copy did mislead and changed: the run-data section read "Factor settings
+per run paired with measured yield / selectivity / impurity outcomes", which
+describes the reader's own data. It now says the rows are fixed sample values and
+points at the picker.
+
+The picker is uncontrolled — `value={null}`, navigate on change — so there is no
+state to re-set and no inline literal feeding a `setState`. That is the shape that
+caused an infinite render loop in this codebase before, and it is avoided
+structurally rather than by care.
+
+---
+
 ## 2026-08-08 — the screens stop showing numbers nobody measured
 
 A sweep for data the product displayed as though it were the customer's own.
