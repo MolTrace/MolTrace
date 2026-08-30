@@ -73,6 +73,13 @@ class SpectralImpurityResolution:
     table_reference: str | None
     rule_set_version: str | None
 
+    # Which ICH Q3C limit this is. Option 1 is the limit at a 10 g/day REFERENCE dose
+    # (PDE * 100), not the product's; Option 2 scales to the real dose (PDE * 1000 / dose), so at
+    # 50 g/day the Option-1 number is five times the permitted one. No dose is reachable anywhere
+    # in this chain, so the basis is labelled and never recomputed from a defaulted dose -- that
+    # would be exactly the guessed limit this module exists to refuse.
+    limit_basis: str | None = None
+
     # Stated, never implied: no measured level exists for a named contaminant today.
     quantitation_available: bool = False
     observed_level_ppm: float | None = None
@@ -98,11 +105,26 @@ class SpectralImpurityResolution:
             "regulatory_basis": self.regulatory_basis,
             "table_reference": self.table_reference,
             "rule_set_version": self.rule_set_version,
+            "limit_basis": self.limit_basis,
             "quantitation_available": self.quantitation_available,
             "observed_level_ppm": self.observed_level_ppm,
             "compliance_note": self.compliance_note,
             "human_review_required": self.human_review_required,
         }
+
+
+def _limit_basis(class_number: int | None) -> str | None:
+    """Name which ICH Q3C limit the reported number is.
+
+    A Class 1 solvent carries a fixed Appendix limit and has no PDE to scale, so it is neither
+    Option 1 nor Option 2 -- both of those are ways to derive a Class 2/3 limit. Calling it
+    Option 1 would be its own false statement.
+    """
+    if class_number is None:
+        return None
+    if class_number == 1:
+        return "ICH Q3C Class 1 fixed concentration limit (dose-independent)"
+    return "ICH Q3C Option 1 (10 g/day reference dose, not this product's dose)"
 
 
 def _unresolved(
@@ -215,4 +237,5 @@ def resolve_observed_impurity(
         regulatory_basis=classification.regulatory_basis,
         table_reference=classification.table_reference,
         rule_set_version=classification.rule_set_version,
+        limit_basis=_limit_basis(classification.class_number),
     )

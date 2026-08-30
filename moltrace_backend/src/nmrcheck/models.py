@@ -17245,6 +17245,11 @@ class SpectralImpurityObservationOut(BaseModel):
     regulatory_basis: str | None = None
     table_reference: str | None = None
     rule_set_version: str | None = None
+    # Which ICH Q3C limit `concentration_limit_ppm` is. Option 1 is the limit at a 10 g/day
+    # REFERENCE dose (PDE * 100), not this product's; Option 2 scales to the real dose
+    # (PDE * 1000 / dose), so at 50 g/day the Option-1 number is five times the permitted one.
+    # No dose is reachable on this surface, so the basis is named and the number never recomputed.
+    limit_basis: str | None = None
     # A limit is not a measurement — both fields are carried so no caller has to infer it.
     quantitation_available: bool = False
     observed_level_ppm: float | None = None

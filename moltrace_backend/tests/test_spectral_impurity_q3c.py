@@ -96,3 +96,42 @@ def test_acetone_resolves_too_so_the_seam_is_not_a_single_lucky_case():
     assert resolution.compound == "acetone"
     assert resolution.identity_status == "resolved"
     assert resolution.q3c_class_number == 3
+
+
+# --- the limit's basis, not only its value -----------------------------------------------------
+
+
+def test_the_reported_limit_says_it_is_the_reference_dose_one_not_this_products():
+    """`concentration_limit_ppm` is the ICH Q3C **Option 1** constant (PDE * 100), which is the
+    limit at a 10 g/day reference dose — not the product's dose. Option 2 scales to the real dose
+    (PDE * 1000 / dose), so at 50 g/day the Option-1 number is five times the permitted one.
+
+    No dose is reachable anywhere in this chain (the create model has no dose field, `AnalysisORM`
+    carries none, and nothing links an analysis to a dossier), so the honest remedy is to label the
+    basis, never to compute Option 2 from a defaulted dose — that would be the guessed limit this
+    module exists to refuse. The sibling dossier path already emits exactly this label; this
+    surface did not inherit it.
+    """
+    resolution = resolve_observed_impurity(nucleus="1H", shift_ppm=2.05, solvent="CDCl3")
+
+    assert resolution.identity_status == "resolved"
+    assert resolution.limit_basis is not None
+    assert "Option 1" in resolution.limit_basis
+    assert "10 g/day" in resolution.limit_basis
+    # The basis must reach the wire, not just the dataclass.
+    assert "limit_basis" in resolution.as_dict()
+
+
+def test_a_class_1_limit_is_not_labelled_as_a_dose_scalable_one():
+    """A Class 1 solvent carries a fixed Appendix limit with no PDE to scale, so it is neither
+    Option 1 nor Option 2. Labelling it Option 1 would be a different false statement."""
+    resolution = resolve_observed_impurity(nucleus="1H", shift_ppm=7.36, solvent="CDCl3")
+
+    # Asserted unconditionally: guarding this behind "if class 1" would let a future change to the
+    # shift table silently empty the test instead of failing it.
+    assert resolution.identity_status == "resolved"
+    assert resolution.compound == "benzene"
+    assert resolution.q3c_class_number == 1
+    assert resolution.limit_basis is not None
+    assert "Option 1" not in resolution.limit_basis
+    assert "dose-independent" in resolution.limit_basis

@@ -25,7 +25,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from .database import session_scope
 from .orm import AnalysisORM, SpectralImpurityObservationORM
-from .spectral_impurity_q3c import resolve_observed_impurity
+from .spectral_impurity_q3c import _limit_basis, resolve_observed_impurity
 
 Nucleus = Literal["1H", "13C"]
 
@@ -53,6 +53,7 @@ class SpectralImpurityObservationRecord:
     regulatory_basis: str | None
     table_reference: str | None
     rule_set_version: str | None
+    limit_basis: str | None
     quantitation_available: bool
     observed_level_ppm: float | None
     compliance_note: str
@@ -82,6 +83,9 @@ def _to_record(row: SpectralImpurityObservationORM) -> SpectralImpurityObservati
         regulatory_basis=row.regulatory_basis,
         table_reference=row.table_reference,
         rule_set_version=row.rule_set_version,
+        # Derived from the persisted class rather than stored alongside it: the basis is a pure
+        # function of the Q3C class, so deriving it cannot drift from the class on the record.
+        limit_basis=_limit_basis(row.q3c_class_number),
         quantitation_available=bool(row.quantitation_available),
         observed_level_ppm=row.observed_level_ppm,
         compliance_note=row.compliance_note,
