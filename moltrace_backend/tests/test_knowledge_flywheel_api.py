@@ -783,3 +783,38 @@ def test_re_running_the_gate_cannot_rewind_a_candidate_that_already_shipped(clie
         "keeping the timestamps that say it shipped"
     )
     assert after.json()["promoted_at"]
+
+
+# --- search must match words, not letters buried inside them ------------------------------------
+
+
+def test_a_query_token_does_not_match_letters_buried_inside_an_unrelated_word():
+    """`_matches` tested `token in text`, so a curator searching the regulatory corpus for "ICH"
+    also got every row containing "which", "enrichment", or "dichloromethane". On a corpus of
+    regulatory topics and requirement text that is a large false-positive class, and the reviewer
+    has no way to tell a real citation from a coincidence of letters.
+    """
+    from nmrcheck.knowledge_flywheel_store import _matches, _query_tokens
+
+    tokens = _query_tokens("ICH")
+
+    assert not _matches(tokens, "Stability", "Samples which are stored at 25C must be tested.")
+    assert not _matches(tokens, "Batch release", "Enrichment of the material is required.")
+    assert not _matches(tokens, "Solvents", "The sample was run in dichloromethane.")
+    # ...while the genuine citation still matches.
+    assert _matches(tokens, "Residual solvents", "ICH Q3C(R8) sets the permitted daily exposure.")
+
+
+def test_a_query_still_finds_a_versioned_guideline_identifier_by_its_stem():
+    """The obvious fix — full word-boundary matching — silently breaks this: `\\bq3\\b` does not
+    match "Q3A", because '3' and 'a' are both word characters so there is no boundary between them.
+    A reviewer searching "Q3" would stop finding Q3A/Q3B/Q3C/Q3D at all. Matching a token at the
+    START of a word keeps the stem search working while still rejecting a buried match.
+    """
+    from nmrcheck.knowledge_flywheel_store import _matches, _query_tokens
+
+    assert _matches(_query_tokens("Q3"), "Impurities", "ICH Q3A(R2) impurities in new drug substances")
+    assert _matches(_query_tokens("Q3C"), "Solvents", "ICH Q3C(R8) residual solvents")
+    # A multi-token query still requires every token to be present.
+    assert _matches(_query_tokens("Suzuki coupling"), "Suzuki coupling of aryl bromide", None)
+    assert not _matches(_query_tokens("Suzuki Heck"), "Suzuki coupling of aryl bromide", None)

@@ -2059,10 +2059,24 @@ def _query_tokens(query: str) -> list[str]:
 
 
 def _matches(tokens: list[str], *values: Any) -> bool:
+    """True when every token starts a word somewhere in the joined text.
+
+    A plain ``token in text`` substring test matched letters buried inside unrelated words, so a
+    search of the regulatory corpus for "ICH" also returned every row containing "which",
+    "enrichment", or "dichloromethane" -- and a reviewer had no way to tell a real citation from a
+    coincidence of letters.
+
+    Anchoring each token to a word START rather than requiring a whole word is deliberate. Full
+    word-boundary matching (``\bq3\b``) does not match "Q3A", because '3' and 'a' are both word
+    characters and there is no boundary between them, so a reviewer searching "Q3" would stop
+    finding Q3A/Q3B/Q3C/Q3D -- the versioned identifiers this corpus is largely made of. The cost
+    of the anchor is that a token no longer matches mid-word, so "chlor" no longer finds
+    "dichloromethane"; searching the leading stem still does.
+    """
     if not tokens:
         return True
     text = " ".join(str(value or "") for value in values).lower()
-    return all(token in text for token in tokens)
+    return all(re.search(rf"\b{re.escape(token)}", text) is not None for token in tokens)
 
 
 def _normalize_text(text: str) -> str:
