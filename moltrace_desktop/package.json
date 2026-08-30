@@ -16,7 +16,8 @@
     "test:upgrade": "node test/upgrade-states.js",
     "test:keys": "node test/key-hierarchy.js",
     "test:signature": "node test/package-signature.js",
-    "test:node": "node test/modules-committed.js && node test/product-config.js && node test/service-credential.js && node test/key-hierarchy.js && node test/capabilities.js && node test/upgrade-states.js && node test/local-service.js && node test/package-freshness.js && node test/package-signature.js",
+    "test:failure-reason": "node test/read-failure-reason.js",
+    "test:node": "node test/modules-committed.js && node test/product-config.js && node test/service-credential.js && node test/key-hierarchy.js && node test/capabilities.js && node test/upgrade-states.js && node test/local-service.js && node test/package-freshness.js && node test/package-signature.js && node test/read-failure-reason.js",
     "test:service": "node test/local-service.js",
     "test:roundtrip": "MOLTRACE_PRODUCT_CONFIG=$PWD/test/fixtures-product.json electron test/spectrum-round-trip.js",
     "package": "node scripts/package.js"

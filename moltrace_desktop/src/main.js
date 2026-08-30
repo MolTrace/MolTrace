@@ -195,7 +195,16 @@ ipcMain.handle('moltrace:open-spectrum', async () => {
     const summary = await requestFromService('/fid/open', { path: picked.filePaths[0] })
     return { ok: true, summary }
   } catch (err) {
-    return { ok: false, reason: localService.describeFailure(err).reason }
+    // TWO DIFFERENT FAILURES, and they were being told as one. `describeFailure`
+    // exists to describe a dead CHILD, and it opens with "The local science
+    // service is not running, so analysis on this computer is unavailable."
+    // Every per-file refusal was routed through it, so a service that had just
+    // read the file and correctly declined it was reported as dead -- and the
+    // real cause, which names the file and what is wrong with it, was demoted to
+    // the second half of a sentence that had already misdiagnosed the app to
+    // itself. A reader who is told the service is down restarts it and gets the
+    // same result.
+    return { ok: false, reason: localService.readFailureReason(err) }
   }
 })
 
@@ -229,7 +238,13 @@ function requestFromService(path, body) {
           if (res.statusCode === 200 && parsed) return resolve(parsed)
           // The service's own refusal sentence describes the FORMAT, never the
           // path, and is written for a person to read.
-          reject(new Error((parsed && parsed.detail) || 'the spectrum could not be read'))
+          const refusal = new Error((parsed && parsed.detail) || 'the spectrum could not be read')
+          // ANSWERED, not absent. A service that refuses a file is working, and
+          // the caller must not describe it as dead: the sentence attached here
+          // is the one thing that tells the reader whether to re-copy their data
+          // or restart the application.
+          refusal.answeredByService = true
+          reject(refusal)
         })
       },
     )

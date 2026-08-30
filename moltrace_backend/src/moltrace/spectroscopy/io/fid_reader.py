@@ -375,12 +375,9 @@ def _read_bruker_pdata_spectrum(pdata_dir: Path, source: Path) -> NMRSpectrum:
     # invariant rather than a chosen bound: all 6 processed acquisitions in the
     # corpus have the two exactly equal, none short and none long.
     #
-    # `_float_param` may answer None or NaN depending on which definition is in
-    # scope, so both are handled here rather than assuming one contract.
-    declared_size = _float_param(procs, "SI")
+    declared_size = _procs_float(procs, "SI")
     if (
-        declared_size is not None
-        and math.isfinite(declared_size)
+        math.isfinite(declared_size)
         and declared_size > 0
         and int(declared_size) != int(real.size)
     ):
@@ -434,9 +431,9 @@ def _pdata_ppm_axis(procs: dict[str, Any], size: int) -> tuple[np.ndarray, dict[
     by ``SW_p / SF`` ppm. Both values are read; neither is invented.
     """
 
-    offset = _float_param(procs, "OFFSET")
-    sf = _float_param(procs, "SF")
-    sw_hz = _float_param(procs, "SW_p")
+    offset = _procs_float(procs, "OFFSET")
+    sf = _procs_float(procs, "SF")
+    sw_hz = _procs_float(procs, "SW_p")
 
     if math.isfinite(offset) and math.isfinite(sf) and sf > 0 and math.isfinite(sw_hz):
         width_ppm = sw_hz / sf
@@ -471,8 +468,8 @@ def _pdata_ppm_axis(procs: dict[str, Any], size: int) -> tuple[np.ndarray, dict[
 def _bruker_processing_provenance(procs: dict[str, Any]) -> dict[str, Any]:
     """What the vendor already applied — preserved so it is not attributed to us."""
 
-    wdw = _float_param(procs, "WDW")
-    bc = _float_param(procs, "BC_mod")
+    wdw = _procs_float(procs, "WDW")
+    bc = _procs_float(procs, "BC_mod")
     provenance: dict[str, Any] = {
         "source": "Bruker procs",
         "window_function": _BRUKER_WDW.get(int(wdw), f"code {int(wdw)}")
@@ -492,7 +489,7 @@ def _bruker_processing_provenance(procs: dict[str, Any]) -> dict[str, Any]:
 
 def _pdata_field_mhz(procs: dict[str, Any], acqus: dict[str, Any]) -> float:
     for source, key in ((acqus, "BF1"), (procs, "SF"), (acqus, "SFO1")):
-        value = _float_param(source, key)
+        value = _procs_float(source, key)
         if math.isfinite(value) and value > 0:
             return value
     return 0.0
@@ -620,7 +617,24 @@ def _finalize_processed_spectrum(
     )
 
 
-def _float_param(params: dict[str, Any], key: str) -> float:
+def _procs_float(params: dict[str, Any], key: str) -> float:
+    """One Bruker parameter as a float, NaN when it is absent or unreadable.
+
+    Named apart from `_float_param` because for a long time BOTH were called
+    that. The other one is defined later in this file, so it silently won this
+    name at import, and every caller written against "NaN on a miss" was handed
+    `None` instead. `math.isfinite(None)` raises, and the crash escaped
+    `open_spectrum`'s `(FIDReaderError, OSError, ValueError)` -- so a chemist who
+    copied a `pdata/N` folder out on its own, which `_locate_pdata` deliberately
+    supports and which is the normal way a processed spectrum gets shared, got a
+    dead service instead of a spectrum. Reproduced: TypeError at
+    `_pdata_field_mhz`, every time.
+
+    The two contracts are both wanted. This one answers NaN so a caller can test
+    `math.isfinite` and move on; `_float_param` answers None and accepts several
+    spellings of a name, which the Varian readers need. Neither is wrong; sharing
+    one name was.
+    """
     try:
         return float(_unwrap_param_value(params.get(key)))
     except (TypeError, ValueError):
@@ -628,7 +642,7 @@ def _float_param(params: dict[str, Any], key: str) -> float:
 
 
 def _float_or_none(params: dict[str, Any], key: str) -> float | None:
-    value = _float_param(params, key)
+    value = _procs_float(params, key)
     return value if math.isfinite(value) else None
 
 
