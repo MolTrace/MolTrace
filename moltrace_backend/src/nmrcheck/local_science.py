@@ -197,6 +197,7 @@ def _summarise_multiplet(
     multiplet: object,
     baseline_sigma: float,
     total_area: float,
+    snr: float,
 ) -> MultipletSummary:
     """One signal, with every claim held to the floor this module declares.
 
@@ -212,10 +213,10 @@ def _summarise_multiplet(
 
     Withheld at the boundary rather than blanked in the display, because the
     label is a claim wherever it is read, and a reader added later would
-    otherwise inherit it. `snr` is computed once here; it decided the flag and
-    was separately recomputed for it.
+    otherwise inherit it. `snr` is measured by the caller and passed in: it
+    decides both the flag and which signals are reported at all, so computing it
+    here as well would run the same measurement twice for one answer.
     """
-    snr = _signal_to_noise(spectrum, multiplet, baseline_sigma)
     quantifiable = snr >= _QUANTIFIABLE_SIGMA
     return MultipletSummary(
         name=multiplet.name,
@@ -545,7 +546,30 @@ def open_spectrum(path: str) -> dict:
     saturated = len(peaks) >= ceiling
 
     multiplets = detect_multiplets(peaks)
-    total_area = sum(abs(p.area) for m in multiplets for p in m.peaks) or 1.0
+
+    # Measured once, above the filter: the noise width sets both which fits are
+    # signals at all and what every reported ratio is divided by.
+    baseline_sigma = _baseline_sigma(spectrum)
+
+    # A RATIO BELOW ZERO IS NOT A WEAK SIGNAL, IT IS THE ABSENCE OF ONE. The
+    # fitted linewidth is not bounded against the acquisition's own resolution,
+    # so the fitter can return a "line" wide enough to be modelling baseline roll
+    # rather than a resonance -- measured up to 8871.9 Hz, 25.2% of the sweep on a
+    # 13C acquisition. Where such a fit sits over a trough its apex, taken within
+    # its own extent, falls below the baseline. Four rows in the corpus did this,
+    # and they did not merely render: the caveat interpolates the weakest range
+    # into prose, so one acquisition told its reader the signals stood "between
+    # -2.7 and -0.2 times the baseline noise". That reads as a software fault and
+    # takes the credibility of the neighbouring numbers with it.
+    #
+    # Definitional rather than a threshold: at or below the baseline there is
+    # nothing to report. Dropped BEFORE `total_area` so they cannot set the scale
+    # every other row is divided by either.
+    measured = [(m, _signal_to_noise(spectrum, m, baseline_sigma)) for m in multiplets]
+    discarded = [m for m, snr in measured if snr <= 0.0]
+    kept = [(m, snr) for m, snr in measured if snr > 0.0]
+
+    total_area = sum(abs(p.area) for m, _ in kept for p in m.peaks) or 1.0
 
     # WHAT THE DETECTOR COULD NOT SEPARATE, asked again with a different question.
     #
@@ -553,11 +577,10 @@ def open_spectrum(path: str) -> dict:
     # by SpectraCheck, qNMR and the verifier, and a change there is a change to
     # every peak list this platform has ever produced. Here it adds a column and
     # takes nothing away.
-    baseline_sigma = _baseline_sigma(spectrum)
 
     summaries = [
-        _summarise_multiplet(spectrum, m, baseline_sigma, total_area)
-        for m in multiplets
+        _summarise_multiplet(spectrum, m, baseline_sigma, total_area, snr)
+        for m, snr in kept
     ]
 
     # WHAT THIS ANALYSIS CANNOT SEPARATE, in the units a chemist thinks in.
@@ -596,8 +619,23 @@ def open_spectrum(path: str) -> dict:
         "limits": [
             "Shifts, multiplicities and couplings are measured from this spectrum alone. "
             "Nothing here has been checked against a proposed structure.",
-            "Areas are shown relative to the whole spectrum. They are ratios, not proton counts: "
-            "assigning protons needs a structure this analysis was not given.",
+            # NAMES WHAT WAS ACTUALLY DIVIDED BY. This said "relative to the whole
+            # spectrum", which is not the denominator: `total_area` is the sum of the
+            # fitted peak areas, measured across the 22 acquisitions at 0.042x to
+            # 2.150x the spectrum's own integral. A proportion is only readable if
+            # its basis is stated correctly.
+            "Areas are shown as a share of the signals listed here, not of the whole "
+            "spectrum. They are ratios, not proton counts: assigning protons needs a "
+            "structure this analysis was not given.",
+            *(
+                []
+                if not discarded
+                else [
+                    f"{len(discarded)} fitted line(s) were discarded before these shares were "
+                    "computed: their strongest point sat at or below the baseline, so they "
+                    "measure no signal. A very broad fit over a dip in the baseline does this."
+                ]
+            ),
             "Multiplicity and coupling assignment is a fit. A crowded or overlapping region can "
             "be grouped more than one way.",
             f"{sum(1 for m in summaries if m.quantifiable)} of {len(summaries)} signals stand "
