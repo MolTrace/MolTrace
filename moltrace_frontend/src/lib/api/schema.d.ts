@@ -39366,6 +39366,8 @@ export interface components {
             table_reference?: string | null;
             /** Rule Set Version */
             rule_set_version?: string | null;
+            /** Limit Basis */
+            limit_basis?: string | null;
             /**
              * Quantitation Available
              * @default false
@@ -44467,6 +44469,8 @@ export interface operations {
                     "application/json": components["schemas"]["SystemActiveVersions"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -48426,6 +48430,8 @@ export interface operations {
                     "application/json": components["schemas"]["ReactionSurrogateModelRecord"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -66994,6 +67000,8 @@ export interface operations {
                     "application/json": components["schemas"]["EntitlementIssuance"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
@@ -67027,6 +67035,8 @@ export interface operations {
                     "application/json": components["schemas"]["EntitlementAuthorityStatus"];
                 };
             };
+            401: components["responses"]["AuthenticationRequired"];
+            403: components["responses"]["AccessDenied"];
             /** @description Validation Error */
             422: {
                 headers: {
