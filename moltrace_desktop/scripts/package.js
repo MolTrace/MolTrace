@@ -193,6 +193,9 @@ function buildIcon() {
   const buildDir = path.join(ROOT, 'build')
   const iconset = path.join(buildDir, 'MolTrace.iconset')
   const icns = path.join(buildDir, 'icon.icns')
+  // Returned WITHOUT the extension: @electron/packager appends the per-platform
+  // one itself, and handing it a path that already ends in .icns made it look for
+  // 'icon.icns.icon' and skip the icon with only a warning.
   fs.rmSync(iconset, { recursive: true, force: true })
   fs.mkdirSync(iconset, { recursive: true })
   for (const [px, name] of ICONSET_SIZES) {
@@ -206,7 +209,7 @@ function buildIcon() {
     throw new Error(`icon set has ${written} of ${ICONSET_SIZES.length} sizes`)
   }
   execFileSync('iconutil', ['-c', 'icns', iconset, '-o', icns], { stdio: 'pipe' })
-  return icns
+  return path.join(buildDir, 'icon')
 }
 
 async function main() {
