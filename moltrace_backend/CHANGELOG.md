@@ -14,6 +14,57 @@ The Prompt 4 multiplet analysis backend opens the v0.7 line.
 
 ---
 
+## v0.74.3 — The width of a line, not the width of the group it sits in (2026-08-29)
+
+A peak carried one width, `width_ppm`, and it is the EXTENT of the whole cluster:
+leftmost point to rightmost, wings included. On real acquisitions it measures
+**3 to 16 times** the width of the line inside it. Nothing on this path carried a
+linewidth, so any threshold written in linewidths and fed this number is wrong by
+that factor.
+
+It was measured twice on the way through and discarded twice — the half-width
+that sizes the integration window, and the `hwhm_ppm` term of the tuples
+`deconvolve_region` returns, which the caller had annotated as a 3-tuple against
+the function's own 4-tuple docstring.
+
+Peaks now also carry `line_width_ppm` and `line_width_hz` (FWHM, matching the
+`width_hz = fwhm_ppm * field_mhz` convention already in `gsd.py`), published
+index-aligned with the peak list. **Hz is `None` when the spectrometer frequency
+was not supplied** rather than fabricated from a default field.
+
+**It is a measurement, not a verdict, and it is honest only where the trace is
+sampled.** Against a known 4 Hz line it reads 1.06x true at 16 points per FWHM,
+1.38x at 8, 1.75x at 4 and 3.50x at 2, because the width is measured on the
+smoothed detection trace. No threshold is drawn on it: merging does move it —
+1.47x a single line at the 0.577-FWHM limit where two Lorentzians lose their dip,
+1.94x at 1.0 — but on real isolated lines the natural spread within one spectrum
+already reaches a median 1.11x (p90 1.56x) for 13C and 1.87x (p90 2.99x) for 1H,
+so no fixed multiple separates a merge from a genuinely broad resonance.
+
+**What it exposed, unfixed and reported here rather than quietly patched:** the
+cluster extent is NON-MONOTONIC in line separation. Sweeping a pair apart, the
+extent climbs to 0.577 FWHM, COLLAPSES over roughly 0.65 to 0.85, then recovers —
+because once the pair raises a saddle between the lines, the flank walk terminates
+at the saddle instead of running out to the wings. The feature gets wider while
+its measured extent gets narrower. `_classify_multiplicity` compares that number
+against a fixed 0.12 ppm, so in that window **two unresolved lines are reported as
+a bare `s`**. It reproduces in 12 of 16 conditions under jitter of centre,
+amplitude and sampling density, and it WIDENS to 0.60-0.90 at 32 points per
+linewidth: better data makes the mislabelling more likely.
+
+The new width is monotonic across the whole range (1.00, 1.12, 1.24, 1.35, 1.47,
+1.59, 1.71, 1.71, 1.82, 1.82, 1.94) and is the quantity that comparison should
+have been written against. **No multiplicity label is changed here** — that
+reaches goldens, DP4, qNMR and the verifier at once, and is its own change.
+
+Median, not narrowest, sets a multi-line cluster's width: the lines of one
+multiplet share a linewidth, and both extremes have a recorded failure — the
+narrowest lets a sliver of a component define it (the trap v0.74.2 hit using
+`min()` for a rejection floor) and the widest is circular, since a merged
+component is precisely the one that is too wide.
+
+---
+
 ## v0.74.2 — Two components on top of each other are one line (2026-08-29)
 
 Found by opening the app and reading the table, not by the corpus.
