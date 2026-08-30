@@ -268,12 +268,11 @@ body {
 .btn--secondary { background: var(--card); color: var(--foreground); border-color: var(--border); }
 .btn--secondary:hover { background: var(--muted); }
 
-.dropzone {
-  border: 2px dashed var(--border); border-radius: var(--radius-xl);
-  padding: 26px; text-align: center; background: var(--muted);
+.chooser {
+  border: 1px solid var(--border); border-radius: var(--radius-xl);
+  padding: 22px; text-align: center; background: var(--muted);
 }
-.dropzone[data-over="true"] { border-color: var(--mt-teal); background: var(--mt-teal-soft); }
-.dropzone__hint { color: var(--muted-foreground); font-size: 12px; margin: 8px 0 14px; }
+.chooser__hint { color: var(--muted-foreground); font-size: 12px; margin: 8px 0 14px; }
 
 table.peaks { width: 100%; border-collapse: collapse; font-family: var(--mono); font-size: 12px; }
 table.peaks th {
@@ -373,4 +372,22 @@ table.peaks tbody tr:hover { background: var(--muted); }
   font-family: var(--mono); font-size: 12px; padding: 3px 8px;
   border: 1px solid var(--border); border-radius: var(--radius-sm);
   background: var(--background); color: var(--mt-slate-ink);
+}
+
+
+/* An inline SVG with no width has no intrinsic size and fills whatever box it is
+ * given: the folder glyph on the primary button rendered about 40px tall and
+ * pushed its own label onto two lines. Constrained here rather than at each call
+ * site, so a button added later cannot reintroduce it. */
+.btn svg { width: 16px; height: 16px; flex: 0 0 16px; }
+.iconbutton svg { width: 16px; height: 16px; }
+.btn { white-space: nowrap; }
+
+/* Said before anything else on the page, and it must not read as decoration. */
+.previewbanner {
+  margin: 0; padding: 9px 24px;
+  background: var(--mt-amber-soft);
+  border-bottom: 1px solid var(--border);
+  color: var(--mt-amber-ink);
+  font-family: var(--mono); font-size: 12px; font-weight: 600;
 }

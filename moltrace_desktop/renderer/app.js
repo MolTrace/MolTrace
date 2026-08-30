@@ -348,9 +348,14 @@
     // Step 1 -- the product's own three-card rhythm: Setup, Run, Results.
     const setup = card('Open a spectrum', null, 'var(--mt-teal)')
     setup.insertBefore(eyebrow('Step 1 \u00b7 Setup'), setup.firstChild)
-    const zone = node('div', 'dropzone')
+    // NOT A DROP TARGET, so it does not dress as one. A dashed box invites a drag,
+    // and dropping here does nothing: a dropped file hands the RENDERER a path,
+    // and the whole point of `openSpectrum` taking no arguments is that a page
+    // which could name a path could ask this service to read anything the user
+    // can read. Drag-and-drop needs that rule revisited, not a CSS border.
+    const zone = node('div', 'chooser')
     zone.append(node('p', null, 'Choose a Bruker or Agilent/Varian acquisition, or a JCAMP-DX file.'))
-    zone.append(node('p', 'dropzone__hint',
+    zone.append(node('p', 'chooser__hint',
       'A Bruker acquisition is a folder; a processed spectrum may be its pdata folder on its own. '
       + 'JCAMP-DX is a single file.'))
     // `analysis__open` is kept as a hook: the end-to-end round trip clicks it and
@@ -650,6 +655,17 @@
     shell.append(sidebar())
     const main = node('main', 'main')
     main.append(topbar())
+
+    // A PREVIEW BUILD SAYS SO BEFORE ANYTHING ELSE. Someone evaluating this needs
+    // to know that what unlocked these capabilities was a declaration in a build,
+    // not a verified licence -- and to know it BEFORE they read any numbers. This
+    // was in the previous shell and I dropped it rewriting the page; the sidebar
+    // saying "MolTrace Preview" is a name, not a disclosure.
+    if (Array.isArray(state.readout) && state.readout.some((c) => c.preview)) {
+      main.append(node('p', 'previewbanner',
+        'Preview build. Entitlement has not been verified \u2014 what this build offers is '
+        + 'declared by the build itself, not confirmed by a licence.'))
+    }
 
     const item = byId(state.section)
     if (!item) main.append(node('div', 'page'))
