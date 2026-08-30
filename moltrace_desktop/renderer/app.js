@@ -148,6 +148,26 @@
     checking: false,
   }
 
+  // EVERY field derived from the open spectrum, named once.
+  //
+  // openSpectrum() cleared four of these by hand and missed `similarError` and
+  // `ranking_error`, so a refusal computed against the PREVIOUS sample stayed on
+  // screen underneath the new one -- "none of these structures matched any of the
+  // 2 measured 1H signals" is a claim about a specific spectrum, and a chemist
+  // would act on it by re-typing structures that were never tested against this
+  // one. Adding two more assignments would leave the next field to be forgotten
+  // the same way; a list the resetters share cannot drift from itself.
+  const DERIVED_FROM_SPECTRUM = [
+    'verdicts', 'verdictError', 'ranking', 'ranking_error', 'similar', 'similarError',
+  ]
+  const EMPTY_DERIVED = { verdicts: [] }
+
+  function clearDerived(keys) {
+    for (const k of (keys || DERIVED_FROM_SPECTRUM)) {
+      state[k] = Object.prototype.hasOwnProperty.call(EMPTY_DERIVED, k) ? EMPTY_DERIVED[k] : null
+    }
+  }
+
   // ---- small builders ------------------------------------------------------
   const node = (tag, cls, text) => {
     const n = document.createElement(tag)
@@ -166,6 +186,23 @@
 
   function eyebrow(text) { return node('p', 'eyebrow', text) }
 
+  /** A column header that announces itself: no <th> here is decorative. */
+  function colHead(label) {
+    const th = node('th', null, label)
+    th.setAttribute('scope', 'col')
+    return th
+  }
+
+  /** Machine-written text, kept reachable without putting it in the reading path. */
+  function rawText(label, text) {
+    const d = document.createElement('details')
+    d.className = 'rawtext'
+    const sm = document.createElement('summary')
+    sm.textContent = label
+    d.append(sm, node('p', 'rawtext__body', text))
+    return d
+  }
+
   function alert(kind, title, body) {
     const a = node('aside', 'alert alert--' + kind)
     a.append(node('p', 'alert__title', title))
@@ -174,10 +211,14 @@
   }
 
   // ---- sidebar -------------------------------------------------------------
-  function brandMark(size) {
+  function brandMark(size, cls) {
     const s = document.createElementNS(SVG, 'svg')
     s.setAttribute('viewBox', '0 0 64 64')
     s.setAttribute('aria-hidden', 'true')
+    // `.empty__mark` exists to hold the empty-state logo back to half opacity so
+    // it reads as a placeholder rather than a second brand lockup. Nothing ever
+    // set the class, so the rule matched nothing and it rendered at full weight.
+    if (cls) s.setAttribute('class', cls)
     s.setAttribute('width', String(size))
     s.setAttribute('height', String(size))
     const pts = '17.75,3.5 46.25,3.5 60.5,32 46.25,60.5 17.75,60.5 3.5,32'
@@ -345,14 +386,24 @@
     const head = node('div', 'page__head')
     head.append(eyebrow('MolTrace \u00b7 SpectraCheck'))
     head.append(node('h1', 'page__title', 'SpectraCheck'))
+    // Both this line and the alert below were written when the page ONLY
+    // measured a spectrum, and three model-backed steps were added between them
+    // without either being re-read. "Nothing here is checked against a proposed
+    // structure" sat above a section that checks structures; "every number below
+    // is a measurement, not an interpretation" sat above a confidence and a DP4
+    // share, which are interpretations. Each says the page is one kind of thing;
+    // it is two, and the split is the useful fact.
     head.append(node('p', 'page__sub',
-      'Read a spectrum from this computer and measure it. Shifts, multiplicities and couplings '
-      + 'are measured from the spectrum alone \u2014 nothing here is checked against a proposed structure.'))
+      'Read a spectrum from this computer, measure it, and check structures against it. The '
+      + 'measurements come from the spectrum alone; anything about a structure is a separate '
+      + 'judgement made from them.'))
     page.append(head)
 
     page.append(alert('warn', 'Human review required \u00b7 local analysis',
-      'Every number below is a measurement, not an interpretation. A chemist has to read it before '
-      + 'it goes into a report, and nothing here is stored for regulated use.'))
+      'The peak table is measured from the spectrum. Everything about a structure \u2014 the '
+      + 'confidence, the ranking, the library matches \u2014 is a model\u2019s judgement built on '
+      + 'those measurements, and can be wrong where the measurement is right. A chemist has to '
+      + 'read both before either goes into a report, and nothing here is stored for regulated use.'))
 
     // Step 1 -- the product's own three-card rhythm: Setup, Run, Results.
     const setup = card('Open a spectrum', null, 'var(--mt-teal)')
@@ -390,7 +441,7 @@
     const s = state.spectrum
     if (!s) {
       const empty = node('div', 'empty')
-      empty.append(brandMark(46))
+      empty.append(brandMark(46, 'empty__mark'))
       empty.append(node('p', null, 'No spectrum open yet.'))
       empty.append(node('p', null, 'Open one above and its measurements appear here.'))
       const c = card(null, null, 'var(--mt-slate)')
@@ -405,7 +456,15 @@
     // No file path on screen. The name is what the scientist chose; the path is
     // machine detail and can carry a compound name into a screenshot.
     results.append(node('h2', 'card__title result__head',
-      s.file_name + ' \u2014 ' + s.nucleus + ' at ' + s.field_mhz.toFixed(2) + ' MHz'))
+      // 0.00 MHz is a REAL reader output, not a placeholder: the FID reader
+      // returns 0.0 when none of SFO1/BF1/sfrq/reffrq is present. The chip below
+      // guards on exactly this and prints "not stated"; this line did not, so the
+      // same spectrum was headed "at 0.00 MHz" three rows above a field reading
+      // "not stated". Same guard, same wording.
+      s.file_name + ' \u2014 ' + s.nucleus
+      + (Number.isFinite(s.field_mhz) && s.field_mhz > 0
+        ? ' at ' + s.field_mhz.toFixed(2) + ' MHz'
+        : ' \u2014 frequency not stated')))
 
     // Where the numbers came from changes what they mean, so it sits WITH them
     // rather than in the caveats underneath. Three cases, not two: "your
@@ -545,15 +604,39 @@
       if (said) c.append(alert('info', 'How often this has been right', said))
     }
 
-    for (const v of state.verdicts) {
-      // THE CAVEAT FIRST. Without NMRNet the prediction falls back to HOSE codes
-      // over a seed knowledge base; on a real acquisition that left half the atoms
-      // with no matched environment and a 35 ppm median uncertainty.
-      if (v.prediction_coverage || v.predictor_note) {
-        c.append(alert('warn', 'Read this confidence with its prediction quality',
-          [v.predictor_note, v.prediction_coverage].filter(Boolean).join(' ')))
-      }
+    // ONCE, NOT ONCE PER CANDIDATE. Which knowledge base answered, what predicted
+    // the shifts, and that a person must read the result are facts about this
+    // BUILD -- identical for every structure checked against it. Emitted inside
+    // the loop they repeated byte-for-byte per candidate, so checking three
+    // structures printed nine caveat blocks, and text a reader has already
+    // skipped twice is text they stop reading.
+    const first = state.verdicts[0] || {}
+    const fkb = first.knowledge_base || {}
+    if (first.prediction_coverage || first.predictor_note) {
+      c.append(alert('warn', 'Read these confidences with their prediction quality',
+        [first.predictor_note, first.prediction_coverage].filter(Boolean).join(' ')))
+    }
+    if (first.comparable_between_candidates === false) {
+      // Measured: on the seed table this same path scored ethanol 0.623 against
+      // ethylene glycol's own 0.556 -- the wrong molecule above the right one.
+      c.append(alert('warn', 'Do not compare these numbers between structures',
+        'This build is answering from a ' + (fkb.reference_count || 0).toLocaleString()
+        + '-atom fallback table, and on a known spectrum that ranked a wrong structure above '
+        + 'the right one. Use a number to find contradictions in one proposal, never to '
+        + 'pick a winner between two \u2014 the list below is in the order you entered them.'))
+    } else {
+      c.append(node('p', 'tablenote',
+        'Shifts predicted from the reference table shipped with this build \u2014 '
+        + (fkb.reference_count || 0).toLocaleString() + ' assigned atoms from NMRShiftDB2, '
+        + 'which is CC BY-SA. Predictions are a model, not a measurement.'))
+    }
+    if (first.human_review_required) {
+      c.append(node('p', 'tablenote',
+        'These are measurements combined by a stated model, not decisions. A chemist has to '
+        + 'read them before they go into a report.'))
+    }
 
+    for (const v of state.verdicts) {
       const verdict = node('div', 'verdict')
       verdict.append(node('code', 'verdict__smiles', v.smiles))
       verdict.append(node('div', 'verdict__word', String(v.verdict).replace(/_/g, ' ')))
@@ -562,10 +645,11 @@
         + (v.prior * 100).toFixed(0) + '%'))
       c.append(verdict)
       c.append(node('p', 'card__desc', v.summary))
+      if (v.summary_diagnostic) c.append(rawText('Show the engine\u2019s own words', v.summary_diagnostic))
 
       const table = node('table', 'peaks')
       const thead = node('thead'); const hr = node('tr')
-      for (const label of ['Test', 'Applied', 'What it found']) hr.append(node('th', null, label))
+      for (const label of ['Test', 'Applied', 'What it found']) hr.append(colHead(label))
       thead.append(hr); table.append(thead)
       const tb = node('tbody')
       for (const t of v.tests) {
@@ -573,36 +657,26 @@
         tr.append(node('td', null, t.label))
         // "Not applicable" is not a failure and must not read as one: a test that
         // abstained had no data, and it did not move the confidence either way.
-        tr.append(node('td', null, t.applicable ? 'yes' : 'no data'))
-        tr.append(node('td', null, t.diagnostic))
+        //
+        // NEITHER DID A TEST THAT RAN AND CARRIED NO WEIGHT. This column's own
+        // reason for existing is whether the test moved the verdict, and it read
+        // "yes" for a test with significance exactly 0.0 -- which moved it by
+        // nothing, the same as an abstention, while looking like evidence. The
+        // three states are distinct and the reader needs all three.
+        tr.append(node('td', null,
+          !t.applicable ? 'no data' : (t.significance > 0 ? 'yes' : 'ran, no weight')))
+        // Structured first, the engine's own line one click away. `finding` is
+        // built from the same fields the engine scored on; `diagnostic` is what
+        // it wrote for itself.
+        const found = node('td')
+        found.append(node('span', null, t.finding || t.diagnostic))
+        if (t.finding && t.diagnostic) found.append(rawText('engine detail', t.diagnostic))
+        tr.append(found)
         tb.append(tr)
       }
       table.append(tb)
       c.append(table)
 
-      // WHICH TABLE ANSWERED, always. A prediction from 495,215 reference atoms
-      // and one from 146 are different products, and a confidence read without
-      // knowing which is a number the reader cannot weigh.
-      const kb = v.knowledge_base || {}
-      if (v.comparable_between_candidates === false) {
-        // Measured: on the seed table this same path scored ethanol 0.623 against
-        // ethylene glycol's own 0.556 -- the wrong molecule above the right one.
-        c.append(alert('warn', 'Do not compare this number between structures',
-          'This build is answering from a ' + (kb.reference_count || 0).toLocaleString()
-          + '-atom fallback table, and on a known spectrum that ranked a wrong structure above '
-          + 'the right one. Use the number to find contradictions in one proposal, never to '
-          + 'pick a winner between two.'))
-      } else {
-        c.append(node('p', 'tablenote',
-          'Shifts predicted from the reference table shipped with this build \u2014 '
-          + (kb.reference_count || 0).toLocaleString() + ' assigned atoms from NMRShiftDB2, '
-          + 'which is CC BY-SA. Predictions are a model, not a measurement.'))
-      }
-      if (v.human_review_required) {
-        c.append(node('p', 'tablenote',
-          'This is a measurement combined by a stated model, not a decision. A chemist has to '
-          + 'read it before it goes into a report.'))
-      }
     }
     return c
   }
@@ -673,8 +747,40 @@
     // between the top two ever closes to nothing, the order is an artefact of
     // how precisely the shifts happen to be known and must not be read as a
     // result.
+    // THE SAME STARVED PREDICTOR RANKS THIS TABLE. Step 3 warns, on a seed
+    // knowledge base, that its confidence must never pick a winner between two
+    // structures -- and this card then presented a ranked table with a #1 built
+    // on that identical predictor, because it never read the knowledge base the
+    // service already returns beside the rows. A warning the next card silently
+    // overrides is worse than no warning.
+    const rkb = r.knowledge_base || {}
+    if (rkb.source && rkb.source !== 'nmrshiftdb2') {
+      c.append(alert('warn', 'This ranking rests on the same fallback table',
+        'The shifts behind these rows come from a ' + (rkb.reference_count || 0).toLocaleString()
+        + '-atom fallback table, the one Step 3 says cannot pick a winner between two structures. '
+        + 'It cannot do so here either. Read the rows for contradictions, not for a first place.'))
+    }
+
     const sep = r.separation || {}
-    if (sep.checked && !sep.separated) {
+    if (sep.checked === false && sep.unchecked_reason) {
+      // Both branches below test `checked`, so an unchecked ranking rendered
+      // NOTHING here -- and silence after a ranking reads as "it held".
+      c.append(alert('warn', 'Whether this order survives the measurement was not tested',
+        'The check re-measures the shifts within the spectrum\u2019s own resolution and watches '
+        + 'whether the leader holds, but ' + sep.unchecked_reason + '. Read the order below as '
+        + 'untested rather than as stable.'))
+    } else if (sep.no_contest) {
+      // NOT a near-tie, and it must not read like one. Only one candidate
+      // matched any measured signal, so the others scored zero by having
+      // nothing to score -- the gap is structural, not evidence. Saying "the
+      // top two are not separated" here would understate it: there was no
+      // comparison at all.
+      c.append(alert('warn', 'Only one of these could be compared to this spectrum',
+        'The other ' + (Math.max(0, (r.rows || []).length - 1)) + ' matched none of the measured '
+        + 'signals, so they score zero for want of anything to compare, not because they were '
+        + 'ruled out. A single candidate cannot be ranked \u2014 check the structures, or that '
+        + 'this is the spectrum you think it is.'))
+    } else if (sep.checked && !sep.separated) {
       c.append(alert('warn', 'This ranking does not separate the top two',
         'Re-measured ' + sep.resamples + ' times within this spectrum\u2019s own resolution ('
         + Number(sep.shift_uncertainty_ppm).toFixed(3) + ' ppm), '
@@ -696,7 +802,7 @@
     const table = node('table', 'peaks rank__table')
     const thead = node('thead'); const hr = node('tr')
     for (const label of ['#', 'Structure', 'Share', 'Matched', 'Mean error (ppm)', 'RMS (ppm)'])
-      hr.append(node('th', null, label))
+      hr.append(colHead(label))
     thead.append(hr); table.append(thead)
     const tb = node('tbody')
     r.rows.forEach((row, i) => {
@@ -774,7 +880,7 @@
     const table = node('table', 'peaks similar__table')
     const thead = node('thead'); const hr = node('tr')
     for (const label of ['#', 'Structure', 'Reference', 'Distance', 'Lines'])
-      hr.append(node('th', null, label))
+      hr.append(colHead(label))
     thead.append(hr); table.append(thead)
     const tb = node('tbody')
     r.matches.forEach((m, i) => {
@@ -828,9 +934,18 @@
         // Replace a re-check of the same structure rather than stacking duplicates.
         state.verdicts = state.verdicts.filter((x) => x.smiles !== out.result.smiles)
         state.verdicts.push(out.result)
-        state.verdicts.sort((a, b) => b.confidence - a.confidence)
+        // DO NOT ORDER BY A NUMBER THE PAGE DISOWNS. On a seed knowledge base
+        // the card below says this confidence must never be used to pick a
+        // winner between two structures -- and this line then ranked them by
+        // exactly that, so the strongest warning on the page was contradicted by
+        // the list underneath it. Measured on the seed table: ethanol 0.623 above
+        // ethylene glycol's own 0.556, the wrong molecule first. When the number
+        // cannot rank, the order a chemist typed them in claims nothing.
+        if (state.verdicts.every((x) => x.comparable_between_candidates !== false)) {
+          state.verdicts.sort((a, b) => b.confidence - a.confidence)
+        }
         // The ranking is over a SET; adding a candidate changes it.
-        state.ranking = null
+        clearDerived(['ranking', 'ranking_error'])
         state.candidate = ''
       } else {
         state.verdictError = (out && out.reason) || 'that structure could not be checked'
@@ -849,7 +964,7 @@
       if (out && out.ok) {
         state.spectrum = out.summary
         // A verdict belongs to the spectrum it was computed against.
-        state.verdicts = []; state.verdictError = null; state.ranking = null; state.similar = null
+        clearDerived()
       }
       else if (out && !out.cancelled) { state.error = out.reason || 'that spectrum could not be read' }
     } catch (e) {
@@ -862,6 +977,8 @@
   //: Which section the DOM currently shows, so a re-render can tell a state
   //: change apart from a navigation.
   let _renderedSection = null
+  // Survives the frames in which the focused control is disabled. See render().
+  let _pendingFocus = null
 
   // ---- render --------------------------------------------------------------
   async function render() {
@@ -910,9 +1027,21 @@
           sidebar: (previous.querySelector('.sidebar') || {}).scrollTop || 0,
         }
       : { main: 0, sidebar: 0 }
-    const focusKey = document.activeElement && document.activeElement.dataset
-      ? document.activeElement.dataset.focusKey || null
-      : null
+    // FOCUS INTENT MUST OUTLIVE THE DISABLED FRAME, which is why this is
+    // remembered rather than re-read each time.
+    //
+    // Reading `activeElement` alone looks right and cannot work: a primary action
+    // sets its busy flag and re-renders, the rebuilt button comes back
+    // `disabled`, and `.focus()` on a disabled element is a no-op -- so focus
+    // lands on <body>. When the operation settles and render() runs again,
+    // <body> has no focusKey, so there is nothing left to restore and the key is
+    // gone for good. The restore block ran on both renders and returned the
+    // keyboard to nobody, which is the exact failure it was added to fix.
+    const active = document.activeElement
+    const activeKey = active && active.dataset ? active.dataset.focusKey || null : null
+    if (activeKey) _pendingFocus = activeKey
+    else if (active && active !== document.body) _pendingFocus = null  // the user moved on
+    const focusKey = _pendingFocus
     const caret = document.activeElement && document.activeElement.tagName === 'INPUT'
       ? document.activeElement.selectionStart
       : null
@@ -930,8 +1059,12 @@
     if (sideEl) sideEl.scrollTop = keepScroll.sidebar
     if (focusKey) {
       const again = shell.querySelector('[data-focus-key="' + focusKey + '"]')
-      if (again) {
+      // Held until it actually lands. A disabled button silently refuses focus,
+      // so "we called .focus()" is not evidence the keyboard went anywhere --
+      // only activeElement is.
+      if (again && !again.disabled) {
         again.focus({ preventScroll: true })
+        if (document.activeElement === again) _pendingFocus = null
         // A caret at position 0 after every keystroke would be worse than losing
         // focus, so it is restored where the field is still the same one.
         if (caret != null && again.tagName === 'INPUT') {
@@ -1079,9 +1212,15 @@
     // "Looks like" is what the engine already knew and never said: the compound,
     // the solvent, its residual proton, an impurity, a 13C satellite. A chemist
     // picks these out by eye on every spectrum they read.
-    for (const label of ['', 'Shift (ppm)', 'Looks like', 'Pattern', 'Couplings (Hz)', 'Lines', 'Width (Hz)', 'S/N', 'Share of signal']) {
+    // THE FIRST COLUMN HAD NO NAME. It holds the signal's label -- the cell that
+    // says which row you are on -- and its header was an empty string, so a
+    // screen-reader user moving cell by cell heard a column name for every
+    // column except the one that identifies the row. `scope="col"` is set on all
+    // of them so each data cell is announced with its heading.
+    for (const label of ['Signal', 'Shift (ppm)', 'Looks like', 'Pattern', 'Couplings (Hz)', 'Lines', 'Width (Hz)', 'S/N', 'Share of signal']) {
       const th = document.createElement('th')
       th.textContent = label
+      th.setAttribute('scope', 'col')
       hrow.append(th)
     }
     thead.append(hrow); table.append(thead)

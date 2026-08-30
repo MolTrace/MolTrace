@@ -1279,3 +1279,59 @@ def test_a_rejected_processed_spectrum_does_not_put_its_path_on_screen(tmp_path:
     assert result.get("processed_spectrum_rejected"), (
         "the processed read did not fail, so the branch under test never ran"
     )
+
+
+def test_the_reason_a_stored_spectrum_was_passed_over_is_true_and_reads_as_one_sentence() -> None:
+    """The sanitiser that fixed the path leak told the reader something FALSE.
+
+    `_readable_refusal` answers "why could this acquisition not be opened at all",
+    and its safe fallback says the acquisition holds neither a processed spectrum
+    nor a readable FID. Routed into the processed-spectrum fallback it becomes a
+    contradiction, because that branch runs only when the FID *did* read and the
+    sentence it lands in already says so:
+
+        "... so one was computed here from the raw measurement instead. that
+         acquisition is not in a form this can read: it holds neither a processed
+         spectrum nor a readable free-induction decay It uses this application's
+         own phasing ..."
+
+    Lowercase, unpunctuated, and it denies the thing the same sentence asserts.
+    Shipped in the commit that fixed the leak: the sanitiser was right and the
+    caller was wrong.
+
+    Truth matters as much as sanitising here. The reader's own check was
+    `ndim != 1 or size < 2` -- ONE message for a 2D dataset and for a truncated
+    one -- so a caller classifying on it called a 4-byte file "two-dimensional".
+    A 0-d squeeze is not 2D; it is the opposite end of the same test.
+    """
+    from nmrcheck.local_science import _rejected_processed_reason
+
+    cases = {
+        "2d": "/some/path/pdata/1 does not hold a 1D processed spectrum "
+              "(got shape (2, 4096)); 2D processed data is not supported here.",
+        "truncated": "/some/path/pdata/1 holds a processed spectrum with too few points "
+                     "to use (got shape (1,)); it is truncated or empty.",
+        "unreadable": "nmrglue could not read the Bruker processed data at "
+                      "/some/path/pdata/1: bad magic",
+    }
+    said = {k: _rejected_processed_reason(ValueError(v)) for k, v in cases.items()}
+
+    for kind, sentence in said.items():
+        assert sentence.endswith("."), f"{kind}: not a sentence: {sentence!r}"
+        assert sentence[0].isupper(), f"{kind}: does not start a sentence: {sentence!r}"
+        assert "/" not in sentence, f"{kind}: a path reached the reader: {sentence!r}"
+        assert "nmrglue" not in sentence.lower(), f"{kind}: named the library: {sentence!r}"
+        assert "shape" not in sentence.lower(), f"{kind}: named an array shape: {sentence!r}"
+        # THE CONTRADICTION. This branch runs because the FID read; a sentence
+        # saying it did not is false wherever it appears.
+        assert "free-induction" not in sentence.lower(), f"{kind}: contradicts the FID: {sentence!r}"
+        assert "neither" not in sentence.lower(), f"{kind}: contradicts the FID: {sentence!r}"
+
+    # Each fault says what it actually is -- the whole reason the reader's two
+    # conditions were split apart.
+    assert "two-dimensional" in said["2d"]
+    assert "incomplete" in said["truncated"]
+    assert "two-dimensional" not in said["truncated"], (
+        "a truncated spectrum was described as two-dimensional, which is the "
+        "conflation the reader's split exists to prevent"
+    )

@@ -39,6 +39,14 @@
   --mt-cyan: #00B8D9;
   --mt-violet: #6B3FE0;
   --mt-amber: #E8A030;
+  /* THE MARKER IS THEMED BECAUSE NO SINGLE VALUE PASSES BOTH. It is the only
+   * mark tying a table row to a line on the trace, so WCAG 1.4.11 asks 3:1 of
+   * it against the plot surface (--muted). Measured: --mt-amber is 6.08:1 on the
+   * dark surface and 1.99:1 on the light one -- and light is the default. Every
+   * darker amber that fixes light drops dark below 3:1 (#B45309 gives 4.52 light
+   * / 2.68 dark), which is how the previous fix moved this same failure from one
+   * theme to the other. Two values, each measured against its own background. */
+  --mt-marker: #B45309;   /* 4.52:1 on the light plot surface */
   --mt-red: #E84040;
   --mt-slate: #64748B;
   --mt-teal-soft: rgba(0, 223, 160, 0.10);
@@ -77,6 +85,7 @@ html.dark {
   --secondary: oklch(0.22 0.015 240);
   --muted: oklch(0.22 0.015 240);
   --muted-foreground: oklch(0.76 0.01 240);
+  --mt-marker: #E8A030;   /* 6.08:1 on the dark plot surface */
   --accent: oklch(0.6 0.18 200);
   --destructive: oklch(0.5 0.2 25);
   --success: oklch(0.55 0.17 145);
@@ -138,7 +147,6 @@ body {
   padding: 14px 12px; border-bottom: 1px solid var(--border);
   min-height: 56px;
 }
-.brand__mark { width: 26px; height: 26px; flex: 0 0 26px; }
 .brand__name {
   font-family: var(--mono); font-size: 14px; font-weight: 700; letter-spacing: -0.01em;
 }
@@ -188,8 +196,6 @@ body {
 .navitem__lock { margin-left: auto; width: 12px; height: 12px; color: var(--muted-foreground); opacity: 0.7; }
 .shell.collapsed .navitem__lock { display: none; }
 
-.sidebar__foot { margin-top: auto; padding: 8px; border-top: 1px solid var(--border); }
-
 /* ---------- main ---------- */
 
 .main { flex: 1 1 auto; overflow-y: auto; min-width: 0; }
@@ -228,7 +234,11 @@ body {
  * the last third. Reading measure is a property of running text, not of a table,
  * so the cap moved onto the text. */
 .page { padding: 22px 24px 56px; }
-.page > .card, .page > .alert, .page > .previewbanner { max-width: 1400px; }
+/* The banner is appended to .main, not .page -- `.page > .previewbanner`
+ * could never match it, so it ran full-bleed while every card beside it
+ * was capped. Matched where it actually lives. */
+.page > .card, .page > .alert { max-width: 1400px; }
+.main > .previewbanner { max-width: 1400px; }
 .page__head, .card__desc, .alert__body, .tablenote { max-width: 92ch; }
 .page__head { margin-bottom: 18px; }
 .page__title { font-family: var(--mono); font-size: 24px; font-weight: 700; letter-spacing: -0.02em; margin: 0; }
@@ -311,10 +321,6 @@ table.peaks tbody tr:hover { background: var(--muted); }
 }
 
 .spectrum { width: 100%; height: auto; display: block; }
-.sronly {
-  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
-  overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
-}
 
 /* ---------- spectrum ---------- */
 
@@ -339,7 +345,7 @@ table.peaks tbody tr:hover { background: var(--muted); }
  * so it has to be visible in both appearances. The brand amber carries its own
  * contrast in either mode and is not one of the three module colours, so it
  * cannot be mistaken for a module cue. */
-.spectrum__marker { stroke: var(--mt-amber); stroke-width: 2; stroke-linecap: round; }
+.spectrum__marker { stroke: var(--mt-marker); stroke-width: 2; stroke-linecap: round; }
 
 .spectrum__caption {
   font-family: var(--mono); font-size: 11px; color: var(--muted-foreground);
@@ -399,10 +405,6 @@ table.peaks tbody tr:hover { background: var(--muted); }
   font-family: var(--mono); font-size: 12px; font-weight: 600;
 }
 
-.similar__smiles {
-  max-width: 30ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-
 
 /* A typed SMILES with explicit stereochemistry runs to hundreds of characters.
  * Wrapped it becomes four lines of the table; clipped it stays one row and the
@@ -410,4 +412,28 @@ table.peaks tbody tr:hover { background: var(--muted); }
  * so they already know which candidate this is. */
 .rank__smiles, .similar__smiles {
   max-width: 46ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* Machine-written text kept reachable but out of the reading path: the engine's
+   own diagnostic line, behind a disclosure beside the sentence built from the
+   same numbers. Muted and small because reaching for it is deliberate. */
+.rawtext { margin-top: 0.35rem; }
+.rawtext > summary {
+  cursor: pointer;
+  font-size: 0.78rem;
+  color: var(--muted-foreground);
+  list-style: revert;
+}
+.rawtext > summary:hover { color: var(--foreground); }
+.rawtext > summary:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+.rawtext__body {
+  margin: 0.3rem 0 0;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: var(--muted-foreground);
+  overflow-wrap: anywhere;
 }

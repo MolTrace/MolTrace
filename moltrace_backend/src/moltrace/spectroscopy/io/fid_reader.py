@@ -350,10 +350,25 @@ def _read_bruker_pdata_spectrum(pdata_dir: Path, source: Path) -> NMRSpectrum:
         ) from exc
 
     real = np.asarray(data, dtype=np.float64).squeeze()
-    if real.ndim != 1 or real.size < 2:
+    # TWO DIFFERENT FAULTS, and they were one message. `ndim != 1` is a 2D
+    # dataset -- a real experiment this reader does not handle. `size < 2` is a
+    # 1D spectrum with nothing in it: truncated, or a stub. A caller classifying
+    # on the combined message had to call a truncated file "not one-dimensional",
+    # which is FALSE for a shape of (1,) and was rendered to a chemist as such.
+    # Separated so the reason a caller reports can be true.
+    if real.ndim > 1:
         raise FIDReaderError(
             f"{pdata_dir} does not hold a 1D processed spectrum "
             f"(got shape {np.asarray(data).shape}); 2D processed data is not supported here."
+        )
+    # ndim < 1 lands here too, and that is the point: a file holding a single
+    # value squeezes to a 0-d array, which `ndim != 1` called "not 1D" and a
+    # caller then reported to a chemist as "two-dimensional". It is truncated,
+    # which is the opposite end of the same test.
+    if real.size < 2:
+        raise FIDReaderError(
+            f"{pdata_dir} holds a processed spectrum with too few points to use "
+            f"(got shape {np.asarray(data).shape}); it is truncated or empty."
         )
 
     procs = dict(dictionary.get("procs", {}) or {})
