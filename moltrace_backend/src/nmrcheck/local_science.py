@@ -208,7 +208,13 @@ def _library_reference(raw: str) -> str:
     return text
 
 
-def _test_finding(name: str, applicable: bool, score: float, significance: float) -> str:
+def _test_finding(
+    name: str,
+    applicable: bool,
+    score: float,
+    significance: float,
+    details: dict | None = None,
+) -> str:
     """What one test found, for a chemist, from the structured fields.
 
     The engine's `diagnostic` is written for whoever is debugging the engine:
@@ -253,6 +259,37 @@ def _test_finding(name: str, applicable: bool, score: float, significance: float
     # point one way and still move nothing, and saying so is the difference
     # between a reader trusting the arrow and trusting the verdict.
     if significance <= 0.0:
+        # NAME THE CAUSE. "Too weak to move the verdict" is true and tells a
+        # chemist nothing they can act on, and on this corpus the assignment test
+        # is zeroed on 9 of 11 acquisitions with a known structure -- so the
+        # verdict routinely rests on ONE of the four tests while the screen says
+        # two had data. The cause is a single number the engine already computed:
+        # `significance = SIG_MAX * (1 - impurity_pct / 25)`, so any spectrum
+        # whose unexplained integral reaches 25% switches this test off.
+        #
+        # What makes that worth saying out loud is WHAT is unexplained. The
+        # verifier has no notion of a solvent; every peak this structure does not
+        # account for is impurity to it, and the CDCl3 triplet is three of them.
+        # This application labels those peaks "solvent" in the table above, so a
+        # reader who is told the number can see for themselves what made it.
+        unexplained = (details or {}).get("impurity_pct")
+        if name == "assignments" and isinstance(unexplained, (int, float)):
+            # NAMES THE NUMBER, NOT A CULPRIT. The first version of this sentence
+            # said "solvent peaks count toward that figure", which is true and
+            # points at the wrong thing: measured over the zeroed cases in this
+            # corpus, solvent-labelled area accounts for the WHOLE unexplained
+            # integral in none of them (58% unexplained against 38% solvent, 77%
+            # against 58%), and one 1H acquisition is zeroed at 30% unexplained
+            # with NO non-compound signal at all. Naming solvent there sends a
+            # chemist to look at a peak that is not the cause. The honest sentence
+            # gives the figure and the threshold and lets the table above -- which
+            # labels every signal -- show where it came from.
+            return (
+                f"{unexplained:.0f}% of the measured signal is not accounted for by this "
+                "structure, and at 25% this test stops counting altogether. Anything the "
+                "structure does not explain adds to that: solvent, an impurity, or a second "
+                f"compound. What it did measure {direction}, on no weight."
+            )
         return f"What this measures {direction}, but on evidence too weak to move the verdict."
     weight = "strong" if significance >= 3.0 else "moderate" if significance >= 1.0 else "weak"
     return f"What this measures {direction} ({weight} evidence)."
@@ -543,7 +580,11 @@ def verify_candidate(path: str | Path, smiles: str) -> dict:
                 "quality": float(t.quality),
                 # What the reader sees, built from the fields above.
                 "finding": _test_finding(
-                    t.name, bool(t.applicable), float(t.score), float(t.significance)
+                    t.name,
+                    bool(t.applicable),
+                    float(t.score),
+                    float(t.significance),
+                    dict(t.details or {}),
                 ),
                 # The engine's own words, kept as the escape hatch behind a
                 # disclosure rather than deleted -- whoever wants them can have
@@ -940,10 +981,16 @@ def _spectrum_library() -> dict | None:
 def find_similar_spectra(path: str | Path, limit: int = 5) -> dict:
     """Known spectra that look like this one. A LOOKUP, never an identification.
 
-    Measured on the shipped library: with the compound present and the nucleus
-    matched, it comes back first 48% of the time and inside the top five 63%. That
-    is a lead worth following and is not an answer, so the rate travels with the
-    result and the interface says which it is.
+    Measured the way this function is actually called -- querying with a real
+    acquisition's detected multiplet centres, over cases where the compound is in
+    the library at all: it comes back first in 3 of 15 and inside the top five in
+    4 of 15. A lead worth following and never an answer, so the rate travels with
+    the result and the interface says which it is.
+
+    The 48%/63% this docstring used to quote was a record-against-record
+    leave-one-out -- a curated shift list querying the library, which is not what
+    this does. See `_SIMILARITY_ACCURACY` for the four harnesses behind that
+    number and why only the last one describes this call.
 
     Searched within the query's own nucleus. The encoding is 128 bins of 1H beside
     128 of 13C, so a 13C query and a 1H reference of the SAME compound sit in

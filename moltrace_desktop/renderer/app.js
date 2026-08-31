@@ -845,10 +845,16 @@
     }
   }
 
-  // A LOOKUP, NEVER AN IDENTIFICATION. Measured on the shipped library with the
-  // compound present and the nucleus matched: first 48% of the time, inside the
-  // top five 63%. That is a lead worth following and is not an answer, so the
-  // rate is printed with the results rather than kept in a docstring.
+  // A LOOKUP, NEVER AN IDENTIFICATION. Measured the way it is actually used --
+  // querying with a real acquisition's measured signals, over cases where the
+  // compound is in the library at all: first in 3 of 15, inside the top five in
+  // 4 of 15. A lead worth following and never an answer, so the rate is printed
+  // with the results rather than kept in a comment.
+  //
+  // This comment said 48%/63% for a while after the constant was corrected. That
+  // figure came from a record-against-record leave-one-out, which is a different
+  // task; the value and the rendered sentence were fixed and the PROSE around
+  // them was not grepped.
   function similarSection() {
     if (!state.spectrum) return null
     const c = card('Reference spectra that look like this one', null, 'var(--mt-cyan)')

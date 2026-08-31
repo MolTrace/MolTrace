@@ -1335,3 +1335,91 @@ def test_the_reason_a_stored_spectrum_was_passed_over_is_true_and_reads_as_one_s
         "a truncated spectrum was described as two-dimensional, which is the "
         "conflation the reader's split exists to prevent"
     )
+
+
+@pytest.mark.slow
+def test_a_test_that_carried_no_weight_says_what_zeroed_it() -> None:
+    """"Too weak to move the verdict" is true and unactionable.
+
+    The assignments test is switched off by a single computed number --
+    `significance = SIG_MAX * (1 - impurity_pct / 25)` -- so any acquisition
+    whose unexplained integral reaches 25% contributes nothing. Measured over
+    every acquisition in this corpus with a stated structure and an applicable
+    assignments test, that is **9 of 11**. The screen says two of four checks had
+    the data to run while one of the two carries zero weight, so a verdict a
+    chemist reads as resting on two tests rests on one.
+
+    The cause is worth naming because of WHAT is unexplained. The verifier has no
+    notion of a solvent: every peak the proposed structure does not account for is
+    impurity to it, and on a routine CDCl3 carbon spectrum the solvent triplet is
+    three of them -- peaks this application labels "solvent" in the table directly
+    above. A reader given the number can see what produced it.
+    """
+    from nmrcheck.local_science import SpectrumUnreadable, open_spectrum, verify_candidate
+
+    # Only acquisitions whose structure the corpus states can be checked at all.
+    truth = {
+        "1,2-epoxybutan": "CCC1CO1",
+        "allyl-glycidyl-ether": "C=CCOCC1CO1",
+        "ethylene glycol": "OCCO",
+        "2-nitroanilin": "Nc1ccccc1[N+](=O)[O-]",
+    }
+
+    def stated(src: str) -> str | None:
+        for name in ("pdata/1/title", "pdata/2/title"):
+            path = Path(src) / name
+            if path.exists():
+                lines = path.read_text(errors="ignore").strip().splitlines()
+                head = lines[0].lower() if lines else ""
+                for key, smiles in truth.items():
+                    if key in head:
+                        return smiles
+        return None
+
+    zeroed = 0
+    for source in _acquisitions():
+        smiles = stated(source)
+        if not smiles:
+            continue
+        try:
+            verdict = verify_candidate(source, smiles)
+            spectrum = open_spectrum(source)
+        except SpectrumUnreadable:
+            continue
+        test = next((t for t in verdict["tests"] if t["name"] == "assignments"), None)
+        if test is None or not test["applicable"] or test["significance"] > 0.0:
+            continue
+        zeroed += 1
+        finding = str(test["finding"])
+        # ASSERT THE INTENT, NOT THE WORDING. A first version of this checked for
+        # the literal phrase "not explained" and went red on a reword that kept
+        # every fact -- a guard that fails on a synonym is measuring prose, not
+        # behaviour. What must be true: the sentence carries the unexplained
+        # FIGURE and the THRESHOLD that switched the test off, because those two
+        # numbers are what a chemist can act on.
+        import re as _re
+
+        percents = [float(x) for x in _re.findall(r"(\d+(?:\.\d+)?)%", finding)]
+        assert percents, f"a zeroed test did not give the figure that zeroed it: {finding!r}"
+        assert 25.0 in percents, (
+            f"the sentence does not name the 25% threshold at which this test stops "
+            f"counting, so the figure has nothing to be read against: {finding!r}"
+        )
+        assert max(percents) >= 25.0, (
+            f"a test was zeroed while the stated unexplained share is below the "
+            f"threshold that zeroes it: {finding!r}"
+        )
+        # AND MUST NOT NAME A CULPRIT IT CANNOT SUPPORT. The first version of the
+        # sentence blamed solvent. Measured over this corpus, solvent-labelled area
+        # never accounts for the whole unexplained integral, and one 1H
+        # acquisition is zeroed at 30% unexplained with NO non-compound signal --
+        # so on that spectrum the sentence sent a chemist to a peak that does not
+        # exist. It may list possible contributors; it may not assert one.
+        if not any(m["category"] != "compound" for m in spectrum["multiplets"]):
+            assert "Solvent peaks count" not in finding, (
+                f"the sentence blamed solvent on an acquisition with no non-compound "
+                f"signal at all: {finding!r}"
+            )
+
+    if zeroed == 0:
+        pytest.skip("no acquisition here has an applicable assignments test at zero weight")
