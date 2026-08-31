@@ -237,9 +237,22 @@ def _test_finding(
     DIRECTION and STRENGTH, which is what the field holds.
     """
     if not applicable:
+        # "NONE WAS SUPPLIED" INVITES A CHEMIST TO GO AND SUPPLY IT. This module
+        # is imported by exactly one caller -- the local service the desktop
+        # starts -- and that service exposes six operations, none of which takes
+        # a 2-D spectrum or MS peaks. So these two of the verifier's four tests
+        # abstain on EVERY check made here, and no action by the reader changes
+        # that. Saying the evidence is missing when the ability to accept it is
+        # what is missing sends them looking for a control that does not exist.
         needs = {
-            "hsqc_2d_ranges": "This needs a 2-D spectrum, and none was supplied.",
-            "ms_molecule_match": "This needs mass-spectrometry peaks, and none were supplied.",
+            "hsqc_2d_ranges": (
+                "This needs a 2-D spectrum, which this installation cannot read yet, "
+                "so it never runs here."
+            ),
+            "ms_molecule_match": (
+                "This needs mass-spectrometry peaks, which this installation cannot read "
+                "yet, so it never runs here."
+            ),
         }
         return needs.get(name, "This test had no data to work with, so it did not run.")
 
@@ -311,12 +324,16 @@ def _verdict_summary(verdict: str, tests: list[dict], nucleus: str) -> str:
         "INCONCLUSIVE": "This spectrum neither supports nor rules out that structure",
         "INCONSISTENT": "This spectrum is not consistent with that structure",
     }.get(str(verdict).upper(), f"Result: {str(verdict).replace('_', ' ').lower()}")
+    # SAME CORRECTION AS THE PER-TEST LINE. "Had the data to run" blames absent
+    # evidence, and on this installation two of the four can never run at all --
+    # it reads neither 2-D spectra nor MS peaks. A chemist told the data was
+    # missing goes looking for a way to add it.
     if ran == 0:
-        return f"{word}. None of the {total} checks had the data they need to run."
+        return f"{word}. None of the {total} checks could run here."
     tail = (
-        f"{ran} of the {total} checks had the data to run"
+        f"{ran} of the {total} checks could run on this evidence"
         if ran < total
-        else f"all {total} checks had the data to run"
+        else f"all {total} checks ran"
     )
     return f"{word}, on its {nucleus} signals. {tail[0].upper()}{tail[1:]}."
 
