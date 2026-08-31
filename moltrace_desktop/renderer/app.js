@@ -72,7 +72,13 @@
     {
       label: 'Modules',
       items: [
-        { id: 'spectracheck', name: 'SpectraCheck', sub: 'NMR \u00b7 MS \u00b7 structure', icon: 'spectra', rail: 'var(--mt-teal)', local: true },
+        // "NMR MS structure" is the WEB module's subtitle and it was copied
+        // verbatim onto a section marked `local: true`, which reads as a promise
+        // that all three run on this computer. Mass spectrometry does not: the
+        // local service exposes six operations and none of them takes MS peaks,
+        // so the verifier's `ms_molecule_match` test abstains on every check here.
+        // The section says what this installation actually does.
+        { id: 'spectracheck', name: 'SpectraCheck', sub: 'NMR \u00b7 structure', icon: 'spectra', rail: 'var(--mt-teal)', local: true },
         { id: 'regentry', name: 'Regentry', sub: 'Dossiers & submissions', icon: 'shield', rail: 'var(--mt-cyan)',
           offline: 'Impurity limits, dossiers and submission work are not part of this installation \u2014 the rule engine is not on this computer. ' + WEB },
         { id: 'repho', name: 'Repho', sub: 'Reaction optimization', icon: 'flask', rail: 'var(--mt-violet)',
