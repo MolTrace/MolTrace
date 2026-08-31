@@ -272,6 +272,58 @@ untouched.
 
 ---
 
+## v0.74.9 — Two of the four checks can never run here, and the screen blamed the data (2026-08-31)
+
+Salvaged from an adversarial audit that returned **nothing**: all six of its agents were killed
+by the host sleeping mid-response, after 3.8M subagent tokens and about fourteen hours. The
+transcripts survived, and the measurements inside their tool results were reproducible by hand.
+
+**A stale number, one layer out from the one that was fixed.** Correcting `_SIMILARITY_ACCURACY`
+in v0.74.8 fixed the value and the sentence on screen and left the prose around them — the
+docstring of `find_similar_spectra` itself still said "it comes back first 48% of the time and
+inside the top five 63%", and so did a comment in the renderer. A constant has readers that are
+not code.
+
+**A test worth nothing looked like a test that ran.** `significance = SIG_MAX * (1 -
+impurity_pct / 25)`, so any acquisition whose unexplained integral reaches 25% switches the
+assignments test off. Measured over every acquisition in this corpus with a stated structure and
+an applicable assignments test: **9 of 11**. The screen said two of the four checks had the data
+to run while one of those two contributed nothing, so a verdict a chemist reads as resting on two
+tests rests on one. It now gives the figure and the threshold, because a rejection that does not
+name its cause is not one a person can act on.
+
+**And the first version of that sentence named a cause it had not measured.** It said "solvent
+peaks count toward that figure" — true, and pointing at the wrong thing. Across the seven zeroed
+cases, solvent-labelled area accounts for the whole unexplained integral in **none** of them (58%
+unexplained against 38% solvent, 77% against 58%, 94% against 78%), and one ¹H acquisition is
+zeroed at 30% unexplained with **no non-compound area at all** — there the sentence sent a chemist
+to look at a peak that is not the cause. It now lists what can contribute and asserts none of it.
+*A cause is a measurement, not an inference from the example you happened to open.*
+
+**It advertised mass spectrometry it cannot do.** The sidebar described SpectraCheck as
+"NMR · MS · structure" on a section marked as running locally; that subtitle is the web module's,
+copied verbatim. The local service exposes six operations and none takes MS peaks. So
+`ms_molecule_match` and `hsqc_2d_ranges` — half the verifier — abstain on **every** check made
+here, and they said "none was supplied", which reads as a missing file a chemist could go and
+provide when what is missing is the ability to accept one. The summary line blamed the data the
+same way. All three now say the installation cannot read that evidence yet.
+
+**Raised by the salvage and refuted on checking:** `open_spectrum` is the only one of the four
+offline results without `human_review_required`. That is correct, not a gap — every
+raw-measurement model in the web product omits it too (`SpectrumGSDAnalyzeResult`,
+`SpectrumMultipletAnalyzeResult`, `SpectrumIntegrationAnalyzeResult`), while judgements carry it.
+A peak table is a measurement.
+
+**Still open, deliberately not changed here.** The verifier has no notion of a solvent, so the
+CDCl₃ triplet is impurity to it. Excluding solvent before scoring would change the input to the
+deterministic arbiter and weaken a guard that exists for a reason — a spectrum the structure
+cannot explain *should* lower confidence in the assignment. Raised rather than decided.
+
+`a13135e`, `0bd84fe`. Backend 42/42 including the slow guards; desktop 10 stages and 15
+round-trip assertions.
+
+---
+
 ## v0.74.8 — The desktop's offline science told a chemist things that were not so (2026-08-30)
 
 Three features had just landed on the desktop's one offline surface — a structure check, a DP4
