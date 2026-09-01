@@ -235,6 +235,24 @@ ipcMain.handle('moltrace:verify-structure', async (_event, smiles) => {
   }
 })
 
+ipcMain.handle('moltrace:proton-inventory', async (_event, smiles) => {
+  if (typeof smiles !== 'string' || !smiles.trim()) {
+    return { ok: false, reason: 'Type a structure to count protons against it.' }
+  }
+  if (!lastOpenedPath) {
+    return { ok: false, reason: 'Open a spectrum first, then count protons against a structure.' }
+  }
+  try {
+    const result = await requestFromService('/structure/inventory', {
+      path: lastOpenedPath,
+      smiles: smiles.trim(),
+    })
+    return { ok: true, result }
+  } catch (err) {
+    return { ok: false, reason: localService.readFailureReason(err) }
+  }
+})
+
 ipcMain.handle('moltrace:rank-structures', async (_event, smilesList) => {
   const list = Array.isArray(smilesList) ? smilesList.filter((s) => typeof s === 'string' && s.trim()) : []
   if (list.length < 2) {

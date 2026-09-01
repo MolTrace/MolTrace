@@ -150,6 +150,9 @@
     similarBusy: false,
     ranking_error: null,
     rankingBusy: false,
+    inventory: null,
+    inventoryError: null,
+    inventoryLoading: false,
     verdictError: null,
     checking: false,
   }
@@ -165,6 +168,11 @@
   // the same way; a list the resetters share cannot drift from itself.
   const DERIVED_FROM_SPECTRUM = [
     'verdicts', 'verdictError', 'ranking', 'ranking_error', 'similar', 'similarError',
+    // The proton counts are a reading of ONE acquisition under one structure.
+    // Left behind, they would be attributed to whatever is opened next -- the
+    // same defect this list exists for, and the reason a new field goes in here
+    // in the commit that introduces it rather than the one that finds the bug.
+    'inventory', 'inventoryError',
   ]
   const EMPTY_DERIVED = { verdicts: [] }
 
@@ -684,6 +692,129 @@
       c.append(table)
 
     }
+    c.append(inventorySection())
+    return c
+  }
+
+  // WHAT THE STRUCTURE GIVES BACK TO THE MEASUREMENT.
+  //
+  // The peak table above reports areas as a SHARE of the listed signals, and
+  // says in its own caveat that turning a share into a proton count needs a
+  // structure the analysis was not given. This is that caveat discharged: once a
+  // structure is on the page, the share has a denominator.
+  function inventorySection() {
+    const c = node('div')
+    if (state.inventoryLoading) {
+      c.append(node('p', 'tablenote', 'Counting protons against that structure\u2026'))
+      return c
+    }
+    if (state.inventoryError) {
+      // A failure here does NOT invalidate the verdict above, and saying so keeps
+      // a chemist from discarding a good structure check over a failed readout.
+      c.append(node('p', 'tablenote',
+        'Proton counts could not be worked out for this structure. The check above still '
+        + 'stands. ' + state.inventoryError))
+      return c
+    }
+    const inv = state.inventory
+    if (!inv) return c
+
+    if (!inv.applicable) {
+      c.append(node('h4', 'peaks-section__heading', 'Proton counts'))
+      c.append(node('p', 'card__desc', inv.reason))
+      return c
+    }
+
+    c.append(node('h4', 'peaks-section__heading', 'Expected against observed'))
+    const st = inv.structure
+    c.append(node('p', 'card__desc',
+      'Areas above are a share of the signals listed. ' + st.formula + ' has '
+      + st.non_labile_hydrogens + ' hydrogen' + (st.non_labile_hydrogens === 1 ? '' : 's')
+      + ' that do not exchange'
+      + (st.labile_hydrogens > 0
+        ? ' (of ' + st.total_hydrogens + ', the other ' + st.labile_hydrogens
+          + ' being OH, NH or SH, which exchange with the solvent and often are not seen)'
+        : '')
+      + ', so that count is what the shares are scaled to.'))
+
+    // THE SENTENCE THIS PANEL EXISTS TO PREVENT. The totals agree because the
+    // scale was chosen to make them agree. A reader who takes the bottom row as
+    // confirmation has read the arithmetic backwards, and it is the one
+    // misreading that would make this panel worse than showing nothing.
+    c.append(alert('info', 'The totals match because they were made to',
+      'The scale is set so the measured signals add up to ' + st.non_labile_hydrogens
+      + ' H. The bottom row therefore agrees for any structure with '
+      + st.non_labile_hydrogens + ' non-exchanging hydrogens, and is not evidence for this '
+      + 'one. What carries information is how far each signal sits from a whole number, '
+      + 'and how the regions below disagree.'))
+
+    // Per-signal, which is where the evidence actually is.
+    const t1 = node('table', 'peaks')
+    const h1 = node('thead'); const r1 = node('tr')
+    for (const label of ['Signal', 'Shift (ppm)', 'Share', 'Protons', 'Nearest whole', 'Off by'])
+      r1.append(colHead(label))
+    h1.append(r1); t1.append(h1)
+    const b1 = node('tbody')
+    for (const sig of inv.signals) {
+      const tr = node('tr')
+      tr.append(node('td', null, sig.name))
+      tr.append(node('td', null, Number(sig.center_ppm).toFixed(3)))
+      tr.append(node('td', null, Number(sig.relative_area).toFixed(4)))
+      tr.append(node('td', null, Number(sig.protons).toFixed(2)))
+      // A count below the quantitation floor is not a measurement, so neither is
+      // the whole number nearest to it. Withheld rather than printed faintly.
+      tr.append(node('td', null, sig.quantifiable ? String(sig.nearest_whole) : '\u2014'))
+      tr.append(node('td', null, sig.quantifiable ? Number(sig.off_by).toFixed(2) : '\u2014'))
+      b1.append(tr)
+    }
+    t1.append(b1); c.append(t1)
+    c.append(node('p', 'tablenote',
+      'A signal far from a whole number is the finding here: two environments that merged '
+      + 'into one signal, one that was split into several, or a structure that does not fit. '
+      + 'The largest gap in this spectrum is ' + Number(inv.largest_residual).toFixed(2) + ' H.'
+      + ' Signals below the limit of quantitation are left blank rather than rounded, because '
+      + 'their area is not a measurement.'))
+
+    // The class table, which is what the web product shows.
+    const ci = inv.class_inventory || {}
+    const obs = ci.observed || {}; const exp = ci.expected || {}; const dl = ci.deltas || {}
+    const REGIONS = [
+      ['aromatic', 'Aromatic / alkene (6\u20139 ppm)'],
+      ['anomeric_or_olefinic', 'Olefinic / anomeric (4.4\u20136 ppm)'],
+      ['aliphatic', 'Aliphatic and heteroatom-adjacent'],
+      ['labile', 'Exchangeable (OH, NH, SH)'],
+    ]
+    const rows = REGIONS.filter(([k]) => obs[k] != null || exp[k] != null)
+    if (rows.length) {
+      const t2 = node('table', 'peaks')
+      const h2 = node('thead'); const r2 = node('tr')
+      for (const label of ['Region of the spectrum', 'Observed (H)', 'Structure predicts (H)', 'Difference'])
+        r2.append(colHead(label))
+      h2.append(r2); t2.append(h2)
+      const b2 = node('tbody')
+      for (const [k, label] of rows) {
+        const tr = node('tr')
+        tr.append(node('td', null, label))
+        tr.append(node('td', null, obs[k] == null ? '\u2014' : Number(obs[k]).toFixed(1)))
+        tr.append(node('td', null, exp[k] == null ? '\u2014' : String(exp[k])))
+        const d = dl[k]
+        tr.append(node('td', null, d == null ? '\u2014' : (d > 0 ? '+' : '') + Number(d).toFixed(1)))
+        b2.append(tr)
+      }
+      t2.append(b2); c.append(t2)
+      // THESE ARE SHIFT WINDOWS, NOT ASSIGNMENTS, and the difference matters
+      // enough to say. The classifier buckets a signal by where it falls on the
+      // axis: on this build it labelled a signal in a nitrogen-free molecule
+      // "nitrogen adjacent", because 2-3 ppm is that window. Aggregated the
+      // label never reaches the reader, but a signal sitting near a boundary
+      // still lands in the neighbouring row, so a small difference here is not
+      // by itself a discrepancy.
+      c.append(node('p', 'tablenote',
+        'Rows are regions of the chemical-shift axis, not assignments \u2014 a signal near a '
+        + 'boundary falls in the neighbouring row, so treat a small difference as noise. A '
+        + 'large one says the spectrum puts signal where this structure predicts none, which '
+        + 'is worth explaining before the structure is accepted.'))
+    }
     return c
   }
 
@@ -934,6 +1065,27 @@
     }
   }
 
+  async function loadInventory(smiles) {
+    // Deliberately NOT awaited by checkStructure: the verdict is the answer the
+    // chemist asked for and must not wait behind a second acquisition read.
+    // A failure here leaves the verdict standing and says so in its own row.
+    state.inventoryLoading = true; state.inventoryError = null; render()
+    try {
+      const out = await window.moltrace.analysis.protonInventory(smiles)
+      if (out && out.ok) {
+        state.inventory = out.result
+      } else {
+        state.inventory = null
+        state.inventoryError = (out && out.reason) || 'proton counts could not be worked out'
+      }
+    } catch (e) {
+      state.inventory = null
+      state.inventoryError = (e && e.message) || 'proton counts could not be worked out'
+    } finally {
+      state.inventoryLoading = false; render()
+    }
+  }
+
   async function checkStructure() {
     if (!state.candidate.trim()) {
       state.verdictError = 'Type a structure to check it against this spectrum.'
@@ -958,6 +1110,17 @@
         }
         // The ranking is over a SET; adding a candidate changes it.
         clearDerived(['ranking', 'ranking_error'])
+        // THE ONE CALL THAT RUNS BACK THE OTHER WAY. Everything else scores a
+        // structure against a fixed measurement; this takes the structure back
+        // to the measurement and turns each signal's share of the area into a
+        // proton count. Fired for the FIRST structure only: the counts are a
+        // reading of this spectrum under one assumed structure, and showing two
+        // sets side by side would invite reading them as a comparison, which
+        // they are not -- each is normalised to its own structure's hydrogen
+        // count, so their totals agree by construction and always match.
+        if (state.verdicts.length === 1) {
+          loadInventory(out.result.smiles)
+        }
         state.candidate = ''
       } else {
         state.verdictError = (out && out.reason) || 'that structure could not be checked'

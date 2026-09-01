@@ -34,6 +34,7 @@ from .local_science import (
     open_spectrum,
     process_spectrum,
     rank_candidates,
+    structure_inventory,
     verify_candidate,
 )
 from .offline_policy import is_served_locally
@@ -53,6 +54,7 @@ ROUTES: dict[str, tuple[str, str]] = {
     "fid.open": ("POST", "/fid/open"),
     "structure.verify": ("POST", "/structure/verify"),
     "structure.rank": ("POST", "/structure/rank"),
+    "structure.inventory": ("POST", "/structure/inventory"),
     "spectrum.similar": ("POST", "/spectrum/similar"),
 }
 
@@ -254,6 +256,50 @@ def _structure_verify(payload: dict = _BODY) -> dict[str, Any]:
     return result
 
 
+def _structure_inventory(payload: dict = _BODY) -> dict[str, Any]:
+    """Turn the measured areas into proton counts, now that a structure is known.
+
+    Not `async`, for the reason the others are not: it re-opens the acquisition
+    and the fit is blocking numerical work.
+
+    A SEPARATE OPERATION RATHER THAN A FIELD ON `structure.verify`, because it
+    answers a different question and can decline on its own terms. A 13C
+    acquisition has no proton inventory at all, and a structure whose hydrogens
+    all exchange has nothing to scale against; both are ordinary outcomes here
+    and neither should look like a failed structure check.
+    """
+    HANDLER_CALLS.append("structure.inventory")
+    path = str(payload.get("path") or "")
+    smiles = str(payload.get("smiles") or "")
+    if not path:
+        _journal("structure.inventory", refused=True, cause="no file was named")
+        raise HTTPException(status_code=400, detail="no file was named")
+    if not smiles.strip():
+        _journal("structure.inventory", refused=True, cause="no structure was given")
+        raise HTTPException(
+            status_code=400, detail="no structure was given to count protons against"
+        )
+    try:
+        result = structure_inventory(path, smiles)
+    except SpectrumUnreadable as unreadable:
+        _journal("structure.inventory", refused=True, cause=str(unreadable))
+        raise HTTPException(status_code=400, detail=str(unreadable)) from None
+
+    # Whether it applied and how far the worst signal sat from a whole number --
+    # never the structure, and never the per-signal counts, which are the
+    # chemist's unpublished work.
+    _journal(
+        "structure.inventory",
+        refused=False,
+        cause=(
+            f"largest residual {result['largest_residual']} H"
+            if result.get("applicable")
+            else "not applicable to this acquisition"
+        ),
+    )
+    return result
+
+
 def _structure_rank(payload: dict = _BODY) -> dict[str, Any]:
     """Order candidate structures by shift agreement, over this acquisition.
 
@@ -393,6 +439,7 @@ def create_local_app(
         "fid.open": _fid_open,
         "structure.verify": _structure_verify,
         "structure.rank": _structure_rank,
+        "structure.inventory": _structure_inventory,
         "spectrum.similar": _spectrum_similar,
     }
     for operation, (method, path) in ROUTES.items():

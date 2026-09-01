@@ -272,6 +272,60 @@ untouched.
 
 ---
 
+## v0.74.10 — The structure now feeds back into the measurement (2026-08-31)
+
+Every offline path ran one way: measure the spectrum without a structure, then score a structure
+against that fixed measurement. Nothing flowed back. Areas were therefore reported as a SHARE of
+the listed signals, and the caveat said why — a proton count needs a denominator only a structure
+supplies.
+
+`structure.inventory` is that denominator. Given the structure a chemist has already typed, each
+signal's share becomes a proton count, and the platform's own `build_proton_inventory` produces
+the same expected-against-observed table the web product shows.
+
+**Scaled to the NON-LABILE hydrogens, which is the whole correctness of it.** OH, NH and SH
+exchange with the solvent and with each other; in a protic solvent they broaden, shift, or vanish.
+Normalising a spectrum that never showed them against a count that includes them puts every other
+signal low by the missing fraction — for glycerol, three of eight hydrogens, that is 37.5%. The
+guard asserts the counts sum to 5 and not to 8.
+
+**The total is not evidence and the panel says so in its own alert.** The scale is chosen so the
+measured signals add up to the structure's hydrogen count, so the bottom row agrees for *any*
+structure with that many non-exchanging hydrogens. A reader taking it as confirmation has read the
+arithmetic backwards. What carries information is the per-signal residual: on the reference
+acquisition, one signal lands at 2.97 H against an expected 3, while three others sit near
+half-integers — 0.51, 0.45, 0.59 — which is the peak detector splitting single protons in two, a
+known defect this readout now surfaces rather than hides.
+
+**Two categorisers meet here and only one answers the question.** The peak table's category comes
+from `classify_peaks`, whose entire vocabulary is compound / solvent / impurity — it answers "is
+this the sample". The inventory buckets by CHEMICAL CLASS, which is `categorize_peak`. Handing the
+first one's words to the second matches none of its category sets, so every observed row came back
+0.0 while the total was right: a table that looks computed and says nothing. It was built that way
+first, measured, and fixed; the guard fails with "every observed region is zero while the total is
+14.1" if the wiring is reverted. The two are not merged — `classify_peaks` stays authoritative for
+whether a signal is the compound at all, or the inventory would count a signal the table calls
+solvent.
+
+**The rows are regions of the shift axis, not assignments,** and the table says so. The classifier
+labelled a signal in a nitrogen-free molecule "nitrogen adjacent" because 2–3 ppm is that window.
+Aggregation keeps that label off the screen, but a signal near a boundary still lands in the
+neighbouring row, so a small difference there is not a discrepancy.
+
+It declines rather than inventing a denominator: a 13C acquisition has no proton inventory, and a
+structure whose hydrogens all exchange has nothing to scale against. Both are ordinary outcomes
+and neither reads as a failed structure check. `inventory` joins `DERIVED_FROM_SPECTRUM` in the
+same commit that introduces it, so a count computed for one acquisition cannot survive into the
+next — the stale-state defect this list already exists for.
+
+Not a fifth test. The verifier remains the sole arbiter and this never moves a verdict.
+
+Backend 45/45 including the slow guards; desktop 10 stages and **19** round-trip assertions, four
+of them new and driven through the real service, including the one that matters: proton counts
+never render without the sentence saying the total is circular.
+
+---
+
 ## v0.74.9 — Two of the four checks can never run here, and the screen blamed the data (2026-08-31)
 
 Salvaged from an adversarial audit that returned **nothing**: all six of its agents were killed

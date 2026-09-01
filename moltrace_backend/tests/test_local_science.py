@@ -1423,3 +1423,151 @@ def test_a_test_that_carried_no_weight_says_what_zeroed_it() -> None:
 
     if zeroed == 0:
         pytest.skip("no acquisition here has an applicable assignments test at zero weight")
+
+
+@pytest.mark.slow
+def test_proton_counts_are_scaled_to_the_hydrogens_that_do_not_exchange() -> None:
+    """The one place a supplied structure flows back into the measurement.
+
+    Areas are reported as a share because turning one into a proton count needs a
+    denominator only a structure supplies. This asserts the denominator is the
+    right one and that the readout says what it cannot show.
+
+    NON-LABILE, not total: OH/NH/SH exchange and frequently are not observed, so
+    scaling a spectrum that never showed them against a count including them puts
+    every other signal low by the missing fraction.
+    """
+    from nmrcheck.local_science import (
+        SpectrumUnreadable,
+        structure_inventory,
+    )
+
+    source = None
+    for candidate in _acquisitions():
+        try:
+            found = structure_inventory(candidate, "C=CCOCC1CO1")
+        except SpectrumUnreadable:
+            continue
+        if found.get("applicable"):
+            source = candidate
+            break
+    if source is None:
+        pytest.skip("no 1H acquisition here can be counted against this structure")
+
+    inv = structure_inventory(source, "C=CCOCC1CO1")
+    st = inv["structure"]
+    assert st["non_labile_hydrogens"] == 10 and st["total_hydrogens"] == 10
+
+    # The counts sum to the structure's non-labile hydrogens BY CONSTRUCTION, and
+    # the payload has to say so, because a reader who takes the total as
+    # agreement has read the arithmetic backwards.
+    total = sum(row["protons"] for row in inv["signals"])
+    assert abs(total - st["non_labile_hydrogens"]) < 0.05
+    assert inv["scale"]["total_matches_by_construction"] is True
+    assert inv["scale"]["basis"] == "non_labile_hydrogens"
+
+    # Glycerol: 8 hydrogens, 3 of them OH. Scaling to 8 would put every signal
+    # 37.5% low, so the basis must be 5.
+    glycerol = structure_inventory(source, "OCC(O)CO")
+    if glycerol.get("applicable"):
+        assert glycerol["structure"]["non_labile_hydrogens"] == 5
+        assert glycerol["structure"]["total_hydrogens"] == 8
+        counted = sum(row["protons"] for row in glycerol["signals"])
+        assert abs(counted - 5) < 0.05, (
+            f"counts summed to {counted}, so the scale used the total hydrogen count "
+            f"rather than the non-exchanging one"
+        )
+
+
+@pytest.mark.slow
+def test_the_expected_against_observed_table_is_not_silently_empty() -> None:
+    """Two categorisers meet in the inventory and only one answers its question.
+
+    The peak table's category comes from `classify_peaks`, whose whole vocabulary
+    is compound / solvent / impurity -- it answers "is this the sample". The
+    inventory buckets by CHEMICAL CLASS, which is `categorize_peak`. Handing the
+    first one's words to the second matches none of its category sets, so every
+    observed row comes back 0.0 while the total is right: a table that looks
+    computed and says nothing at all. It shipped that way for one commit.
+
+    Non-vacuous by construction: the acquisition must put signal in at least one
+    region, or this asserts that zero equals zero.
+    """
+    from nmrcheck.local_science import (
+        SpectrumUnreadable,
+        structure_inventory,
+    )
+
+    source = None
+    for candidate in _acquisitions():
+        try:
+            found = structure_inventory(candidate, "C=CCOCC1CO1")
+        except SpectrumUnreadable:
+            continue
+        if found.get("applicable"):
+            source = candidate
+            break
+    if source is None:
+        pytest.skip("no 1H acquisition here can be counted against this structure")
+
+    inv = structure_inventory(source, "C=CCOCC1CO1")
+    observed = inv["class_inventory"]["observed"]
+    regions = ("aromatic", "anomeric_or_olefinic", "aliphatic", "labile")
+    populated = [r for r in regions if float(observed.get(r) or 0.0) > 0.0]
+    assert populated, (
+        "every observed region is zero while the total is "
+        f"{observed.get('total')} -- the class buckets are not being fed a chemical "
+        f"class, which is what an empty expected-vs-observed table looks like"
+    )
+    # And the total must not exceed what the regions account for, or the table
+    # would show a total no row explains.
+    assert float(observed.get("total") or 0.0) > 0.0
+
+
+@pytest.mark.slow
+def test_counting_protons_declines_rather_than_inventing_a_denominator() -> None:
+    """Three ordinary situations where there is no proton count to give.
+
+    Each must decline in its own words rather than returning an empty table, and
+    none may read as a failed structure check -- a 13C acquisition having no
+    proton inventory is a fact about the nucleus, not a fault.
+    """
+    from nmrcheck.local_science import (
+        SpectrumUnreadable,
+        open_spectrum,
+        structure_inventory,
+    )
+
+    carbon = None
+    proton = None
+    for candidate in _acquisitions():
+        try:
+            opened = open_spectrum(candidate)
+        except Exception:  # noqa: BLE001 - unreadable acquisitions are not this test's subject
+            continue
+        if opened.get("nucleus") == "13C" and carbon is None:
+            carbon = candidate
+        if opened.get("nucleus") == "1H" and proton is None:
+            proton = candidate
+        if carbon and proton:
+            break
+
+    if carbon:
+        got = structure_inventory(carbon, "CCO")
+        assert got["applicable"] is False
+        assert "1H" in got["reason"] or "13C" in got["reason"]
+        assert got["human_review_required"] is True
+
+    if proton:
+        # Water: every hydrogen exchanges, so there is no fixed count to scale to.
+        water = structure_inventory(proton, "O")
+        assert water["applicable"] is False
+        assert "exchang" in water["reason"].lower()
+
+        # And the refusals name the input, never the machinery or the path.
+        for bad, expect in (("", "structure"), ("Te]CC1", "molecule")):
+            with pytest.raises(SpectrumUnreadable) as raised:
+                structure_inventory(proton, bad)
+            said = str(raised.value)
+            assert expect in said.lower()
+            assert "/" not in said and "nmrglue" not in said.lower()

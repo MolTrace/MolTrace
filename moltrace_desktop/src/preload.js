@@ -68,6 +68,12 @@ contextBridge.exposeInMainWorld('moltrace', {
     // A LIST of structures and still no path. DP4 normalises across the set, so
     // this is the one call that has to see them together.
     rankStructures: async (smilesList) => ipcRenderer.invoke('moltrace:rank-structures', smilesList),
+    // The one call that runs the other way. Everything above measures the
+    // spectrum and then scores a structure against that fixed measurement; this
+    // takes the structure BACK to the measurement and turns each signal's share
+    // of the area into a proton count, which is a number the spectrum alone
+    // cannot produce. Same rule as the rest: a structure, never a path.
+    protonInventory: async (smiles) => ipcRenderer.invoke('moltrace:proton-inventory', smiles),
     // No arguments at all: the acquisition is the one already open, and the
     // library is the one shipped with the build.
     findSimilar: async () => ipcRenderer.invoke('moltrace:find-similar'),

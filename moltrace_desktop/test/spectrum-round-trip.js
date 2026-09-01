@@ -235,6 +235,62 @@ app.whenReady().then(async () => {
     if (/^\d+$/.test(name)) throw new Error(`the acquisition is named "${name}", which identifies nothing`)
   })
 
+  // ---- the structure feeding back into the measurement ---------------------
+  //
+  // Everything above measures the spectrum. This types a structure and asserts
+  // what comes back the other way. Deliberately structure-INDEPENDENT: the
+  // fixture is whichever acquisition this checkout happens to hold, so the
+  // assertions are invariants that must hold for any structure against any
+  // spectrum, not facts about one molecule.
+  const typed = await win.webContents.executeJavaScript([
+    '(()=>{',
+    '  const i = document.querySelector(\'input[aria-label="Candidate structure as SMILES"]\')',
+    "  if (!i) return 'NO INPUT'",
+    "  const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set",
+    "  setter.call(i, 'C=CCOCC1CO1')",
+    "  i.dispatchEvent(new Event('input', { bubbles: true }))",
+    "  const b = [...document.querySelectorAll('button')].find(x => /^Check structure/.test(x.textContent.trim()))",
+    "  if (!b) return 'NO BUTTON'",
+    '  b.click(); return \'clicked\'',
+    '})()',
+  ].join('\n'), true)
+
+  if (typed === 'clicked') {
+    for (let i = 0; i < 120; i++) {
+      await new Promise((r) => setTimeout(r, 500))
+      const settled = await win.webContents.executeJavaScript(
+        "/Expected against observed|Proton counts|could not be worked out|was not checked/.test(document.body.textContent||'')", true)
+      if (settled) break
+    }
+    const inv = await win.webContents.executeJavaScript(
+      "(()=>{const t=document.body.textContent||''; return JSON.stringify({"
+      + "counts: /Nearest whole/.test(t), circular: /totals match because they were made to/i.test(t),"
+      + "declined: /Proton counts/.test(t) && !/Nearest whole/.test(t),"
+      + "regions: /Region of the spectrum/.test(t),"
+      + "path: /(?:\\/[\\w.-]+){2,}/.test(t)})})()", true)
+    const got = JSON.parse(inv)
+
+    check('a checked structure produces proton counts or says why not', () => {
+      if (!got.counts && !got.declined) {
+        throw new Error('the structure check produced neither proton counts nor a stated reason')
+      }
+    })
+    // THE ONE THAT MATTERS. The counts sum to the structure's hydrogen count
+    // because the scale was chosen to make them; shown without that sentence,
+    // the bottom row reads as confirmation of the structure it assumed.
+    check('proton counts never appear without saying the total is circular', () => {
+      if (got.counts && !got.circular) {
+        throw new Error('proton counts rendered with no note that the total agrees by construction')
+      }
+    })
+    check('shift regions are labelled as regions, not as assignments', () => {
+      if (got.counts && !got.regions) throw new Error('the expected-vs-observed table did not render')
+    })
+    check('counting protons renders no filesystem path', () => {
+      if (got.path) throw new Error('a path was rendered by the proton-count panel')
+    })
+  }
+
   clearTimeout(watchdog)
   main.shutdown()
   console.log(problems.length

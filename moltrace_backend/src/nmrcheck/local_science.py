@@ -41,6 +41,9 @@ from moltrace.spectroscopy.peaks.gsd import (
     _distance_points,
 )
 
+from .chemistry import structure_summary_from_smiles
+from .peak_categorization import build_proton_inventory, categorize_peak
+
 
 @dataclass(frozen=True)
 class PeakSummary:
@@ -682,6 +685,187 @@ _DP4_BASIS = (
     "the structure is correct. The DP4 error model was fitted to DFT-computed shifts; the "
     "shifts ranked here come from an empirical predictor with a wider measured error."
 )
+
+
+def structure_inventory(path: str | Path, smiles: str) -> dict:
+    """What the measured areas become once a structure is known.
+
+    THIS IS THE ONE PLACE A SUPPLIED STRUCTURE FLOWS BACK INTO THE MEASUREMENT.
+    Everything else here runs one way: the spectrum is measured without a
+    structure, and a structure is then scored against that fixed measurement.
+    Areas are reported as a SHARE of the listed signals for exactly that reason --
+    turning a share into a proton count needs a denominator only the structure
+    supplies, and the readout says so in as many words.
+
+    Given one, the share becomes protons. The scale is the structure's own
+    non-labile hydrogen count divided by the share the compound's signals hold.
+
+    NON-LABILE, not total. OH, NH and SH protons exchange with the solvent and
+    with each other; in a protic solvent they broaden, shift, or vanish, and
+    normalising a spectrum that never showed them against a count that includes
+    them shrinks every other signal by the missing fraction. A structure with
+    four of its twelve hydrogens labile would put every count 33% low.
+
+    WHAT THIS CANNOT TELL YOU, and the reason the total is reported as a
+    constraint rather than a result: the total matches the expectation BY
+    CONSTRUCTION. The scale is chosen to make it match. A reader who sees "10.00
+    of 10 H" and takes it as agreement has read the arithmetic backwards. The
+    evidence is entirely in the PER-SIGNAL residuals -- a real structure puts
+    each signal near a whole number, and a signal sitting at 1.4 H is telling you
+    that two environments merged, that one split into several, or that the
+    structure is wrong. The verifier remains the arbiter of the last of those;
+    this is a readout, not a fifth test, and it never moves the verdict.
+    """
+    source = Path(path)
+    candidate = (smiles or "").strip()
+    if not candidate:
+        raise SpectrumUnreadable("no structure was given to count protons against")
+
+    summary = open_spectrum(str(source))
+    nucleus = str(summary.get("nucleus") or "unknown")
+
+    # A proton inventory over carbon is not a thing. Said plainly rather than
+    # returned as an empty table the reader has to interpret.
+    if nucleus != "1H":
+        return {
+            "applicable": False,
+            "nucleus": nucleus,
+            "reason": (
+                f"Counting protons needs a {'1H'} spectrum, and this one is {nucleus}. "
+                f"The structure check above still applies."
+            ),
+            "human_review_required": True,
+        }
+
+    try:
+        structure = structure_summary_from_smiles(candidate)
+    except Exception as bad:  # noqa: BLE001 - the chemist's input, not a fault
+        raise SpectrumUnreadable(
+            f"that structure could not be read as a molecule ({bad})"
+        ) from None
+
+    multiplets = list(summary.get("multiplets") or [])
+    compound = [m for m in multiplets if m.get("category") == "compound"]
+    share = sum(float(m.get("relative_area") or 0.0) for m in compound)
+
+    non_labile = int(structure.non_labile_hydrogens)
+    if non_labile <= 0:
+        return {
+            "applicable": False,
+            "nucleus": nucleus,
+            "reason": (
+                f"{structure.formula} has no non-exchanging hydrogens to count against, so a "
+                f"proton count cannot be scaled from this spectrum."
+            ),
+            "human_review_required": True,
+        }
+    if share <= 0.0:
+        return {
+            "applicable": False,
+            "nucleus": nucleus,
+            "reason": (
+                "No signal here is attributed to the compound, so there is no area to turn "
+                "into proton counts."
+            ),
+            "human_review_required": True,
+        }
+
+    scale = non_labile / share
+
+    rows = []
+    for m in sorted(compound, key=lambda x: -float(x.get("center_ppm") or 0.0)):
+        protons = float(m.get("relative_area") or 0.0) * scale
+        nearest = round(protons)
+        rows.append(
+            {
+                "name": m.get("name"),
+                "center_ppm": m.get("center_ppm"),
+                "relative_area": m.get("relative_area"),
+                "protons": round(protons, 2),
+                "nearest_whole": int(nearest),
+                # The residual IS the evidence, so it travels as a number rather
+                # than as a rendered string a reader has to re-derive.
+                "off_by": round(abs(protons - nearest), 2),
+                # Below the quantitation floor an area is not a measurement, so a
+                # proton count derived from one is not either.
+                "quantifiable": bool(m.get("quantifiable")),
+            }
+        )
+
+    # The class-level table the platform already computes, so the desktop shows
+    # the same expected-vs-observed a chemist sees on the web rather than a
+    # second, subtly different one.
+    #
+    # TWO CATEGORISERS MEET HERE AND ONLY ONE OF THEM ANSWERS THIS QUESTION.
+    # What the peak table shows comes from `classify_peaks`, whose vocabulary is
+    # compound / solvent / impurity -- it answers "is this the sample". The
+    # inventory buckets by CHEMICAL CLASS -- aromatic, olefinic, oxygenated,
+    # labile -- which is `categorize_peak`. Handing the first one's words to the
+    # second matches none of its category sets, so every observed class comes
+    # back 0.0 while the total is right: a table that looks computed and says
+    # nothing. Measured before this line existed.
+    #
+    # The two are not merged. `classify_peaks` stays authoritative for whether a
+    # signal is the compound at all, because that is the call the peak table
+    # renders and a disagreement between the two would put a signal in the
+    # inventory that the table calls solvent. `categorize_peak` is asked only
+    # what KIND of proton an already-accepted compound signal is.
+    peaks = []
+    for m in multiplets:
+        if m.get("category") != "compound":
+            # Carried through with its own label so the inventory can exclude it
+            # from the total exactly as the web does.
+            peaks.append({"category": m.get("category"), "shift_ppm": m.get("center_ppm")})
+            continue
+        try:
+            fine = categorize_peak(
+                nucleus="1H",
+                shift_ppm=float(m.get("center_ppm") or 0.0),
+                multiplicity=str(m.get("multiplicity") or "") or None,
+                solvent=summary.get("solvent") or None,
+                structure=structure,
+                integration_h=float(m.get("relative_area") or 0.0) * scale,
+            )
+            chemical_class = str(fine.get("category") or "")
+        except Exception:  # noqa: BLE001 - an uncategorised signal still counts
+            chemical_class = ""
+        peaks.append(
+            {
+                "category": chemical_class,
+                "shift_ppm": m.get("center_ppm"),
+                "integration_h": float(m.get("relative_area") or 0.0) * scale,
+            }
+        )
+    inventory = build_proton_inventory(
+        peaks=peaks,
+        structure=structure,
+        nucleus="1H",
+        solvent=summary.get("solvent") or None,
+    )
+
+    worst = max((r["off_by"] for r in rows if r["quantifiable"]), default=0.0)
+    return {
+        "applicable": True,
+        "nucleus": nucleus,
+        "structure": {
+            "formula": structure.formula,
+            "total_hydrogens": int(structure.total_hydrogens),
+            "non_labile_hydrogens": non_labile,
+            "labile_hydrogens": int(structure.labile_hydrogens),
+        },
+        "scale": {
+            "hydrogens_per_share": round(scale, 4),
+            "compound_share": round(share, 4),
+            "basis": "non_labile_hydrogens",
+            # Stated as data so the interface cannot present the total as
+            # agreement even by accident.
+            "total_matches_by_construction": True,
+        },
+        "signals": rows,
+        "largest_residual": round(float(worst), 2),
+        "class_inventory": inventory,
+        "human_review_required": True,
+    }
 
 
 def rank_candidates(path: str | Path, smiles_list: Sequence[str]) -> dict:
