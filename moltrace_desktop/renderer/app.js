@@ -737,6 +737,30 @@
         : '')
       + ', so that count is what the shares are scaled to.'))
 
+    // WHAT WAS LEFT OUT OF THE DENOMINATOR. Placed ABOVE the counts, not below
+    // them, because it decides whether they mean anything: the scale divides the
+    // structure's hydrogens by the share held by signals called the compound, so
+    // a signal wrongly classified away puts every count out by the ratio of the
+    // shares while still producing whole-looking numbers.
+    const ex = inv.excluded || {}
+    const contested = ex.coupled_signals || []
+    if (contested.length) {
+      c.append(alert('warn', 'Some excluded signals look like they could be yours',
+        Math.round(100 * (ex.share || 0)) + '% of the listed area was set aside as solvent or '
+        + 'impurity and is not in the counts below. ' + contested.length + ' of those '
+        + (contested.length === 1 ? 'signals carries' : 'signals carry') + ' resolved coupling '
+        + '\u2014 ' + contested.map((x) => x.name + ' at ' + Number(x.center_ppm).toFixed(2)
+          + ' ppm, ' + x.line_count + ' lines, ' + Math.round(100 * x.relative_area) + '% of the area')
+          .join('; ') + '. Water, chloroform and acetone are single lines, so a coupled signal '
+        + 'here is worth your eye \u2014 though a residual solvent can be coupled too, and this '
+        + 'has not been reclassified. If any of them is your compound, every count below is wrong.'))
+    } else if ((ex.share || 0) > 0) {
+      c.append(node('p', 'tablenote',
+        Math.round(100 * ex.share) + '% of the listed area was set aside as solvent or impurity '
+        + 'and is not counted. The counts below divide the structure\u2019s hydrogens across the '
+        + 'remaining ' + Math.round(100 * (ex.counted_share || 0)) + '%.'))
+    }
+
     // THE SENTENCE THIS PANEL EXISTS TO PREVENT. The totals agree because the
     // scale was chosen to make them agree. A reader who takes the bottom row as
     // confirmation has read the arithmetic backwards, and it is the one

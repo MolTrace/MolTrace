@@ -312,6 +312,27 @@ labelled a signal in a nitrogen-free molecule "nitrogen adjacent" because 2–3 
 Aggregation keeps that label off the screen, but a signal near a boundary still lands in the
 neighbouring row, so a small difference there is not a discrepancy.
 
+**And it discloses what it left out of the denominator, which is the thing most likely to make
+these numbers wrong.** The scale divides the structure's hydrogens by the share held by signals
+classified `compound`, so everything called solvent or impurity is excluded — and if one of those
+is really the compound, every count is out by the ratio of the shares while still looking like a
+whole number. Chased on a second known molecule: a 1,2-epoxybutane acquisition (C4H8O, four
+distinct environments, eight hydrogens) returns just **two** compound signals reading 5.29 H and
+2.71 H, because **48.7% of its listed area is classified away** — a 9-line multiplet at 1.583 ppm
+called an impurity, and a 4-line one at 2.486 called residual solvent.
+
+The mechanism is that `classify_peak` decides per LINE and by POSITION, and a multiplet then
+inherits its strongest line's verdict. Water in CDCl3 sits at 1.56 and is a **singlet**; a 9-line
+coupled multiplet whose strongest line lands there inherits "impurity" at 85% confidence.
+
+Nothing is reclassified. The deterministic classifier decides, and a heuristic overriding it here
+is exactly the guess this codebase keeps away from the arbiter — the exceptions are real, since
+DMSO-d5's residual is a quintet and ethyl acetate gives a triplet and a quartet. What is added is
+the disclosure: the excluded share, and every excluded signal carrying resolved coupling, with the
+sentence "if any of them is your compound, every count below is wrong." Across this corpus
+contaminant-labelled multiplets have a **median of 1 line**, so flagging three or more is a
+measured separation and not a threshold chosen to fit.
+
 It declines rather than inventing a denominator: a 13C acquisition has no proton inventory, and a
 structure whose hydrogens all exchange has nothing to scale against. Both are ordinary outcomes
 and neither reads as a failed structure check. `inventory` joins `DERIVED_FROM_SPECTRUM` in the
@@ -320,7 +341,7 @@ next — the stale-state defect this list already exists for.
 
 Not a fifth test. The verifier remains the sole arbiter and this never moves a verdict.
 
-Backend 45/45 including the slow guards; desktop 10 stages and **19** round-trip assertions, four
+Backend 46/46 including the slow guards; desktop 10 stages and **19** round-trip assertions, four
 of them new and driven through the real service, including the one that matters: proton counts
 never render without the sentence saying the total is circular.
 
