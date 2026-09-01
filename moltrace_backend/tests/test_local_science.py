@@ -1571,3 +1571,65 @@ def test_counting_protons_declines_rather_than_inventing_a_denominator() -> None
             said = str(raised.value)
             assert expect in said.lower()
             assert "/" not in said and "nmrglue" not in said.lower()
+
+
+@pytest.mark.slow
+def test_the_proton_counts_disclose_how_much_area_they_left_out() -> None:
+    """The counts depend entirely on which signals are called the compound.
+
+    The scale divides the structure's hydrogens by the share held by signals
+    classified `compound`, so anything called solvent or impurity is excluded from
+    the denominator. If one of those is really the compound, EVERY count is out by
+    the ratio of the shares -- and the arithmetic still produces whole-looking
+    numbers, so nothing about the output says it happened.
+
+    Measured: one 1,2-epoxybutane acquisition has 48.7% of its listed area
+    classified away -- a 9-line multiplet at 1.583 called an impurity (water in
+    CDCl3 sits at 1.56 and is a SINGLET) and a 4-line one at 2.486 called
+    residual solvent -- leaving two signals to carry all eight hydrogens, which
+    came out 5.29 and 2.71.
+
+    This asserts the DISCLOSURE, not a reclassification. `classify_peaks` is
+    deterministic and it decides; the readout's duty is to say what it removed.
+    """
+    from nmrcheck.local_science import open_spectrum, structure_inventory
+
+    seen_excluded = False
+    seen_contested = False
+    for candidate in _acquisitions():
+        try:
+            opened = open_spectrum(candidate)
+        except Exception:  # noqa: BLE001 - unreadable acquisitions are not the subject
+            continue
+        if opened.get("nucleus") != "1H":
+            continue
+        inv = structure_inventory(candidate, "CCC1CO1")
+        if not inv.get("applicable"):
+            continue
+        excluded = inv["excluded"]
+
+        # The two shares are the whole listed area between them, or one of them
+        # is being computed over a different set than it claims.
+        total = excluded["share"] + excluded["counted_share"]
+        assert 0.98 <= total <= 1.02, (
+            f"counted {excluded['counted_share']} + excluded {excluded['share']} = {total}, "
+            f"which is not the whole listed area"
+        )
+        if excluded["share"] > 0:
+            seen_excluded = True
+
+        # Every flagged signal must actually carry the evidence it is flagged for,
+        # or the warning is noise a reader learns to skip.
+        for sig in excluded["coupled_signals"]:
+            assert sig["line_count"] >= 3, f"flagged a {sig['line_count']}-line signal as coupled"
+            assert sig["category"] not in ("compound", ""), (
+                f"flagged a {sig['category']!r} signal as excluded"
+            )
+            seen_contested = True
+
+    if not seen_excluded:
+        pytest.skip("no acquisition here classifies any area away, so this asserts nothing")
+    assert seen_contested, (
+        "no contaminant-labelled multiplet in this corpus carries resolved coupling, so the "
+        "flag never fires and this test is vacuous -- the epoxybutane acquisition has two"
+    )

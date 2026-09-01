@@ -843,6 +843,50 @@ def structure_inventory(path: str | Path, smiles: str) -> dict:
         solvent=summary.get("solvent") or None,
     )
 
+    # WHAT WAS LEFT OUT OF THE DENOMINATOR, because the counts depend on it
+    # entirely and nothing on screen said so.
+    #
+    # The scale is the structure's hydrogen count divided by the share held by
+    # signals classified `compound`. Every signal called solvent or impurity is
+    # therefore excluded, and if one of them is really the compound, EVERY count
+    # is wrong by the ratio of the shares -- silently, because the arithmetic
+    # still produces whole-looking numbers.
+    #
+    # Measured on this corpus: one acquisition of 1,2-epoxybutane has 48% of its
+    # listed area classified away (a 9-line multiplet at 1.583 called an impurity,
+    # and a 4-line one at 2.486 called residual solvent), leaving two compound
+    # signals to carry all 8 hydrogens. The counts came out 5.29 and 2.71.
+    #
+    # THIS DOES NOT RECLASSIFY ANYTHING. `classify_peaks` is deterministic and it
+    # decides; a heuristic here that overrode it would be exactly the kind of
+    # guess this codebase keeps out of the arbiter's way. What is added is the
+    # disclosure: how much was excluded, and which excluded signals carry
+    # resolved coupling. Water, chloroform, acetone and TMS are SINGLETS -- a
+    # contaminant-labelled multiplet with several resolved lines is at least worth
+    # a chemist's eye. Across this corpus contaminant-labelled multiplets have a
+    # median of 1 line, so this is a real separation and not a threshold invented
+    # to fit; the exceptions are real too (DMSO-d5 is a quintet, ethyl acetate
+    # gives a triplet and a quartet), which is why these are flagged and not
+    # moved.
+    excluded_share = sum(
+        float(m.get("relative_area") or 0.0)
+        for m in multiplets
+        if m.get("category") != "compound"
+    )
+    contested = [
+        {
+            "name": m.get("name"),
+            "center_ppm": m.get("center_ppm"),
+            "category": m.get("category"),
+            "relative_area": m.get("relative_area"),
+            "line_count": int(m.get("line_count") or 0),
+            "multiplicity": m.get("multiplicity"),
+        }
+        for m in sorted(multiplets, key=lambda x: -float(x.get("relative_area") or 0.0))
+        if m.get("category") not in ("compound", "")
+        and int(m.get("line_count") or 0) >= 3
+    ]
+
     worst = max((r["off_by"] for r in rows if r["quantifiable"]), default=0.0)
     return {
         "applicable": True,
@@ -862,6 +906,11 @@ def structure_inventory(path: str | Path, smiles: str) -> dict:
             "total_matches_by_construction": True,
         },
         "signals": rows,
+        "excluded": {
+            "share": round(float(excluded_share), 4),
+            "counted_share": round(float(share), 4),
+            "coupled_signals": contested,
+        },
         "largest_residual": round(float(worst), 2),
         "class_inventory": inventory,
         "human_review_required": True,
