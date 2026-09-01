@@ -70,6 +70,9 @@ POLICY: dict[str, str] = {
     # local bytes and the chemist's own candidates, with no record and no
     # authorization involved.
     "structure.rank": "offline-compute",
+    # Re-opens the acquisition and counts protons against a supplied
+    # structure. RDKit and arithmetic; nothing leaves the machine.
+    "structure.inventory": "offline-compute",
     # Looking a spectrum up against the reference library shipped with the build.
     # Same class again: local bytes, local library, deterministic arithmetic, no
     # record and no authorization.
