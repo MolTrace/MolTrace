@@ -1618,23 +1618,15 @@ def test_the_proton_counts_disclose_how_much_area_they_left_out() -> None:
         if excluded["share"] > 0:
             seen_excluded = True
 
-        # Every flagged signal must actually carry the evidence it is flagged for,
-        # or the warning is noise a reader learns to skip.
-        for sig in excluded["coupled_signals"]:
-            # The flag must name a SPECIFIC contradiction, not a general
-            # suspicion: this signal shows more resolved lines than the
-            # contaminant it was matched to can produce. Counting lines alone
-            # called a 4-line quartet suspicious when it matched triethylamine's
-            # CH2, which is a quartet.
-            assert sig["category"] not in ("compound", ""), (
-                f"flagged a {sig['category']!r} signal as excluded"
-            )
-            assert sig["matched_label"], "flagged a signal without naming what it matched"
-            assert sig["line_count"] >= sig["expected_lines"] + 2, (
-                f"{sig['matched_label']} is a {sig['matched_pattern']} expecting "
-                f"{sig['expected_lines']} line(s); flagging a {sig['line_count']}-line signal "
-                f"against it is not a contradiction"
-            )
+        # THE DISCLOSURE FOLLOWS THE DECISION. A signal whose shape contradicts
+        # its label is now MOVED into the compound rather than flagged where it
+        # sits, so what has to be disclosed is the move: the counts are divided
+        # across whatever is called `compound`, and these are the members of that
+        # set a judgement was made about.
+        for sig in inv.get("reclassified", []):
+            assert sig["was"] in {"solvent", "residual_solvent", "impurity"}
+            assert sig["contradicted"], "moved without naming what it contradicted"
+            assert sig["line_count"] >= 3
             seen_contested = True
 
     if not seen_excluded:
