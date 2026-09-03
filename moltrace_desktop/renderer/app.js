@@ -1441,10 +1441,19 @@
         // The call and how sure it is, together. A bare label reads as certain,
         // and these run from 0.38 to 0.79 on real data. An em dash means the
         // engine did not place this line at all, which is a state, not a guess.
-        m.category
-          ? readableCategory(m.category) + (m.category_confidence
-              ? ' (' + Math.round(m.category_confidence * 100) + '%)' : '')
-          : '\u2014',
+        // A MOVED SIGNAL SAYS SO. This one was matched to a contaminant on its
+        // strongest line's shift and then put back with the compound because
+        // its shape contradicts that contaminant. A reader comparing this
+        // against their instrument's own printout, or against an earlier run of
+        // this app, is owed the reason the call differs.
+        m.reclassified_from
+          ? readableCategory(m.category) + ' \u2014 moved here from '
+            + readableCategory(m.reclassified_from) + ', too many lines for '
+            + m.reclassified_against
+          : (m.category
+            ? readableCategory(m.category) + (m.category_confidence
+                ? ' (' + Math.round(m.category_confidence * 100) + '%)' : '')
+            : '\u2014'),
         // Empty below the limit of quantitation: the service withholds the
         // pattern and the couplings there rather than blanking them here, so an
         // em dash means "not claimed", not "not applicable".
