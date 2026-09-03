@@ -328,10 +328,23 @@ coupled multiplet whose strongest line lands there inherits "impurity" at 85% co
 Nothing is reclassified. The deterministic classifier decides, and a heuristic overriding it here
 is exactly the guess this codebase keeps away from the arbiter — the exceptions are real, since
 DMSO-d5's residual is a quintet and ethyl acetate gives a triplet and a quartet. What is added is
-the disclosure: the excluded share, and every excluded signal carrying resolved coupling, with the
-sentence "if any of them is your compound, every count below is wrong." Across this corpus
-contaminant-labelled multiplets have a **median of 1 line**, so flagging three or more is a
-measured separation and not a threshold chosen to fit.
+the disclosure: the excluded share, and every excluded signal that does not look like the thing it
+was matched to, with the sentence "if any of these is your compound, every count below is wrong."
+
+**Counting lines was the first version of that test and it was too blunt** — it called a 4-line
+quartet at 2.486 ppm suspicious when the shift matches triethylamine's CH2, which *is* a quartet:
+a correct classification reported as a doubt. So `ImpurityShift` now carries each contaminant's
+published pattern from the same Fulmer tables its shifts come from, and
+`describe_impurity_match()` exposes what a shift matched and what that thing should look like.
+**Purely additive: no existing classification changes**, which matters because this module is
+shared with the web product. `classify_peak` still decides; it simply cannot see a multiplet, since
+it classifies one line at a time.
+
+The test is now a specific contradiction — more resolved lines than the matched contaminant can
+produce, by a margin of two to absorb the fitter's over-picking. Across the corpus it fires on six
+signals in five of nine ¹H acquisitions, and every one is a many-line multiplet matched to a
+**singlet**: 9 lines on water, 8 on dimethylformamide's CH3, 5 on acetone, 6 on water again. The
+triethylamine quartet is correctly silent.
 
 It declines rather than inventing a denominator: a 13C acquisition has no proton inventory, and a
 structure whose hydrogens all exchange has nothing to scale against. Both are ordinary outcomes

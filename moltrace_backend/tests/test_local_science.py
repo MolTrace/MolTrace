@@ -1621,9 +1621,19 @@ def test_the_proton_counts_disclose_how_much_area_they_left_out() -> None:
         # Every flagged signal must actually carry the evidence it is flagged for,
         # or the warning is noise a reader learns to skip.
         for sig in excluded["coupled_signals"]:
-            assert sig["line_count"] >= 3, f"flagged a {sig['line_count']}-line signal as coupled"
+            # The flag must name a SPECIFIC contradiction, not a general
+            # suspicion: this signal shows more resolved lines than the
+            # contaminant it was matched to can produce. Counting lines alone
+            # called a 4-line quartet suspicious when it matched triethylamine's
+            # CH2, which is a quartet.
             assert sig["category"] not in ("compound", ""), (
                 f"flagged a {sig['category']!r} signal as excluded"
+            )
+            assert sig["matched_label"], "flagged a signal without naming what it matched"
+            assert sig["line_count"] >= sig["expected_lines"] + 2, (
+                f"{sig['matched_label']} is a {sig['matched_pattern']} expecting "
+                f"{sig['expected_lines']} line(s); flagging a {sig['line_count']}-line signal "
+                f"against it is not a contradiction"
             )
             seen_contested = True
 

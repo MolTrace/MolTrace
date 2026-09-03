@@ -262,6 +262,20 @@ class ImpurityShift:
     shift_ppm: float
     solvent: str | None
     tol_ppm: float = 0.05
+    #: The pattern this resonance actually shows, from the same Fulmer tables the
+    #: shifts come from. Recorded because a SHIFT ALONE CANNOT TELL A CONTAMINANT
+    #: FROM A COMPOUND SIGNAL SITTING ON TOP OF IT -- and most of this table is
+    #: singlets, so the distinction is available almost for free. Water in CDCl3
+    #: is a singlet at 1.56; a nine-line coupled multiplet centred at 1.583 is
+    #: not water, and classifying it as water removed 27% of one acquisition's
+    #: area from its proton counts.
+    #:
+    #: Nothing in this module reads it. It is exposed through
+    #: `describe_impurity_match` so a caller holding a MULTIPLET -- which this
+    #: module never sees, since it classifies one line at a time -- can notice
+    #: the contradiction. The default is "s" because it is correct for the
+    #: majority of the 1H table and for every proton-decoupled 13C entry.
+    multiplicity: str = "s"
 
 
 # Fulmer ¹H impurity table columns, in the published order.
@@ -279,6 +293,7 @@ def _h1_rows(
     values: _H1Cells,
     *,
     tol_ppm: float = 0.05,
+    multiplicity: str = "s",
 ) -> tuple[ImpurityShift, ...]:
     """Expand one Fulmer ¹H table row into per-solvent :class:`ImpurityShift`s."""
     label = f"{name} {proton}".strip()
@@ -286,7 +301,9 @@ def _h1_rows(
     for solvent, value in zip(_H1_COLUMNS, values, strict=True):
         if value is None:
             continue
-        rows.append(ImpurityShift(label, proton, kind, float(value), solvent, tol_ppm))
+        rows.append(
+            ImpurityShift(label, proton, kind, float(value), solvent, tol_ppm, multiplicity)
+        )
     return tuple(rows)
 
 
@@ -311,38 +328,94 @@ COMMON_IMPURITIES: tuple[ImpurityShift, ...] = (
     *_h1_rows("cyclohexane", "CH2", _RS, (1.43, 1.43, 1.40, 1.40, 1.44, 1.45, None)),
     *_h1_rows("1,2-dichloroethane", "CH2", _RS, (3.73, 3.87, 3.90, 2.90, 3.81, 3.78, None)),
     *_h1_rows("dichloromethane", "CH2", _RS, (5.30, 5.63, 5.76, 4.27, 5.44, 5.49, None)),
-    *_h1_rows("diethyl ether", "CH3", _RS, (1.21, 1.11, 1.09, 1.11, 1.12, 1.18, 1.17)),
-    *_h1_rows("diethyl ether", "CH2", _RS, (3.48, 3.41, 3.38, 3.26, 3.42, 3.49, 3.56)),
+    *_h1_rows(
+        "diethyl ether", "CH3", _RS,
+        (1.21, 1.11, 1.09, 1.11, 1.12, 1.18, 1.17),
+        multiplicity="t",
+    ),
+    *_h1_rows(
+        "diethyl ether", "CH2", _RS,
+        (3.48, 3.41, 3.38, 3.26, 3.42, 3.49, 3.56),
+        multiplicity="q",
+    ),
     *_h1_rows("1,2-dimethoxyethane", "OCH3", _RS, (3.40, 3.28, 3.24, 3.12, 3.28, 3.35, 3.37)),
     *_h1_rows("1,2-dimethoxyethane", "CH2", _RS, (3.55, 3.46, 3.43, 3.33, 3.45, 3.52, 3.60)),
     *_h1_rows("dimethylformamide", "CH", _RS, (8.02, 7.96, 7.95, 7.63, 7.92, 7.97, 7.92)),
     *_h1_rows("dimethylformamide", "CH3", _RS, (2.96, 2.94, 2.89, 2.36, 2.89, 2.99, 3.01)),
     *_h1_rows("dimethyl sulfoxide", "CH3", _RS, (2.62, 2.52, 2.54, 1.68, 2.50, 2.65, 2.71)),
     *_h1_rows("dioxane", "CH2", _RS, (3.71, 3.59, 3.57, 3.35, 3.60, 3.66, 3.75)),
-    *_h1_rows("ethanol", "CH3", _RS, (1.25, 1.12, 1.06, 0.96, 1.12, 1.19, 1.17)),
-    *_h1_rows("ethanol", "CH2", _RS, (3.72, 3.57, 3.44, 3.34, 3.54, 3.60, 3.65)),
+    *_h1_rows("ethanol", "CH3", _RS, (1.25, 1.12, 1.06, 0.96, 1.12, 1.19, 1.17), multiplicity="t"),
+    *_h1_rows("ethanol", "CH2", _RS, (3.72, 3.57, 3.44, 3.34, 3.54, 3.60, 3.65), multiplicity="q"),
     *_h1_rows("ethyl acetate", "CH3CO", _RS, (2.05, 1.97, 1.99, 1.65, 1.97, 2.01, 2.07)),
-    *_h1_rows("ethyl acetate", "OCH2CH3", _RS, (4.12, 4.05, 4.03, 3.89, 4.06, 4.09, 4.14)),
-    *_h1_rows("ethyl acetate", "CH3", _RS, (1.26, 1.20, 1.17, 0.92, 1.20, 1.24, 1.24)),
+    *_h1_rows(
+        "ethyl acetate", "OCH2CH3", _RS,
+        (4.12, 4.05, 4.03, 3.89, 4.06, 4.09, 4.14),
+        multiplicity="q",
+    ),
+    *_h1_rows(
+        "ethyl acetate", "CH3", _RS,
+        (1.26, 1.20, 1.17, 0.92, 1.20, 1.24, 1.24),
+        multiplicity="t",
+    ),
     *_h1_rows("ethylene glycol", "CH", _IM, (3.76, 3.28, 3.34, 3.41, 3.51, 3.59, 3.65)),
-    *_h1_rows("grease", "CH2", _IM, (1.26, 1.29, None, 1.36, 1.27, 1.29, None), tol_ppm=0.08),
-    *_h1_rows("n-hexane", "CH3", _RS, (0.88, 0.88, 0.86, 0.89, 0.89, 0.90, None)),
-    *_h1_rows("n-hexane", "CH2", _RS, (1.26, 1.28, 1.25, 1.24, 1.28, 1.29, None)),
+    *_h1_rows(
+        "grease", "CH2", _IM,
+        (1.26, 1.29, None, 1.36, 1.27, 1.29, None),
+        tol_ppm=0.08, multiplicity="m",
+    ),
+    *_h1_rows("n-hexane", "CH3", _RS, (0.88, 0.88, 0.86, 0.89, 0.89, 0.90, None), multiplicity="t"),
+    *_h1_rows("n-hexane", "CH2", _RS, (1.26, 1.28, 1.25, 1.24, 1.28, 1.29, None), multiplicity="m"),
     *_h1_rows("methanol", "CH3", _RS, (3.49, 3.31, 3.16, None, 3.28, 3.34, 3.34)),
     *_h1_rows("nitromethane", "CH3", _RS, (4.33, 4.43, 4.42, 2.94, 4.31, 4.34, 4.40)),
-    *_h1_rows("n-pentane", "CH3", _RS, (0.88, 0.88, 0.86, 0.87, 0.89, 0.90, None)),
-    *_h1_rows("n-pentane", "CH2", _RS, (1.27, 1.27, 1.27, 1.23, 1.29, 1.29, None)),
-    *_h1_rows("2-propanol", "CH3", _RS, (1.22, 1.10, 1.04, 0.95, 1.09, 1.50, 1.17)),
-    *_h1_rows("2-propanol", "CH", _RS, (4.04, 3.90, 3.78, 3.67, 3.87, 3.92, 4.02)),
-    *_h1_rows("pyridine", "CH(2)", _RS, (8.62, 8.58, 8.58, 8.53, 8.57, 8.53, 8.52)),
+    *_h1_rows(
+        "n-pentane", "CH3", _RS,
+        (0.88, 0.88, 0.86, 0.87, 0.89, 0.90, None),
+        multiplicity="t",
+    ),
+    *_h1_rows(
+        "n-pentane", "CH2", _RS,
+        (1.27, 1.27, 1.27, 1.23, 1.29, 1.29, None),
+        multiplicity="m",
+    ),
+    *_h1_rows(
+        "2-propanol", "CH3", _RS,
+        (1.22, 1.10, 1.04, 0.95, 1.09, 1.50, 1.17),
+        multiplicity="d",
+    ),
+    *_h1_rows(
+        "2-propanol", "CH", _RS,
+        (4.04, 3.90, 3.78, 3.67, 3.87, 3.92, 4.02),
+        multiplicity="sept",
+    ),
+    *_h1_rows(
+        "pyridine", "CH(2)", _RS,
+        (8.62, 8.58, 8.58, 8.53, 8.57, 8.53, 8.52),
+        multiplicity="m",
+    ),
     *_h1_rows(
         "silicone grease", "CH3", _IM, (0.07, 0.13, None, 0.29, 0.08, 0.10, None), tol_ppm=0.08
     ),
-    *_h1_rows("tetrahydrofuran", "CH2", _RS, (1.85, 1.79, 1.76, 1.40, 1.80, 1.87, 1.88)),
-    *_h1_rows("tetrahydrofuran", "OCH2", _RS, (3.76, 3.63, 3.60, 3.57, 3.64, 3.71, 3.74)),
+    *_h1_rows(
+        "tetrahydrofuran", "CH2", _RS,
+        (1.85, 1.79, 1.76, 1.40, 1.80, 1.87, 1.88),
+        multiplicity="m",
+    ),
+    *_h1_rows(
+        "tetrahydrofuran", "OCH2", _RS,
+        (3.76, 3.63, 3.60, 3.57, 3.64, 3.71, 3.74),
+        multiplicity="m",
+    ),
     *_h1_rows("toluene", "CH3", _RS, (2.36, 2.32, 2.30, 2.11, 2.33, 2.32, None)),
-    *_h1_rows("triethylamine", "CH3", _RS, (1.03, 0.96, 0.93, 0.96, 0.96, 1.05, 0.99)),
-    *_h1_rows("triethylamine", "CH2", _RS, (2.53, 2.45, 2.43, 2.40, 2.45, 2.58, 2.57)),
+    *_h1_rows(
+        "triethylamine", "CH3", _RS,
+        (1.03, 0.96, 0.93, 0.96, 0.96, 1.05, 0.99),
+        multiplicity="t",
+    ),
+    *_h1_rows(
+        "triethylamine", "CH2", _RS,
+        (2.53, 2.45, 2.43, 2.40, 2.45, 2.58, 2.57),
+        multiplicity="q",
+    ),
 )
 
 
@@ -724,6 +797,59 @@ def classify_peak(
 
     best_alt = max((conf for _p, _c, conf in candidates), default=0.0)
     return "compound", _clamp(max(_COMPOUND_CONFIDENCE_FLOOR, 1.0 - best_alt))
+
+
+def describe_impurity_match(
+    peak_ppm: float, solvent: str | None, nucleus: str
+) -> dict[str, object] | None:
+    """What the contaminant tables matched at this shift, or ``None``.
+
+    PURELY ADDITIVE. `classify_peak` decides categories and this changes nothing
+    about that; it only says what the shift matched and what pattern that
+    contaminant is published to show, so a caller can notice a contradiction the
+    classifier structurally cannot see.
+
+    THE CONTRADICTION IT EXISTS FOR: this module classifies one LINE at a time,
+    by POSITION. A caller holding a fitted MULTIPLET knows something the line
+    never did -- how many resolved lines it has. Water in CDCl3 is a singlet at
+    1.56 ppm; a nine-line coupled multiplet centred on 1.583 is not water,
+    however well its strongest line matches. Measured on one 1,2-epoxybutane
+    acquisition, that mismatch classified away 27% of the spectrum's area, and a
+    second signal took another 21% with it -- leaving two signals to carry all
+    eight of the molecule's hydrogens.
+
+    The caller decides what to do about it. Most of this table is genuinely
+    singlets, but not all of it -- ethanol gives a triplet and a quartet, ethyl
+    acetate a triplet and a quartet, DMSO's residual a quintet -- which is why
+    the published pattern travels with the match rather than a caller assuming
+    that any coupled signal must be the compound.
+    """
+    match = _match_impurity(float(peak_ppm), solvent, nucleus)
+    if match is None:
+        return None
+    kind, label, proximity = match
+
+    entry: ImpurityShift | None = None
+    if nucleus == "13C":
+        pool: tuple[ImpurityShift, ...] = _C13_IMPURITIES
+    else:
+        pool = COMMON_IMPURITIES
+    best = -1.0
+    for candidate in pool:
+        if candidate.label != label:
+            continue
+        prox = _proximity(abs(float(peak_ppm) - candidate.shift_ppm), candidate.tol_ppm)
+        if prox is not None and prox > best:
+            best, entry = prox, candidate
+
+    return {
+        "kind": kind,
+        "label": label,
+        "proximity": proximity,
+        "multiplicity": entry.multiplicity if entry is not None else "s",
+        "expects_single_line": (entry.multiplicity if entry is not None else "s") == "s",
+        "shift_ppm": entry.shift_ppm if entry is not None else None,
+    }
 
 
 def classify_peaks(
