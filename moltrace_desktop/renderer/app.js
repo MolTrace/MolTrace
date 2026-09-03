@@ -745,15 +745,23 @@
     const ex = inv.excluded || {}
     const contested = ex.coupled_signals || []
     if (contested.length) {
-      c.append(alert('warn', 'Some excluded signals look like they could be yours',
+      // Names the CONTAMINANT and its published pattern, not just "this looks
+      // coupled". The first version counted lines alone and called a 4-line
+      // quartet suspicious when it matched triethylamine's CH2, which is a
+      // quartet -- a correct classification reported as a doubt. What a reader
+      // can act on is the specific contradiction.
+      c.append(alert('warn', 'Some excluded signals do not look like what they were matched to',
         Math.round(100 * (ex.share || 0)) + '% of the listed area was set aside as solvent or '
-        + 'impurity and is not in the counts below. ' + contested.length + ' of those '
-        + (contested.length === 1 ? 'signals carries' : 'signals carry') + ' resolved coupling '
-        + '\u2014 ' + contested.map((x) => x.name + ' at ' + Number(x.center_ppm).toFixed(2)
-          + ' ppm, ' + x.line_count + ' lines, ' + Math.round(100 * x.relative_area) + '% of the area')
-          .join('; ') + '. Water, chloroform and acetone are single lines, so a coupled signal '
-        + 'here is worth your eye \u2014 though a residual solvent can be coupled too, and this '
-        + 'has not been reclassified. If any of them is your compound, every count below is wrong.'))
+        + 'impurity and is not in the counts below. '
+        + (contested.length === 1 ? 'One of those signals does' : contested.length + ' of those signals do')
+        + ' not have the shape of the contaminant matched to it \u2014 '
+        + contested.map((x) => x.name + ' at ' + Number(x.center_ppm).toFixed(2) + ' ppm shows '
+            + x.line_count + ' lines, but it was matched to ' + x.matched_label + ', which is '
+            + (x.expected_lines === 1 ? 'a single line' : 'a ' + x.matched_pattern)
+            + ' (' + Math.round(100 * x.relative_area) + '% of the area)').join('; ')
+        + '. This has not been reclassified \u2014 the classifier decides, and a residual solvent '
+        + 'can genuinely be coupled. But if any of these is your compound, every count below is '
+        + 'wrong, because the scale divides by what is left.'))
     } else if ((ex.share || 0) > 0) {
       c.append(node('p', 'tablenote',
         Math.round(100 * ex.share) + '% of the listed area was set aside as solvent or impurity '
