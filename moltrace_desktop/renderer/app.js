@@ -743,30 +743,26 @@
     // a signal wrongly classified away puts every count out by the ratio of the
     // shares while still producing whole-looking numbers.
     const ex = inv.excluded || {}
-    const contested = ex.coupled_signals || []
-    if (contested.length) {
-      // Names the CONTAMINANT and its published pattern, not just "this looks
-      // coupled". The first version counted lines alone and called a 4-line
-      // quartet suspicious when it matched triethylamine's CH2, which is a
-      // quartet -- a correct classification reported as a doubt. What a reader
-      // can act on is the specific contradiction.
-      c.append(alert('warn', 'Some excluded signals do not look like what they were matched to',
-        Math.round(100 * (ex.share || 0)) + '% of the listed area was set aside as solvent or '
-        + 'impurity and is not in the counts below. '
-        + (contested.length === 1 ? 'One of those signals does' : contested.length + ' of those signals do')
-        + ' not have the shape of the contaminant matched to it \u2014 '
-        + contested.map((x) => x.name + ' at ' + Number(x.center_ppm).toFixed(2) + ' ppm shows '
-            + x.line_count + ' lines, but it was matched to ' + x.matched_label + ', which is '
-            + (x.expected_lines === 1 ? 'a single line' : 'a ' + x.matched_pattern)
-            + ' (' + Math.round(100 * x.relative_area) + '% of the area)').join('; ')
-        + '. This has not been reclassified \u2014 the classifier decides, and a residual solvent '
-        + 'can genuinely be coupled. But if any of these is your compound, every count below is '
-        + 'wrong, because the scale divides by what is left.'))
-    } else if ((ex.share || 0) > 0) {
+    const moved = inv.reclassified || []
+    if (moved.length) {
+      // The counts are divided across whatever is called the compound, and these
+      // signals are there because a judgement was made about their shape. If it
+      // is wrong, the counts are wrong -- so it is stated before the numbers,
+      // not after them.
+      c.append(alert('warn', 'Some signals were moved into the compound to reach these counts',
+        (moved.length === 1 ? 'One signal was' : moved.length + ' signals were')
+        + ' matched to a contaminant on shift and then moved back because the shape contradicts '
+        + 'it \u2014 ' + moved.map((x) => x.name + ' at ' + Number(x.center_ppm).toFixed(2)
+            + ' ppm (' + x.line_count + ' lines) was ' + readableCategory(x.was) + ', but '
+            + x.contradicted + ' cannot show that many lines; it holds '
+            + Math.round(100 * x.relative_area) + '% of the area').join('; ')
+        + '. If that judgement is wrong, the counts below are wrong.'))
+    }
+    if ((ex.share || 0) > 0) {
       c.append(node('p', 'tablenote',
-        Math.round(100 * ex.share) + '% of the listed area was set aside as solvent or impurity '
-        + 'and is not counted. The counts below divide the structure\u2019s hydrogens across the '
-        + 'remaining ' + Math.round(100 * (ex.counted_share || 0)) + '%.'))
+        Math.round(100 * ex.share) + '% of the listed area is solvent or impurity and is not '
+        + 'counted. The counts below divide the structure\u2019s hydrogens across the remaining '
+        + Math.round(100 * (ex.counted_share || 0)) + '%.'))
     }
 
     // THE SENTENCE THIS PANEL EXISTS TO PREVENT. The totals agree because the

@@ -762,7 +762,9 @@ def _multiplet_category(
     # candidates: 0.8, 1.2, then 2.5, 3.4, 6.8, 27.8 -- nothing between 1.2 and
     # 2.5, and the two below it are the two that should not move.
     span_hz = abs(float(multiplet.range_ppm[0]) - float(multiplet.range_ppm[1])) * field_mhz
-    widest = max((float(getattr(pk, "width_hz", 0.0) or 0.0) for pk in multiplet.peaks), default=0.0)
+    widest = max(
+        (float(getattr(pk, "width_hz", 0.0) or 0.0) for pk in multiplet.peaks), default=0.0
+    )
     if widest <= 0.0 or span_hz < 2.0 * widest:
         return {"category": category, "category_confidence": confidence}
 
@@ -974,44 +976,34 @@ def structure_inventory(path: str | Path, smiles: str) -> dict:
         for m in multiplets
         if m.get("category") != "compound"
     )
-    # WHICH contaminant it matched, and does this signal look like that thing?
+    # WHAT THE COUNTS NOW DEPEND ON, which is no longer the same question.
     #
-    # Counting resolved lines alone was the first version and it was too blunt:
-    # it flagged a 4-line quartet at 2.486 ppm that matches triethylamine's CH2,
-    # which IS a quartet -- a correct classification called suspicious. The table
-    # now carries each contaminant's published pattern, so the question becomes
-    # specific: water is a singlet, and a nine-line multiplet sitting on water's
-    # shift is not water however well its strongest line matches.
+    # This block used to flag excluded signals that did not look like the
+    # contaminant matched to them. Reclassification took that job: a signal whose
+    # shape contradicts its label is now MOVED into the compound, so it is not
+    # excluded any more and cannot be listed here. What survived the move is the
+    # opposite population -- signals with many fitted lines whose lines are NOT
+    # resolved, which the span guard deliberately left as contaminants. Reporting
+    # those as doubtful would tell a reader that a signal does not look like its
+    # label immediately after deciding that it does. Measured: 2 of 9 1H
+    # acquisitions had exactly that contradiction on screen.
     #
-    # `+ 2` rather than `>`, because the line fitter over-picks and a singlet
-    # occasionally comes back as two. The margin has to exceed that noise before
-    # a correct classification gets called into question.
-    contested = []
-    for m in sorted(multiplets, key=lambda x: -float(x.get("relative_area") or 0.0)):
-        if m.get("category") in ("compound", ""):
-            continue
-        lines = int(m.get("line_count") or 0)
-        matched = describe_impurity_match(
-            float(m.get("center_ppm") or 0.0), summary.get("solvent") or None, "1H"
-        )
-        if matched is None:
-            continue
-        expected_lines = _PATTERN_LINES.get(str(matched.get("multiplicity") or "s"))
-        if expected_lines is None or lines < expected_lines + 2:
-            continue
-        contested.append(
-            {
-                "name": m.get("name"),
-                "center_ppm": m.get("center_ppm"),
-                "category": m.get("category"),
-                "relative_area": m.get("relative_area"),
-                "line_count": lines,
-                "multiplicity": m.get("multiplicity"),
-                "matched_label": matched.get("label"),
-                "matched_pattern": matched.get("multiplicity"),
-                "expected_lines": expected_lines,
-            }
-        )
+    # So the disclosure follows the decision. The counts are divided across
+    # whatever is called `compound`, and the signals MOVED there are the part of
+    # that set a judgement was made about. If the judgement is wrong, the counts
+    # are wrong, and the reader is owed the list.
+    reclassified = [
+        {
+            "name": m.get("name"),
+            "center_ppm": m.get("center_ppm"),
+            "was": m.get("reclassified_from"),
+            "contradicted": m.get("reclassified_against"),
+            "relative_area": m.get("relative_area"),
+            "line_count": int(m.get("line_count") or 0),
+        }
+        for m in sorted(multiplets, key=lambda x: -float(x.get("relative_area") or 0.0))
+        if m.get("reclassified_from")
+    ]
 
     worst = max((r["off_by"] for r in rows if r["quantifiable"]), default=0.0)
     return {
@@ -1035,8 +1027,8 @@ def structure_inventory(path: str | Path, smiles: str) -> dict:
         "excluded": {
             "share": round(float(excluded_share), 4),
             "counted_share": round(float(share), 4),
-            "coupled_signals": contested,
         },
+        "reclassified": reclassified,
         "largest_residual": round(float(worst), 2),
         "class_inventory": inventory,
         "human_review_required": True,
