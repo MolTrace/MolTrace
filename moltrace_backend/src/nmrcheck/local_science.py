@@ -157,6 +157,15 @@ class MultipletSummary:
     #: an invention. The wire key says what it is; the display must not relabel it.
     relative_area: float
 
+    #: Set when this multiplet was classified as a contaminant on its strongest
+    #: line's SHIFT and then moved back to `compound` because its SHAPE
+    #: contradicts that contaminant. Holds what it was called before, so the
+    #: change is visible rather than silent -- a reader who sees different
+    #: numbers is owed the reason.
+    reclassified_from: str = ""
+    #: The contaminant whose pattern was contradicted, e.g. "water H2O".
+    reclassified_against: str = ""
+
     def to_dict(self) -> dict:
         return {
             "name": self.name,
@@ -167,6 +176,8 @@ class MultipletSummary:
             "snr": self.snr,
             "quantifiable": self.quantifiable,
             "line_count": self.line_count,
+            "reclassified_from": self.reclassified_from,
+            "reclassified_against": self.reclassified_against,
             "resolved_lines": self.resolved_lines,
             "width_hz": self.width_hz,
             "category": self.category,
@@ -438,6 +449,7 @@ def _summarise_multiplet(
     total_area: float,
     snr: float,
     categories: dict[int, tuple[str, float]],
+    solvent: str = "",
 ) -> MultipletSummary:
     """One signal, with every claim held to the floor this module declares.
 
@@ -472,7 +484,9 @@ def _summarise_multiplet(
         # answer, and the tallest line in it is the one the call was most
         # confident about -- averaging categories across lines would invent a
         # category nothing measured.
-        **_multiplet_category(multiplet, categories),
+        **_multiplet_category(
+            multiplet, categories, solvent, str(spectrum.nucleus), float(spectrum.field_mhz)
+        ),
         resolved_lines=_resolved_line_count(spectrum, multiplet, baseline_sigma),
         snr=snr,
         quantifiable=quantifiable,
@@ -665,8 +679,41 @@ def verify_candidate(path: str | Path, smiles: str) -> dict:
 
 
 
-def _multiplet_category(multiplet: object, categories: dict[int, tuple[str, float]]) -> dict:
-    """What this signal appears to be, taken from its strongest line."""
+#: Categories a shift-table match can produce, and so the only ones a shape
+#: contradiction can overturn. `13C_satellite` and `artifact` are decided by peer
+#: spacing and lineshape rather than by a table lookup, so a contaminant's
+#: published pattern says nothing about them.
+_TABLE_MATCHED_CATEGORIES = frozenset({"solvent", "residual_solvent", "impurity"})
+
+
+def _multiplet_category(
+    multiplet: object,
+    categories: dict[int, tuple[str, float]],
+    solvent: str = "",
+    nucleus: str = "1H",
+    field_mhz: float = 0.0,
+) -> dict:
+    """What this signal appears to be, taken from its strongest line -- unless its
+    shape says that cannot be right.
+
+    THE STRONGEST LINE DECIDES, and for most signals that is the whole story.
+    But the classifier it inherits from works one LINE at a time and matches on
+    POSITION alone; it never sees a multiplet, so it cannot notice that the thing
+    it matched is the wrong SHAPE. Water in CDCl3 is a singlet at 1.56 ppm. A
+    nine-line coupled multiplet centred on 1.583 is not water, however well its
+    tallest line matches, and calling it water removed 27% of one acquisition's
+    area from every proton count derived from it.
+
+    So a contaminant call is overturned when the signal shows more resolved lines
+    than that specific contaminant can produce. Not "more than one" -- the table
+    holds real coupled contaminants, and ethanol's quartet, ethyl acetate's
+    triplet and triethylamine's quartet must survive. The margin of two absorbs
+    the line fitter's known over-picking.
+
+    ONLY IN THIS DIRECTION. A contaminant is promoted to `compound`; nothing is
+    ever demoted. Being wrong here costs a chemist a signal they have to explain,
+    which they can see and judge; the opposite silently deletes evidence.
+    """
     best: tuple[str, float] | None = None
     best_intensity = -1.0
     for peak in multiplet.peaks:
@@ -680,7 +727,54 @@ def _multiplet_category(multiplet: object, categories: dict[int, tuple[str, floa
         # Unclassified is a state, not a guess. An empty string renders as an em
         # dash and says nothing, which is the truth.
         return {"category": "", "category_confidence": 0.0}
-    return {"category": str(best[0]), "category_confidence": float(best[1])}
+
+    category, confidence = str(best[0]), float(best[1])
+    if category not in _TABLE_MATCHED_CATEGORIES:
+        return {"category": category, "category_confidence": confidence}
+
+    # 1H ONLY, and this was a REGRESSION before it was a rule. The patterns in
+    # the contaminant table are 1H patterns. In 13C, a deuterated solvent's own
+    # carbon is split by coupling to deuterium -- CDCl3 is a 1:1:1 TRIPLET at
+    # 77.16 ppm, DMSO-d6 a septet -- so a table that calls chloroform a singlet
+    # is describing its proton, not its carbon. Measured: two CDCl3 carbons at
+    # 77.21 and 77.28 ppm were promoted out of `solvent` and into the compound
+    # on exactly that mistake. Restoring the solvent peak of a 13C spectrum to
+    # the analyte is not a small error.
+    if nucleus != "1H":
+        return {"category": category, "category_confidence": confidence}
+
+    matched = describe_impurity_match(float(multiplet.center_ppm), solvent or None, nucleus)
+    if matched is None:
+        return {"category": category, "category_confidence": confidence}
+    expected = _PATTERN_LINES.get(str(matched.get("multiplicity") or "s"))
+    if expected is None or len(multiplet.peaks) < expected + 2:
+        return {"category": category, "category_confidence": confidence}
+
+    # A LINE COUNT IS NOT A COUPLING UNLESS THE LINES ARE APART. Counting fitted
+    # lines alone promoted two signals whose whole width is one linewidth: a
+    # 6-line "multiplet" spanning 36.3 Hz with a 43.0 Hz linewidth, and a 5-line
+    # one at 39.4 Hz against 31.8. Lines closer together than their own width are
+    # not resolved, so those counts are the fitter picking structure out of one
+    # broad peak -- which is exactly what a broad water or residual-solvent
+    # signal looks like.
+    #
+    # The threshold is where the corpus is empty. Ratios measured on the eight
+    # candidates: 0.8, 1.2, then 2.5, 3.4, 6.8, 27.8 -- nothing between 1.2 and
+    # 2.5, and the two below it are the two that should not move.
+    span_hz = abs(float(multiplet.range_ppm[0]) - float(multiplet.range_ppm[1])) * field_mhz
+    widest = max((float(getattr(pk, "width_hz", 0.0) or 0.0) for pk in multiplet.peaks), default=0.0)
+    if widest <= 0.0 or span_hz < 2.0 * widest:
+        return {"category": category, "category_confidence": confidence}
+
+    return {
+        "category": "compound",
+        # NOT the contaminant's confidence, which was a proximity score for a
+        # match just overturned. This is a shape argument and it is reported as
+        # one -- weaker than a clean positive call, and deliberately so.
+        "category_confidence": 0.5,
+        "reclassified_from": category,
+        "reclassified_against": str(matched.get("label") or ""),
+    }
 
 
 
@@ -1729,8 +1823,16 @@ def open_spectrum(path: str) -> dict:
     # every peak list this platform has ever produced. Here it adds a column and
     # takes nothing away.
 
+    # THE SAME SOLVENT THE LINES WERE CLASSIFIED AGAINST. `classify_peaks` above
+    # is given `spectrum.solvent or detected_solvent`, and the shape check that
+    # can overturn its verdict has to consult the same column of the table -- a
+    # CDCl3 line judged against a DMSO shift would be overturned on evidence
+    # about a different spectrum.
+    effective_solvent = str(spectrum.solvent or detected_solvent or "")
     summaries = [
-        _summarise_multiplet(spectrum, m, baseline_sigma, total_area, snr, categories)
+        _summarise_multiplet(
+            spectrum, m, baseline_sigma, total_area, snr, categories, effective_solvent
+        )
         for m, snr in kept
     ]
 

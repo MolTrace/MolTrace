@@ -1643,3 +1643,77 @@ def test_the_proton_counts_disclose_how_much_area_they_left_out() -> None:
         "no contaminant-labelled multiplet in this corpus carries resolved coupling, so the "
         "flag never fires and this test is vacuous -- the epoxybutane acquisition has two"
     )
+
+
+@pytest.mark.slow
+def test_a_contaminant_whose_shape_contradicts_its_label_is_moved_back_to_the_compound() -> None:
+    """The classifier matches one LINE by POSITION and cannot see a multiplet.
+
+    Water in CDCl3 is a SINGLET at 1.56 ppm. A nine-line coupled multiplet
+    centred on 1.583 is not water, however well its tallest line matches -- and
+    calling it water took 27% of one acquisition's area out of every proton count
+    derived from it. So a contaminant call is overturned when the signal shows
+    more resolved lines than that contaminant can produce.
+
+    THREE THINGS THIS MUST NOT DO, each of which it did before it was measured:
+
+    1. Overturn on a line count alone. A 6-line "multiplet" spanning 36.3 Hz with
+       a 43.0 Hz linewidth has no resolved coupling at all -- the lines are closer
+       together than their own width, which is the fitter finding structure in one
+       broad peak, and a broad peak is what water looks like.
+    2. Touch 13C. A deuterated solvent's own carbon is split by coupling to
+       deuterium: CDCl3 is a 1:1:1 TRIPLET at 77.16 ppm. The table's patterns are
+       PROTON patterns, so two CDCl3 carbons were promoted into the analyte.
+    3. Overturn a contaminant that is genuinely coupled. Ethanol gives a triplet
+       and a quartet, ethyl acetate a triplet and a quartet, triethylamine a
+       quartet. The test is against the pattern of the SPECIFIC thing matched.
+
+    Only ever toward the compound. Being wrong here hands a chemist a signal to
+    explain, which they can see; the opposite silently deletes evidence.
+    """
+    from nmrcheck.local_science import open_spectrum
+
+    promoted: list[dict] = []
+    carbon_promotions = 0
+    for candidate in _acquisitions():
+        try:
+            opened = open_spectrum(candidate)
+        except Exception:  # noqa: BLE001 - unreadable acquisitions are not the subject
+            continue
+        field = float(opened.get("field_mhz") or 0.0)
+        for signal in opened["multiplets"]:
+            if not signal.get("reclassified_from"):
+                continue
+            if opened.get("nucleus") != "1H":
+                carbon_promotions += 1
+                continue
+            promoted.append({**signal, "field_mhz": field})
+
+    assert carbon_promotions == 0, (
+        f"{carbon_promotions} signal(s) were promoted out of a non-1H spectrum, where the "
+        f"table's proton multiplicities do not apply -- CDCl3's carbon is a triplet"
+    )
+    if not promoted:
+        pytest.skip("no signal in this corpus contradicts the contaminant matched to it")
+
+    for signal in promoted:
+        # It says what it was and what it contradicted, or the change is silent.
+        assert signal["category"] == "compound"
+        assert signal["reclassified_from"] in {"solvent", "residual_solvent", "impurity"}
+        assert signal["reclassified_against"], "promoted without naming what it contradicted"
+
+        # And the lines it was promoted for are actually apart. A span narrower
+        # than a single linewidth cannot hold resolved coupling.
+        span_hz = abs(signal["range_ppm"][0] - signal["range_ppm"][1]) * signal["field_mhz"]
+        assert signal["width_hz"] > 0
+        assert span_hz >= 2.0 * signal["width_hz"], (
+            f"{signal['name']} at {signal['center_ppm']:.3f} spans {span_hz:.1f} Hz with a "
+            f"{signal['width_hz']:.1f} Hz linewidth, so its {signal['line_count']} lines are "
+            f"not resolved and are no evidence against {signal['reclassified_against']}"
+        )
+
+    # Non-vacuous in the direction that matters: the acquisition with a nine-line
+    # multiplet on water's shift must be one of them.
+    assert any("water" in str(s["reclassified_against"]).lower() for s in promoted), (
+        "the measured water case did not move, so this test is not guarding it"
+    )

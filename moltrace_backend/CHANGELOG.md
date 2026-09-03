@@ -272,6 +272,54 @@ untouched.
 
 ---
 
+## v0.74.11 — A contaminant whose shape contradicts its label is moved back to the compound (2026-09-03)
+
+The reclassification the previous entry deliberately stopped short of. `classify_peak` matches one
+LINE by POSITION and cannot see a multiplet; water in CDCl3 is a **singlet** at 1.56 ppm, and a
+nine-line coupled multiplet centred on 1.583 is not water however well its tallest line matches.
+That call was taking 27% of one acquisition's area out of every proton count derived from it.
+
+A contaminant call is now overturned when the signal shows more resolved lines than that specific
+contaminant can produce. Confined to `local_science` — the shared classifier still decides, and
+`describe_impurity_match` only reports what it matched.
+
+**Three ways the first version was wrong, each found by measuring rather than reasoning:**
+
+*It reclassified ¹³C.* A deuterated solvent's own carbon is split by coupling to deuterium — CDCl3
+is a 1:1:1 **triplet** at 77.16 ppm, DMSO-d6 a septet. The table's patterns are PROTON patterns, so
+two CDCl3 carbons at 77.21 and 77.28 were promoted out of `solvent` and into the analyte. Restoring
+a solvent peak to the compound in a ¹³C spectrum is not a small error. Now ¹H only, and a guard
+asserts zero promotions in ¹³C across the corpus's thirteen carbon acquisitions.
+
+*It counted lines that were not apart.* A six-line "multiplet" spanning 36.3 Hz with a **43.0 Hz
+linewidth** has no resolved coupling at all — its lines are closer together than their own width,
+which is the fitter finding structure inside one broad peak, and a broad peak is exactly what water
+looks like. Span-to-linewidth ratios over the eight candidates were 0.8, 1.2, then 2.5, 3.4, 6.8,
+27.8. The threshold sits in that empty gap, and the two below it are the two that should not move.
+
+*And one suspicion of mine was wrong.* I read "8 lines in 0.9 Hz" as obvious over-picking; 0.9 Hz
+is the LINE width and the signal spans 25.89 Hz — a ratio of 27.8, the cleanest multiplet in the
+set. Measuring it kept a correct promotion that reasoning would have thrown away.
+
+Four signals move across the whole 264-multiplet corpus: nine lines against water, eight against
+dimethylformamide's CH3, three against BHT's tert-butyl carrying real 19.9 and 4.2 Hz couplings,
+and a fitted triplet with a 7.1 Hz coupling against chloroform's singlet. Ethanol's quartet, ethyl
+acetate's triplet and triethylamine's quartet are untouched — the test is against the pattern of
+the specific thing matched, not against coupling in general.
+
+Only ever toward the compound; nothing is demoted. Being wrong here hands a chemist a signal to
+explain, which they can see and judge. The opposite silently deletes evidence.
+
+**What it fixed, and what it did not.** On 1,2-epoxybutane the excluded area falls from 48.7% to
+21.3% and the counts go from two signals reading 5.29 H and 2.71 H to three reading 3.45, 2.79 and
+1.77 against an expected 3, 2, 3. The epoxide envelope is now right. The other two are not: a CH3
+of three protons still reads **less** than a CH2 of two. That is not a classification error —
+it is the integration, and this entry does not touch it. The peak table names every moved signal
+and what it contradicted, so a chemist comparing against their instrument's own printout can see
+why the call differs.
+
+---
+
 ## v0.74.10 — The structure now feeds back into the measurement (2026-08-31)
 
 Every offline path ran one way: measure the spectrum without a structure, then score a structure
