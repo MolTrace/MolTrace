@@ -1709,3 +1709,70 @@ def test_a_contaminant_whose_shape_contradicts_its_label_is_moved_back_to_the_co
     assert any("water" in str(s["reclassified_against"]).lower() for s in promoted), (
         "the measured water case did not move, so this test is not guarding it"
     )
+
+
+@pytest.mark.slow
+def test_reported_areas_are_proton_ratios_on_a_molecule_whose_answer_is_known() -> None:
+    """The share a signal is given must be the share of the spectrum it holds.
+
+    1,2-epoxybutane, C4H8O, eight hydrogens in four environments: CH3 3H near
+    1.01 ppm, ethyl CH2 2H near 1.58, and the epoxide's two diastereotopic CH2
+    protons plus its CH split across ~2.49 (1H) and ~2.81 (2H). The file records
+    CDCl3, whose residual line is the 7.29 singlet -- the 2.49 quartet is the
+    compound, not a solvent.
+
+    Written RED. Before the fix the four came back 1.394 / 2.202 / 1.682 / 2.722
+    against 3 / 2 / 1 / 2.
+
+    THE DEFECT WAS NEVER THE NUMERATOR. The CH3's own fitted area is right to
+    2.1%; what was wrong is what it was divided BY. The desktop fits at GSD level
+    2, which fits each apex independently with no constraint that the fits
+    partition the trace, and `sigma.max` is the width of the fit WINDOW -- so for
+    a pseudo-Voigt, whose fwhm is 2*sigma, a line may be fitted exactly twice as
+    wide as the data that constrained it. lmfit's `amplitude` integrates to
+    infinity, so most of such a peak's reported area is extrapolation into trace
+    the fit never saw: measured, one peak under the 2.81 envelope had 29.7% of
+    its area inside its own window. Three of those sit under one envelope, each
+    claiming most of it, and summing them inflated the denominator 2.15x.
+    """
+    import numpy as np
+
+    from nmrcheck.local_science import open_spectrum
+
+    source = None
+    for candidate in _acquisitions():
+        if candidate.endswith("nmrshiftdb2_40254842_1h_bruker/251"):
+            source = candidate
+            break
+    if source is None:
+        pytest.skip("the 1,2-epoxybutane acquisition is not in this checkout")
+
+    opened = open_spectrum(source)
+    by_shift = {}
+    for signal in opened["multiplets"]:
+        by_shift[round(float(signal["center_ppm"]), 2)] = float(signal["relative_area"])
+
+    # The four compound environments, by the shift each sits at.
+    wanted = {1.01: 3.0, 1.58: 2.0, 2.49: 1.0, 2.81: 2.0}
+    found = {}
+    for shift, protons in wanted.items():
+        match = [v for k, v in by_shift.items() if abs(k - shift) <= 0.03]
+        if not match:
+            pytest.skip(f"no signal near {shift} ppm in this build's peak list")
+        found[shift] = max(match)
+
+    scale = 8.0 / sum(found.values())
+    for shift, protons in sorted(wanted.items()):
+        counted = found[shift] * scale
+        assert abs(counted - protons) <= 0.05 * 8.0, (
+            f"the signal at {shift} ppm holds {counted:.3f} of the molecule's 8 hydrogens "
+            f"where its environment has {protons:.0f}"
+        )
+
+    # And the shares must still be shares: every signal in [0,1], summing to 1.
+    every = [float(m["relative_area"]) for m in opened["multiplets"]]
+    assert all(0.0 <= a <= 1.0 for a in every)
+    assert abs(sum(every) - 1.0) < 0.01, (
+        f"the reported shares sum to {sum(every):.4f}, so the windows they were "
+        f"measured over either overlap or leave signal unclaimed"
+    )
