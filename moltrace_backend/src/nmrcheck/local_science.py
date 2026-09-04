@@ -442,6 +442,83 @@ _PATTERN_LINES: dict[str, int] = {"s": 1, "d": 2, "t": 3, "q": 4, "quint": 5, "s
 
 
 
+#: How far past a line's own half-width the integration window reaches. A
+#: Lorentzian's wings are heavy: at 6 half-widths a line still carries ~10% of its
+#: area outside. Measured on the reference acquisition, the CH3's raw trace does
+#: not reach its fitted total until +-100 Hz, and a 3-point pad omitted 25.4% of
+#: genuine tail. Six is where the four known environments land within 2.7% while
+#: the windows still stay apart; it is not a round number chosen for looks.
+_AREA_WINDOW_HALF_WIDTHS = 6.0
+
+
+def _trace_areas(
+    spectrum: NMRSpectrum, multiplets: Sequence[object]
+) -> dict[int, float]:
+    """Integrate the trace under each signal, over windows that tile it.
+
+    NOT THE SUM OF FITTED AREAS, which is what this replaced and which is not a
+    quantitation. The desktop fits at GSD level 2: one independent fit per
+    detected apex, with no constraint that the fits partition the spectrum. The
+    upper bound on a fitted line's width is the width of its own fit WINDOW, and a
+    pseudo-Voigt's fwhm is twice its sigma, so a line may legally come back twice
+    as wide as the data that constrained it. lmfit's `amplitude` is the integral
+    to infinity, so most of such a peak's area is extrapolation into trace nobody
+    measured. Measured on the reference acquisition: 4 of 31 peaks sat at that
+    bound, one reported area of which 29.7% lay inside its own window, three of
+    them sat under a single envelope each claiming most of it, and summing them
+    inflated the denominator 2.15x. The sharp CH3's own area was right to 2.1% the
+    whole time -- it was the DENOMINATOR that was wrong, so the error showed up as
+    a signal that reads 1.4 H where the molecule has 3.
+
+    NOT `range_ppm` EITHER. `multiplet.analysis` builds it as
+    `(centres[0], centres[-1])`, so a singlet's range has zero width -- 52 of the
+    100 multiplets across this corpus. Integrating over that measures nothing.
+    The window comes from each line's own centre and fitted half-width.
+
+    Windows are clamped to their midpoint where neighbours would overlap, so the
+    intensity is partitioned rather than double-counted: every share is measured
+    over trace no other signal claims, and they sum to one because they tile.
+    """
+    axis = np.asarray(spectrum.ppm_axis, dtype=float)
+    data = np.asarray(spectrum.data, dtype=float)
+    if axis.size < 2 or data.size != axis.size:
+        return {}
+    order = np.argsort(axis)
+    ax, dy = axis[order], data[order]
+    step = float(np.median(np.diff(ax)))
+    if not np.isfinite(step) or step <= 0:
+        return {}
+    # The same flat baseline the picker fits over, for the same reason: an
+    # offset counted as signal is area credited to whichever window is widest.
+    baseline = float(np.median(dy))
+    field = float(spectrum.field_mhz) or 1.0
+
+    bounds: list[tuple[float, float, int]] = []
+    for multiplet in multiplets:
+        centres = [float(p.position_ppm) for p in multiplet.peaks]
+        halves = [float(p.width_hz) / field for p in multiplet.peaks]
+        if not centres:
+            continue
+        lo = min(c - _AREA_WINDOW_HALF_WIDTHS * w for c, w in zip(centres, halves, strict=False))
+        hi = max(c + _AREA_WINDOW_HALF_WIDTHS * w for c, w in zip(centres, halves, strict=False))
+        bounds.append((lo, hi, id(multiplet)))
+
+    bounds.sort(key=lambda b: b[0])
+    for i in range(1, len(bounds)):
+        prev_lo, prev_hi, prev_id = bounds[i - 1]
+        lo, hi, ident = bounds[i]
+        if lo < prev_hi:
+            middle = 0.5 * (prev_hi + lo)
+            bounds[i - 1] = (prev_lo, middle, prev_id)
+            bounds[i] = (middle, hi, ident)
+
+    areas: dict[int, float] = {}
+    for lo, hi, ident in bounds:
+        window = (ax >= lo) & (ax <= hi)
+        areas[ident] = float(np.sum(np.clip(dy[window] - baseline, 0.0, None)) * step)
+    return areas
+
+
 def _summarise_multiplet(
     spectrum: NMRSpectrum,
     multiplet: object,
@@ -450,6 +527,7 @@ def _summarise_multiplet(
     snr: float,
     categories: dict[int, tuple[str, float]],
     solvent: str = "",
+    measured_area: float | None = None,
 ) -> MultipletSummary:
     """One signal, with every claim held to the floor this module declares.
 
@@ -490,7 +568,10 @@ def _summarise_multiplet(
         resolved_lines=_resolved_line_count(spectrum, multiplet, baseline_sigma),
         snr=snr,
         quantifiable=quantifiable,
-        relative_area=float(sum(abs(p.area) for p in multiplet.peaks) / total_area),
+        # The trace under this signal, over a window no other signal claims --
+        # never the sum of fitted amplitudes, which do not partition anything.
+        relative_area=float((measured_area if measured_area is not None
+                             else sum(abs(p.area) for p in multiplet.peaks)) / total_area),
     )
 
 
@@ -1806,7 +1887,9 @@ def open_spectrum(path: str) -> dict:
     discarded = [m for m, snr in measured if snr <= 0.0]
     kept = [(m, snr) for m, snr in measured if snr > 0.0]
 
-    total_area = sum(abs(p.area) for m, _ in kept for p in m.peaks) or 1.0
+    _areas = _trace_areas(spectrum, [m for m, _ in kept])
+    total_area = (sum(_areas.values()) if _areas
+                  else sum(abs(p.area) for m, _ in kept for p in m.peaks)) or 1.0
 
     # WHAT THE DETECTOR COULD NOT SEPARATE, asked again with a different question.
     #
@@ -1823,7 +1906,8 @@ def open_spectrum(path: str) -> dict:
     effective_solvent = str(spectrum.solvent or detected_solvent or "")
     summaries = [
         _summarise_multiplet(
-            spectrum, m, baseline_sigma, total_area, snr, categories, effective_solvent
+            spectrum, m, baseline_sigma, total_area, snr, categories, effective_solvent,
+            _areas.get(id(m)),
         )
         for m, snr in kept
     ]
