@@ -228,11 +228,54 @@ ipcMain.handle('moltrace:verify-structure', async (_event, smiles) => {
     const result = await requestFromService('/structure/verify', {
       path: lastOpenedPath,
       smiles: smiles.trim(),
+      // Applied to every check while a spectrum is loaded, so the evidence a
+      // verdict rests on is the same for every candidate on the page.
+      ...(massSpectrum ? { ms_peaks: massSpectrum } : {}),
     })
     return { ok: true, result }
   } catch (err) {
     return { ok: false, reason: localService.readFailureReason(err) }
   }
+})
+
+// The parsed peaks live HERE, not in the service, which is stateless by design:
+// an operation that answers about a path must not also remember a file from a
+// previous call, or an answer can be attributed to the wrong acquisition.
+let massSpectrum = null
+
+ipcMain.handle('moltrace:open-mass-spectrum', async () => {
+  const picked = await dialog.showOpenDialog({
+    title: 'Choose a mass-spectrum peak table',
+    properties: ['openFile'],
+    filters: [
+      { name: 'Peak tables', extensions: ['csv', 'tsv', 'txt', 'asc', 'dat'] },
+      { name: 'All files', extensions: ['*'] },
+    ],
+  })
+  if (picked.canceled || !picked.filePaths.length) return { ok: false, cancelled: true }
+  try {
+    const result = await requestFromService('/ms/open', { path: picked.filePaths[0] })
+    // Peaks kept in the main process; the renderer receives the SUMMARY only, so
+    // a page that is compromised cannot read the chemist's measurement back out.
+    massSpectrum = result.peaks
+    return {
+      ok: true,
+      summary: {
+        file_name: result.file_name,
+        peak_count: result.peak_count,
+        mz_range: result.mz_range,
+        base_peak_mz: result.base_peak_mz,
+      },
+    }
+  } catch (err) {
+    massSpectrum = null
+    return { ok: false, reason: localService.readFailureReason(err) }
+  }
+})
+
+ipcMain.handle('moltrace:forget-mass-spectrum', async () => {
+  massSpectrum = null
+  return { ok: true }
 })
 
 ipcMain.handle('moltrace:proton-inventory', async (_event, smiles) => {

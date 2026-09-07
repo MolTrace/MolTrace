@@ -153,6 +153,9 @@
     inventory: null,
     inventoryError: null,
     inventoryLoading: false,
+    massSpectrum: null,
+    massError: null,
+    massBusy: false,
     verdictError: null,
     checking: false,
   }
@@ -585,6 +588,43 @@
       + 'deterministic tests the platform uses everywhere \u2014 on this computer, and the '
       + 'structure never leaves it.'))
 
+    // THE EVIDENCE PANEL, above the input, because it changes what a check means.
+    // Without a mass spectrum two of the verifier's four tests abstain and the
+    // desktop decides on half the platform's evidence; the reader should know
+    // which of those two states they are in before they type a structure.
+    const ms = node('div', 'msrow')
+    if (state.massSpectrum) {
+      const m = state.massSpectrum
+      ms.append(node('p', 'tablenote',
+        'Mass spectrum: ' + m.file_name + ' \u2014 ' + m.peak_count + ' peaks, '
+        + Number(m.mz_range[0]).toFixed(2) + '\u2013' + Number(m.mz_range[1]).toFixed(2)
+        + ' m/z, strongest at ' + Number(m.base_peak_mz).toFixed(3)
+        + '. Every check below uses it.'))
+      const drop = node('button', 'btn btn--secondary')
+      drop.type = 'button'
+      drop.append(document.createTextNode('Use NMR only'))
+      drop.dataset.focusKey = 'forget-ms'
+      drop.addEventListener('click', forgetMassSpectrum)
+      ms.append(drop)
+    } else {
+      const add = node('button', 'btn btn--secondary')
+      add.type = 'button'
+      add.append(document.createTextNode(state.massBusy ? 'Reading\u2026' : 'Add a mass spectrum'))
+      add.disabled = state.massBusy || !(state.service && state.service.running)
+      add.dataset.focusKey = 'open-ms'
+      add.addEventListener('click', openMassSpectrum)
+      ms.append(add)
+      ms.append(node('p', 'tablenote',
+        'A processed centroid peak table \u2014 rows of m/z and intensity, as CSV or TSV. '
+        + 'It lets one more of the four checks run: on this build\u2019s own reference '
+        + 'acquisition, supplying the molecular ion moved a true structure from inconclusive '
+        + 'to consistent. mzML and vendor formats are not read here.'))
+    }
+    if (state.massError) {
+      ms.append(alert('warn', 'That peak table was not read', state.massError))
+    }
+    c.append(ms)
+
     const row = node('div', 'formrow')
     const input = node('input', 'input')
     input.type = 'text'
@@ -659,6 +699,21 @@
         + (v.prior * 100).toFixed(0) + '%'))
       c.append(verdict)
       c.append(node('p', 'card__desc', v.summary))
+      // WHAT THE MASS SPECTRUM CANNOT DO. Its weight is the fraction of the
+      // predicted pattern that matched, so a structure matching NOTHING scores
+      // zero significance and its confidence does not move at all. Measured
+      // against a 114 Da molecular ion, ethanol, glycol and aspirin -- 46, 62 and
+      // 180 Da -- each moved by exactly +0.000. A reader who sees one candidate
+      // lifted and the others unchanged would otherwise reasonably conclude the
+      // others had been ruled out.
+      if (state.massSpectrum
+          && v.tests.some((t) => t.name === 'ms_molecule_match' && t.applicable)) {
+        c.append(node('p', 'tablenote',
+          'The mass spectrum can raise a structure\u2019s confidence and cannot lower it: a '
+          + 'candidate whose predicted pattern matches nothing scores no weight rather than '
+          + 'negative weight, so it is left where it was. Read an unchanged candidate as '
+          + 'unsupported by the MS, never as ruled out by it.'))
+      }
       if (v.summary_diagnostic) c.append(rawText('Show the engine\u2019s own words', v.summary_diagnostic))
 
       const table = node('table', 'peaks')
@@ -1112,6 +1167,33 @@
     } finally {
       state.inventoryLoading = false; render()
     }
+  }
+
+  async function openMassSpectrum() {
+    state.massBusy = true; state.massError = null; render()
+    try {
+      const out = await window.moltrace.analysis.openMassSpectrum()
+      if (out && out.ok) {
+        state.massSpectrum = out.summary
+        // The verdicts on screen were reached WITHOUT this evidence. Leaving them
+        // beside a panel announcing a mass spectrum would let a reader take them
+        // as having used it.
+        clearDerived(['verdicts', 'verdictError', 'ranking', 'ranking_error'])
+      } else if (!(out && out.cancelled)) {
+        state.massError = (out && out.reason) || 'that peak table could not be read'
+      }
+    } catch (e) {
+      state.massError = (e && e.message) || 'that peak table could not be read'
+    } finally {
+      state.massBusy = false; render()
+    }
+  }
+
+  async function forgetMassSpectrum() {
+    try { await window.moltrace.analysis.forgetMassSpectrum() } catch { /* nothing to undo */ }
+    state.massSpectrum = null; state.massError = null
+    clearDerived(['verdicts', 'verdictError', 'ranking', 'ranking_error'])
+    render()
   }
 
   async function checkStructure() {

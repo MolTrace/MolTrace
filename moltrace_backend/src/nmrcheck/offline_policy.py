@@ -73,6 +73,8 @@ POLICY: dict[str, str] = {
     # Re-opens the acquisition and counts protons against a supplied
     # structure. RDKit and arithmetic; nothing leaves the machine.
     "structure.inventory": "offline-compute",
+    # Reads a peak table from disk and parses it. No network, no service.
+    "ms.open": "offline-compute",
     # Looking a spectrum up against the reference library shipped with the build.
     # Same class again: local bytes, local library, deterministic arithmetic, no
     # record and no authorization.

@@ -272,6 +272,42 @@ untouched.
 
 ---
 
+## v0.75.1 — Mass spectrometry, and the half of the verifier the desktop was not using (2026-09-07)
+
+The verifier runs four tests. Two of them — `hsqc_2d_ranges` and `ms_molecule_match` — abstained on
+**every** check the desktop ever made, because nothing on this machine could supply their evidence.
+Half the platform's arbiter, dormant. This supplies one of the two.
+
+`ms.open` reads a processed centroid peak table and `structure.verify` takes the peaks, so
+`ms_molecule_match` runs. Measured on a reference acquisition with the true structure: **2 of 4
+tests → 3 of 4**, and the verdict moves from **inconclusive 0.562 to consistent 0.925**.
+
+**Parsed by `parse_ms1_peak_text`, not by a second reader.** It already accepts CSV, TSV and
+whitespace rows, skips comments and headers, tolerates a `%` column, and refuses with the LINE
+NUMBER when a row carries only one number. Processed centroid peaks only — mzML and vendor formats
+go through the LC-MS import bridge, which is a server surface, and the refusal says so rather than
+returning an empty table.
+
+**The peaks live in the host, not the service.** Every other operation here takes a path and
+answers about it; a service that remembered a file between calls could attribute an answer to the
+wrong acquisition. The renderer receives a summary only — file name, peak count, m/z range, base
+peak — so a compromised page cannot read the chemist's measurement back out of it. Loading or
+dropping a spectrum clears the verdicts on screen, which were reached without that evidence.
+
+**The asymmetry is rendered, because it is not guessable from the result.** This test's weight is
+`_SIG_MAX * matched_fraction`, so a candidate whose predicted pattern matches NOTHING scores zero
+significance — and a test of zero significance moves the posterior by nothing. Measured against a
+114 Da molecular ion, ethanol, ethylene glycol and aspirin (46, 62 and 180 Da) each moved by
+exactly **+0.000**. A reader seeing one candidate lifted and three unchanged would reasonably
+conclude the three were ruled out. They were not, and the page says: *read an unchanged candidate
+as unsupported by the MS, never as ruled out by it.* The guard asserts that direction rather than
+the formula.
+
+A malformed `ms_peaks` on `structure.verify` is ignored rather than refused: a structure check
+without MS is the normal case and must not fail on a malformed optional field.
+
+---
+
 ## v0.75.0 — A fitted line may not be wider than the data that constrained it (2026-09-07)
 
 The first change to the **shared** fitter in this line of work. Everything before it routed the

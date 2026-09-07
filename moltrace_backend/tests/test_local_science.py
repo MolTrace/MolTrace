@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import glob
 import os
+import re
 from pathlib import Path
 
 import numpy as np
@@ -1824,3 +1825,91 @@ def test_contaminant_signals_keep_a_measured_share_of_their_own() -> None:
 
     if not checked:
         pytest.skip("no acquisition here classifies any signal as a contaminant")
+
+
+@pytest.mark.slow
+def test_a_mass_spectrum_lets_a_third_check_run_and_can_only_raise_confidence(
+    tmp_path: Path,
+) -> None:
+    """The second of the verifier's four tests this machine can actually answer.
+
+    Without MS peaks `ms_molecule_match` abstains, and with `hsqc_2d_ranges`
+    abstaining too the desktop decides on half the platform's evidence.
+
+    AND THE ASYMMETRY, which is the part a reader has to be told. The test's
+    weight is `_SIG_MAX * matched_fraction`: a candidate whose predicted pattern
+    matches NOTHING scores zero significance, and a test of zero significance
+    moves the posterior by nothing. So the mass spectrum can confirm and cannot
+    refute -- a wrong structure is left exactly where it was, not pushed down.
+    Someone reading one candidate lifted and three unchanged would otherwise
+    reasonably conclude the three had been ruled out.
+    """
+    from nmrcheck.local_science import (
+        SpectrumUnreadable,
+        open_spectrum,
+        read_mass_spectrum,
+        verify_candidate,
+    )
+
+    # Allyl glycidyl ether, C6H10O2, 114.07 Da: the molecular ion and two others.
+    table = tmp_path / "peaks.csv"
+    table.write_text("m/z,intensity\n114.068,100\n115.071,7.6\n57.034,42\n")
+    parsed = read_mass_spectrum(str(table))
+    assert parsed["peak_count"] == 3
+    assert parsed["base_peak_mz"] == pytest.approx(114.068, abs=1e-3)
+
+    source = None
+    for candidate in _acquisitions():
+        try:
+            if open_spectrum(candidate).get("nucleus") == "1H":
+                source = candidate
+                break
+        except Exception:  # noqa: BLE001 - unreadable acquisitions are not the subject
+            continue
+    if source is None:
+        pytest.skip("no readable 1H acquisition in this checkout")
+
+    true_structure = "C=CCOCC1CO1"
+    without = verify_candidate(source, true_structure)
+    with_ms = verify_candidate(source, true_structure, ms_peaks=parsed["peaks"])
+
+    ran_without = sum(1 for t in without["tests"] if t["applicable"])
+    ran_with = sum(1 for t in with_ms["tests"] if t["applicable"])
+    assert ran_with == ran_without + 1, (
+        f"supplying MS peaks did not make another check applicable "
+        f"({ran_without} -> {ran_with} of {len(with_ms['tests'])})"
+    )
+    assert with_ms["confidence"] > without["confidence"], (
+        f"the molecular ion did not raise the true structure: "
+        f"{without['confidence']:.3f} -> {with_ms['confidence']:.3f}"
+    )
+
+    # THE ASYMMETRY, measured rather than asserted from the formula. Structures
+    # of 46, 62 and 180 Da against a 114 Da molecular ion: none may be pushed
+    # DOWN, because a non-matching pattern carries no weight at all.
+    for wrong in ("CCO", "OCCO", "CC(=O)Oc1ccccc1C(=O)O"):
+        base = verify_candidate(source, wrong)
+        withms = verify_candidate(source, wrong, ms_peaks=parsed["peaks"])
+        assert withms["confidence"] >= base["confidence"] - 1e-9, (
+            f"{wrong!r} was pushed DOWN by a mass spectrum it does not match "
+            f"({base['confidence']:.3f} -> {withms['confidence']:.3f}); this test "
+            f"can confirm and cannot refute, and the interface says so"
+        )
+
+    # Refusals name the input, never the machinery or the path.
+    with pytest.raises(SpectrumUnreadable) as folder:
+        read_mass_spectrum(str(tmp_path))
+    assert "folder" in str(folder.value)
+
+    junk = tmp_path / "notes.txt"
+    junk.write_text("this file is prose, not a peak table\n")
+    with pytest.raises(SpectrumUnreadable) as bad:
+        read_mass_spectrum(str(junk))
+    said = str(bad.value)
+    # A PATH, not a slash. The refusal says "lines like 'm/z,intensity'", and
+    # "m/z" is the term the chemist needs -- the same distinction as the
+    # acquisition's own name, which is shown on purpose. Two or more
+    # slash-separated segments is a path; one slash inside a unit is not.
+    assert not re.search(r"(?:/[\w.-]+){2,}", said), f"a path reached the reader: {said}"
+    assert "nmrglue" not in said.lower()
+    assert "m/z" in said or "peak" in said.lower()

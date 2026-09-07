@@ -34,6 +34,7 @@ from .local_science import (
     open_spectrum,
     process_spectrum,
     rank_candidates,
+    read_mass_spectrum,
     structure_inventory,
     verify_candidate,
 )
@@ -54,6 +55,7 @@ ROUTES: dict[str, tuple[str, str]] = {
     "fid.open": ("POST", "/fid/open"),
     "structure.verify": ("POST", "/structure/verify"),
     "structure.rank": ("POST", "/structure/rank"),
+    "ms.open": ("POST", "/ms/open"),
     "structure.inventory": ("POST", "/structure/inventory"),
     "spectrum.similar": ("POST", "/spectrum/similar"),
 }
@@ -236,8 +238,20 @@ def _structure_verify(payload: dict = _BODY) -> dict[str, Any]:
     if not smiles.strip():
         _journal("structure.verify", refused=True, cause="no structure was given")
         raise HTTPException(status_code=400, detail="no structure was given to check")
+    # The MS peaks the host holds, if it has any. A list of [m/z, intensity]
+    # pairs; anything else is ignored rather than refused, because a structure
+    # check without MS is the normal case and must not fail on a malformed
+    # optional field.
+    raw_ms = payload.get("ms_peaks")
+    ms_peaks = None
+    if isinstance(raw_ms, list) and raw_ms:
+        try:
+            ms_peaks = [(float(pair[0]), float(pair[1])) for pair in raw_ms]
+        except (TypeError, ValueError, IndexError):
+            ms_peaks = None
+
     try:
-        result = verify_candidate(path, smiles)
+        result = verify_candidate(path, smiles, ms_peaks=ms_peaks)
     except SpectrumUnreadable as unreadable:
         # Names the FORMAT or the structure, never the path: a filename can carry
         # a compound name and this string is written to the device journal.
@@ -252,6 +266,42 @@ def _structure_verify(payload: dict = _BODY) -> dict[str, Any]:
         "structure.verify",
         refused=False,
         cause=f"{result['verdict']} on {applied} of {len(result['tests'])} tests",
+    )
+    return result
+
+
+def _ms_open(payload: dict = _BODY) -> dict[str, Any]:
+    """Read a centroid MS peak table so the verifier's MS test can run.
+
+    Not `async`: file read and parse, blocking work with no await in it.
+
+    THE PEAKS GO BACK TO THE CALLER RATHER THAN BEING HELD HERE. This service is
+    stateless by design -- every other operation takes a path and answers about
+    it -- and a spectrum cached between calls is a spectrum that can be attributed
+    to the wrong acquisition. The host holds them and passes them to the checks
+    it wants them applied to, which is also what makes it visible on screen which
+    checks used them.
+    """
+    HANDLER_CALLS.append("ms.open")
+    path = str(payload.get("path") or "")
+    if not path:
+        _journal("ms.open", refused=True, cause="no file was named")
+        raise HTTPException(status_code=400, detail="no file was named")
+    try:
+        result = read_mass_spectrum(path)
+    except SpectrumUnreadable as unreadable:
+        _journal("ms.open", refused=True, cause=str(unreadable))
+        raise HTTPException(status_code=400, detail=str(unreadable)) from None
+
+    # How many peaks and over what range -- never the peaks themselves, which are
+    # the chemist's unpublished measurement.
+    _journal(
+        "ms.open",
+        refused=False,
+        cause=(
+            f"{result['peak_count']} peaks over "
+            f"{result['mz_range'][0]}-{result['mz_range'][1]} m/z"
+        ),
     )
     return result
 
@@ -440,6 +490,7 @@ def create_local_app(
         "structure.verify": _structure_verify,
         "structure.rank": _structure_rank,
         "structure.inventory": _structure_inventory,
+        "ms.open": _ms_open,
         "spectrum.similar": _spectrum_similar,
     }
     for operation, (method, path) in ROUTES.items():

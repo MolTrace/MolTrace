@@ -362,6 +362,9 @@ table.peaks tbody tr:hover { background: var(--muted); }
 /* ---------- structure check ---------- */
 
 .formrow { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; }
+/* The evidence a check will run on, stated above the input that starts it. */
+.msrow { border-left: 3px solid var(--border); padding-left: 10px; margin-bottom: 12px; }
+.msrow .tablenote { margin-bottom: 8px; max-width: 78ch; }
 .input {
   flex: 1 1 auto; min-width: 0; min-height: 38px;
   padding: 8px 12px; border: 1px solid var(--border); border-radius: var(--radius);

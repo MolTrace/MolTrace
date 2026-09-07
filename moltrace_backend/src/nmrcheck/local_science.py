@@ -658,7 +658,63 @@ _TEST_LABELS: dict[str, str] = {
 }
 
 
-def verify_candidate(path: str | Path, smiles: str) -> dict:
+def read_mass_spectrum(path: str | Path) -> dict:
+    """A centroid MS peak table from this computer, for the verifier's MS test.
+
+    Parsed by the platform's own `parse_ms1_peak_text` rather than a second
+    reader written here: it already accepts CSV, TSV and whitespace rows, skips
+    comments and header lines, tolerates a `%` column, and refuses with the LINE
+    NUMBER when a row does not carry both numbers. There is no reason for the
+    desktop to have a different idea of what a peak table is.
+
+    PROCESSED CENTROID PEAKS ONLY, which is what the whole platform takes at this
+    layer -- mzML and vendor formats go through the LC-MS import bridge, which is
+    a server surface. Said plainly here so a chemist with a .raw file learns it
+    from the refusal rather than from an empty table.
+    """
+    source = Path(path)
+    if not source.exists():
+        raise SpectrumUnreadable("that file is no longer where it was")
+    if source.is_dir():
+        raise SpectrumUnreadable(
+            "a mass spectrum here is a peak table in a single file, not a folder"
+        )
+    try:
+        text = source.read_text(errors="ignore")
+    except OSError:
+        raise SpectrumUnreadable("that file could not be read") from None
+
+    from .adduct_inference import AdductInferenceError, parse_ms1_peak_text
+
+    try:
+        parsed = parse_ms1_peak_text(text)
+    except AdductInferenceError as refused:
+        # The parser names a line number, which is exactly what a chemist needs
+        # and carries no path. Passed through rather than replaced.
+        raise SpectrumUnreadable(str(refused)) from None
+    except Exception:  # noqa: BLE001 - an unreadable table is the input, not a fault
+        raise SpectrumUnreadable(
+            "that file does not read as a peak table. Export processed centroid peaks as "
+            "rows of m/z and intensity; mzML and vendor formats are not read here."
+        ) from None
+
+    peaks = [(float(x.mz), float(x.intensity)) for x in parsed]
+    strongest = max(peaks, key=lambda pair: pair[1])
+    return {
+        "file_name": source.name,
+        "peak_count": len(peaks),
+        "peaks": peaks,
+        "mz_range": [round(min(p[0] for p in peaks), 4), round(max(p[0] for p in peaks), 4)],
+        "base_peak_mz": round(strongest[0], 4),
+        "human_review_required": True,
+    }
+
+
+def verify_candidate(
+    path: str | Path,
+    smiles: str,
+    ms_peaks: Sequence[tuple[float, float]] | None = None,
+) -> dict:
     """Check a proposed structure against an acquisition on this computer.
 
     THE VERIFIER IS THE ARBITER, and it runs here in full: `verify_structure` is
@@ -691,8 +747,33 @@ def verify_candidate(path: str | Path, smiles: str) -> dict:
         except FIDReaderError as unreadable:
             raise SpectrumUnreadable(_readable_refusal(unreadable, source)) from None
 
+    # MASS SPECTROMETRY IS THE SECOND OF THE VERIFIER'S FOUR TESTS THIS MACHINE
+    # CAN ACTUALLY RUN. Without peaks `ms_molecule_match` abstains, and with
+    # `hsqc_2d_ranges` abstaining too the desktop decides on half the evidence
+    # the platform has. Measured on one reference acquisition, supplying the
+    # molecular ion moves the true structure from `inconclusive` at 0.730 to
+    # `consistent` at 0.963.
+    #
+    # WHAT IT CANNOT DO, and the interface says so rather than leaving it to be
+    # discovered: this test can confirm and cannot refute. Its weight is
+    # `_SIG_MAX * matched_fraction`, so a candidate matching NOTHING gets a
+    # significance of zero and its confidence does not move at all. Measured
+    # against the same 114 Da molecular ion, ethanol, glycol and aspirin -- 46,
+    # 62 and 180 Da -- each moved by exactly +0.000.
+    options = None
+    if ms_peaks:
+        from moltrace.spectroscopy.verification import VerificationOptions
+
+        options = VerificationOptions(
+            ms_peaks=[(float(mz), float(intensity)) for mz, intensity in ms_peaks]
+        )
+
     try:
-        result = verify_structure(spectrum, candidate)
+        result = (
+            verify_structure(spectrum, candidate, options=options)
+            if options is not None
+            else verify_structure(spectrum, candidate)
+        )
     except ValueError as bad:
         # A structure the chemist typed that RDKit cannot read is their input, not
         # a fault: say which part failed rather than reporting a dead service.

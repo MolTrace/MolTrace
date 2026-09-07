@@ -68,6 +68,12 @@ contextBridge.exposeInMainWorld('moltrace', {
     // A LIST of structures and still no path. DP4 normalises across the set, so
     // this is the one call that has to see them together.
     rankStructures: async (smilesList) => ipcRenderer.invoke('moltrace:rank-structures', smilesList),
+    // A MASS SPECTRUM, and no path again: the main process runs the picker and
+    // holds what it parsed. Supplying one lets the verifier's `ms_molecule_match`
+    // run, which is the second of its four tests this machine can answer -- the
+    // desktop otherwise decides on half the platform's evidence.
+    openMassSpectrum: async () => ipcRenderer.invoke('moltrace:open-mass-spectrum'),
+    forgetMassSpectrum: async () => ipcRenderer.invoke('moltrace:forget-mass-spectrum'),
     // The one call that runs the other way. Everything above measures the
     // spectrum and then scores a structure against that fixed measurement; this
     // takes the structure BACK to the measurement and turns each signal's share
