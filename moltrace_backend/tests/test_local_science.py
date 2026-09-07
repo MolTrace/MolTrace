@@ -1776,3 +1776,51 @@ def test_reported_areas_are_proton_ratios_on_a_molecule_whose_answer_is_known() 
         f"the reported shares sum to {sum(every):.4f}, so the windows they were "
         f"measured over either overlap or leave signal unclaimed"
     )
+
+
+@pytest.mark.slow
+def test_contaminant_signals_keep_a_measured_share_of_their_own() -> None:
+    """`integrate_sum`, not the integration module's `edited_sum` default.
+
+    The desktop reports what share of the listed signal each multiplet holds --
+    solvent and impurity rows included, because the proton-count readout derives
+    its excluded share from exactly those. `edited_sum` answers a different
+    question: it scales a window by `compound_height / total_height` so that only
+    the analyte's contribution survives, which is right for a purity integral and
+    wrong here.
+
+    Two things break if someone switches to the module default. Every contaminant
+    window goes to zero, so the shares no longer sum to one and the excluded
+    share reads 0% on a spectrum that is half solvent. And the weighting comes
+    from PEAK-level categories, while this module settles categories at the
+    MULTIPLET level -- a signal promoted out of `impurity` because its shape
+    contradicts the contaminant matched to it is still an impurity to every line
+    inside it. Measured on the reference acquisition, that promoted multiplet
+    comes back as 0.025 H where the molecule has 2.
+    """
+    from nmrcheck.local_science import open_spectrum
+
+    checked = 0
+    for candidate in _acquisitions():
+        try:
+            opened = open_spectrum(candidate)
+        except Exception:  # noqa: BLE001 - unreadable acquisitions are not the subject
+            continue
+        signals = opened.get("multiplets") or []
+        contaminants = [m for m in signals if m.get("category") not in ("compound", "")]
+        if not contaminants:
+            continue
+        checked += 1
+        for signal in contaminants:
+            assert float(signal["relative_area"]) > 0.0, (
+                f"the {signal['category']} signal at {signal['center_ppm']:.3f} ppm was "
+                f"given a share of zero, which is what weighting a window by its compound "
+                f"fraction does -- the excluded-share disclosure reads from these"
+            )
+        total = sum(float(m["relative_area"]) for m in signals)
+        assert abs(total - 1.0) < 0.01, (
+            f"shares sum to {total:.4f}: the windows no longer tile the listed signal"
+        )
+
+    if not checked:
+        pytest.skip("no acquisition here classifies any signal as a contaminant")

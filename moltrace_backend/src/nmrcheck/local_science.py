@@ -20,14 +20,16 @@ they appear. This lists what crosses the boundary.
 
 from __future__ import annotations
 
+import math
 import re
 from collections.abc import Sequence
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 
 import numpy as np
 
 from moltrace.spectroscopy.classify.solvent_impurity import describe_impurity_match
+from moltrace.spectroscopy.integration.methods import integrate_sum
 from moltrace.spectroscopy.io.fid_reader import (
     FIDReaderError,
     NMRSpectrum,
@@ -493,7 +495,7 @@ def _trace_areas(
     baseline = float(np.median(dy))
     field = float(spectrum.field_mhz) or 1.0
 
-    bounds: list[tuple[float, float, int]] = []
+    bounds: list[tuple[float, float, int, float]] = []
     for multiplet in multiplets:
         centres = [float(p.position_ppm) for p in multiplet.peaks]
         halves = [float(p.width_hz) / field for p in multiplet.peaks]
@@ -501,21 +503,56 @@ def _trace_areas(
             continue
         lo = min(c - _AREA_WINDOW_HALF_WIDTHS * w for c, w in zip(centres, halves, strict=False))
         hi = max(c + _AREA_WINDOW_HALF_WIDTHS * w for c, w in zip(centres, halves, strict=False))
-        bounds.append((lo, hi, id(multiplet)))
+        bounds.append((lo, hi, id(multiplet), float(multiplet.center_ppm)))
 
-    bounds.sort(key=lambda b: b[0])
-    for i in range(1, len(bounds)):
-        prev_lo, prev_hi, prev_id = bounds[i - 1]
-        lo, hi, ident = bounds[i]
-        if lo < prev_hi:
-            middle = 0.5 * (prev_hi + lo)
-            bounds[i - 1] = (prev_lo, middle, prev_id)
-            bounds[i] = (middle, hi, ident)
+    # THE BOUNDARY IS THE MIDPOINT BETWEEN CENTRES, not between window edges.
+    #
+    # Clamping edge-to-edge assumes the windows only ever partially overlap. They
+    # do not: a sharp signal's window can sit ENTIRELY INSIDE a broad
+    # neighbour's, and then the midpoint between the broad window's far edge and
+    # the sharp one's near edge lands past the sharp one's own far edge and
+    # INVERTS it -- a window of negative width, integrating to exactly zero.
+    # Measured on one acquisition here, two signals were silently given a share
+    # of 0.0 that way, one of them a residual-solvent line the proton-count
+    # readout subtracts from its denominator.
+    #
+    # Bounding each window by the midpoints to its neighbouring CENTRES cannot
+    # invert, because a multiplet's own centre always lies strictly between them.
+    # The windows stay disjoint by construction rather than by repair.
+    bounds.sort(key=lambda b: b[3])
+    for i, (lo, hi, ident, centre) in enumerate(bounds):
+        left = 0.5 * (bounds[i - 1][3] + centre) if i > 0 else -math.inf
+        right = 0.5 * (centre + bounds[i + 1][3]) if i + 1 < len(bounds) else math.inf
+        bounds[i] = (max(lo, left), min(hi, right), ident, centre)
 
+    # THE PLATFORM'S OWN TRAPEZOID, not a second one written here. Measured
+    # against the hand-rolled version this replaced, over identical windows on
+    # the reference acquisition: 2.950/2.055/1.008/1.988 against
+    # 2.951/2.054/1.008/1.987, i.e. 0.001 H apart. One implementation is better
+    # than two that agree.
+    #
+    # `sum` AND NOT `edited_sum`, which is that module's default and is the
+    # better method for the question IT answers. It weights a window by
+    # `compound_height / total_height` taken from PEAK-level categories, and this
+    # module's categories are settled at the MULTIPLET level -- a signal promoted
+    # out of `impurity` because its shape contradicts the contaminant matched to
+    # it is still an impurity to every line inside it. Measured: the promoted
+    # 1.583 ppm multiplet comes back as 0.025 H where the molecule has 2, and
+    # every contaminant window goes to zero, which would break both the
+    # shares-sum-to-one invariant and the excluded-share disclosure that depends
+    # on it. `peaks` is the summed-fitted-area method this whole function exists
+    # to stop using: 1.949 H of error on the same acquisition.
+    #
+    # The baseline is subtracted BEFORE the call because `integrate_sum`
+    # integrates the trace as given: a DC offset would otherwise be counted as
+    # signal in proportion to each window's width, and these windows differ in
+    # width by 20x.
+    corrected = replace(
+        spectrum, data=np.clip(np.asarray(spectrum.data, dtype=float) - baseline, 0.0, None)
+    )
     areas: dict[int, float] = {}
-    for lo, hi, ident in bounds:
-        window = (ax >= lo) & (ax <= hi)
-        areas[ident] = float(np.sum(np.clip(dy[window] - baseline, 0.0, None)) * step)
+    for lo, hi, ident, _centre in bounds:
+        areas[ident] = float(integrate_sum(corrected, (lo, hi))) if hi > lo else 0.0
     return areas
 
 
