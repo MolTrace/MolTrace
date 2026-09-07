@@ -321,6 +321,51 @@ corpus rather than one.
 
 ---
 
+## v0.74.14 — A measured level with no applicable limit is undetermined, never a pass (2026-09-03)
+
+An adversarial sweep over v0.74.5–v0.74.6's own commits, looking specifically for
+the half-applied-guard pattern this codebase keeps producing. It found three, and
+all three were introduced or missed by those commits.
+
+**The shape.** A branch computes no limit, says so in a warning, and leaves
+`threshold_triggered` at its `False` initialiser — which reads as *within limits* to
+every machine consumer of the record. The prose says one thing and the stored value
+says the opposite.
+
+* **ICH Q3C, a route the guideline does not cover.** v0.74.5 added the decline and
+  the warning but never touched the verdict, so acetonitrile at 5000 ppm on a
+  cutaneous dossier was stored as within limits — for a product Q3C had just been
+  declared not to cover. Its test asserted `is not True`, which `False` satisfies:
+  the test encoded the weakness instead of catching it.
+* **ICH Q3C, no configured rule and no encoded entry.** The `source_needed` branch
+  already says this is not a determination that ICH leaves the solvent unrestricted.
+  The stored verdict said the opposite.
+* **ICH Q3D, an element outside the list of 24.** That branch leaves the loop before
+  the "no limit means undetermined" guard 40 lines below it. v0.74.6 hoisted
+  `route_assumed` above the same early exit and did not hoist the verdict with it —
+  the guard was half-applied *inside the commit that introduced it*. Measured 9000
+  ppm of an element ICH Q3D sets no limit for, recorded as within limits.
+
+Scoped to rows carrying an observed value; a row with nothing measured keeps its
+existing meaning, since no verdict is at risk there.
+
+**The vocabulary lesson did not take the first time.** `_q3d_pde_varies_by_route`
+retyped `("oral", "parenteral", "inhalation")` one commit after v0.74.5 published
+`Q3C_ROUTES` to stop exactly that — and whose own rationale was that retyping the
+vocabulary is what let two endpoints disagree. Now `Q3D_ENCODED_ROUTES` is published
+and used, so if the Q3D(R2) cutaneous appendix is ever encoded the guard follows the
+canonical list instead of silently narrowing.
+
+**And the undeclared-route warning now fires whenever the route was assumed**, not
+only where a verdict was withheld. Lead and thallium share one PDE across all three
+encoded routes so they rightly keep their verdict — but the dossier vocabulary also
+admits a cutaneous route, for which Q3D encodes no limit at all, so a lead-only panel
+asserted a pass and said nothing whatever about having assumed the route.
+
+Every fix proven red first. Full suite green.
+
+---
+
 ## v0.74.13 — The platform's own trapezoid, and windows that stopped inverting (2026-09-07)
 
 Two changes, and the second was found by the guard written for the first.
