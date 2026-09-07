@@ -272,6 +272,53 @@ untouched.
 
 ---
 
+## v0.74.13 — The platform's own trapezoid, and windows that stopped inverting (2026-09-07)
+
+Two changes, and the second was found by the guard written for the first.
+
+**The consolidation, and how little it bought.** `local_science` had a hand-rolled trapezoid where
+`moltrace.spectroscopy.integration.methods` already offers one. Measured over identical windows on
+the reference acquisition, worst error against a known 3/2/1/2 partition: hand-rolled **0.054 H**,
+`integrate_sum` **0.055 H**. Equivalent, so the duplicate goes — but nothing improved, and the
+memory note that prompted this pointed at the wrong module entirely (the tail-restoration code in
+`nmrcheck/spectrum.py` is fused into peak detection and its `(2/π)·arctan(w/hwhm)` is a *per-line*
+correction, while this integrates multiplet *envelopes*).
+
+**`sum`, and emphatically not the module's `edited_sum` default**, which weights a window by
+`compound_height / total_height` from **peak-level** categories. This module settles categories at
+the **multiplet** level, so a signal promoted out of `impurity` because its shape contradicts the
+contaminant matched to it is still an impurity to every line inside it: measured, that promoted
+1.583 ppm multiplet returns **0.025 H** where the molecule has 2, and every contaminant window goes
+to zero — breaking both the shares-sum-to-one invariant and the excluded-share disclosure that
+reads from it. `peaks` is the summed-fitted-area method v0.74.12 existed to stop using: **1.949 H**
+of error on the same spectrum. Guarded by
+`test_contaminant_signals_keep_a_measured_share_of_their_own`.
+
+**The bug that guard found, shipped in `ce66e47`.** Integration windows do not merely overlap — a
+sharp line's window can sit **entirely inside** a broad neighbour's. Clamping edge-to-edge then
+places the boundary past the contained window's own upper edge and **inverts** it to negative
+width, integrating to exactly 0.0. Two signals across the corpus were silently given a share of
+zero, one of them a residual-solvent line the proton-count readout subtracts from its denominator.
+
+**Both checks run when that shipped were true and blind.** "Overlaps: 0" holds because a zero-width
+window overlaps nothing; "shares sum to 1.000000" holds because the sum is normalised by itself.
+The invariant that catches it is that every listed signal holds a **positive** share.
+
+Each window is now bounded by the midpoints to its neighbouring **centres**, which cannot invert
+because a multiplet's own centre always lies strictly between them — disjoint by construction
+rather than by repair. Zero-share signals across the corpus go from 2 to **0 of 264**, and the
+reference acquisition improves slightly to **2.953 / 2.051 / 1.005 / 1.991** against 3/2/1/2.
+
+The first attempt at that fix sorted the bounds by `b[2]`, which after appending the centre is the
+object **id** rather than the centre, so midpoints were computed between arbitrary unrelated
+multiplets: zero-share signals went from 2 to **188 of 264**. The tests caught it immediately; the
+reasoning did not. Recorded because the failure mode is invisible to inspection.
+
+`3a3fc34`, `002dafb`. Backend 49/49 including the slow guards, adjacent spectroscopy and qNMR
+suites green, 19 round-trip assertions.
+
+---
+
 ## v0.74.12 — A signal's share is the trace under it, not a sum of fitted areas (2026-09-07)
 
 The sharp CH3 of 1,2-epoxybutane reported **1.4 H where the molecule has 3**, and the premise
