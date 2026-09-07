@@ -272,6 +272,79 @@ untouched.
 
 ---
 
+## v0.74.12 — A signal's share is the trace under it, not a sum of fitted areas (2026-09-07)
+
+The sharp CH3 of 1,2-epoxybutane reported **1.4 H where the molecule has 3**, and the premise
+behind that investigation was wrong. The line does not lose area. Its own fitted area is right to
+**2.1%**. What was wrong is what it was divided by.
+
+**The denominator was inflated 2.15x.** The desktop fits at GSD level 2, which runs one
+independent `_fit_single_peak` per detected apex — no neighbour components, no baseline term, and
+nothing requiring the fits to partition the spectrum between them. `_fit_single_with_model`
+(`gsd.py:730`) bounds sigma at `max(span, step)` where `span` is the width of that peak's own fit
+window, and a pseudo-Voigt's `fwhm` is `2*sigma`, so a line may legally come back **exactly twice
+as wide as the data that constrained it**. Four of the thirty-one peaks in this acquisition sat at
+that bound. `amplitude` in lmfit is the integral to infinity, so most of such a peak's reported
+area is extrapolation into trace the fit never saw — measured, one peak under the 2.81 ppm
+envelope carried only **29.7%** of its reported area inside its own window. Three of those sat
+under that single envelope, each claiming most of it, and `local_science.py` summed them.
+
+`relative_area` is now the integral of the baseline-subtracted trace under each signal, over a
+window built from each line's own centre and fitted half-width and clamped at the midpoint where
+neighbours would meet. The windows **tile**: nothing is counted twice, nothing is left unclaimed,
+and the shares sum to 1.000000.
+
+Deliberately **not** `range_ppm`. `multiplet/analysis.py:466` builds it as
+`(centres_ppm[0], centres_ppm[-1])`, so every singlet's range is zero-width — 52 of the 100
+multiplets across this corpus. Integrating over that measures the window, not the signal.
+
+Measured against a molecule whose answer is arithmetic — C4H8O, eight hydrogens as 3/2/1/2 across
+four environments:
+
+```
+                  before                 after      true
+CH3   1.01 ppm    1.394                  2.951      3
+CH2   1.58        2.202                  2.054      2
+CH2   2.49        1.682                  1.008      1
+CH+CH2 2.81       2.722                  1.987      2
+```
+
+The invariant test was written **red** at the first column and is committed with the fix.
+
+**Three hypotheses died first, each by measurement rather than argument.** That the line is
+under-sampled — it has 68 points across it, and the figure that suggested otherwise
+(`resolution_hz`) is a `find_peaks(distance=)` constraint from a hard-coded 0.006 ppm table entry,
+**87x** the true digitization of 0.017152 Hz/pt. That the fitter carries a width-dependent area
+bias — it does not: on planted isolated lines recovered/true runs 0.9996 to 0.9842 across 0.5–20
+Hz for a Lorentzian and 1.0000 to 0.9998 for a Gaussian, with one fitted component at every width.
+And that the sigma **floor** was the cause — it is inert, corresponding to a 0.012 Hz linewidth,
+46x below the narrowest line here; the load-bearing bound is the **upper** one on the same source
+line.
+
+**`gsd.py` is untouched, and that is a decision rather than an omission.** The defect is really
+there: independently fitted lines summed with no partition constraint is not a quantitation, and
+`max=max(span, step)` has no recorded rationale at either site. But changing it rewrites every
+peak list SpectraCheck, qNMR and the verifier have produced — widths, areas, multiplicity labels,
+DP4 inputs, the A/B envelope fixture, the curated-shift recall baselines — and it would not be
+sufficient anyway: on synthetic triplets, summed fitted area still over-recovers up to **3.96x**
+with joint fitting enabled, at both level 4 and level 5. That needs its own re-baselining task
+against the golden corpus. Raising the GSD level is likewise refuted as a fix: level 4 lands
+near-exact on this one acquisition and fails on synthetic ground truth.
+
+This change is confined to the desktop. `relative_area` has no reader outside `local_science.py`
+and the renderer; qNMR consumes `range_ppm`, which is untouched.
+
+**Left standing, deliberately.** `resolution_hz` is rendered as "Hz/point" and is not one, and
+`rank_candidates` uses it as a physical shift uncertainty. The copy is wrong and safe to fix; the
+science change is not safe on this evidence — substituting the true digital resolution makes the
+ranking confidently endorse the wrong structure on this acquisition, because that oversized
+constant is the only thing currently producing its "does not separate the top two" warning.
+
+Backend 48/48 including the slow guards, adjacent spectroscopy and qNMR suites green, desktop 10
+stages and 19 round-trip assertions.
+
+---
+
 ## v0.74.11 — A contaminant whose shape contradicts its label is moved back to the compound (2026-09-03)
 
 The reclassification the previous entry deliberately stopped short of. `classify_peak` matches one
