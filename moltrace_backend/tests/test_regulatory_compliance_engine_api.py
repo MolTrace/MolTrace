@@ -631,7 +631,9 @@ def test_a_cutaneous_dossier_is_not_given_q3c_solvent_limits(client, api_headers
         body = assessment.json()
         match = body["residual_solvent_summary_json"]["matched_solvents"][0]
 
-        # No Q3C limit may be asserted for a route Q3C does not cover.
+        # No Q3C limit may be asserted for a route Q3C does not cover -- and `is not True` is too
+        # weak an assertion here, because the initialiser is False, which reads as "within limits".
+        assert match.get("threshold_triggered") is None, match
         assert match.get("concentration_limit") is None, (
             "a cutaneous dossier was given an ICH Q3C limit that the sibling assess endpoint "
             "refuses to give for the same route"
@@ -821,3 +823,99 @@ def test_a_route_with_no_encoded_limit_does_not_report_a_pass(client, api_header
         )
         assert ni.get("review_required") is True
         assert any("cutaneous" in w.lower() for w in body["warnings"]), body["warnings"]
+
+
+def test_an_undeclared_route_is_disclosed_even_when_every_element_still_gets_a_verdict(
+    client, api_headers
+):
+    """A route-invariant panel produced a verdict and no warning whatsoever.
+
+    Lead and thallium are the two elements whose PDE is identical across the three encoded
+    routes, so the assumed route cannot change their answer and the verdict is rightly kept.
+    But the warning naming the assumption is emitted only for elements whose verdict was
+    withheld, so a lead-only assessment on a dossier with no declared route said nothing at all
+    about having assumed one.
+
+    The assumption is still load-bearing in a way the encoded three cannot show: the dossier
+    vocabulary also admits `cutaneous`, for which ICH Q3D(R2) encodes no limit at all, so a pass
+    here holds only if the real route is one of the three encoded ones.
+    """
+    headers = api_headers
+    with client:
+        juris = _jurisdiction(client, headers, "Q3D noroute Pb only US", "US")
+        res = client.post(
+            "/regulatory/dossiers",
+            headers=headers,
+            json={
+                "title": "No-route lead-only dossier",
+                "product_name": "Lead-only product",
+                "compound_name": "Lead-only compound",
+                "jurisdiction_id": juris["id"],
+                "intended_use": "Research decision support",
+                "max_daily_dose_g": 1.0,
+            },
+        )
+        assert res.status_code == 201, res.text
+        dossier = res.json()
+        assert dossier["route"] is None
+
+        assessment = client.post(
+            f"/regulatory/dossiers/{dossier['id']}/elemental-impurity-assessment",
+            headers=headers,
+            json={"elements_json": [{"element": "Pb", "observed_ppm": 3.0}]},
+        )
+        assert assessment.status_code == 201, assessment.text
+        body = assessment.json()
+        pb = next(m for m in body["elemental_summary_json"]["assessed_elements"]
+                  if m["input_element"] == "Pb")
+
+        # The verdict is rightly kept -- withholding it would be the over-correction.
+        assert pb["threshold_triggered"] is False
+        assert pb.get("route_assumed") is True
+
+        # But the assumption must be stated, not left implicit in a JSON flag.
+        assert body["warnings"], "an assumed route produced a verdict with no warning at all"
+        assert any("route" in w.lower() for w in body["warnings"]), body["warnings"]
+
+
+def test_an_unlisted_element_with_a_measured_level_is_not_recorded_as_within_limits(
+    client, api_headers
+):
+    """An element outside the ICH Q3D list of 24 leaves the loop before the "no limit means
+    undetermined" guard can run, so a measured level kept the initial False -- a machine-readable
+    "within limits" for a substance the guidance sets no limit for at all.
+
+    This is the more extreme form of the case the route fix addressed: not "no limit for this
+    route" but no limit whatsoever.
+    """
+    headers = api_headers
+    with client:
+        juris = _jurisdiction(client, headers, "Q3D unlisted US", "US")
+        res = client.post(
+            "/regulatory/dossiers",
+            headers=headers,
+            json={
+                "title": "Unlisted element dossier",
+                "product_name": "Unlisted product",
+                "compound_name": "Unlisted compound",
+                "jurisdiction_id": juris["id"],
+                "intended_use": "Research decision support",
+                "max_daily_dose_g": 1.0,
+                "route": "oral",
+            },
+        )
+        assert res.status_code == 201, res.text
+        dossier = res.json()
+
+        assessment = client.post(
+            f"/regulatory/dossiers/{dossier['id']}/elemental-impurity-assessment",
+            headers=headers,
+            json={"elements_json": [{"element": "Fe", "observed_ppm": 9000.0}]},
+        )
+        assert assessment.status_code == 201, assessment.text
+        fe = next(m for m in assessment.json()["elemental_summary_json"]["assessed_elements"]
+                  if m["input_element"] == "Fe")
+        assert fe["threshold_triggered"] is None, (
+            "9000 ppm of an element ICH Q3D sets no limit for was recorded as within limits"
+        )
+        assert fe.get("review_required") is True

@@ -65,6 +65,11 @@ CONTROL_THRESHOLD_FRACTION = 0.30
 
 # Routes whose PDEs are encoded from ICH Q3D(R2) Table A.2.1.
 _ENCODED_ROUTES = ("oral", "parenteral", "inhalation")
+
+# Public alias, mirroring Q3C_ROUTES. Callers outside this package need the encoded-route list to
+# reason about whether an assumed route could change an answer; retyping it at the call site means
+# a future encoding of the Q3D(R2) cutaneous appendix would silently not reach them.
+Q3D_ENCODED_ROUTES = _ENCODED_ROUTES
 _ROUTE_COLUMN = {"oral": 3, "parenteral": 4, "inhalation": 5}
 # Recognised but not encoded (the Q3D(R2) cutaneous appendix).
 _CUTANEOUS_ROUTES = frozenset({"cutaneous", "transcutaneous"})

@@ -37,6 +37,7 @@ from moltrace.regulatory.impurities.q3c_solvents import (
     q3c_rule_set,
 )
 from moltrace.regulatory.impurities.q3d_elements import (
+    Q3D_ENCODED_ROUTES,
     ConcentrationLimit,
     ElementalRiskAssessment,
     ElementPDE,
@@ -67,6 +68,7 @@ __all__ = [
     "classify_cpca",
     "classify_m7",
     "Q3C_ROUTES",
+    "Q3D_ENCODED_ROUTES",
     "classify_solvent",
     "cpca_rule_set",
     "get_element_pde",

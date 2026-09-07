@@ -1018,13 +1018,13 @@ def _q3d_pde_varies_by_route(element: str) -> bool:
     mercury 30 against 1. An element we cannot resolve is treated as load-bearing.
     """
 
-    from moltrace.regulatory.impurities import get_element_pde
+    from moltrace.regulatory.impurities import Q3D_ENCODED_ROUTES, get_element_pde
     from moltrace.regulatory.infra.validation import DataValidationError
 
     try:
         values = {
             get_element_pde(element, candidate).pde_ug_per_day
-            for candidate in ("oral", "parenteral", "inhalation")
+            for candidate in Q3D_ENCODED_ROUTES
         }
     except DataValidationError:
         return True
@@ -1094,6 +1094,11 @@ def create_residual_solvent_assessment(
                     f"route; {name or 'this solvent'} was not assessed against Q3C."
                 )
                 match["review_required"] = True
+                if observed_value is not None:
+                    # The initialiser is False, which reads as "within limits". A measured level
+                    # with no applicable limit is undetermined -- the same rule the elemental
+                    # path states for itself further down this file.
+                    match["threshold_triggered"] = None
             else:
                 engine = _q3c_default(name, dossier.max_daily_dose_g)
                 if engine is not None:
@@ -1127,6 +1132,8 @@ def create_residual_solvent_assessment(
                         "that ICH leaves the solvent unrestricted."
                     )
                     match["review_required"] = True
+                    if observed_value is not None:
+                        match["threshold_triggered"] = None
             if match.get("threshold_triggered") or match.get("review_required"):
                 action = _create_action_item_row(
                     session,
@@ -1223,6 +1230,11 @@ def create_elemental_impurity_assessment(
                     f"source_needed: {name or 'unknown element'} is not an ICH Q3D-listed element."
                 )
                 match["review_required"] = True
+                if observed_value is not None:
+                    # This branch `continue`s past the "no limit means undetermined" guard below,
+                    # so it has to state the same thing itself. An element with no limit at all is
+                    # the more extreme form of an element with no limit for this route.
+                    match["threshold_triggered"] = None
                 matches.append(match)
                 continue
             match.update(
@@ -1304,15 +1316,28 @@ def create_elemental_impurity_assessment(
                 )
                 action_ids.append(action.id)
             matches.append(match)
-        if route_withheld:
-            # One warning naming every affected element, not one paragraph per element: a full
+        if not route_declared and matches:
+            # One warning for the whole assessment, not one paragraph per element: a full
             # 24-element panel would otherwise repeat the same sentence 22 times.
-            named = ", ".join(sorted(route_withheld))
+            #
+            # It fires whenever the route was assumed, not only where a verdict was withheld.
+            # Lead and thallium have the same PDE on all three encoded routes, so they keep their
+            # verdict -- but the dossier vocabulary also admits a cutaneous route, for which
+            # Q3D(R2) encodes no limit at all, so even their pass holds only if the real route is
+            # one of the encoded three. A lead-only panel used to say nothing at all.
+            detail = ""
+            if route_withheld:
+                named = ", ".join(sorted(route_withheld))
+                detail = (
+                    f" No pass or fail is reported for {named}, whose limits change with the "
+                    "route."
+                )
             warnings.append(
-                "No route of administration is recorded for this dossier, so these elements were "
-                f"measured against the oral limit -- the most permissive route: {named}. Their "
-                "limits change with the route, so no pass or fail is reported for them. Record "
-                "the route of administration to obtain a determination."
+                "No route of administration is recorded for this dossier, so it was assessed "
+                "against the oral limits -- the most permissive of the encoded routes. ICH "
+                "Q3D(R2) encodes no limits for a cutaneous route, so if this product is topical "
+                f"none of these comparisons applies.{detail} Record the route of administration "
+                "to obtain a determination."
             )
         status = "action_required" if action_ids else "ready_for_review"
         row = BatchRegulatoryAssessmentORM(
