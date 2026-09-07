@@ -272,6 +272,55 @@ untouched.
 
 ---
 
+## v0.75.0 — A fitted line may not be wider than the data that constrained it (2026-09-07)
+
+The first change to the **shared** fitter in this line of work. Everything before it routed the
+desktop around `gsd.py`; this fixes something in it, for every product that reads a peak list.
+
+**The bound.** `_fit_single_with_model` set `sigma.max = max(span, step)`, where `span` is the
+width of that peak's own fit window. `LorentzianModel` and `PseudoVoigtModel` both define
+`fwhm = 2 * sigma`, so the bound permitted a fitted line **exactly twice as wide as the window it
+was fitted on** — and `amplitude` in lmfit is the integral to infinity, so a fit pinned there
+reports mostly area that was never measured. Measured across the whole corpus before the change:
+**35 of 428 fitted lines** were wider than their own window, ratios running to exactly 2.000.
+
+It is now `max(span / 2.0, step)`, making the ceiling `fwhm <= span`. Not a tuned number — the
+point at which a fit stops claiming to have measured something wider than it looked at. The window
+opens at four times the seed width, so a well-seeded line sits near `span / 8`: **393 of 428 lines
+were already inside the new bound**.
+
+**The re-baseline, visibly.** Peak counts are **unchanged on 22 of 22 acquisitions** — this moves
+fitted widths only, and detection not at all. Nine acquisitions change their widest line, the
+runaways coming down: 43.0→21.5 Hz, 33.8→19.8, 31.8→25.9, 14.6→10.0. Two move slightly the other
+way (46.8→49.3, 18.6→18.9), which is a constrained optimisation settling on a different local
+minimum; both under 6%.
+
+**All 137 tests across the fifteen `gsd` / `detector` / `peak` suites still pass**, as do
+`local_science`, qNMR and the spectroscopy suites. Nothing depended on the runaway behaviour.
+
+**What this did NOT fix, stated plainly.** Summed fitted areas still over-recover: **1.831x** the
+true trace integral on the reference acquisition, down from 2.150x but far from 1.0. Proton ratios
+taken that way are 1.639/2.526/1.449/2.386 against 3/2/1/2 — worst error **1.361 H**, improved from
+1.949 H. The sigma bound was *a* cause and not *the* cause. What remains is the absence of any
+constraint that independently fitted apexes PARTITION the trace: capping a component's width limits
+how much of its neighbour's envelope it can absorb, it does not stop it absorbing. Synthetic ground
+truth says joint fitting alone does not close it either — over-recovery to 3.96x survives at levels
+3, 4 and 5. The desktop therefore still needs its trace integral, and SpectraCheck, qNMR and the
+verifier still consume a fitter that over-recovers ~83% on this acquisition.
+
+**`fit_window_ppm` is now recorded on every fitted peak.** The width of the data a fit actually saw
+cannot be recovered afterwards: the window is opened from the SEED width measured on the smoothed
+signal, and a fit that runs away from its seed leaves no trace of how narrow the evidence was.
+Reconstructing it from the FITTED width — the obvious thing, and what the first version of the
+guard did — inflates the window for precisely the runaway fits and hides them. That test passed
+when it was predicted to fail, which is how the flaw was found. With an area that integrates to
+infinity, this field is what separates measured from extrapolated.
+
+`tests/test_gsd_fit_window_bound.py` is the guard, and it runs over every acquisition in the
+corpus rather than one.
+
+---
+
 ## v0.74.13 — The platform's own trapezoid, and windows that stopped inverting (2026-09-07)
 
 Two changes, and the second was found by the guard written for the first.
