@@ -477,9 +477,19 @@ def _trace_areas(
     100 multiplets across this corpus. Integrating over that measures nothing.
     The window comes from each line's own centre and fitted half-width.
 
-    Windows are clamped to their midpoint where neighbours would overlap, so the
-    intensity is partitioned rather than double-counted: every share is measured
-    over trace no other signal claims, and they sum to one because they tile.
+    EACH WINDOW IS BOUNDED BY THE MIDPOINTS TO ITS NEIGHBOURING CENTRES, so the
+    intensity is partitioned rather than double-counted and the shares sum to one.
+    Not by clamping neighbouring window EDGES, which was the first version and
+    which breaks on the case it looks like it handles: windows do not merely
+    overlap, a sharp line's window can sit ENTIRELY INSIDE a broad neighbour's,
+    and the midpoint between the broad one's far edge and the sharp one's near
+    edge then lands past the sharp one's own far edge and inverts it -- a window
+    of negative width, integrating to exactly zero. Two signals shipped that way.
+    A centre midpoint cannot invert, because a multiplet's centre always lies
+    strictly between its neighbours'.
+
+    The trapezoid itself is `integrate_sum`; see the call site for why not the
+    `edited_sum` default.
     """
     axis = np.asarray(spectrum.ppm_axis, dtype=float)
     data = np.asarray(spectrum.data, dtype=float)
@@ -487,6 +497,9 @@ def _trace_areas(
         return {}
     order = np.argsort(axis)
     ax, dy = axis[order], data[order]
+    # An axis sanity check, not an integration increment -- `integrate_sum` does
+    # the trapezoid against the ppm axis itself. A degenerate or non-monotonic
+    # axis would make every window meaningless, so it is refused here.
     step = float(np.median(np.diff(ax)))
     if not np.isfinite(step) or step <= 0:
         return {}
