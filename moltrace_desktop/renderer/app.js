@@ -156,6 +156,9 @@
     massSpectrum: null,
     massError: null,
     massBusy: false,
+    twoD: null,
+    twoDError: null,
+    twoDBusy: false,
     verdictError: null,
     checking: false,
   }
@@ -623,6 +626,44 @@
     if (state.massError) {
       ms.append(alert('warn', 'That peak table was not read', state.massError))
     }
+
+    if (state.twoD) {
+      const d = state.twoD
+      const aside = Object.keys(d.set_aside || {})
+      ms.append(node('p', 'tablenote',
+        '2-D spectrum: ' + d.file_name + ' \u2014 ' + d.peak_count + ' one-bond C\u2013H '
+        + 'correlations, \u03b4H ' + Number(d.proton_range[0]).toFixed(2) + '\u2013'
+        + Number(d.proton_range[1]).toFixed(2) + ', \u03b4C '
+        + Number(d.carbon_range[0]).toFixed(1) + '\u2013' + Number(d.carbon_range[1]).toFixed(1)
+        + '. Every check below uses it.'
+        + (aside.length
+          ? ' ' + aside.map((k) => d.set_aside[k] + ' ' + k).join(' and ') + ' set aside: those '
+            + 'correlate protons to each other or across more than one bond, so a one-bond check '
+            + 'would count them against your structure.'
+          : '')))
+      const drop2 = node('button', 'btn btn--secondary')
+      drop2.type = 'button'
+      drop2.append(document.createTextNode('Drop the 2-D'))
+      drop2.dataset.focusKey = 'forget-2d'
+      drop2.addEventListener('click', forget2dSpectrum)
+      ms.append(drop2)
+    } else {
+      const add2 = node('button', 'btn btn--secondary')
+      add2.type = 'button'
+      add2.append(document.createTextNode(state.twoDBusy ? 'Reading\u2026' : 'Add a 2-D spectrum'))
+      add2.disabled = state.twoDBusy || !(state.service && state.service.running)
+      add2.dataset.focusKey = 'open-2d'
+      add2.addEventListener('click', open2dSpectrum)
+      ms.append(add2)
+      ms.append(node('p', 'tablenote',
+        'An HSQC or HMQC cross-peak table \u2014 rows of experiment, proton shift and carbon '
+        + 'shift. It runs the last of the four checks, and it is the one that can argue BOTH '
+        + 'ways: measured here, it moved a true structure from inconclusive to consistent and '
+        + 'two wrong ones to inconsistent.'))
+    }
+    if (state.twoDError) {
+      ms.append(alert('warn', 'That cross-peak table was not read', state.twoDError))
+    }
     c.append(ms)
 
     const row = node('div', 'formrow')
@@ -713,6 +754,18 @@
           + 'candidate whose predicted pattern matches nothing scores no weight rather than '
           + 'negative weight, so it is left where it was. Read an unchanged candidate as '
           + 'unsupported by the MS, never as ruled out by it.'))
+      }
+      // AND THE 2-D SAYS THE OPPOSITE, which is why it is worth stating rather
+      // than assuming a reader generalises from the line above. This test's
+      // weight is set by how many correlations the STRUCTURE predicts, not by how
+      // many the data matched, so a structure whose predicted rectangles are all
+      // empty scores negative at full weight instead of abstaining.
+      if (state.twoD && v.tests.some((t) => t.name === 'hsqc_2d_ranges' && t.applicable)) {
+        c.append(node('p', 'tablenote',
+          'The 2-D spectrum argues both ways, unlike the mass spectrum above it: a structure '
+          + 'whose predicted C\u2013H correlations are missing from your data is pushed down, '
+          + 'not merely left unsupported. A verdict of inconsistent here is evidence against '
+          + 'the structure, not an absence of evidence for it.'))
       }
       if (v.summary_diagnostic) c.append(rawText('Show the engine\u2019s own words', v.summary_diagnostic))
 
@@ -1192,6 +1245,30 @@
   async function forgetMassSpectrum() {
     try { await window.moltrace.analysis.forgetMassSpectrum() } catch { /* nothing to undo */ }
     state.massSpectrum = null; state.massError = null
+    clearDerived(['verdicts', 'verdictError', 'ranking', 'ranking_error'])
+    render()
+  }
+
+  async function open2dSpectrum() {
+    state.twoDBusy = true; state.twoDError = null; render()
+    try {
+      const out = await window.moltrace.analysis.open2dSpectrum()
+      if (out && out.ok) {
+        state.twoD = out.summary
+        clearDerived(['verdicts', 'verdictError', 'ranking', 'ranking_error'])
+      } else if (!(out && out.cancelled)) {
+        state.twoDError = (out && out.reason) || 'that cross-peak table could not be read'
+      }
+    } catch (e) {
+      state.twoDError = (e && e.message) || 'that cross-peak table could not be read'
+    } finally {
+      state.twoDBusy = false; render()
+    }
+  }
+
+  async function forget2dSpectrum() {
+    try { await window.moltrace.analysis.forget2dSpectrum() } catch { /* nothing to undo */ }
+    state.twoD = null; state.twoDError = null
     clearDerived(['verdicts', 'verdictError', 'ranking', 'ranking_error'])
     render()
   }

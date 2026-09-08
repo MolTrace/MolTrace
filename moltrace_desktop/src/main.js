@@ -231,6 +231,7 @@ ipcMain.handle('moltrace:verify-structure', async (_event, smiles) => {
       // Applied to every check while a spectrum is loaded, so the evidence a
       // verdict rests on is the same for every candidate on the page.
       ...(massSpectrum ? { ms_peaks: massSpectrum } : {}),
+      ...(twoDSpectrum ? { hsqc_peaks: twoDSpectrum } : {}),
     })
     return { ok: true, result }
   } catch (err) {
@@ -271,6 +272,42 @@ ipcMain.handle('moltrace:open-mass-spectrum', async () => {
     massSpectrum = null
     return { ok: false, reason: localService.readFailureReason(err) }
   }
+})
+
+let twoDSpectrum = null
+
+ipcMain.handle('moltrace:open-2d-spectrum', async () => {
+  const picked = await dialog.showOpenDialog({
+    title: 'Choose a 2-D cross-peak table',
+    properties: ['openFile'],
+    filters: [
+      { name: 'Cross-peak tables', extensions: ['csv', 'tsv', 'txt', 'json'] },
+      { name: 'All files', extensions: ['*'] },
+    ],
+  })
+  if (picked.canceled || !picked.filePaths.length) return { ok: false, cancelled: true }
+  try {
+    const result = await requestFromService('/nmr2d/open', { path: picked.filePaths[0] })
+    twoDSpectrum = result.peaks
+    return {
+      ok: true,
+      summary: {
+        file_name: result.file_name,
+        peak_count: result.peak_count,
+        set_aside: result.set_aside,
+        proton_range: result.proton_range,
+        carbon_range: result.carbon_range,
+      },
+    }
+  } catch (err) {
+    twoDSpectrum = null
+    return { ok: false, reason: localService.readFailureReason(err) }
+  }
+})
+
+ipcMain.handle('moltrace:forget-2d-spectrum', async () => {
+  twoDSpectrum = null
+  return { ok: true }
 })
 
 ipcMain.handle('moltrace:forget-mass-spectrum', async () => {

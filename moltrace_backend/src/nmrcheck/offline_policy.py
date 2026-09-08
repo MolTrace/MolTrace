@@ -75,6 +75,8 @@ POLICY: dict[str, str] = {
     "structure.inventory": "offline-compute",
     # Reads a peak table from disk and parses it. No network, no service.
     "ms.open": "offline-compute",
+    # Reads a cross-peak table from disk and parses it. Nothing leaves.
+    "nmr2d.open": "offline-compute",
     # Looking a spectrum up against the reference library shipped with the build.
     # Same class again: local bytes, local library, deterministic arithmetic, no
     # record and no authorization.

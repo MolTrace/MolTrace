@@ -1913,3 +1913,91 @@ def test_a_mass_spectrum_lets_a_third_check_run_and_can_only_raise_confidence(
     assert not re.search(r"(?:/[\w.-]+){2,}", said), f"a path reached the reader: {said}"
     assert "nmrglue" not in said.lower()
     assert "m/z" in said or "peak" in said.lower()
+
+
+@pytest.mark.slow
+def test_a_2d_spectrum_runs_the_last_check_and_can_argue_both_ways(tmp_path: Path) -> None:
+    """The fourth of the verifier's tests, and the only one that can refute.
+
+    `ms_molecule_match` weights itself by how much of its predicted pattern
+    MATCHED, so a structure matching nothing scores zero significance and does not
+    move. `hsqc_2d_ranges` weights itself by how many correlations the STRUCTURE
+    predicts -- `_SIG_MAX * n / (n + _HSQC_SAT)` -- and scores
+    `(matched - missing - extra) / n`. A structure whose predicted rectangles are
+    all empty therefore scores negative at full weight. That difference is the
+    whole reason the interface states them separately.
+
+    THE EXPERIMENT FILTER IS PART OF THE CORRECTNESS, not tidiness. `extra` counts
+    every supplied peak falling outside a predicted rectangle, so COSY (proton to
+    proton) or HMBC (more than one bond) fed into a one-bond test marks down a
+    CORRECT structure for evidence that was never about it.
+    """
+    from nmrcheck.local_science import (
+        SpectrumUnreadable,
+        open_spectrum,
+        read_2d_spectrum,
+        verify_candidate,
+    )
+
+    hsqc = sorted(Path("tests/fixtures").glob("**/*hsqc*.csv"))
+    if not hsqc:
+        pytest.skip("no HSQC fixture in this checkout")
+    table = read_2d_spectrum(str(hsqc[0]))
+    assert table["peak_count"] >= 2
+
+    # Ethanol's HSQC: CH3 near (1.26, 18.2) and CH2 near (3.65, 58.3). The order
+    # is (proton, carbon) -- reversed, every correlation would fall outside every
+    # predicted rectangle and mark the true structure down.
+    for proton, carbon in table["peaks"]:
+        assert -2.0 <= proton <= 16.0, f"{proton} is not a proton shift; the axes are swapped"
+        assert 0.0 <= carbon <= 230.0, f"{carbon} is not a carbon shift; the axes are swapped"
+
+    source = None
+    for candidate in _acquisitions():
+        try:
+            if open_spectrum(candidate).get("nucleus") == "1H":
+                source = candidate
+                break
+        except Exception:  # noqa: BLE001 - unreadable acquisitions are not the subject
+            continue
+    if source is None:
+        pytest.skip("no readable 1H acquisition in this checkout")
+
+    without = verify_candidate(source, "CCO")
+    with_2d = verify_candidate(source, "CCO", hsqc_peaks=table["peaks"])
+    ran_without = sum(1 for t in without["tests"] if t["applicable"])
+    ran_with = sum(1 for t in with_2d["tests"] if t["applicable"])
+    assert ran_with == ran_without + 1, (
+        f"supplying 2-D peaks did not make another check applicable "
+        f"({ran_without} -> {ran_with} of {len(with_2d['tests'])})"
+    )
+    assert with_2d["confidence"] > without["confidence"], (
+        f"the compound's own HSQC did not raise it: "
+        f"{without['confidence']:.3f} -> {with_2d['confidence']:.3f}"
+    )
+
+    # AND IT MUST PUSH A WRONG STRUCTURE DOWN. This is the assertion that
+    # distinguishes this test from the mass spectrum, where the same structures
+    # move by exactly zero. Benzene has no sp3 C-H at all.
+    wrong_before = verify_candidate(source, "c1ccccc1")
+    wrong_after = verify_candidate(source, "c1ccccc1", hsqc_peaks=table["peaks"])
+    assert wrong_after["confidence"] < wrong_before["confidence"], (
+        f"a 2-D spectrum that cannot be benzene's left it where it was "
+        f"({wrong_before['confidence']:.3f} -> {wrong_after['confidence']:.3f}); this test "
+        f"is supposed to refute, and the interface says it does"
+    )
+
+    # COSY and HMBC are refused BY NAME rather than silently scored.
+    for pattern in ("**/*cosy*.csv", "**/*hmbc*.csv"):
+        found = sorted(Path("tests/fixtures").glob(pattern))
+        if not found:
+            continue
+        with pytest.raises(SpectrumUnreadable) as refused:
+            read_2d_spectrum(str(found[0]))
+        said = str(refused.value)
+        assert "one-bond" in said
+        assert not re.search(r"(?:/[\w.-]+){2,}", said), f"a path reached the reader: {said}"
+
+    with pytest.raises(SpectrumUnreadable) as folder:
+        read_2d_spectrum(str(tmp_path))
+    assert "folder" in str(folder.value)

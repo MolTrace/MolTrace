@@ -298,6 +298,48 @@ untouched.
 
 ---
 
+## v0.75.2 — The fourth check, and the only one that can argue back (2026-09-07)
+
+`hsqc_2d_ranges` was the last of the verifier's four tests still abstaining on every check this
+machine made. `nmr2d.open` reads a processed cross-peak table and `structure.verify` takes the
+correlations, so **all four now run offline**.
+
+**It is qualitatively unlike the other three.** The mass spectrum weights itself by how much of its
+predicted pattern MATCHED, so a structure matching nothing scores zero significance and does not
+move — it can confirm and cannot refute. This test weights itself by how many correlations the
+STRUCTURE predicts (`_SIG_MAX * n / (n + _HSQC_SAT)`) and scores `(matched - missing - extra) / n`,
+so a structure whose predicted rectangles are empty scores negative at full weight. Measured on one
+acquisition against ethanol's own HSQC:
+
+```
+ethanol   inconclusive 0.415 -> consistent   0.830   (+0.415)
+aspirin   inconclusive 0.227 -> inconsistent 0.036   (-0.191)
+benzene   inconclusive 0.500 -> inconsistent 0.119   (-0.381)
+```
+
+The page states that contrast directly beneath the mass-spectrum caveat that says the opposite,
+rather than trusting a reader to notice two tests behave differently.
+
+**The experiment filter is part of the correctness.** `extra` counts every supplied peak falling
+outside a predicted one-bond rectangle, so COSY — which correlates proton to PROTON, making its
+second axis a proton shift read as a carbon — or HMBC, which spans more than one bond, marks down a
+**correct** structure for evidence that was never about it. Only HSQC and HMQC reach the verifier;
+COSY and HMBC files are refused by name, and a mixed table reports what was set aside and why.
+Every corpus fixture was run through it: the four HSQC tables parse, the COSY and HMBC tables are
+refused.
+
+**Axis order is asserted, not assumed.** `f2` is the proton axis and `f1` the carbon axis. Reversed,
+every correlation falls outside every rectangle and the true structure is marked down — a silent
+failure that looks like a confident refutation. The guard range-checks both dimensions.
+
+Parsed by the platform's own `parse_processed_2d_nmr`. Peaks are held by the host, not the
+stateless service, and the renderer receives a summary only.
+
+**The desktop now answers all four of the verifier's tests**: `prediction_bounds`, `assignments`,
+`ms_molecule_match` and `hsqc_2d_ranges`.
+
+---
+
 ## v0.75.1 — Mass spectrometry, and the half of the verifier the desktop was not using (2026-09-07)
 
 The verifier runs four tests. Two of them — `hsqc_2d_ranges` and `ms_molecule_match` — abstained on

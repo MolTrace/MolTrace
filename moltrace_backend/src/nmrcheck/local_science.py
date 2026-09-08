@@ -710,10 +710,99 @@ def read_mass_spectrum(path: str | Path) -> dict:
     }
 
 
+#: One-bond C-H correlation experiments, which is what `hsqc_2d_ranges` scores.
+#: HMQC detects the same coupling as HSQC by a different pulse sequence, so it
+#: answers the same question and is accepted. COSY and HMBC are NOT: COSY
+#: correlates proton to PROTON, so its second axis is a proton shift that would
+#: be read as a carbon, and HMBC correlates over two and three bonds, so its
+#: cross-peaks sit where no one-bond rectangle is predicted. Either one fed in
+#: here counts as `extra` in the score and drives a CORRECT structure down.
+_ONE_BOND_CH_EXPERIMENTS = frozenset({"HSQC", "HMQC"})
+
+
+def read_2d_spectrum(path: str | Path) -> dict:
+    """A processed 2-D cross-peak table, for the verifier's HSQC test.
+
+    Parsed by the platform's own `parse_processed_2d_nmr`, which already reads
+    the CSV/TSV/JSON shapes this product accepts and names the experiment per
+    row. A second reader here would be a second opinion about what a cross-peak
+    table is.
+
+    THE EXPERIMENT FILTER IS NOT BOOKKEEPING. `hsqc_2d_ranges` predicts one-bond
+    C-H rectangles and scores `(matched - missing - extra) / n`, so every supplied
+    peak that falls outside a predicted rectangle counts AGAINST the structure. A
+    COSY table's second axis is a proton shift; passed in as a carbon it lands
+    nowhere near any rectangle, and a correct structure is marked down for
+    evidence that was never about it. So only one-bond correlations are handed to
+    the verifier, and anything else is reported as set aside rather than silently
+    dropped.
+
+    UNLIKE THE MASS SPECTRUM, THIS TEST CAN REFUTE. Its weight comes from the
+    number of correlations the STRUCTURE predicts, not from how many of them
+    matched, so a structure whose predicted rectangles are all empty scores
+    negative at full weight rather than abstaining. That is a real difference in
+    what a chemist can conclude from it, and the interface says so.
+    """
+    source = Path(path)
+    if not source.exists():
+        raise SpectrumUnreadable("that file is no longer where it was")
+    if source.is_dir():
+        raise SpectrumUnreadable(
+            "a 2-D spectrum here is a cross-peak table in a single file, not a folder"
+        )
+    try:
+        content = source.read_bytes()
+    except OSError:
+        raise SpectrumUnreadable("that file could not be read") from None
+
+    from .nmr2d_parser import NMR2DParseError, parse_processed_2d_nmr
+
+    try:
+        preview = parse_processed_2d_nmr(source.name, content)
+    except NMR2DParseError as refused:
+        raise SpectrumUnreadable(str(refused)) from None
+    except Exception:  # noqa: BLE001 - an unreadable table is the input, not a fault
+        raise SpectrumUnreadable(
+            "that file does not read as a cross-peak table. Export processed 2-D peaks as rows "
+            "carrying an experiment name and two shifts; raw 2-D matrices are not read here."
+        ) from None
+
+    usable: list[tuple[float, float]] = []
+    set_aside: dict[str, int] = {}
+    for peak in preview.peaks:
+        name = str(getattr(peak.experiment, "value", peak.experiment) or "UNKNOWN")
+        if name in _ONE_BOND_CH_EXPERIMENTS:
+            # f2 is the proton axis and f1 the carbon axis, which is the order
+            # the verifier takes; reversing them silently scores every
+            # correlation against the structure.
+            usable.append((float(peak.f2_ppm), float(peak.f1_ppm)))
+        else:
+            set_aside[name] = set_aside.get(name, 0) + 1
+
+    if not usable:
+        kinds = ", ".join(sorted(set_aside)) or "none"
+        raise SpectrumUnreadable(
+            f"that table holds no one-bond C-H correlations to check a structure against "
+            f"(it holds {kinds}). HSQC or HMQC is what this test reads; COSY correlates "
+            f"proton to proton and HMBC over more than one bond."
+        )
+
+    return {
+        "file_name": source.name,
+        "peak_count": len(usable),
+        "peaks": usable,
+        "set_aside": set_aside,
+        "proton_range": [round(min(p[0] for p in usable), 3), round(max(p[0] for p in usable), 3)],
+        "carbon_range": [round(min(p[1] for p in usable), 3), round(max(p[1] for p in usable), 3)],
+        "human_review_required": True,
+    }
+
+
 def verify_candidate(
     path: str | Path,
     smiles: str,
     ms_peaks: Sequence[tuple[float, float]] | None = None,
+    hsqc_peaks: Sequence[tuple[float, float]] | None = None,
 ) -> dict:
     """Check a proposed structure against an acquisition on this computer.
 
@@ -761,11 +850,18 @@ def verify_candidate(
     # against the same 114 Da molecular ion, ethanol, glycol and aspirin -- 46,
     # 62 and 180 Da -- each moved by exactly +0.000.
     options = None
-    if ms_peaks:
+    if ms_peaks or hsqc_peaks:
         from moltrace.spectroscopy.verification import VerificationOptions
 
         options = VerificationOptions(
-            ms_peaks=[(float(mz), float(intensity)) for mz, intensity in ms_peaks]
+            ms_peaks=(
+                [(float(mz), float(intensity)) for mz, intensity in ms_peaks]
+                if ms_peaks
+                else None
+            ),
+            hsqc_peaks=(
+                [(float(dh), float(dc)) for dh, dc in hsqc_peaks] if hsqc_peaks else None
+            ),
         )
 
     try:

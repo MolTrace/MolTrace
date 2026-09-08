@@ -34,6 +34,7 @@ from .local_science import (
     open_spectrum,
     process_spectrum,
     rank_candidates,
+    read_2d_spectrum,
     read_mass_spectrum,
     structure_inventory,
     verify_candidate,
@@ -56,6 +57,7 @@ ROUTES: dict[str, tuple[str, str]] = {
     "structure.verify": ("POST", "/structure/verify"),
     "structure.rank": ("POST", "/structure/rank"),
     "ms.open": ("POST", "/ms/open"),
+    "nmr2d.open": ("POST", "/nmr2d/open"),
     "structure.inventory": ("POST", "/structure/inventory"),
     "spectrum.similar": ("POST", "/spectrum/similar"),
 }
@@ -250,8 +252,16 @@ def _structure_verify(payload: dict = _BODY) -> dict[str, Any]:
         except (TypeError, ValueError, IndexError):
             ms_peaks = None
 
+    raw_2d = payload.get("hsqc_peaks")
+    hsqc_peaks = None
+    if isinstance(raw_2d, list) and raw_2d:
+        try:
+            hsqc_peaks = [(float(pair[0]), float(pair[1])) for pair in raw_2d]
+        except (TypeError, ValueError, IndexError):
+            hsqc_peaks = None
+
     try:
-        result = verify_candidate(path, smiles, ms_peaks=ms_peaks)
+        result = verify_candidate(path, smiles, ms_peaks=ms_peaks, hsqc_peaks=hsqc_peaks)
     except SpectrumUnreadable as unreadable:
         # Names the FORMAT or the structure, never the path: a filename can carry
         # a compound name and this string is written to the device journal.
@@ -301,6 +311,38 @@ def _ms_open(payload: dict = _BODY) -> dict[str, Any]:
         cause=(
             f"{result['peak_count']} peaks over "
             f"{result['mz_range'][0]}-{result['mz_range'][1]} m/z"
+        ),
+    )
+    return result
+
+
+def _nmr2d_open(payload: dict = _BODY) -> dict[str, Any]:
+    """Read a processed 2-D cross-peak table so the verifier's HSQC test can run.
+
+    Not `async`: file read and parse, blocking work with no await in it.
+
+    Peaks go back to the caller for the same reason `ms.open`'s do -- this
+    service answers about a path and remembers nothing between calls.
+    """
+    HANDLER_CALLS.append("nmr2d.open")
+    path = str(payload.get("path") or "")
+    if not path:
+        _journal("nmr2d.open", refused=True, cause="no file was named")
+        raise HTTPException(status_code=400, detail="no file was named")
+    try:
+        result = read_2d_spectrum(path)
+    except SpectrumUnreadable as unreadable:
+        _journal("nmr2d.open", refused=True, cause=str(unreadable))
+        raise HTTPException(status_code=400, detail=str(unreadable)) from None
+
+    # How many correlations and what was set aside -- never the shifts, which are
+    # the chemist's unpublished measurement.
+    _journal(
+        "nmr2d.open",
+        refused=False,
+        cause=(
+            f"{result['peak_count']} one-bond correlations"
+            + (f", set aside {sorted(result['set_aside'])}" if result["set_aside"] else "")
         ),
     )
     return result
@@ -491,6 +533,7 @@ def create_local_app(
         "structure.rank": _structure_rank,
         "structure.inventory": _structure_inventory,
         "ms.open": _ms_open,
+        "nmr2d.open": _nmr2d_open,
         "spectrum.similar": _spectrum_similar,
     }
     for operation, (method, path) in ROUTES.items():

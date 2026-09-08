@@ -74,6 +74,12 @@ contextBridge.exposeInMainWorld('moltrace', {
     // desktop otherwise decides on half the platform's evidence.
     openMassSpectrum: async () => ipcRenderer.invoke('moltrace:open-mass-spectrum'),
     forgetMassSpectrum: async () => ipcRenderer.invoke('moltrace:forget-mass-spectrum'),
+    // A 2-D cross-peak table, which lights the LAST of the verifier's four tests.
+    // Unlike the mass spectrum this one can refute as well as confirm: its weight
+    // comes from how many correlations the STRUCTURE predicts, not from how many
+    // of them the data matched.
+    open2dSpectrum: async () => ipcRenderer.invoke('moltrace:open-2d-spectrum'),
+    forget2dSpectrum: async () => ipcRenderer.invoke('moltrace:forget-2d-spectrum'),
     // The one call that runs the other way. Everything above measures the
     // spectrum and then scores a structure against that fixed measurement; this
     // takes the structure BACK to the measurement and turns each signal's share
