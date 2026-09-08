@@ -376,7 +376,7 @@ without MS is the normal case and must not fail on a malformed optional field.
 
 ---
 
-## v0.75.0 — A fitted line may not be wider than the data that constrained it (2026-09-07)
+## v0.75.4 — A fitted line may not be wider than the data that constrained it (2026-09-07)
 
 The first change to the **shared** fitter in this line of work. Everything before it routed the
 desktop around `gsd.py`; this fixes something in it, for every product that reads a peak list.
