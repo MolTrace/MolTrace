@@ -237,7 +237,7 @@ No migration; no ORM object is touched.
 
 ---
 
-## v0.75.2 — The route qualification travels with the numbers, not beside them (2026-09-03)
+## v0.75.3 — The route qualification travels with the numbers, not beside them (2026-09-03)
 
 `residual_solvent_summary_json` is copied verbatim into the draft CTD Module 3
 bundle and into the regulatory readiness roll-up. Neither carries `warnings_json`
