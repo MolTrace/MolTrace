@@ -1094,6 +1094,10 @@ def create_residual_solvent_assessment(
                     f"route; {name or 'this solvent'} was not assessed against Q3C."
                 )
                 match["review_required"] = True
+                # Machine-readable beside the prose: the warning lives in `warnings_json`, which
+                # the CTD bundle and the readiness roll-up do not carry, so a row that travels
+                # without it still has to say why it was not assessed.
+                match["q3c_route_covered"] = False
                 if observed_value is not None:
                     # The initialiser is False, which reads as "within limits". A measured level
                     # with no applicable limit is undetermined -- the same rule the elemental
@@ -1156,7 +1160,17 @@ def create_residual_solvent_assessment(
             batch_id=payload.batch_id,
             compound_id=payload.compound_id,
             overall_status=status,
-            residual_solvent_summary_json=_json_dump({"matched_solvents": matches, "action_required": bool(action_ids)}),
+            residual_solvent_summary_json=_json_dump(
+                {
+                    "matched_solvents": matches,
+                    # This dict is copied verbatim into the draft CTD Module 3 bundle and the
+                    # readiness roll-up, neither of which carries `warnings_json` with it. The
+                    # qualification has to travel with the numbers, not beside them.
+                    "route": dossier.route,
+                    "q3c_route_covered": q3c_route_covered,
+                    "action_required": bool(action_ids),
+                }
+            ),
             action_item_ids_json=_json_dump(action_ids),
             warnings_json=_json_dump(warnings),
             notes_json=_json_dump([_COMPLIANCE_NOTE]),

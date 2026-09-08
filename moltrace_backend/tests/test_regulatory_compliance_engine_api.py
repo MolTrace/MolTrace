@@ -919,3 +919,51 @@ def test_an_unlisted_element_with_a_measured_level_is_not_recorded_as_within_lim
             "9000 ppm of an element ICH Q3D sets no limit for was recorded as within limits"
         )
         assert fe.get("review_required") is True
+
+
+def test_the_route_qualification_travels_with_the_solvent_numbers(client, api_headers):
+    """The reason a verdict was withheld must ride on the summary, not only in the warnings.
+
+    `residual_solvent_summary_json` is copied verbatim into the draft CTD Module 3 bundle
+    (`product_orchestration_store._build_ctd_report_json`) and into the readiness roll-up, and
+    neither carries `warnings_json` along with it. So the rows travelled into a submission-shaped
+    document with an undetermined verdict and nothing on the record saying why.
+
+    The elemental summary already carries `route` and `route_assumed` for this reason; the
+    residual-solvent summary carried neither.
+    """
+    headers = api_headers
+    with client:
+        juris = _jurisdiction(client, headers, "Q3C ctd carry US", "US")
+        res = client.post(
+            "/regulatory/dossiers",
+            headers=headers,
+            json={
+                "title": "CTD carry dossier",
+                "product_name": "Topical product",
+                "compound_name": "Topical compound",
+                "jurisdiction_id": juris["id"],
+                "intended_use": "Research decision support",
+                "route": "cutaneous",
+            },
+        )
+        assert res.status_code == 201, res.text
+        dossier = res.json()
+
+        assessment = client.post(
+            f"/regulatory/dossiers/{dossier['id']}/residual-solvent-assessment",
+            headers=headers,
+            json={"solvents_json": [{"solvent_name": "acetonitrile", "observed_ppm": 5000}]},
+        )
+        assert assessment.status_code == 201, assessment.text
+        summary = assessment.json()["residual_solvent_summary_json"]
+
+        # The summary itself -- the part that is copied onward -- must say which route it was
+        # assessed for and whether the guideline covers it.
+        assert summary.get("route") == "cutaneous", summary
+        assert summary.get("q3c_route_covered") is False, summary
+
+        # And the individual row must be self-describing, since a reader may see it alone.
+        match = summary["matched_solvents"][0]
+        assert match.get("q3c_route_covered") is False, match
+        assert match.get("threshold_triggered") is None, match
