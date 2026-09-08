@@ -291,6 +291,42 @@ app.whenReady().then(async () => {
     })
   }
 
+  // ---- the two evidence surfaces, driven through the real app ----------------
+  //
+  // jsdom proves the renderer builds the right DOM from a payload. This proves
+  // the whole path: a real Electron main process, a real picker bypassed by
+  // injecting the file directly through the IPC the picker feeds, a real
+  // service, and a real verifier.
+  const fixtures = path.join(__dirname, '..', '..', 'moltrace_backend', 'tests', 'fixtures')
+  const hsqcFile = path.join(fixtures, 'nmr2d', 'ethanol_hsqc.csv')
+  const cosyFile = path.join(fixtures, 'nmr2d', 'ethanol_cosy.csv')
+
+  if (fs.existsSync(hsqcFile)) {
+    const twoD = await main.__readTwoDForTest(hsqcFile)
+    check('a real HSQC table is read end to end', () => {
+      if (!twoD || !twoD.ok) throw new Error(`2-D read failed: ${twoD && twoD.reason}`)
+      if (!(twoD.summary.peak_count >= 2)) throw new Error('no one-bond correlations parsed')
+    })
+    // Reversed axes are silent and present as a confident refutation, so the
+    // orientation is asserted rather than trusted.
+    check('the proton axis is the proton axis', () => {
+      const [lo, hi] = twoD.summary.proton_range
+      const [clo, chi] = twoD.summary.carbon_range
+      if (!(lo >= -2 && hi <= 16)) throw new Error(`proton range ${lo}-${hi} is not proton-like`)
+      if (!(clo >= 0 && chi <= 230)) throw new Error(`carbon range ${clo}-${chi} is not carbon-like`)
+    })
+  }
+
+  if (fs.existsSync(cosyFile)) {
+    const cosy = await main.__readTwoDForTest(cosyFile)
+    check('COSY is refused by name rather than scored as one-bond', () => {
+      if (cosy && cosy.ok) throw new Error('a proton-proton table was accepted for a one-bond test')
+      if (!/one-bond/.test((cosy && cosy.reason) || '')) {
+        throw new Error(`refusal does not say why: ${cosy && cosy.reason}`)
+      }
+    })
+  }
+
   clearTimeout(watchdog)
   main.shutdown()
   console.log(problems.length

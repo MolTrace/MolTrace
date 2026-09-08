@@ -118,6 +118,32 @@ function shutdown() {
 }
 module.exports.shutdown = shutdown
 
+// A TEST SEAM, and deliberately a narrow one. The round-trip drives the real
+// app, and the only part it cannot drive is the OS file picker -- a modal that
+// no automated run can answer. This exposes the step AFTER the picker: given a
+// path the picker would have returned, do the service, the parser and the
+// experiment filter behave. It grants the renderer nothing: the bridge still
+// has no method that names a path, and this is reached from the main process's
+// own module exports, which the renderer cannot import.
+module.exports.__readTwoDForTest = async (filePath) => {
+  try {
+    const result = await requestFromService('/nmr2d/open', { path: filePath })
+    twoDSpectrum = result.peaks
+    return {
+      ok: true,
+      summary: {
+        file_name: result.file_name,
+        peak_count: result.peak_count,
+        set_aside: result.set_aside,
+        proton_range: result.proton_range,
+        carbon_range: result.carbon_range,
+      },
+    }
+  } catch (err) {
+    return { ok: false, reason: localService.readFailureReason(err) }
+  }
+}
+
 app.on('will-quit', shutdown)
 
 // §7.1 asks the readout to report "module, local-pack, network, and SERVICE
