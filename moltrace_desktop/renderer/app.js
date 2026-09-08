@@ -510,7 +510,15 @@
         + (s.solvent_detected && s.solvent && s.solvent_detected.toLowerCase() !== s.solvent.toLowerCase()
           ? ' (peaks look like ' + s.solvent_detected + ')' : '')],
       ['Field', Number.isFinite(s.field_mhz) && s.field_mhz > 0 ? s.field_mhz.toFixed(2) + ' MHz' : 'not stated'],
-      ['Resolution', Number.isFinite(s.resolution_hz) ? s.resolution_hz.toFixed(2) + ' Hz/point' : '\u2014'],
+      // NOT Hz PER POINT, which is what this said and what it is not. The value
+      // is `separation_points * step * field`: the closest two lines the peak
+      // detector will report as separate, from a spacing floor of 0.006 ppm at
+      // this level. Measured on one acquisition it reads 1.4923 while the true
+      // digitisation is 0.0172 Hz per point -- the label was wrong by 87x, and a
+      // chemist reading it as digitisation would think the spectrum forty times
+      // coarser than it is.
+      ['Closest separable lines',
+        Number.isFinite(s.resolution_hz) ? s.resolution_hz.toFixed(2) + ' Hz apart' : '\u2014'],
       ['Acquired', s.acquired_at ? String(s.acquired_at).slice(0, 10) : 'not stated'],
       ['Source', s.processing === 'instrument' ? 'the instrument\u2019s own spectrum' : 'computed here from the raw measurement'],
     ]

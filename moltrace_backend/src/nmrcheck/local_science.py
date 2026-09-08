@@ -1459,6 +1459,24 @@ def rank_candidates(path: str | Path, smiles_list: Sequence[str]) -> dict:
     import numpy as _np
 
     _resamples = 50
+    # THIS IS NOT THE DIGITISATION, AND MUST NOT BE "CORRECTED" TO IT.
+    #
+    # `resolution_hz` is `separation_points * step * field` -- the closest two
+    # lines the detector will report separately, from a 0.006 ppm spacing floor.
+    # On one acquisition it is 1.4923 Hz against a true digitisation of 0.0172
+    # Hz per point, 87x apart. It reads like a per-point figure and it is not;
+    # the label that said so has been corrected in the interface.
+    #
+    # It stays as the resampling width anyway, and deliberately. The digitisation
+    # is far SMALLER than the real uncertainty in a fitted line centre -- line
+    # fitting, referencing and lineshape all add more -- so resampling at 0.0172
+    # Hz would declare almost every ordering stable. Measured on the epoxybutane
+    # acquisition, whose shipped ranking already puts butanal above the true
+    # structure: this oversized constant is the only reason that ranking carries
+    # its "does not separate the top two" warning. Substituting the digitisation
+    # removes the warning and leaves the tool confidently endorsing the wrong
+    # molecule. A defensible replacement is a MEASURED centre uncertainty, not a
+    # narrower constant, and that is its own piece of work.
     _sigma_ppm = float(summary.get("resolution_hz") or 0.0) / max(float(summary["field_mhz"]), 1e-9)
     _margins: list[float] = []
     _leaders: list[int] = []
