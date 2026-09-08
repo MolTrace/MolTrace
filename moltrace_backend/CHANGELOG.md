@@ -237,6 +237,32 @@ No migration; no ORM object is touched.
 
 ---
 
+## v0.75.2 — The route qualification travels with the numbers, not beside them (2026-09-03)
+
+`residual_solvent_summary_json` is copied verbatim into the draft CTD Module 3
+bundle and into the regulatory readiness roll-up. Neither carries `warnings_json`
+with it. So the prose explaining that ICH Q3C does not cover a cutaneous route
+stayed behind while the rows travelled into a submission-shaped document — the
+number moved and the caveat did not.
+
+v0.74.14 had already stopped those rows reading as a false pass; they carry an
+undetermined verdict rather than `false`. But an undetermined verdict with no stated
+reason is its own gap: a reviewer reading the bundle cannot tell *no limit applies
+to this route* from *something went wrong here*.
+
+The qualification now rides on the data those consumers already copy — `route` and
+`q3c_route_covered` on the summary, and `q3c_route_covered` on each declined row so
+a row read on its own is still self-describing. The elemental summary already
+carried `route` and `route_assumed` for exactly this reason; the residual-solvent
+summary carried neither, which is the same half-applied shape as the rest of this
+series.
+
+Neither consumer needed changing, which is why the fix sits at the producer.
+Verified that the new keys survive the bundle's `_public_json` filter — they match
+none of its private markers — rather than assuming they would.
+
+---
+
 ## v0.75.0 — One `rp_id`, several exact origins (2026-08-21)
 
 Hardware-backed step-up pinned exactly one expected origin, server-side. That is where its
